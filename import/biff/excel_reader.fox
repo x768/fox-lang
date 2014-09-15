@@ -1,0 +1,1332 @@
+/*
+ * Based on php-excel-reader
+ *
+ * PHP Excel Reader - Parse and retrieve information from XLS files
+ * http://code.google.com/p/php-excel-reader/
+ *
+ * The MIT License
+ * http://opensource.org/licenses/mit-license.php
+ */
+import biff.ole_reader
+import time
+import image
+
+
+def _EXCEL_READER_BIFF8 = 0x600
+def _EXCEL_READER_BIFF7 = 0x500
+def _EXCEL_READER_WORKBOOKGLOBALS = 0x5
+def _EXCEL_READER_WORKSHEET = 0x10
+def _EXCEL_READER_TYPE_BOF = 0x809
+def _EXCEL_READER_TYPE_EOF = 0x0a
+def _EXCEL_READER_TYPE_BOUNDSHEET = 0x85
+def _EXCEL_READER_TYPE_DIMENSION = 0x200
+def _EXCEL_READER_TYPE_ROW = 0x208
+def _EXCEL_READER_TYPE_DBCELL = 0xd7
+def _EXCEL_READER_TYPE_FILEPASS = 0x2f
+def _EXCEL_READER_TYPE_NOTE = 0x1c
+def _EXCEL_READER_TYPE_TXO = 0x1b6
+def _EXCEL_READER_TYPE_RK = 0x7e
+def _EXCEL_READER_TYPE_RK2 = 0x27e
+def _EXCEL_READER_TYPE_MULRK = 0xbd
+def _EXCEL_READER_TYPE_MULBLANK = 0xbe
+def _EXCEL_READER_TYPE_INDEX = 0x20b
+def _EXCEL_READER_TYPE_SST = 0xfc
+def _EXCEL_READER_TYPE_EXTSST = 0xff
+def _EXCEL_READER_TYPE_CONTINUE = 0x3c
+def _EXCEL_READER_TYPE_LABEL = 0x204
+def _EXCEL_READER_TYPE_LABELSST = 0xfd
+def _EXCEL_READER_TYPE_NUMBER = 0x203
+def _EXCEL_READER_TYPE_NAME = 0x18
+def _EXCEL_READER_TYPE_ARRAY = 0x221
+def _EXCEL_READER_TYPE_STRING = 0x207
+def _EXCEL_READER_TYPE_FORMULA = 0x406
+def _EXCEL_READER_TYPE_FORMULA2 = 0x6
+def _EXCEL_READER_TYPE_FORMAT = 0x41e
+def _EXCEL_READER_TYPE_XF = 0xe0
+def _EXCEL_READER_TYPE_BOOLERR = 0x205
+def _EXCEL_READER_TYPE_FONT = 0x0031
+def _EXCEL_READER_TYPE_PALETTE = 0x0092
+def _EXCEL_READER_TYPE_UNKNOWN = 0xffff
+def _EXCEL_READER_TYPE_NINETEENFOUR = 0x22
+def _EXCEL_READER_TYPE_MERGEDCELLS = 0xE5
+def _EXCEL_READER_UTCOFFSETDAYS = 25569.0
+def _EXCEL_READER_UTCOFFSETDAYS1904 = 24107.0
+def _EXCEL_READER_MSINADAY = 86400.0
+def _EXCEL_READER_TYPE_HYPER = 0x01b8
+def _EXCEL_READER_TYPE_COLINFO = 0x7d
+def _EXCEL_READER_TYPE_DEFCOLWIDTH = 0x55
+def _EXCEL_READER_TYPE_STANDARDWIDTH = 0x99
+def _EXCEL_READER_DEF_NUM_FORMAT = "%s"
+
+def _ASCII = Charset('Windows-1251')
+def _UTF16 = Charset('UTF-16LE')
+
+def _DEFAULT_FORMATS = {
+	0x1: "0",
+	0x2: "0.00",
+	0x3: "#,##0",
+	0x4: "#,##0.00",
+	0x5: "\$#,##0;(\$#,##0)",
+	0x6: "\$#,##0;[Red](\$#,##0)",
+	0x7: "\$#,##0.00;(\$#,##0.00)",
+	0x8: "\$#,##0.00;[Red](\$#,##0.00)",
+	0x9: "0%",
+	0xa: "0.00%",
+	0xb: "0.00E+00",
+	0xe: "mm/dd/yyyy",
+	0xf: "mmm-dd-yyyy",
+	0x10: "dd-mmm",
+	0x11: "mmm-yyyy",
+	0x12: "h:mm am/pm",
+	0x13: "h:mm:ss am/pm",
+	0x14: "hh:mm",
+	0x15: "hh:mm:ss",
+	0x16: "dd/mm/yyy hh:mm",
+	0x2d: "mm:ss",
+	0x2e: "h:mm:ss",
+	0x2f: "mm:ss.sss",
+	0x25: "#,##0;(#,##0)",
+	0x26: "#,##0;[Red](#,##0)",
+	0x27: "#,##0.00;(#,##0.00)",
+	0x28: "#,##0.00;[Red](#,##0.00)",
+	0x29: "#,##0;(#,##0)",  // Not exactly
+	0x2a: "\$#,##0;(\$#,##0)",  // Not exactly
+	0x2b: "#,##0.00;(#,##0.00)",  // Not exactly
+	0x2c: "\$#,##0.00;(\$#,##0.00)",  // Not exactly
+	0x30: "##0.0E+0",
+}
+
+def _COLORS = {
+	0x00: "#000000",
+	0x01: "#FFFFFF",
+	0x02: "#FF0000",
+	0x03: "#00FF00",
+	0x04: "#0000FF",
+	0x05: "#FFFF00",
+	0x06: "#FF00FF",
+	0x07: "#00FFFF",
+	0x08: "#000000",
+	0x09: "#FFFFFF",
+	0x0A: "#FF0000",
+	0x0B: "#00FF00",
+	0x0C: "#0000FF",
+	0x0D: "#FFFF00",
+	0x0E: "#FF00FF",
+	0x0F: "#00FFFF",
+	0x10: "#800000",
+	0x11: "#008000",
+	0x12: "#000080",
+	0x13: "#808000",
+	0x14: "#800080",
+	0x15: "#008080",
+	0x16: "#C0C0C0",
+	0x17: "#808080",
+	0x18: "#9999FF",
+	0x19: "#993366",
+	0x1A: "#FFFFCC",
+	0x1B: "#CCFFFF",
+	0x1C: "#660066",
+	0x1D: "#FF8080",
+	0x1E: "#0066CC",
+	0x1F: "#CCCCFF",
+	0x20: "#000080",
+	0x21: "#FF00FF",
+	0x22: "#FFFF00",
+	0x23: "#00FFFF",
+	0x24: "#800080",
+	0x25: "#800000",
+	0x26: "#008080",
+	0x27: "#0000FF",
+	0x28: "#00CCFF",
+	0x29: "#CCFFFF",
+	0x2A: "#CCFFCC",
+	0x2B: "#FFFF99",
+	0x2C: "#99CCFF",
+	0x2D: "#FF99CC",
+	0x2E: "#CC99FF",
+	0x2F: "#FFCC99",
+	0x30: "#3366FF",
+	0x31: "#33CCCC",
+	0x32: "#99CC00",
+	0x33: "#FFCC00",
+	0x34: "#FF9900",
+	0x35: "#FF6600",
+	0x36: "#666699",
+	0x37: "#969696",
+	0x38: "#003366",
+	0x39: "#339966",
+	0x3A: "#003300",
+	0x3B: "#333300",
+	0x3C: "#993300",
+	0x3D: "#993366",
+	0x3E: "#333399",
+	0x3F: "#333333",
+	0x40: "#000000",
+	0x41: "#FFFFFF",
+
+	0x43: "#000000",
+	0x4D: "#000000",
+	0x4E: "#FFFFFF",
+	0x4F: "#000000",
+	0x50: "#FFFFFF",
+	0x51: "#000000",
+
+	0x7FFF: "#000000",
+}
+
+def _LINE_STYLES = [
+	null,
+	"1px solid",
+	"2px solid",
+	"1px dashed",
+	"1px dotted",
+	"3px solid",
+	"double",
+	"1px solid",
+	"2px dashed",
+	"1px dashed",
+	"2px dashed",
+	"1px dashed",
+	"2px dashed",
+	"2px dashed",
+]
+
+def _min(a, b) => a < b ? a : b
+
+def _get_float_value(rknum:Int)
+{
+	var val = null
+	if (rknum & 0x02) != 0 {
+		if (rknum & 0x8000_0000) != 0 {
+			let n = 0x1_0000_0000 - rknum
+			val = -(n >> 2).to_float()
+		} else {
+			val = (rknum >> 2).to_float()
+		}
+	} else {
+		let b = BytesIO()
+		b.pack "x4 i", rknum & 0xFFFFFFFC
+		val = b.peek("d")
+	}
+	if (rknum & 0x01) != 0 {
+		val /= 100.0
+	}
+	return val
+}
+def _format_digit(value:Float, fmt:Str, loc:Locale)
+{
+	let f = StrIO()
+	var v = value
+	var prefix = ""
+	var postfix = ""
+
+	if fmt.find(",") {
+		f.print ","
+		if let m = fmt.match(/\.(0+)/) {
+			f.print ".", m[1].size
+		} else {
+			f.print ".0"
+		}
+	} else {
+		if fmt.find(".") {
+			if let m = fmt.match(/(0+)\.(0*)/) {
+				f.print m[1].size
+				f.print ".", m[2].size
+			} else {
+				f.print ".0"
+			}
+		} else {
+			if let m = fmt.match(/0+/) {
+				f.print m[0].size
+			}
+			f.print ".0"
+		}
+	}
+	if fmt.find("%") {
+		v *= 100.0
+		postfix = "%"
+	}
+	if fmt.find('$') {
+		prefix = '$'
+	}
+	if fmt.find("_)") && value < 0.0 {
+		prefix = "($prefix"
+		postfix = "$postfix)"
+		v = -v
+	}
+	if !fmt.find(",") && (fmt.find("E") || fmt.find("e")) {
+		f.print "e"
+	} else {
+		f.print "f"
+	}
+	return "$prefix${v.to_str(f.data, loc)}$postfix"
+}
+def _format_time(value:Time, fmt:Str, loc:Locale)
+{
+	let s = StrIO()
+	var quot = false
+	var escape = false
+	var last = 0
+	var minute = false
+	var ampm = fmt.tolower().find("am/pm")
+
+	for i in 0..fmt.size {
+		let c = fmt.sub(i, i + 1)
+		if last > 0 {
+			last--
+		} elif escape {
+			s.print c
+			escape = false
+		} elif c == '"' {
+			quot = !quot
+		} elif c == "\\" {
+			escape = true
+		} elif quot {
+			s.print c
+		} else {
+			let t = fmt.sub(i).tolower()
+
+			if let m = t.match(/^y+/) {
+				s.print value.to_str(m[0], loc)
+				last = m[0].size - 1
+				minute = false
+			} elif let m = t.match(/^m+/) {
+				if minute {
+					s.print value.to_str(m[0], loc)
+				} else {
+					s.print value.to_str(m[0].toupper(), loc)
+				}
+				last = m[0].size - 1
+				minute = false
+			} elif let m = t.match(/^d+/) {
+				s.print value.to_str(m[0], loc)
+				last = m[0].size - 1
+				minute = false
+			} elif let m = t.match(/^h+/) {
+				if ampm {
+					s.print value.to_str(m[0], loc)
+				} else {
+					s.print value.to_str(m[0].toupper(), loc)
+				}
+				last = m[0].size - 1
+				minute = true
+			} elif let m = t.match(/^s+/) {
+				s.print value.to_str(m[0], loc)
+				last = m[0].size - 1
+				minute = false
+			} elif let m = t.match(/^am\/pm/) {
+				s.print value.to_str("a", loc)
+				last = m[0].size - 1
+				minute = false
+			} else {
+				s.print c
+			}
+		}
+	}
+
+	return s.data
+}
+def _read16bitstring(data:StreamIO)
+{
+	let s = StrIO()
+	while true {
+		let c = data.peek("s")
+		if c == 0 {
+			break
+		}
+		s.print Str.chr(c)
+	}
+	return s.data
+}
+
+class ExcelReaderError : Error
+{
+	new(s)
+	{
+		super(s)
+	}
+}
+
+class ExcelSheet
+{
+	var m_name
+	var m_offset
+	var m_day_offset
+
+	var m_rowcount
+	var m_colcount
+	var m_row_height
+	var m_col_width
+	var m_row_hidden
+	var m_col_hidden
+
+	var m_cells
+
+	new(name:Str, offset:Int, day_offset:Float)
+	{
+		m_name = name
+		m_offset = offset
+		m_day_offset = day_offset
+		m_rowcount = 0
+		m_colcount = 0
+
+		m_row_height  = []
+		m_col_width  = []
+		m_row_hidden = []
+		m_col_hidden = []
+
+		m_cells = {}
+	}
+	def name => m_name
+	def offset => m_offset
+	def rows => m_rowcount
+	def cols => m_colcount
+
+	def row_height(col:Int) => m_row_height[col]
+	def col_width(col:Int) => m_col_width[col]
+	def row_hidden(col:Int) => m_row_hidden[col]
+	def col_hidden(col:Int) => m_col_hidden[col]
+
+	def op_index(col:Int, row:Int)
+	{
+		if col < 0 || col >= 65536 {
+			throw IndexError("'col' out of bounds")
+		}
+		if row < 0 || row >= 65536 {
+			throw IndexError("'row' out of bounds")
+		}
+		if m_colcount <= col {
+			m_colcount = col + 1
+		}
+		if m_rowcount <= row {
+			m_rowcount = row + 1
+		}
+		let i = col + row * 65536
+		if i in m_cells {
+			return m_cells[i]
+		} else {
+			let c = ExcelCell(m_day_offset)
+			m_cells[i] = c
+			return c
+		}
+	}
+
+	def rowcount=(n:Int) { m_rowcount = n }
+	def colcount=(n:Int) { m_colcount = n }
+}
+class ExcelCell
+{
+	var m_value
+	var m_rowspan
+	var m_colspan
+	var m_xf
+	var m_flags
+	var m_desc
+	var m_link
+	var m_day_offset
+	var m_visible
+
+	new(day_offset:Float)
+	{
+		m_day_offset = day_offset
+		m_colspan = 1
+		m_rowspan = 1
+		m_visible = true
+	}
+
+	def rowspan => m_rowspan
+	def colspan => m_colspan
+	def link => m_link
+	def desc => m_desc
+	def value {
+		if typeof(m_value) == Float && m_xf.type == Time {
+			return this.to_time()
+		} else {
+			return m_value
+		}
+	}
+	def format {
+		if !m_xf {
+			return ""
+		} elif typeof(m_value) == Float && m_value < 0.0 {
+			return m_xf.format_neg
+		} else {
+			return m_xf.format
+		}
+	}
+	def fgcolor {
+		var c = null
+		if !m_xf {
+		} elif typeof(m_value) == Float && m_value < 0.0 {
+			c = m_xf.fgcolor_neg
+		} else {
+			c = m_xf.fgcolor
+		}
+		if !c && this.font {
+			c = this.font.color
+		}
+		return c
+	}
+	def bgcolor {
+		if !m_xf || !m_xf.bgcolor {
+			return null
+		} elif m_xf.bgcolor in _COLORS {
+			return Color.parse(_COLORS[m_xf.bgcolor])
+		} else {
+			return null
+		}
+	}
+	def align {
+		if m_xf {
+			return [null, "left", "center", "right"][m_xf.align]
+		} else {
+			return null
+		}
+	}
+	def xf => m_xf
+	def font => m_xf && m_xf.font
+	def visible => m_visible
+
+	def get_css()
+	{
+		let s = StrIO()
+		if this.fgcolor {
+			s.printf "color:%{0:hex};", this.fgcolor
+		}
+		if this.bgcolor {
+			s.printf "background:%{0:hex};", this.bgcolor
+		}
+		if this.align {
+			s.print "text-align:", this.align, ";"
+		} else {
+			let t = this.type
+			if t == Float || t == Time {
+				s.print "text-align:right;"
+			}
+		}
+		if this.font {
+			let f = this.font
+			if !f.font.empty {
+				s.printf "font-family:'%{0:x}';", f.font.replace("'", "")
+			}
+			s.printf "font-size:%{0:d}px;", f.height
+			if f.italic {
+				s.print "font-style:italic;"
+			}
+			if f.bold {
+				s.print "font-weight:bold;"
+			}
+			if f.underline {
+				s.print "text-decoration:underline;"
+			}
+		}
+		if m_xf {
+			if m_xf.border_left {
+				s.printf "border-left:%{0} %{1:hex};", m_xf.border_left.style, m_xf.border_left.color
+			}
+			if m_xf.border_right {
+				s.printf "border-right:%{0} %{1:hex};", m_xf.border_right.style, m_xf.border_right.color
+			}
+			if m_xf.border_top {
+				s.printf "border-top:%{0} %{1:hex};", m_xf.border_top.style, m_xf.border_top.color
+			}
+			if m_xf.border_bottom {
+				s.printf "border-bottom:%{0} %{1:hex};", m_xf.border_bottom.style, m_xf.border_bottom.color
+			}
+		}
+		return s.data
+	}
+
+	def to_str(fmt:Str = null, loc:Locale = null)
+	{
+		var f = fmt
+		if f.empty {
+			if m_xf {
+				f = m_xf.format
+			} else {
+				f = ""
+			}
+		}
+		switch typeof(m_value) {
+		case Null
+			return ""
+		case Bool
+			return m_value ? "TRUE" : "FALSE"
+		case ErrorCell
+			return m_value.to_str()
+		case Str
+			return m_value
+		case Float
+			let type = m_xf ? m_xf.type : Str
+			switch type {
+			case Float
+				return _format_digit(m_value, f, loc ? loc : Locale('en'))
+			case Str
+				return m_value.to_str(".0f")
+			case Time
+				return _format_time(this.to_time(), f, loc ? loc : Locale('en'))
+			}
+		}
+	}
+	def to_int() => Int(m_value)
+	def to_float() => Float(m_value)
+	def to_time(tz:TimeZone = null)
+	{
+		if typeof(m_value) == Float {
+			let utcdays = m_value - m_day_offset
+			let ts = TimeStamp(1970, 1, 1) + TimeDelta(0, 0, 0, (utcdays * 86400.0).to_int())
+			let tm = Time(TimeZone.UTC, ts)
+			return Time(tz ? tz : TimeZone.LOCAL, tm.year, tm.month, tm.day_of_month, tm.hour, tm.minute, tm.second)
+		} else {
+			return null
+		}
+	}
+	def type {
+		let type = typeof(m_value)
+		if m_xf && m_xf.type == Time && type == Float {
+			return Time
+		} else {
+			return type
+		}
+	}
+
+
+	def value=(v) { m_value = v }
+	def rowspan=(n:Int) { m_rowspan = n }
+	def colspan=(n:Int) { m_colspan = n }
+	def visible=(b:Bool) { m_visible = b }
+	def xf=(x:ExcelXF) { m_xf = x }
+
+	def set_link(flags:Int, desc:Str, link:Str)
+	{
+		m_flags = flags
+		m_desc = desc
+		m_link = link
+	}
+}
+class ExcelFont
+{
+	var m_height
+	var m_italic
+	var m_color
+	var m_underline
+	var m_bold
+	var m_font
+
+	new(height:Float, italic:Bool, color:Int, underline:Bool, bold:Bool, font:Str)
+	{
+		m_height = height
+		m_italic = italic
+		m_color = (color in _COLORS) ? Color.parse(_COLORS[color]) : null
+		m_underline = underline
+		m_bold = bold
+		m_font = font
+	}
+	def height => m_height
+	def italic => m_italic
+	def color => m_color
+	def underline => m_underline
+	def bold => m_bold
+	def font => m_font
+}
+class ExcelXF
+{
+	var m_font_records
+	var m_index_code
+	var m_align
+	var m_font_index
+	var m_bgcolor
+	var m_fill_pattern
+	var m_border_left
+	var m_border_right
+	var m_border_top
+	var m_border_bottom
+	var m_format
+	var m_format_neg
+	var m_fgcolor
+	var m_fgcolor_neg
+	var m_type
+
+	new(font_records:List, index_code:Int, align:Int, font_index:Int, bgcolor:Int, fill_pattern:Int, border:Int, format:Str)
+	{
+		m_font_records = font_records
+		m_index_code = index_code
+		m_align = align
+		m_font_index = font_index
+		if bgcolor >= 0 {
+			m_bgcolor = bgcolor
+		}
+		m_fill_pattern = fill_pattern
+
+		if (border & 0xF) != 0 {
+			m_border_left = ExcelXFBorder(border & 0xF, (border >> 16) & 0x7F)
+		}
+		if (border & 0xF0) != 0 {
+			m_border_right = ExcelXFBorder((border >> 4) & 0xF, (border >> 23) & 0x7F)
+		}
+		if (border & 0xF00) != 0 {
+			m_border_top = ExcelXFBorder((border >> 8) & 0xF, (border >> 32) & 0x7F)
+		}
+		if (border & 0xF000) != 0 {
+			m_border_bottom = ExcelXFBorder((border >> 12) & 0xF, (border >> 39) & 0x7F)
+		}
+
+		let fmt = format.split(";")
+		m_format = fmt[0]
+		let color_re = /^\[(BLACK|BLUE|CYAN|GREEN|MAGENTA|RED|WHITE|YELLOW)\]/i
+		if let m = m_format.match(color_re) {
+			m_fgcolor = Color.parse(m[1])
+		}
+		m_format = m_format.replace(/^\[.*?\]/, "")
+
+		if fmt.size >= 2 {
+			m_format_neg = fmt[1]
+			if let m = m_format_neg.match(color_re) {
+				m_fgcolor_neg = Color.parse(m[1])
+			}
+			m_format_neg = m_format_neg.replace(/^\[.*?\]/, "")
+		} else {
+			m_format_neg = m_format
+			m_fgcolor_neg = m_fgcolor
+		}
+
+		if m_format == "" || m_format.toupper() == "GENERAL" {
+			m_type = Str
+		} elif !m_format.find(/[^hmsday\\\/\-:\s\,AMP]/i) {
+			m_type = Time
+		} elif m_format.find(/[0#]/) {
+			m_type = Float
+		} else {
+			m_type = Str
+		}
+	}
+	def type => m_type
+	def format => m_format
+	def format_neg => m_format_neg
+	def fgcolor => m_fgcolor
+	def fgcolor_neg => m_fgcolor_neg
+	def bgcolor => m_bgcolor
+	def align => m_align
+	def font => m_font_records[m_font_index]
+
+	def border_left => m_border_left
+	def border_right => m_border_right
+	def border_top => m_border_top
+	def border_bottom => m_border_bottom
+}
+class ExcelXFBorder
+{
+	var m_style
+	var m_color
+
+	new(style:Int, color:Int)
+	{
+		m_style = _LINE_STYLES[style]
+		if color in _COLORS {
+			m_color = Color.parse(_COLORS[color])
+		}
+	}
+	def style => m_style
+	def color => m_color
+}
+class ErrorCell
+{
+	new(){}
+
+	def to_str(fmt:Str = null, loc:Locale = null) => "#ERR!"
+}
+
+/*
+* Main Class
+*/
+class ExcelReader
+{
+	var m_standard_col_width
+	var m_default_col_width
+	var m_version
+	var m_day_offset
+
+	var m_format_records
+	var m_font_records
+	var m_colors
+	var m_xf_records
+
+	var m_sst
+	var m_sheets
+
+	var m_data
+	var m_ole
+	var m_default_format
+
+	new(src)
+	{
+		m_standard_col_width = 0
+		m_default_col_width = 0
+		m_day_offset = _EXCEL_READER_UTCOFFSETDAYS
+
+		m_format_records = {}
+		m_font_records = []
+		m_colors = {}
+		m_xf_records = []
+
+		m_sst = []
+		m_sheets = []
+
+		m_default_format = _EXCEL_READER_DEF_NUM_FORMAT
+
+		let type = typeof(src)
+		if type == Str || type == File {
+			m_ole = OLERead(FileIO(src))
+		} elif type in StreamIO {
+			m_ole = OLERead(src)
+		} else {
+			throw TypeError("Str, File or StreamIO required but $type")
+		}
+		m_data = m_ole.get(/^(work)?book$/i)
+		if !m_data {
+			throw ExcelReaderError("Not a Excel book")
+		}
+		this._parse()
+		m_ole = null
+	}
+
+	def sheets => m_sheets.iterator()
+	def size => m_sheets.size
+	def op_index(name)
+	{
+		let type = typeof(name)
+
+		switch type {
+		case Int
+			return m_sheets[name]
+		case Str
+			for s in m_sheets {
+				if s.name == name {
+					return s
+				}
+			}
+			return null
+		default
+			throw TypeError("Int or Str required but $type")
+		}
+	}
+
+	/**
+	 * Parse a workbook
+	 */
+	def _parse()
+	{
+		this._parse_head()
+
+		while true {
+			let code = m_data.peek("s")
+			let length = m_data.peek("s")
+			let spos = m_data.pos
+
+			switch code {
+			case _EXCEL_READER_TYPE_EOF
+				break // while true
+			case _EXCEL_READER_TYPE_SST
+				this._parse_type_sst(spos + length)
+			case _EXCEL_READER_TYPE_FILEPASS
+				throw ExcelReaderError("Crypted excel file not supported")
+			case _EXCEL_READER_TYPE_NAME
+			case _EXCEL_READER_TYPE_FORMAT
+				this._parse_type_format()
+			case _EXCEL_READER_TYPE_FONT
+				this._parse_type_font()
+			case _EXCEL_READER_TYPE_PALETTE
+				this._parse_type_palette()
+			case _EXCEL_READER_TYPE_XF
+				this._parse_type_xf(spos)
+			case _EXCEL_READER_TYPE_NINETEENFOUR
+				m_day_offset = (m_data.peek("c") == 1 ? _EXCEL_READER_UTCOFFSETDAYS1904 : _EXCEL_READER_UTCOFFSETDAYS)
+			case _EXCEL_READER_TYPE_BOUNDSHEET
+				this._parse_type_boundsheet()
+			default
+				//puts code, ":", length
+			}
+			m_data.pos = spos + length
+		}
+		for s in m_sheets {
+			this._parse_sheet(s)
+		}
+	}
+
+	def _parse_head()
+	{
+		let code = m_data.peek("s")
+		let length = m_data.peek("s")
+		let version = m_data.peek("s")
+		let substream_type = m_data.peek("s")
+
+		m_version = version
+		if version != _EXCEL_READER_BIFF8 && version != _EXCEL_READER_BIFF7 {
+			throw ExcelReaderError("Not a BIFF7/BIFF8")
+		}
+		if substream_type != _EXCEL_READER_WORKBOOKGLOBALS {
+			throw ExcelReaderError("Not a Excel book")
+		}
+		m_data.pos = length + 4
+	}
+	def _parse_type_sst(a_limitpos:Int)
+	{
+		m_data.pos += 4
+		var limitpos = a_limitpos
+		let unique_strings = m_data.peek("+i")
+
+		for i in 0..unique_strings {
+			// Read in the number of characters
+			if m_data.pos == limitpos {
+				let opcode = m_data.peek("s")
+				let conlength = m_data.peek("s")
+				if opcode != _EXCEL_READER_TYPE_CONTINUE {
+					throw ExcelReaderError("Illigal format")
+				}
+				limitpos = m_data.pos + conlength
+			}
+			let num_chars = m_data.peek("s")
+			let option_flags = m_data.peek("c")
+			var ascii_encoding = ((option_flags & 0x01) == 0)
+			var formatting_runs = 0
+			var extended_run_length = 0
+			let retstr = StrIO()
+
+			// See if string contains formatting information
+			if (option_flags & 0x08) != 0 {
+				// Read in the crun
+				formatting_runs = m_data.peek("s")
+			}
+			if (option_flags & 0x04) != 0 {
+				// Read in cchExtRst
+				extended_run_length = m_data.peek("i")
+			}
+
+			if m_data.pos > limitpos {
+				m_data.pos = limitpos
+			} else {
+				var chars_left = num_chars
+				var option = option_flags
+				while chars_left > 0 {
+					if ascii_encoding {
+						let len = chars_left
+						let bytes_read = _min(len, limitpos - m_data.pos)
+						retstr.print Str(m_data.read(bytes_read), _ASCII, true)
+						chars_left -= bytes_read
+					} else {
+						let len = chars_left * 2
+						let bytes_read = _min(len, limitpos - m_data.pos)
+						retstr.print Str(m_data.read(bytes_read), _UTF16, true)
+						chars_left -= bytes_read / 2
+					}
+					if (option & 0x01) == 0 {
+						ascii_encoding = true
+					} else {
+						ascii_encoding = false
+					}
+
+					if chars_left <= 0 {
+						break
+					}
+					let opcode = m_data.peek("s")
+					let conlength = m_data.peek("s")
+					if opcode != _EXCEL_READER_TYPE_CONTINUE {
+						throw ExcelReaderError("Illigal format")
+					}
+					limitpos = m_data.pos + conlength
+					option = m_data.peek("c")
+				}
+
+				if formatting_runs > 0 || extended_run_length > 0 {
+					var last = 4 * formatting_runs + extended_run_length
+					while true {
+						let rd = _min(last, limitpos - m_data.pos)
+						m_data.pos += rd
+						last -= rd
+						if last <= 0 {
+							break
+						}
+						let opcode = m_data.peek("s")
+						let conlength = m_data.peek("s")
+						if opcode != _EXCEL_READER_TYPE_CONTINUE {
+							throw ExcelReaderError("Illigal format")
+						}
+						limitpos = m_data.pos + conlength
+					}
+				}
+			}
+			m_sst.push retstr.data
+		}
+	}
+	def _parse_type_format()
+	{
+		let index_code = m_data.peek("s")
+		var format = null
+		if m_version == _EXCEL_READER_BIFF8 {
+			let len = m_data.peek("s")
+			if m_data.peek("c") == 0 {
+				format = Str(m_data.read(len), _ASCII, true)
+			} else {
+				format = Str(m_data.read(len * 2), _UTF16, true)
+			}
+		} else {
+			let len = m_data.peek("c")
+			format = Str(m_data.read(len * 2), _UTF16, true)
+		}
+		m_format_records[index_code] = format
+	}
+	def _parse_type_font()
+	{
+		let height = m_data.peek("s") //v($data,$pos+4);
+		let option = m_data.peek("s") //v($data,$pos+6);
+		let color = m_data.peek("s") //v($data,$pos+8);
+		let weight = m_data.peek("s") //v($data,$pos+10);
+		m_data.peek("x2")
+		let under  = m_data.peek("c") //ord($data[$pos+14]);
+		m_data.peek("x3")
+
+		// Font name
+		var font = null
+		let num_chars = m_data.peek("c")
+		if (m_data.peek("c") & 1) == 0 {
+			font = Str(m_data.read(num_chars), _ASCII, true)
+		} else {
+			font = Str(m_data.read(num_chars * 2), _UTF16, true)
+		}
+		m_font_records.push ExcelFont(
+			height.to_float() / 20.0,
+			(option & 2) != 0,
+			color,
+			under != 0,
+			weight >= 700,
+			font
+		)
+	}
+	def _parse_type_palette()
+	{
+		let num = m_data.peek("s")
+		for i in 0..num {
+			let r = m_data.peek("c")
+			let g = m_data.peek("c")
+			let b = m_data.peek("c")
+			m_data.peek("x1")
+			m_colors[8 + i] = Color.rgb(r, g, b)
+		}
+	}
+	def _parse_type_xf(spos:Int)
+	{
+		var font_index = m_data.peek("s") - 1
+		if font_index < 0 {
+			font_index = 0
+		}
+		let index_code = m_data.peek("s")
+		m_data.peek("x2")
+		let align = m_data.peek("c") & 3
+		m_data.pos = spos + 18
+		let bgi = m_data.peek("s") & 0x3FFF
+		var bgcolor = bgi & 0x7F
+
+		m_data.pos = spos + 17
+		let fill_pattern = m_data.peek("c") >> 2
+		if fill_pattern == 0 {
+			bgcolor = -1
+		}
+		m_data.pos = spos + 10
+		let border1 = m_data.peek("i")
+		let border2 = m_data.peek("s")
+		var format = ''
+		if index_code in _DEFAULT_FORMATS {
+			format = _DEFAULT_FORMATS[index_code]
+		} elif index_code in m_format_records {
+			format = m_format_records[index_code]
+		}
+
+		m_xf_records.push ExcelXF(
+			m_font_records,
+			index_code,
+			align,
+			font_index,
+			bgcolor,
+			fill_pattern,
+			border1 | (border2 << 32),
+			format
+		)
+	}
+	def _parse_type_boundsheet()
+	{
+		let offset = m_data.peek("i")
+		let type = m_data.peek("c")
+		let visible = m_data.peek("c")
+		let length = m_data.peek("c")
+
+		var name = null
+		if m_version == _EXCEL_READER_BIFF8 && m_data.peek("c") != 0 {
+			name = Str(m_data.read(length * 2), _UTF16, true)
+		} else {
+			name = Str(m_data.read(length), _ASCII, true)
+		}
+		m_sheets.push ExcelSheet(name, offset, m_day_offset)
+	}
+
+	/**
+	 * Parse a worksheet
+	 */
+	def _parse_sheet(sheet:ExcelSheet)
+	{
+		m_data.pos = sheet.offset
+
+		var code = m_data.peek("s")
+		var length = m_data.peek("s")
+		let version = m_data.peek("s")
+		let substream_type = m_data.peek("s")
+		var prev_row = 0
+		var prev_col = 0
+
+		if version != _EXCEL_READER_BIFF8 && version != _EXCEL_READER_BIFF7 {
+			throw ExcelReaderError("Illigal format (version)")
+		}
+		if substream_type != _EXCEL_READER_WORKSHEET {
+			throw ExcelReaderError("Illigal format (worksheet)")
+		}
+		m_data.pos += length - 4
+
+		while true {
+			code = m_data.peek("s")
+			if (code & 0xFF) == _EXCEL_READER_TYPE_EOF {
+				break
+			}
+			length = m_data.peek("s")
+			let spos = m_data.pos
+
+			switch code {
+			case _EXCEL_READER_TYPE_DIMENSION
+				if length == 10 || version == _EXCEL_READER_BIFF7 {
+					m_data.peek("x2")
+					sheet.rowcount = m_data.peek("s")
+					m_data.peek("x2")
+					sheet.colcount = m_data.peek("s")
+				} else {
+					m_data.peek("x4")
+					sheet.rowcount = m_data.peek("s")
+					m_data.peek("x4")
+					sheet.colcount = m_data.peek("s")
+				}
+			case _EXCEL_READER_TYPE_MERGEDCELLS
+				let cell_ranges = m_data.peek("s")
+
+				for i in 0..cell_ranges {
+					let fr = m_data.peek("s")
+					let lr = m_data.peek("s") + 1
+					let fc = m_data.peek("s")
+					let lc = m_data.peek("s") + 1
+					if lr - fr > 1 {
+						sheet[fc, fr].rowspan = lr - fr
+					}
+					if lc - fc > 1 {
+						sheet[fc, fr].colspan = lc - fc
+					}
+					for r in fr..lr {
+						for c in fc..lc {
+							sheet[c, r].visible = (r == fr && c == fc)
+						}
+					}
+				}
+			case _EXCEL_READER_TYPE_RK, _EXCEL_READER_TYPE_RK2
+				let row = m_data.peek("s")
+				let column = m_data.peek("s")
+				let xf = m_xf_records[m_data.peek("s")]
+				let value = _get_float_value(m_data.peek("i"))
+
+				let c = sheet[column, row]
+				c.value = value
+				c.xf = xf
+			case _EXCEL_READER_TYPE_LABELSST
+				let row = m_data.peek("s")
+				let column = m_data.peek("s")
+				let xf = m_xf_records[m_data.peek("s")]
+				let index = m_data.peek("i")
+
+				let c = sheet[column, row]
+				if index < m_sst.size {
+					c.value = m_sst[index]
+				} else {
+					c.value = "?"
+				}
+				c.xf = xf
+			case _EXCEL_READER_TYPE_MULRK
+				let row = m_data.peek("s")
+				let col_begin = m_data.peek("s")
+				m_data.pos = spos + length - 2
+				let col_end = m_data.peek("s") + 1
+				m_data.pos = spos + 4
+
+				for i in col_begin..col_end {
+					let xf = m_xf_records[m_data.peek("s")]
+					let value = _get_float_value(m_data.peek("i"))
+
+					let c = sheet[i, row]
+					c.value = value
+					c.xf = xf
+				}
+			case _EXCEL_READER_TYPE_NUMBER
+				let row = m_data.peek("s")
+				let column = m_data.peek("s")
+				let xf = m_xf_records[m_data.peek("s")]
+				let value = m_data.peek("d")
+
+				let c = sheet[column, row]
+				c.value = value
+				c.xf = xf
+			case _EXCEL_READER_TYPE_FORMULA, _EXCEL_READER_TYPE_FORMULA2
+				let row = m_data.peek("s")
+				let column = m_data.peek("s")
+				let xf = m_xf_records[m_data.peek("s")]
+				let flag1 = m_data.peek("c")
+				m_data.pos = spos + 12
+				let flag2 = m_data.peek("s")
+				var value = null
+
+				if flag1 == 0 && flag2 == 65535 {
+					//String formula. Result follows in a STRING record
+					// This row/col are stored to be referenced in that record
+					// http://code.google.com/p/php-excel-reader/issues/detail?id=4
+					prev_row = row
+					prev_col = column
+				} elif flag1 == 1 && flag2 == 65535 {
+					m_data.pos = 8
+					value = (m_data.peek("c") == 1)
+				} elif flag1 == 2 && flag2 == 65535 {
+					value = ErrorCell()
+				} elif flag1 == 3 && flag2 == 65535 {
+					//Formula result is a null string.
+				} else {
+					m_data.pos = spos + 6
+					value = m_data.peek("d")
+				}
+
+				let c = sheet[column, row]
+				c.value = value
+				c.xf = xf
+			case _EXCEL_READER_TYPE_BOOLERR
+				let row = m_data.peek("s")
+				let column = m_data.peek("s")
+				let xf = m_xf_records[m_data.peek("s")]
+				let value = m_data.peek("c") != 0
+
+				let c = sheet[column, row]
+				c.value = value
+				c.xf = xf
+			case _EXCEL_READER_TYPE_STRING
+				var value = null
+				// http://code.google.com/p/php-excel-reader/issues/detail?id=4
+				if version == _EXCEL_READER_BIFF8 {
+					// Unicode 16 string, like an SST record
+					let len = m_data.peek("s")
+					let option = m_data.peek("c")
+					let ascii_encoding = ((option & 1) == 0)
+					let extended = ((option & 4) != 0)
+					let rich_string = ((option & 8) != 0)
+
+					// See if string contains formatting information
+					if rich_string {
+						// Read in the crun
+						m_data.peek("x2")
+					}
+					if extended {
+						m_data.peek("x4")
+					}
+					if ascii_encoding {
+						value = Str(m_data.read(len), _ASCII, true)
+					} else {
+						value = Str(m_data.read(len * 2), _UTF16, true)
+					}
+				} elif version == _EXCEL_READER_BIFF7 {
+					// Simple byte string
+					let len = m_data.peek("s")
+					value = Str(m_data.read(len), _ASCII, true)
+				}
+				sheet[prev_col, prev_row].value = value
+			case _EXCEL_READER_TYPE_ROW
+				let row = m_data.peek("s")
+				m_data.pos = spos + 6
+				let row_info = m_data.peek("s")& 0x7FFF
+				var row_height = -1
+				if (row_info & 0x8000) == 0 {
+					row_height = row_info & 0x7FFF
+				}
+				m_data.pos = spos + 12
+				let row_hidden = (m_data.peek("c") & 0x20) >> 5
+				//$this->rowInfo[$this->sn][$row+1] = Array('height' => $rowHeight / 20, 'hidden'=>$rowHidden );
+			case _EXCEL_READER_TYPE_MULBLANK
+				let row = m_data.peek("s")
+				let col_begin = m_data.peek("s")
+				let col_end = col_begin + length / 2 - 3
+				for i in col_begin..col_end {
+					let xf = m_xf_records[m_data.peek("s")]
+					sheet[i, row].xf = xf
+				}
+			case _EXCEL_READER_TYPE_LABEL
+				let row = m_data.peek("s")
+				let column = m_data.peek("s")
+				let xf = m_xf_records[m_data.peek("s")]
+				let len = m_data.peek("s")
+				let value = Str(m_data.read(len), _ASCII, true)
+
+				let c = sheet[column, row]
+				c.value = value
+				c.xf = xf
+			case _EXCEL_READER_TYPE_HYPER
+				//  Only handle hyperlinks to a URL
+				let row	= m_data.peek("s")
+				let row2 = m_data.peek("s") + 1
+				let col = m_data.peek("s")
+				let col2	= m_data.peek("s") + 1
+
+				m_data.pos = spos + 28
+				let flags = m_data.peek("c")
+				var udesc = ""
+				var ulink = ""
+
+				//if (($flags & 1) > 0 ) {   // is a type we understand
+				if (flags & 1) != 0 {
+					//  is there a description ?
+					var uloc = 32
+					if (flags & 0x14) == 0x14 {   // has a description
+						m_data.pos = spos + 32
+						let desc_len = m_data.peek("s")
+						m_data.pos = spos + 36
+						udesc = Str(m_data.read(desc_len * 2), _UTF16, true)
+						uloc += 4 + desc_len * 2
+					}
+					m_data.pos = spos + uloc + 20
+					ulink = _read16bitstring(m_data)
+					if udesc.empty {
+						udesc = ulink
+					}
+				}
+				for r in row..row2 {
+					for c in col..col2 {
+						sheet[c, r].set_link(flags, udesc, ulink)
+					}
+				}
+			case _EXCEL_READER_TYPE_DEFCOLWIDTH
+				//$this->defaultColWidth  = ord($data[$spos+4]) | ord($data[$spos+5]) << 8; 
+			case _EXCEL_READER_TYPE_STANDARDWIDTH
+				//$this->standardColWidth  = ord($data[$spos+4]) | ord($data[$spos+5]) << 8; 
+			case _EXCEL_READER_TYPE_COLINFO
+				let col = m_data.peek("s")
+				let col2 = m_data.peek("s") + 1
+				let cw = m_data.peek("s")
+				let cxf = m_data.peek("s")
+				let co = m_data.peek("c")
+				for i in col..col2 {
+					
+//					$this->colInfo[$this->sn][$coli+1] = Array('width' => $cw, 'xf' => $cxf, 'hidden' => ($co & 0x01), 'collapsed' => ($co & 0x1000) >> 12);
+				}
+			default
+			}
+			m_data.pos = spos + length
+		}
+	}
+}
+

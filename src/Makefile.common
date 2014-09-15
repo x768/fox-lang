@@ -1,0 +1,25 @@
+ifeq ($(DEBUG_MODE),y)
+COMMON_CFLAGS=-Wall -Wwrite-strings -Wshadow -Wno-unused-result -Werror -g
+COMMON_LFLAGS=-Wall
+else
+COMMON_CFLAGS=-Wall -Wwrite-strings -Wshadow -Wno-unused-result -O3 -DNO_DEBUG
+ifeq ($(TARGET),osx)
+COMMON_LFLAGS=-Wall -O3
+else
+ifeq ($(TARGET),win)
+COMMON_LFLAGS=-Wall -s -O3 -static-libgcc
+else
+COMMON_LFLAGS=-Wall -s -O3
+endif
+endif
+endif
+
+ifeq ($(TARGET),osx)
+COMMON_DLFLAGS=-shared -Wl,-order_file,../../fox-ext.order
+else
+ifeq ($(TARGET),win)
+COMMON_DLFLAGS=-shared -Wl,--version-script,../../fox-ext.map -static-libgcc
+else
+COMMON_DLFLAGS=-shared -Wl,--version-script,../../fox-ext.map
+endif
+endif

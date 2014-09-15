@@ -1,0 +1,2 @@
+var help = Resource('usage', 'best')
+printf help, 'message'

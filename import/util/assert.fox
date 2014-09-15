@@ -1,0 +1,33 @@
+class AssertError : Error
+{
+	new(msg:Str){
+		super(msg)
+	}
+}
+
+def assert_true(b)
+{
+	if !b {
+		throw AssertError("Assertion fault")
+	}
+}
+def assert_equal(a, b)
+{
+	if a != b {
+		throw AssertError(sprintf("%1 expected but %0", a, b))
+	}
+}
+def assert_error(f:Function, ex:Class)
+{
+	try {
+		f()
+	} catch e:Error {
+		let t = typeof(e)
+		if t in ex {
+			return
+		}
+		throw AssertError(sprintf("%0 error expected thrown but %1", ex, t))
+	}
+	throw AssertError("No error thrown")
+}
+

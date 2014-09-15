@@ -1,0 +1,1 @@
+iana=Shift_JIS

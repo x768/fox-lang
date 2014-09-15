@@ -1,0 +1,44 @@
+import util.assert
+
+assert_equal 1 + 1, 2
+assert_equal 1 - 1, 0
+assert_equal 2 * 3, 6
+assert_equal 7 / 2, 3
+
+assert_equal 2147483647 + 1, 2147483648
+assert_equal 2147483648 - 1, 2147483647
+assert_equal 1_000_000 * 1_000_000, 1_000_000_000_000
+assert_equal 1_000_000_000_000 / 1_000_000, 1_000_000
+
+assert_equal 4 / 3, 1
+assert_equal 4 % 3, 1
+assert_equal -4 / 3, -2
+assert_equal -4 % 3, 2
+assert_equal 4 / -3, -2
+assert_equal 4 % -3, -2
+assert_equal -4 / -3, 1
+assert_equal -4 % -3, -1
+
+assert_error () => 1 / 0, ZeroDivisionError
+
+assert_equal Int(10.0), 10
+assert_equal Int(10.0d), 10
+assert_equal Int('123456789012345678901234567890'), 123456789012345678901234567890
+assert_equal Int(-10.0), -10
+assert_equal Int(-10.0d), -10
+assert_equal Int('-123456789012345678901234567890'), -123456789012345678901234567890
+
+
+assert_equal sprintf("%0", 0), "0"
+assert_equal sprintf("%0", 12345), "12345"
+assert_equal sprintf("%0", -12345), "-12345"
+
+assert_equal sprintf("%{0:5}", 123), "  123"
+assert_equal sprintf("%{0:05}", 123), "00123"
+assert_equal sprintf("%{0:+5}", 123), "+  123"
+
+assert_equal sprintf("%{0:x}", 256), "100"
+assert_equal sprintf("%{0:x}", 15), "f"
+assert_equal sprintf("%{0:X}", 15), "F"
+assert_equal sprintf("%{0:x}", -256), "-100"
+

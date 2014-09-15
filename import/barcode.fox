@@ -1,0 +1,8 @@
+abstract class BarcodeError : Error
+{
+	new(s)
+	{
+		super(s)
+	}
+}
+

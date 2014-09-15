@@ -1,0 +1,21 @@
+import util.assert
+
+assert_equal 1d + 1d, 2d
+assert_equal 1d - 1d, 0d
+assert_equal 2d * 3d, 6d
+assert_equal 7d / 2d, 3.5d
+assert_equal 1d / 10d, 0.1d
+
+assert_equal 1_000d * 1_000d, 1_000_000d
+assert_equal 0.000_1d * 0.000_1d, 0.000_000_01d
+
+assert_error () => 1d / 0d, ZeroDivisionError
+
+assert_equal Frac(10), 10d
+assert_equal Frac(10.0), 10d
+assert_equal Frac('1.23456789'), 1.23456789d
+assert_equal Frac('1e+6'), 1_000_000d
+assert_equal Frac(-10), -10d
+assert_equal Frac(-10.0), -10d
+assert_equal Frac('-1.23456789'), -1.23456789d
+

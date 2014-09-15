@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple Computer//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+  <dict>
+
+    <!-- For a full list of properties, see
+    http://developer.apple.com/documentation/MacOSX/Conceptual/BPRuntimeConfig/Articles/PListKeys.html
+    -->
+
+    <key>CFBundleIconFile</key>
+    <string>icon.icns</string>
+
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+
+    <key>CFBundleGetInfoString</key>
+    <string>foxw</string>
+
+    <key>CFBundleSignature</key>
+    <string>foxw</string>
+
+    <key>CFBundleExecutable</key>
+    <string>foxw</string>
+
+    <key>CFBundleVersion</key>
+    <string>0.0.0</string>
+
+    <key>CFBundleShortVersionString</key>
+    <string>0.0.0</string>
+
+    <key>CFBundleName</key>
+    <string>foxw</string>
+
+    <key>CFBundleInfoDictionaryVersion</key>
+    <string>6.0</string>
+
+    <key>CFBundleIdentifier</key>
+    <string>com.x768.foxw</string>
+
+    <key>CFBundleDocumentTypes</key>
+    <array>
+      <dict>
+        <key>CFBundleTypeExtensions</key>
+          <array>
+            <string>foxw</string>
+          </array>
+        <key>CFBundleTypeIconFile</key>
+        <string>icon</string>
+        <key>CFBundleTypeName</key>
+        <string>foxw script interpreter</string>
+        <key>CFBundleTypeOSTypes</key>
+           <array>
+             <string>foxw</string>
+           </array>
+        <key>CFBundleTypeRole</key>
+        <string>Editor</string>
+      </dict>
+    </array>
+
+    <key>NSServices</key>
+      <array>
+        <dict>
+          <key>NSMenuItem</key>
+          <dict>
+            <key>default</key>
+            <string>Open Selected File in foxw</string>
+          </dict>
+          <key>NSMessage</key>
+          <string>openFile</string>
+          <key>NSPortName</key>
+          <string>TextEdit</string>
+          <key>NSRequiredContext</key>
+          <dict>
+            <key>NSTextContent</key>
+            <string>FilePath</string>
+          </dict>
+          <key>NSSendTypes</key>
+          <array>
+            <string>public.plain-text</string>
+          </array>
+      </dict>
+    </array>
+  </dict>
+</plist>

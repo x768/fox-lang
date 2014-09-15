@@ -1,0 +1,7 @@
+{
+	global:
+		define_module;
+		module_version;
+	local:
+		*;
+};
