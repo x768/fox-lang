@@ -30,7 +30,17 @@ It works on Windows, MacOSX and Linux.
 
 ### Windows
 
+fox-win32.zip and fox-win64 are available.
+
+http://x768.com/fox-lang/
+
+Just unzip it and add %PATH% to fox.exe directory.
+
 ### MacOSX
+
+fox-osx.dmg is available.
+
+http://x768.com/fox-lang/
 
 ### Linux (GTK+3)
 
