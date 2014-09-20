@@ -1,0 +1,4 @@
+langtag:ff_SN
+language:ff
+territory:SN
+bidi:ltr

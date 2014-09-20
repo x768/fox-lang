@@ -1,0 +1,4 @@
+langtag:dz_BT
+language:dz
+territory:BT
+bidi:ltr

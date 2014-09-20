@@ -1,0 +1,4 @@
+langtag:gaa_GH
+language:gaa
+territory:GH
+bidi:ltr

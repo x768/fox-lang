@@ -1,0 +1,4 @@
+langtag:fr_RE
+language:fr
+territory:RE
+bidi:ltr

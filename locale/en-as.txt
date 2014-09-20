@@ -1,0 +1,4 @@
+langtag:en_AS
+language:en
+territory:AS
+bidi:ltr

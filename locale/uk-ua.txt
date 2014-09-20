@@ -1,0 +1,4 @@
+langtag:uk_UA
+language:uk
+territory:UA
+bidi:ltr

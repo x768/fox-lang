@@ -752,7 +752,7 @@ char *resource_to_path(Str name_s, const char *ext_p)
 	}
 
 ERROR_END:
-	throw_errorf(fs->mod_io, "FileOpenError", "Cannot find file for %S", name_s);
+	throw_errorf(fs->mod_file, "FileOpenError", "Cannot find file for %S", name_s);
 	free(name_p);
 	return NULL;
 }

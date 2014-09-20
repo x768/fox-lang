@@ -1,0 +1,88 @@
+locale=gsw
+Etc/Unknown:Unbekannt
+Europe/Tirane:Tirana
+Asia/Yerevan:Erivan
+America/Curacao:Curaçao
+Antarctica/South_Pole:Süüdpol
+Antarctica/Vostok:Woschtok
+Antarctica/DumontDUrville:Dumont D'Urville
+Europe/Vienna:Wien
+Europe/Brussels:Brüssel
+Africa/Ouagadougou:Wagadugu
+Atlantic/Bermuda:Bermudas
+Europe/Zurich:Züri
+Pacific/Easter:Oschterinsle
+America/Havana:Havanna
+Atlantic/Cape_Verde:Kap Verde
+Indian/Christmas:Wienachts-Insle
+Asia/Nicosia:Nikosia
+Africa/Djibouti:Dschibuti
+Europe/Copenhagen:Kopehage
+Africa/Algiers:Algier
+Africa/Cairo:Kairo
+Africa/El_Aaiun:El Aaiún
+Atlantic/Canary:Kanare
+Africa/Addis_Ababa:Addis Abeba
+Pacific/Fiji:Fidschi
+Atlantic/Faeroe:Färöer
+Asia/Tbilisi:Tiflis
+Africa/Accra:Akkra
+America/Scoresbysund:Ittoqqortoormiit
+Europe/Athens:Athen
+Atlantic/South_Georgia:Süüd-Georgie
+Asia/Hong_Kong:Hongkong
+Asia/Baghdad:Bagdad
+Asia/Tehran:Teheran
+Europe/Rome:Rom
+America/Jamaica:Jamaika
+Asia/Tokyo:Tokio
+Asia/Bishkek:Bischkek
+Indian/Comoro:Komore
+America/St_Kitts:St. Kitts
+Asia/Pyongyang:Pjöngjang
+America/Cayman:Kaimaninsle
+Asia/Aqtobe:Aktobe
+America/St_Lucia:St. Lucia
+Europe/Vilnius:Wilna
+Europe/Luxembourg:Luxemburg
+Europe/Chisinau:Kischinau
+Asia/Ulaanbaatar:Ulan-Baator
+Asia/Macau:Macao
+Indian/Maldives:Maledive
+America/Mexico_City:Mexiko-Schtadt
+Africa/Niamey:Niger
+Asia/Muscat:Muschkat
+Europe/Warsaw:Warschau
+Atlantic/Azores:Azore
+Europe/Lisbon:Lissabon
+America/Asuncion:Asunción
+Asia/Qatar:Katar
+Indian/Reunion:Réunion
+Europe/Bucharest:Bukarescht
+Europe/Moscow:Moskau
+Asia/Yekaterinburg:Jekaterinburg
+Asia/Novosibirsk:Nowosibirsk
+Asia/Krasnoyarsk:Krasnojarsk
+Asia/Yakutsk:Jakutsk
+Asia/Vladivostok:Wladiwostok
+Asia/Sakhalin:Sachalin
+Asia/Kamchatka:Kamtschatka
+Asia/Riyadh:Riad
+Africa/Khartoum:Khartum
+Asia/Singapore:Singapur
+Atlantic/St_Helena:St. Helena
+Africa/Mogadishu:Mogadischu
+Africa/Sao_Tome:São Tomé
+America/El_Salvador:Salvador
+Asia/Damascus:Damaskus
+Asia/Dushanbe:Duschanbe
+America/Port_of_Spain:Port-of-Spain
+Asia/Taipei:Taipeh
+Africa/Dar_es_Salaam:Daressalam
+Europe/Uzhgorod:Uschgorod
+Europe/Kiev:Kiew
+Europe/Zaporozhye:Saporischja
+America/Indiana/Knox:Knox
+Asia/Tashkent:Taschkent
+America/St_Vincent:St. Vincent
+America/St_Thomas:St. Thomas

@@ -1,0 +1,5 @@
+langtag:mn_Mong_CN
+language:mn
+script:Mong
+territory:CN
+bidi:ltr

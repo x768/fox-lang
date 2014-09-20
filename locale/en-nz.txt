@@ -1,0 +1,5 @@
+langtag:en_NZ
+language:en
+territory:NZ
+date:d/MM/yy	d/MM/yyyy	d MMMM y	dddd, d MMMM y
+bidi:ltr

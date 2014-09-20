@@ -1,0 +1,12 @@
+langtag:hy
+language:hy
+month_w:Հունվար	Փետրվար	Մարտ	Ապրիլ	Մայիս	Հունիս	Հուլիս	Օգոստոս	Սեպտեմբեր	Հոկտեմբեր	Նոյեմբեր	Դեկտեմբեր
+month:Հնվ	Փտվ	Մրտ	Ապր	Մյս	Հնս	Հլս	Օգս	Սեպ	Հոկ	Նոյ	Դեկ
+days_w:Երկուշաբթի	Երեքշաբթի	Չորեքշաբթի	Հինգշաբթի	Ուրբաթ	Շաբաթ	Կիրակի
+days:Երկ	Երք	Չոր	Հնգ	Ուր	Շաբ	Կիր
+am_pm:Առ․	Կե․
+date:MM/dd/yy	MMM d, y	MMMM dd, y	dddd, MMMM d, y
+time:HH:mm	HH:mm:ss	HH:mm:ss z	HH:mm:ss Z
+decimal:,
+group:.
+bidi:ltr

@@ -1,10 +1,3 @@
-/*
- * zipfile.c
- *
- *  Created on: 2012/03/18
- *      Author: frog
- */
-
 #include "zipfile.h"
 #include <string.h>
 #include <stdio.h>

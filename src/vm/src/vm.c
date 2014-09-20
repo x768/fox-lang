@@ -109,7 +109,6 @@ void init_so_func(void)
 	fs->get_random = get_random;
 	fs->fix_bigint = (void (*)(Value *v, void *mp))fix_bigint;
 	fs->bytesio_get_strbuf = bytesio_get_strbuf;
-	fs->bytesio_get_str = bytesio_get_str;
 
 	fs->get_loader_function = get_loader_function;
 	fs->load_aliases_file = load_aliases_file;

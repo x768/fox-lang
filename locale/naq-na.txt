@@ -1,0 +1,4 @@
+langtag:naq_NA
+language:naq
+territory:NA
+bidi:ltr

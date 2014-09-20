@@ -1,0 +1,12 @@
+langtag:km
+language:km
+month_w:មករា	កុម្ភៈ	មិនា	មេសា	ឧសភា	មិថុនា	កក្កដា	សីហា	កញ្ញា	តុលា	វិច្ឆិកា	ធ្នូ
+month:១	២	៣	៤	៥	៦	៧	៨	៩	១០	១១	១២
+days_w:​ថ្ងៃច័ន្ទ	ថ្ងៃអង្គារ	ថ្ងៃពុធ	ថ្ងៃព្រហស្បតិ៍	ថ្ងៃសុក្រ	ថ្ងៃសៅរ៍	ថ្ងៃអាទិត្យ
+days:ច	អ	ពុ	ព្រ	សុ	ស	អា
+am_pm:ព្រឹក	ល្ងាច
+date:d/M/yyyy	d MMM y	d ខែ MMMM ឆ្នាំ y	dddd ថ្ងៃ d ខែ MMMM ឆ្នាំ y
+time:H:mm	H:mm:ss	H ម៉ោង m នាទី ss វិនាទី​z	H ម៉ោង m នាទី ss វិនាទី​ Z
+decimal:,
+group:.
+bidi:ltr

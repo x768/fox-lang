@@ -1,0 +1,5 @@
+langtag:ku_Latn_TR
+language:ku
+script:Latn
+territory:TR
+bidi:ltr

@@ -1,0 +1,4 @@
+langtag:nr_ZA
+language:nr
+territory:ZA
+bidi:ltr

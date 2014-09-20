@@ -1,0 +1,11 @@
+langtag:hi
+language:hi
+month_w:जनवरी	फरवरी	मार्च	अप्रैल	मई	जून	जुलाई	अगस्त	सितम्बर	अक्तूबर	नवम्बर	दिसम्बर
+days_w:सोमवार	मंगलवार	बुधवार	बृहस्पतिवार	शुक्रवार	शनिवार	रविवार
+days:सोम.	मंगल.	बुध.	बृह.	शुक्र.	शनि.	रवि.
+am_pm:पूर्वाह्न	अपराह्न
+date:d-M-yy	dd-MM-yyyy	d MMMM y	dddd, d MMMM y
+time:h:mm a	h:mm:ss a	h:mm:ss a z	h:mm:ss a Z
+decimal:.
+group:,
+bidi:ltr

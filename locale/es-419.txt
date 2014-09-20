@@ -1,0 +1,6 @@
+langtag:es_419
+language:es
+territory:419
+decimal:.
+group:,
+bidi:ltr

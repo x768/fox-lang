@@ -1,0 +1,4 @@
+langtag:ne_NP
+language:ne
+territory:NP
+bidi:ltr

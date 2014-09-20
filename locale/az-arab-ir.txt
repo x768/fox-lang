@@ -1,0 +1,5 @@
+langtag:az_Arab_IR
+language:az
+script:Arab
+territory:IR
+bidi:ltr

@@ -1,0 +1,3 @@
+locale=kw
+kw:kernewek
+GB:Rywvaneth Unys

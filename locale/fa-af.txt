@@ -1,0 +1,6 @@
+langtag:fa_AF
+language:fa
+territory:AF
+month_w:جنوری	فبروری	مارچ	اپریل	می	جون	جولای	اگست	سپتمبر	اکتوبر	نومبر	دسمبر
+month:جنو				مـی		جول					دسم
+bidi:ltr

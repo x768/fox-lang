@@ -575,7 +575,9 @@ static void locale_put_array(StrBuf *buf, const char **arr, int size)
 		if (i > 0) {
 			StrBuf_add(buf, sep, SEP_SIZE);
 		}
-		add_backslashes_sub(buf, arr[i], -1, ADD_BACKSLASH_U_UCS2);
+		if (arr[i] != NULL) {
+			add_backslashes_sub(buf, arr[i], -1, ADD_BACKSLASH_U_UCS2);
+		}
 	}
 }
 /**
@@ -863,7 +865,7 @@ static int resource_new(Value *vret, Value *v, RefNode *node)
 			}
 		}
 		if (!found) {
-			throw_errorf(fs->mod_io, "FileOpenError", "Cannot find file for %S", name_s);
+			throw_errorf(fs->mod_file, "FileOpenError", "Cannot find file for %S", name_s);
 			free(path);
 			return FALSE;
 		}

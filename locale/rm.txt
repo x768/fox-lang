@@ -1,0 +1,11 @@
+langtag:rm
+language:rm
+month_w:schaner	favrer	mars	avrigl	matg	zercladur	fanadur	avust	settember	october	november	december
+month:schan.	favr.	mars	avr.	matg	zercl.	fan.	avust	sett.	oct.	nov.	dec.
+days_w:glindesdi	mardi	mesemna	gievgia	venderdi	sonda	dumengia
+days:gli	ma	me	gie	ve	so	du
+am_pm:am	sm
+date:dd.MM.yy	dd.MM.yyyy	d. MMMM y	dddd, d. MMMM y
+time:HH:mm	HH:mm:ss	HH:mm:ss z	HH:mm:ss Z
+decimal:.
+bidi:ltr

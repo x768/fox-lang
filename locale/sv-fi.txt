@@ -1,0 +1,4 @@
+langtag:sv_FI
+language:sv
+territory:FI
+bidi:ltr

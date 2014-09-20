@@ -1,0 +1,8 @@
+langtag:ve
+language:ve
+month_w:Phando	Luhuhi	Ṱhafamuhwe	Lambamai	Shundunthule	Fulwi	Fulwana	Ṱhangule	Khubvumedzi	Tshimedzi	Ḽara	Nyendavhusiku
+month:Pha	Luh	Ṱha	Lam	Shu	Lwi	Lwa	Ṱha	Khu	Tsh	Ḽar	Nye
+days_w:Musumbuluwo	Ḽavhuvhili	Ḽavhuraru	Ḽavhuṋa	Ḽavhuṱanu	Mugivhela	Swondaha
+days:Mus	Vhi	Rar	Ṋa	Ṱan	Mug	Swo
+decimal:,
+bidi:ltr

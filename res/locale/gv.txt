@@ -1,0 +1,3 @@
+locale=gv
+gv:Gaelg
+GB:Rywvaneth Unys

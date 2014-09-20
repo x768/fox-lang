@@ -1,0 +1,22 @@
+locale=nds
+Etc/Unknown:Unbekannt
+Antarctica/South_Pole:Süüdpool
+Antarctica/Vostok:Wostok
+Antarctica/DumontDUrville:Dumont d’Urville
+Atlantic/Canary:Kanaren
+Asia/Ulaanbaatar:Ulanbator
+America/Mexico_City:Mexiko-Stadt
+Atlantic/Azores:Azoren
+Europe/Moscow:Moskau
+Europe/Volgograd:Wolgograd
+Asia/Yekaterinburg:Jekaterinborg
+Asia/Novosibirsk:Nowosibirsk
+Asia/Krasnoyarsk:Krasnojarsk
+Asia/Yakutsk:Jakutsk
+Asia/Vladivostok:Wladiwostok
+Asia/Sakhalin:Sachalin
+Asia/Kamchatka:Kamschatka
+Europe/Uzhgorod:Uschgorod
+Europe/Zaporozhye:Saporoschje
+America/North_Dakota/New_Salem:New Salem, Noord-Dakota
+America/North_Dakota/Center:Center, Noord-Dakota

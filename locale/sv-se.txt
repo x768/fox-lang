@@ -1,0 +1,4 @@
+langtag:sv_SE
+language:sv
+territory:SE
+bidi:ltr

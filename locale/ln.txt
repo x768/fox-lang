@@ -1,0 +1,10 @@
+langtag:ln
+language:ln
+month_w:sánzá ya yambo	sánzá ya míbalé	sánzá ya mísáto	sánzá ya mínei	sánzá ya mítáno	sánzá ya motóbá	sánzá ya nsambo	sánzá ya mwambe	sánzá ya libwa	sánzá ya zómi	sánzá ya zómi na mɔ̌kɔ́	sánzá ya zómi na míbalé
+month:s1	s2	s3	s4	s5	s6	s7	s8	s9	s10	s11	s12
+days_w:mokɔlɔ ya libosó	mokɔlɔ ya míbalé	mokɔlɔ ya mísáto	mokɔlɔ ya mínéi	mokɔlɔ ya mítáno	mpɔ́sɔ	eyenga
+days:m1	m2	m3	m4	m5	mps	eye
+date:yy/MM/dd	y MMM d	y MMMM d	dddd, y MMMM dd
+time:HH:mm	HH:mm:ss	HH:mm:ss z	HH:mm:ss Z
+decimal:.
+bidi:ltr

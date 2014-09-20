@@ -1,0 +1,250 @@
+locale=ka
+Etc/Unknown:უცნობი
+America/Antigua:ბარბუდა
+America/Anguilla:ანგილა
+America/Curacao:ნიდერლანდის
+Africa/Luanda:ანგოლა
+Antarctica/Rothera:როთერა
+Antarctica/Palmer:პალმერი
+Antarctica/South_Pole:სამხრეთი პოლუსი
+Antarctica/Syowa:სიოუა
+Antarctica/Mawson:მოუსონი
+Antarctica/Davis:დევისი
+Antarctica/Vostok:ვოსტოკი
+Antarctica/Casey:კეისი
+Antarctica/DumontDUrville:დიუმონ დ'ურვილი
+Antarctica/McMurdo:მაკმურდო
+America/Argentina/Rio_Gallegos:რიო გალეგოსი
+America/Mendoza:მენდოზა
+America/Argentina/San_Juan:სან ხუანი
+America/Argentina/Ushuaia:უშუაია
+America/Argentina/La_Rioja:ლა რიოხა
+America/Argentina/San_Luis:სან ლუისი
+America/Catamarca:კატამარკა
+America/Jujuy:ჯუჯუი
+America/Argentina/Tucuman:ტუკუმანი
+America/Cordoba:კორდობა
+America/Buenos_Aires:ბუენოს აირესი
+Australia/Perth:პერთი
+Australia/Eucla:ეუკლა
+Australia/Darwin:დარვინი
+Australia/Adelaide:ადელაიდა
+Australia/Broken_Hill:ბროუკენ ჰილი
+Australia/Currie:ქური
+Australia/Melbourne:მელბურნი
+Australia/Hobart:ჰობარტი
+Australia/Lindeman:ლინდმანი
+Australia/Sydney:სიდნეი
+Australia/Brisbane:ბრისბეინი
+Australia/Lord_Howe:ლორდ ჰოუი
+America/Aruba:არუბა
+America/Barbados:ბარბადოსი
+Africa/Ouagadougou:ბურკინა ფასო
+Africa/Bujumbura:ბურუნდი
+Africa/Porto-Novo:ბენინი
+America/La_Paz:ბოლივია
+America/Eirunepe:ეირუნეპე
+America/Rio_Branco:რიო ბრანკო
+America/Porto_Velho:პორტო ველჰო
+America/Boa_Vista:ბოა ვისტა
+America/Manaus:მანაუსი
+America/Cuiaba:კუიაბა
+America/Campo_Grande:კამპო გრანდე
+America/Belem:ბელემი
+America/Araguaina:არაგუაინა
+America/Sao_Paulo:საო პაულო
+America/Bahia:ბაია
+America/Fortaleza:ფორტალეზა
+America/Maceio:მასეიო
+America/Recife:რეციფე
+America/Noronha:ნორონია
+America/Nassau:ბაჰამის კუნძულები
+Africa/Gaborone:ბოტსვანა
+America/Belize:ბელიზი
+America/Dawson:დოუსონი
+America/Whitehorse:უაითჰორსი
+America/Inuvik:ინუვიკი
+America/Vancouver:ვანკუვერი
+America/Dawson_Creek:დოუსონ ქრიკი
+America/Yellowknife:იელოუნაიფი
+America/Edmonton:ედმონტონი
+America/Swift_Current:სვიფტ კარენტი
+America/Cambridge_Bay:კემბრიჯ ბეი
+America/Regina:რეჯინა
+America/Winnipeg:უინიპეგი
+America/Resolute:რეზოლუტე
+America/Rainy_River:რეინი რივერი
+America/Rankin_Inlet:რენკინ ინლეტი
+America/Coral_Harbour:ქორალ ჰარბორი
+America/Thunder_Bay:თანდერ ბეი
+America/Nipigon:ნიპიგონი
+America/Toronto:ტორონტო
+America/Montreal:მონრეალი
+America/Iqaluit:იქალუიტი
+America/Pangnirtung:პანგნირტუნგი
+America/Moncton:მონქტონი
+America/Halifax:ჰალიფაქსი
+America/Goose_Bay:გუზ ბეი
+America/Glace_Bay:გლეის ბეი
+America/Blanc-Sablon:ბლან-საბლონი
+America/St_Johns:სენტ ჯონსი
+Africa/Kinshasa:კინშასა
+Africa/Lubumbashi:ლუბუმბაში
+Africa/Bangui:ცენტრალური აფრიკის რესპუბლიკა
+Africa/Brazzaville:კონგო - ბრაზავილი
+Africa/Abidjan:სპილოს ძვლის სანაპირო
+Pacific/Easter:ისთერი
+Africa/Douala:კამერუნი
+Asia/Kashgar:კაშგარი
+Asia/Urumqi:ურუმქი
+Asia/Chongqing:ჩონგქინგი
+Asia/Harbin:ჰარბინი
+America/Bogota:კოლუმბია
+America/Costa_Rica:კოსტა რიკა
+America/Havana:კუბა
+Africa/Djibouti:ჯიბუტი
+America/Dominica:დომინიკა
+Africa/Algiers:ალჟირი
+Pacific/Galapagos:გალაპაგოსი
+Africa/Cairo:ეგვიპტე
+Africa/El_Aaiun:დასავლეთი საჰარა
+Africa/Asmera:ერითრეა
+Atlantic/Canary:კანარი
+Africa/Ceuta:სეუტა
+Africa/Addis_Ababa:ეთიოპია
+Pacific/Truk:ტრუკი
+Pacific/Ponape:პონაპე
+Pacific/Kosrae:კოსრაე
+Africa/Libreville:გაბონი
+America/Grenada:გრენადა
+America/Cayenne:გუიანა
+Africa/Accra:განა
+America/Thule:თულე
+America/Scoresbysund:სკორსბისუნდი
+America/Danmarkshavn:დენმარკშავნი
+Africa/Banjul:გამბია
+Africa/Conakry:გინეა
+America/Guadeloupe:გუადელუპე
+Africa/Malabo:ეკვატორული გვინეა
+America/Guatemala:გუატემალა
+Africa/Bissau:გინეა-ბისაუ
+Asia/Jakarta:ჯაკარტა
+Asia/Pontianak:პონტიანაკი
+Asia/Makassar:მაკასარი
+Asia/Jayapura:ჯაიაპურა
+America/Jamaica:იამაიკა
+Africa/Nairobi:კენია
+Pacific/Enderbury:ენდერბური
+Pacific/Kiritimati:კირიტიმატი
+Pacific/Tarawa:ტარაუა
+America/Cayman:კაიმანის
+Asia/Aqtau:აქტაუ
+Asia/Oral:ორალი
+Asia/Aqtobe:აქტობე
+Asia/Qyzylorda:ყიზილორდა
+Asia/Almaty:ალმატი
+Africa/Monrovia:ლიბერია
+Africa/Maseru:ლესოთო
+Africa/Tripoli:ლიბია
+Africa/Casablanca:მაროკო
+Pacific/Kwajalein:კვაჯალეინი
+Pacific/Majuro:მახურო
+Africa/Bamako:მალი
+Asia/Hovd:ჰოვდი
+Asia/Ulaanbaatar:ულანბატარი
+Asia/Choibalsan:ჩოიბალსანი
+America/Martinique:მარტინიკი
+Africa/Nouakchott:მავრიტანია
+America/Montserrat:მონსერატი
+Africa/Blantyre:მალავი
+America/Tijuana:ტიხუანა
+America/Hermosillo:ჰერმოსიო
+America/Mazatlan:მაზატლანი
+America/Chihuahua:ჩიჰუაჰუა
+America/Monterrey:მონტერეი
+America/Mexico_City:მექსიკო სითი
+America/Merida:მერიდა
+America/Cancun:კანკუნი
+Asia/Kuching:კუჩინგი
+Africa/Maputo:მოზამბიკი
+Africa/Windhoek:ნამიბია
+Africa/Niamey:ნიგერი
+Africa/Lagos:ნიგერია
+America/Managua:ნიკარაგუა
+Pacific/Chatham:ჩათამი
+America/Lima:პერუ
+Pacific/Marquesas:მარკეზასი
+Pacific/Gambier:გამბიერი
+America/Miquelon:სენტ პიერი და მიკელონი
+Atlantic/Azores:აზორეს
+Atlantic/Madeira:მადეირა
+America/Asuncion:პარაგვაი
+Europe/Kaliningrad:კალინინგრადი
+Europe/Moscow:მოსკოვი
+Europe/Volgograd:ვოლგოგრადი
+Europe/Samara:სამარა
+Asia/Yekaterinburg:ეკატერინბურგი
+Asia/Omsk:ომსკი
+Asia/Novosibirsk:ნოვოსიბირსკი
+Asia/Krasnoyarsk:კრასნოიარსკი
+Asia/Irkutsk:ირკუტსკი
+Asia/Yakutsk:იაკუტსკი
+Asia/Vladivostok:ვლადივოსტოკი
+Asia/Sakhalin:სახალინი
+Asia/Magadan:მაგადანი
+Asia/Kamchatka:კამჩატკა
+Asia/Anadyr:ანადირი
+Africa/Kigali:რუანდა
+Africa/Khartoum:სუდანი
+Africa/Freetown:სიერა ლეონე
+Africa/Dakar:სენეგალი
+Africa/Mogadishu:სომალია
+Africa/Sao_Tome:საო ტომე და პრინსიპე
+America/El_Salvador:ელ სალვადორი
+Africa/Mbabane:სვაზილენდი
+America/Grand_Turk:ტერკის და კაიკოს
+Africa/Ndjamena:ჩადი
+Africa/Lome:ტოგო
+Africa/Tunis:ტუნისი
+Africa/Dar_es_Salaam:ტანზანია
+Europe/Uzhgorod:უჟგოროდი
+Europe/Kiev:კიევი
+Europe/Simferopol:სიმფეროპოლი
+Europe/Zaporozhye:ზაპოროჟიე
+Africa/Kampala:უგანდა
+Pacific/Midway:მიდუეი
+Pacific/Johnston:ჯონსტონი
+Pacific/Wake:უეიკი
+America/Adak:ადაკი
+America/Nome:ნომი
+Pacific/Honolulu:ჰონოლულუ
+America/Anchorage:ენქორაჯი
+America/Yakutat:იაკუტატი
+America/Juneau:ჯუნო
+America/Los_Angeles:ლოს ანჯელესი
+America/Boise:ბუასი
+America/Phoenix:ფენიქსი
+America/Shiprock:შიპროკი
+America/Denver:დენვერი
+America/North_Dakota/New_Salem:ნიუ სალემი, ჩრდილოეთი დაკოტა
+America/North_Dakota/Center:ცენტრი, ჩრდილოეთი დაკოტა
+America/Chicago:ჩიკაგო
+America/Menominee:მენომინი
+America/Indiana/Vincennes:ვინსენი, ინდიანა
+America/Indiana/Petersburg:პიტერსბურგი
+America/Indiana/Tell_City:თელ სითი, ინდიანა
+America/Indiana/Knox:ნოქსი, ინდიანა
+America/Indiana/Winamac:უინემაკი, ინდიანა
+America/Indiana/Marengo:მარენგო
+America/Indianapolis:ინდიანაპოლისი
+America/Louisville:ლუისვილი
+America/Indiana/Vevay:ვივეი, ინდიანა
+America/Kentucky/Monticello:მონტიჩელო
+America/Detroit:დეტროიტი
+America/New_York:ნიუ იორკი
+America/Montevideo:ურუგვაი
+Asia/Samarkand:სამარყანდი
+America/Caracas:ვენესუელა
+Africa/Johannesburg:სამხრეთი აფრიკა
+Africa/Lusaka:ზამბია
+Africa/Harare:ზიმბაბვე

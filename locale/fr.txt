@@ -1,0 +1,11 @@
+langtag:fr
+language:fr
+month_w:janvier	février	mars	avril	mai	juin	juillet	août	septembre	octobre	novembre	décembre
+month:jan	fév	mar	avr	mai	juin	juil	août	sept	oct	nov	déc
+days_w:lundi	mardi	mercredi	jeudi	vendredi	samedi	dimanche
+days:lun	mar	mer	jeu	ven	sam	dim
+am_pm:av.m.	ap.m.
+date:dd/MM/yy	d MMM y	d MMMM y	dddd d MMMM y
+time:HH:mm	HH:mm:ss	HH:mm:ss z	HH:mm:ss Z
+decimal:,
+bidi:ltr

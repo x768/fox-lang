@@ -1,0 +1,4 @@
+langtag:ta_LK
+language:ta
+territory:LK
+bidi:ltr

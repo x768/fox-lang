@@ -1,0 +1,4 @@
+langtag:vi_VN
+language:vi
+territory:VN
+bidi:ltr

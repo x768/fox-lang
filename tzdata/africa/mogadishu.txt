@@ -1,0 +1,5 @@
+=Africa/Mogadishu
+8000000000000000 10888 0 LMT
+fffffdd05fea68c0 10800 0 EAT
+fffffee16fdde880 9000 0 BEAT
+ffffffa07c045bc0 10800 0 EAT

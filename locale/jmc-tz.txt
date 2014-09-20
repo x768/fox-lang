@@ -1,0 +1,4 @@
+langtag:jmc_TZ
+language:jmc
+territory:TZ
+bidi:ltr

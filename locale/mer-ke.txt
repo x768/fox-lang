@@ -1,0 +1,4 @@
+langtag:mer_KE
+language:mer
+territory:KE
+bidi:ltr

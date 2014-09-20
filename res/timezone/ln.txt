@@ -1,0 +1,3 @@
+locale=ln
+Africa/Kinshasa:Kinsásá
+Africa/Bangui:Santrafríka

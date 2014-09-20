@@ -1,0 +1,4 @@
+langtag:ha_Latn
+language:ha
+script:Latn
+bidi:ltr

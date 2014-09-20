@@ -1,0 +1,4 @@
+langtag:kok_IN
+language:kok
+territory:IN
+bidi:ltr

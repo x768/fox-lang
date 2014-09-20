@@ -1,0 +1,14 @@
+locale=fil
+Etc/Unknown:Unknown
+Africa/Porto-Novo:Porto - Novo
+Indian/Christmas:Pasko.
+Asia/Tbilisi:Tbilisi.
+Africa/Conakry:Conarky
+America/St_Kitts:St. Kitts
+America/St_Lucia:St. Lucia
+Africa/Maseru:Maseru.
+Asia/Dushanbe:Dushanbe.
+America/Port_of_Spain:Port nang Espanya
+America/St_Vincent:St. Vincent
+America/St_Thomas:St. Thomas
+Africa/Harare:Harare.

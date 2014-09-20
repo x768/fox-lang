@@ -1,0 +1,7 @@
+langtag:es_GT
+language:es
+territory:GT
+date:d/MM/yy	d/MM/yyyy		
+decimal:.
+group:,
+bidi:ltr

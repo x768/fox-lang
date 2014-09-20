@@ -1,0 +1,5 @@
+langtag:es_AR
+language:es
+territory:AR
+am_pm:a.m.	p.m.
+bidi:ltr

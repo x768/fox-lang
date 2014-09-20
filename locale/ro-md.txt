@@ -1,0 +1,4 @@
+langtag:ro_MD
+language:ro
+territory:MD
+bidi:ltr

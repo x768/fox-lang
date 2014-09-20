@@ -1,0 +1,11 @@
+langtag:az
+language:az
+month_w:Yanvar	Fevral	Mart	Aprel	May	İyun	İyul	Avqust	Sentyabr	Oktyabr	Noyabr	Dekabr
+month:yan	fev	mar	apr	may	iyn	iyl	avq	sen	okt	noy	dek
+days_w:bazar ertəsi	çərşənbə axşamı	çərşənbə	cümə axşamı	cümə	şənbə	bazar
+days:B.E.	Ç.A.	Ç.	C.A.	C	Ş.	B.
+date:yy/MM/dd	d MMM, y	d MMMM , y	dddd, d, MMMM, y
+time:HH:mm	HH:mm:ss	HH:mm:ss z	HH:mm:ss Z
+decimal:,
+group:.
+bidi:ltr

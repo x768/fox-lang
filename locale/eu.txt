@@ -1,0 +1,11 @@
+langtag:eu
+language:eu
+month_w:urtarrila	otsaila	martxoa	apirila	maiatza	ekaina	uztaila	abuztua	iraila	urria	azaroa	abendua
+month:urt	ots	mar	api	mai	eka	uzt	abu	ira	urr	aza	abe
+days_w:astelehena	asteartea	asteazkena	osteguna	ostirala	larunbata	igandea
+days:al	as	az	og	or	lr	ig
+date:yyyy-MM-dd	y MMM d	y'eko' MMM'ren' dd'a'	dddd, y'eko' MMMM'ren' dd'a'
+time:HH:mm	HH:mm:ss	HH:mm:ss z	HH:mm:ss Z
+decimal:,
+group:.
+bidi:ltr

@@ -1,0 +1,4 @@
+langtag:gv_GB
+language:gv
+territory:GB
+bidi:ltr

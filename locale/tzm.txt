@@ -1,0 +1,11 @@
+langtag:tzm
+language:tzm
+month_w:Yennayer	Yebrayer	Mars	Ibrir	Mayyu	Yunyu	Yulyuz	Ɣuct	Cutanbir	Kṭuber	Nwanbir	Dujanbir
+month:Yen	Yeb	Mar	Ibr	May	Yun	Yul	Ɣuc	Cut	Kṭu	Nwa	Duj
+days_w:Aynas	Asinas	Akras	Akwas	Asimwas	Asiḍyas	Asamas
+days:Ayn	Asn	Akr	Akw	Asm	Asḍ	Asa
+am_pm:Zdat azal	Ḍeffir aza
+date:dd/MM/yyyy	d MMM y	d MMMM y	dddd, d MMMM y
+time:h:mm a	h:mm:ss a	h:mm:ss a z	h:mm:ss a Z
+decimal:,
+bidi:ltr

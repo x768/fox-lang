@@ -1,0 +1,2 @@
+locale=bo
+Etc/Unknown:མ་རྟོགས་པ

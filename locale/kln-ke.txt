@@ -1,0 +1,4 @@
+langtag:kln_KE
+language:kln
+territory:KE
+bidi:ltr

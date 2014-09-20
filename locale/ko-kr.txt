@@ -1,0 +1,4 @@
+langtag:ko_KR
+language:ko
+territory:KR
+bidi:ltr

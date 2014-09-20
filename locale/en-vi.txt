@@ -1,0 +1,4 @@
+langtag:en_VI
+language:en
+territory:VI
+bidi:ltr

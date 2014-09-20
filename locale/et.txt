@@ -1,0 +1,11 @@
+langtag:et
+language:et
+month_w:jaanuar	veebruar	märts	aprill	mai	juuni	juuli	august	september	oktoober	november	detsember
+month:jaan	veebr	märts	apr	mai	juuni	juuli	aug	sept	okt	nov	dets
+days_w:esmaspäev	teisipäev	kolmapäev	neljapäev	reede	laupäev	pühapäev
+days:esm	tei	kol	nel	ree	lau	püh
+am_pm:e.k.	p.k.
+date:dd.MM.yy	dd.MM.yyyy	d. MMMM y	dddd, d. MMMM y
+time:H:mm	H:mm.ss	H:mm.ss z	H:mm.ss Z
+decimal:,
+bidi:ltr

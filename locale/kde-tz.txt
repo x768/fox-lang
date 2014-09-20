@@ -1,0 +1,4 @@
+langtag:kde_TZ
+language:kde
+territory:TZ
+bidi:ltr

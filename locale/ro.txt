@@ -1,0 +1,12 @@
+langtag:ro
+language:ro
+month_w:ianuarie	februarie	martie	aprilie	mai	iunie	iulie	august	septembrie	octombrie	noiembrie	decembrie
+month:ian.	feb.	mar.	apr.	mai	iun.	iul.	aug.	sept.	oct.	nov.	dec.
+days_w:luni	marți	miercuri	joi	vineri	sâmbătă	duminică
+days:Lu	Ma	Mi	Jo	Vi	Sâ	Du
+am_pm:AM	PM
+date:dd.MM.yyyy	dd.MM.yyyy	d MMMM y	dddd, d MMMM y
+time:HH:mm	HH:mm:ss	HH:mm:ss z	HH:mm:ss Z
+decimal:,
+group:.
+bidi:ltr

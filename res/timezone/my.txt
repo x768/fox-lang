@@ -1,0 +1,13 @@
+locale=my
+Etc/Unknown:မသိသော
+America/Rio_Branco:ရီယို ဗြန်ကို
+America/Campo_Grande:ကိမ်ပို ဂရန်ဒ
+America/Sao_Paulo:ဆာပိုလို
+Pacific/Honolulu:ဟိုနိုလူလူ
+America/Anchorage:အန်ကာရေ့ဂျ်
+America/Los_Angeles:လော့စ်အိန်ဂျယ်လိစ်
+America/Phoenix:ဖီးနစ်
+America/Denver:ဒင်ဗာ
+America/Chicago:ချီကာကို
+America/Indianapolis:အင်ဒီယားနားပိုလစ်
+America/New_York:နယူးယောက်

@@ -1,0 +1,4 @@
+langtag:id_ID
+language:id
+territory:ID
+bidi:ltr

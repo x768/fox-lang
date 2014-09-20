@@ -1,0 +1,4 @@
+langtag:ms_MY
+language:ms
+territory:MY
+bidi:ltr

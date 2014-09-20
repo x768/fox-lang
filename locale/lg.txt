@@ -1,0 +1,9 @@
+langtag:lg
+language:lg
+month_w:Janwaliyo	Febwaliyo	Marisi	Apuli	Maayi	Juuni	Julaayi	Agusito	Sebuttemba	Okitobba	Novemba	Desemba
+month:Jan	Feb	Mar	Apu	Maa	Juu	Jul	Agu	Seb	Oki	Nov	Des
+days_w:Balaza	Lwakubiri	Lwakusatu	Lwakuna	Lwakutaano	Lwamukaaga	Sabbiiti
+days:Bal	Lw2	Lw3	Lw4	Lw5	Lw6	Sab
+date:dd/MM/yyyy	d MMM y	d MMMM y	dddd, d MMMM y
+time:h:mm a	h:mm:ss a	h:mm:ss a z	h:mm:ss a Z
+bidi:ltr

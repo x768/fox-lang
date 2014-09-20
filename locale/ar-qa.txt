@@ -1,0 +1,5 @@
+langtag:ar_QA
+language:ar
+territory:QA
+days:الاثنين	الثلاثاء	الأربعاء	الخميس	الجمعة	السبت	الأحد
+bidi:ltr

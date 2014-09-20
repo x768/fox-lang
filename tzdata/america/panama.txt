@@ -1,0 +1,4 @@
+=America/Panama
+8000000000000000 -19088 0 LMT
+fffffdb437ecae80 -19176 0 CMT
+fffffe3ab29e7240 -18000 0 EST

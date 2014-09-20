@@ -1,0 +1,13 @@
+langtag:jbo
+language:jbo
+am_pm:lir	lec
+month_w:pavma'i	relma'i	cibma'i	vonma'i	mumyma'i	xavma'i	zelma'i	bivma'i	sozma'i	pavnonma'i	pavypavma'i	pavrelma'i
+month:1	2	3	4	5	6	7	8	9	10	11	12
+days_w:pavdei	reldei	cibdei	vondei	mumdei	xavdei	nondei
+days:pa	re	ci	vo	mu	xa	no
+date:d-M-yy	d-M-y	d'moi' MMMM y'moi'	dddd d'moi' MMMM y'moi'
+time:HH:mm	HH:mm:ss	HH:mm:ss z	HH:mm:ss Z
+decimal:.
+group: 
+group_n:3
+bidi:ltr

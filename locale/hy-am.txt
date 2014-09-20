@@ -1,0 +1,4 @@
+langtag:hy_AM
+language:hy
+territory:AM
+bidi:ltr

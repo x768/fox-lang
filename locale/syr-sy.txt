@@ -1,0 +1,4 @@
+langtag:syr_SY
+language:syr
+territory:SY
+bidi:ltr

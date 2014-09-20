@@ -1,0 +1,5 @@
+langtag:fr_LU
+language:fr
+territory:LU
+group:.
+bidi:ltr

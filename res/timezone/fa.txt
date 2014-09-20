@@ -1,0 +1,224 @@
+locale=fa
+Etc/Unknown:نامشخص
+Europe/Andorra:آندورا
+Asia/Kabul:کابل
+America/Anguilla:آنگویلا
+Antarctica/Rothera:روترا
+Antarctica/Palmer:پالمر
+Antarctica/South_Pole:قطب جنوب
+Antarctica/Syowa:سی ووا
+Antarctica/Mawson:ماوسون
+Antarctica/Davis:دیویس
+Antarctica/Vostok:ووستوک
+Antarctica/Casey:کیسی
+Antarctica/DumontDUrville:دومونت د اورویل
+Antarctica/McMurdo:مک موردو
+America/Argentina/Rio_Gallegos:ریو گالگوس
+America/Mendoza:مندوسا
+America/Argentina/San_Juan:سن خوان
+America/Argentina/Ushuaia:اوشوایا
+America/Argentina/La_Rioja:لاریوجا
+America/Argentina/San_Luis:سن لوئیس
+America/Catamarca:کاتامارکا
+America/Jujuy:خوخوئی
+America/Argentina/Tucuman:توکومن
+America/Cordoba:کوردووا
+America/Buenos_Aires:بوئنوس‌آیرس
+Australia/Perth:پرت
+Australia/Eucla:اوکلا
+Australia/Darwin:داروین
+Australia/Adelaide:آدلاید
+Australia/Broken_Hill:بروکن هیل
+Australia/Currie:کوری
+Australia/Melbourne:ملبورن
+Australia/Hobart:هوبارت
+Australia/Lindeman:لیندمن
+Australia/Sydney:سیدنی
+Australia/Brisbane:بریسبین
+Australia/Lord_Howe:لردهاو
+America/Aruba:آروبا
+America/Barbados:باربادس
+Asia/Bahrain:بحرین
+Atlantic/Bermuda:برمودا
+America/Eirunepe:ایرونپه
+America/Rio_Branco:ریو برانکو
+America/Porto_Velho:پورتوولیو
+America/Boa_Vista:بوئاویشتا
+America/Manaus:ماناوس
+America/Cuiaba:کویاوا
+America/Campo_Grande:کمپو گرانده
+America/Belem:بلم
+America/Araguaina:آراگواینا
+America/Sao_Paulo:سائوپائولو
+America/Bahia:باهیا
+America/Fortaleza:فورتالزا
+America/Maceio:ماسیو
+America/Recife:ریسایف
+America/Noronha:نورونیا
+America/Belize:بلیز
+America/Dawson:داوسن
+America/Whitehorse:وایت‌هورس
+America/Inuvik:اینوویک
+America/Vancouver:ونکوور
+America/Dawson_Creek:داوسن کریک
+America/Yellowknife:یلونایف
+America/Edmonton:ادمونتون
+America/Swift_Current:سوئیفت کورنت
+America/Cambridge_Bay:خلیج کمبریج
+America/Regina:رجاینا
+America/Winnipeg:وینیپگ
+America/Resolute:رسولوت
+America/Rainy_River:رینی‌ریور
+America/Rankin_Inlet:خلیجک رنکین
+America/Coral_Harbour:کورال هاربر
+America/Thunder_Bay:ثاندر بی
+America/Nipigon:نیپیگان
+America/Toronto:تورنتو
+America/Montreal:مونرئال
+America/Iqaluit:ایکلوئت
+America/Pangnirtung:پانگنیرتونگ
+America/Moncton:مانکتون
+America/Halifax:هلیفکس
+America/Goose_Bay:خلیج گوس
+America/Glace_Bay:گلیس بی
+America/Blanc-Sablon:بلنک-سابلن
+America/St_Johns:سنت جان
+Africa/Kinshasa:کینشاسا
+Africa/Lubumbashi:لوبومباشی
+Pacific/Easter:ایستر
+America/Santiago:سانتیاگو
+Asia/Kashgar:کاشغر
+Asia/Urumqi:ارومچی
+Asia/Chongqing:چونگ کینگ
+Asia/Shanghai:شانگهای
+Asia/Harbin:هاربین
+America/Costa_Rica:کستا ریکا
+Atlantic/Cape_Verde:کیپ ورد
+Africa/Djibouti:دجیبوتی
+America/Dominica:دمونیکا
+Pacific/Galapagos:گالاپاگوس
+America/Guayaquil:گوایاکیل
+Atlantic/Canary:قناری
+Africa/Ceuta:سئوتا
+Europe/Madrid:مادرید
+Pacific/Fiji:فیجی
+Pacific/Truk:تراک
+Pacific/Ponape:پناپه
+Pacific/Kosrae:کوساره
+America/Grenada:گرینادا
+Europe/Gibraltar:جبل الطارق
+America/Thule:تول
+America/Godthab:گودهوب
+America/Scoresbysund:اسکورسبیساند
+America/Danmarkshavn:دانمارک شاون
+America/Guadeloupe:گوادلوپ
+America/Guatemala:گواتمالا
+Pacific/Guam:گوام
+America/Guyana:گویانا
+Asia/Hong_Kong:هونگ کنگ
+Asia/Jakarta:جاکارتا
+Asia/Pontianak:پونتیاناک
+Asia/Makassar:ماکاسار
+Asia/Jayapura:جیاپورا
+Asia/Tehran:تهران
+America/Jamaica:جامایکا
+Pacific/Enderbury:اندربری
+Pacific/Kiritimati:کریتیماتی
+Pacific/Tarawa:تاراوا
+Asia/Kuwait:کویت
+Asia/Aqtau:آکتا
+Asia/Oral:اورال
+Asia/Aqtobe:آکتوبه
+Asia/Qyzylorda:کویزیلوردا
+Asia/Almaty:آلماتی
+Europe/Luxembourg:لاکسمبورگ
+Europe/Monaco:موناکو
+Pacific/Kwajalein:کواجالین
+Pacific/Majuro:ماجورو
+Asia/Hovd:هود
+Asia/Ulaanbaatar:اولان باتار
+Asia/Choibalsan:چیو بال سان
+Asia/Macau:مکاو
+America/Martinique:مارتینیکو
+America/Montserrat:منتسرات
+Europe/Malta:مالتا
+Indian/Mauritius:ماوریتیوس
+Indian/Maldives:مالدیو
+America/Tijuana:تی جوانا
+America/Hermosillo:ارموسیو
+America/Mazatlan:ماساتلان
+America/Chihuahua:چیئوائوا
+America/Monterrey:مونترئی
+America/Mexico_City:مکزیکوسیتی
+America/Merida:مریدا
+America/Cancun:کانکون
+Asia/Kuching:کوچینگ
+Pacific/Nauru:ناورو
+Pacific/Niue:نیوه
+Pacific/Chatham:چاتام
+America/Panama:پاناما
+Pacific/Tahiti:تاهیتی
+Pacific/Marquesas:مارکوس
+Pacific/Gambier:گامبیر
+Pacific/Pitcairn:پیتکیرن
+America/Puerto_Rico:پورتو ریکو
+Atlantic/Azores:آزورس
+Atlantic/Madeira:مادریا
+Europe/Lisbon:لیسبون
+Pacific/Palau:پالاو
+Asia/Qatar:قطر
+Indian/Reunion:ریونیون
+Europe/Kaliningrad:کالینینگراد
+Europe/Moscow:مسکو
+Europe/Volgograd:ولگاگراد
+Europe/Samara:سامارا
+Asia/Yekaterinburg:یکاترینبرگ
+Asia/Omsk:اومسک
+Asia/Novosibirsk:نووسیبیریسک
+Asia/Krasnoyarsk:کراسنویارسک
+Asia/Irkutsk:ایرکوتسک
+Asia/Yakutsk:یاکوتسک
+Asia/Vladivostok:ولادی‌وستوک
+Asia/Sakhalin:ساخالین
+Asia/Magadan:مگادن
+Asia/Kamchatka:کامچاتکا
+Asia/Anadyr:آنادیر
+Asia/Singapore:سنگاپور
+America/El_Salvador:ال سالوادر
+Europe/Uzhgorod:اوژگورود
+Europe/Kiev:کیف
+Europe/Simferopol:سیمفروپل
+Europe/Zaporozhye:زاپوروژی
+Pacific/Midway:میدوی
+Pacific/Johnston:جانستون
+Pacific/Wake:ویک
+America/Adak:ایدک
+America/Nome:نوم
+Pacific/Honolulu:هونولولو
+America/Anchorage:انکریج
+America/Yakutat:یاکوتات
+America/Juneau:جونو
+America/Los_Angeles:لوس‌آنجلس
+America/Boise:بویسی
+America/Phoenix:فینکس
+America/Shiprock:شیپراک
+America/Denver:دنور
+America/North_Dakota/New_Salem:سالم جدید، داکوتای شمالی
+America/North_Dakota/Center:سنتر، داکوتای شمالی
+America/Chicago:شیکاگو
+America/Menominee:منامینی
+America/Indiana/Vincennes:وینسنس ایندیانا
+America/Indiana/Petersburg:پترزبرگ
+America/Indiana/Tell_City:تل‌سیتی، ایندیانا
+America/Indiana/Knox:ناکس
+America/Indiana/Winamac:ویناماک ایندیانا
+America/Indiana/Marengo:مارنگو
+America/Indianapolis:ایندیاناپولیس
+America/Louisville:لوئیزویل
+America/Indiana/Vevay:ویوی
+America/Kentucky/Monticello:مانتیسلو
+America/Detroit:دترویت
+America/New_York:نیویورک
+Asia/Samarkand:سمرقند
+Asia/Tashkent:تاشکند
+Indian/Mayotte:مایوته

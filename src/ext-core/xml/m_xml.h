@@ -13,9 +13,10 @@
 
 
 enum {
-	INDEX_NAME = 0,
-	INDEX_ATTR = 1,
-	INDEX_CHILDREN = 2,
+	INDEX_ELEM_NAME,
+	INDEX_ELEM_ATTR,
+	INDEX_ELEM_CHILDREN,
+	INDEX_ELEM_NUM,
 };
 
 #ifdef DEFINE_GLOBALS
@@ -32,12 +33,14 @@ extern RefNode *cls_node;
 extern RefNode *cls_elem;
 extern RefNode *cls_text;
 
-extern UnicodeStatic *uni;
-
 #ifdef DEFINE_GLOBALS
 #undef extern
 #endif
 
+// m_xml.c
+int ch_get_category(int ch);
+
+// xml_select.c
 int select_css(Value *vret, Value *v, int num, Str sel);
 int delete_css(Value *vret, Value *v, int num, Str sel);
 int delete_nodelist(Value *vret, Value *v, int num, RefArray *ra);

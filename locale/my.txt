@@ -1,0 +1,12 @@
+langtag:my
+language:my
+month_w:ဇန်နဝါရီ	ဖေဖော်ဝါရီ	မတ်	ဧပြီ	မေ	ဇွန်	ဇူလိုင်	ဩဂုတ်	စက်တင်ဘာ	အောက်တိုဘာ	နိုဝင်ဘာ	ဒီဇင်ဘာ
+month:ဇန်	ဖေ	မတ်	ဧ	မေ	ဇွန်	ဇူ	ဩ	စက်	အောက်	နို	ဒီ
+days_w:တနင်္လာ	အင်္ဂါ	ဗုဒ္ဓဟူး	ကြာသပတေး	သောကြာ	စနေ	တနင်္ဂနွေ
+days:လာ	ဂါ	ဟူး	တေး	ကြာ	နေ	နွေ
+am_pm:နံနက်	ညနေ
+date:yy/MM/dd	y MMM d	y MMMM d	dddd, y MMMM dd
+time:HH:mm	HH:mm:ss	HH:mm:ss z	HH:mm:ss Z
+decimal:.
+group:,
+bidi:ltr

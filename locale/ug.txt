@@ -1,0 +1,3 @@
+langtag:ug
+language:ug
+bidi:rtl

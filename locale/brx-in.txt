@@ -1,0 +1,4 @@
+langtag:brx_IN
+language:brx
+territory:IN
+bidi:ltr

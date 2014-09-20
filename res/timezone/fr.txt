@@ -1,0 +1,171 @@
+locale=fr
+Etc/Unknown:zone inconnue
+Europe/Andorra:Andorre
+Asia/Dubai:Dubaï
+Asia/Kabul:Kaboul
+America/Antigua:Saint John’s
+America/Anguilla:The Valley
+Europe/Tirane:Tirana
+Asia/Yerevan:Erevan
+America/Curacao:Curaçao
+Antarctica/South_Pole:Pôle Sud
+Antarctica/Syowa:Showa
+Antarctica/DumontDUrville:Dumont d’Urville
+Antarctica/McMurdo:Mac Murdo
+America/Argentina/Ushuaia:Ushuaïa
+America/Argentina/Tucuman:Tucumán
+America/Cordoba:Córdoba
+Europe/Vienna:Vienne
+Australia/Adelaide:Adélaïde
+America/Aruba:Oranjestad
+Asia/Baku:Bakou
+America/Barbados:Barbade (La)
+Asia/Dhaka:Dhâkâ
+Europe/Brussels:Bruxelles
+Asia/Bahrain:Bahreïn
+Atlantic/Bermuda:Bermudes
+Asia/Brunei:Bandar Seri Begawan
+America/Eirunepe:Eirunepé
+America/Manaus:Manaos
+America/Cuiaba:Cuiabá
+America/Belem:Belém
+America/Araguaina:Araguaína
+America/Sao_Paulo:São Paulo
+America/Maceio:Maceió
+Asia/Thimphu:Thimphou
+America/Belize:Belmopan
+America/Regina:Régina
+America/Montreal:Montréal
+America/St_Johns:Saint-Jean de Terre-Neuve
+Indian/Cocos:West Island
+Pacific/Easter:Île de Pâques
+Asia/Kashgar:Kachgar
+Asia/Urumqi:Ürümqi
+America/Costa_Rica:San José
+America/Havana:La Havane
+Atlantic/Cape_Verde:Cap Vert
+Indian/Christmas:Flying Fish Cove
+Asia/Nicosia:Nicosie
+Europe/Copenhagen:Copenhague
+America/Dominica:Dominique
+America/Santo_Domingo:Saint Domingue
+Africa/Algiers:Alger
+Pacific/Galapagos:Galápagos
+Europe/Tallinn:Tallin
+Africa/Cairo:Le Caire
+Africa/El_Aaiun:Laâyoune
+Africa/Asmera:Asmara
+Atlantic/Canary:Îles Canaries
+Africa/Addis_Ababa:Addis-Abeba
+Pacific/Fiji:Fidji
+Atlantic/Stanley:Port Stanley
+Atlantic/Faeroe:Féroé
+Europe/London:Londres
+America/Grenada:Grenade
+Asia/Tbilisi:Tbilissi
+Europe/Guernsey:Saint-Pierre-Port
+America/Thule:Thulé
+America/Godthab:Godthåb
+America/Guadeloupe:Basse-Terre
+Europe/Athens:Athènes
+Atlantic/South_Georgia:Géorgie du Sud
+Pacific/Guam:Hagåtña
+America/Guyana:Guyane
+Asia/Hong_Kong:Hong-Kong
+Asia/Makassar:Macassar
+Asia/Jerusalem:Jérusalem
+Europe/Isle_of_Man:Douglas
+Asia/Calcutta:Kolkata
+Indian/Chagos:Diego Garcia
+Asia/Baghdad:Bagdad
+Asia/Tehran:Téhéran
+Atlantic/Reykjavik:Reykjavík
+Europe/Jersey:Saint-Hélier
+America/Jamaica:Jamaïque
+Asia/Bishkek:Bichkek
+Indian/Comoro:Comores (Archipel)
+America/St_Kitts:Saint-Kitts
+Asia/Seoul:Séoul
+Asia/Kuwait:Koweït
+America/Cayman:Caïmans
+Asia/Aqtau:Aktaou
+Asia/Oral:Ouralsk
+Asia/Aqtobe:Aktioubinsk
+Asia/Qyzylorda:Kzyl Orda
+Asia/Almaty:Alma Ata
+Asia/Beirut:Beyrouth
+America/St_Lucia:Sainte-Lucie
+Asia/Ulaanbaatar:Oulan-Bator
+Asia/Choibalsan:Tchoïbalsan
+Asia/Macau:Macao
+America/Martinique:Fort-de-France
+America/Montserrat:Brades
+Europe/Malta:Malte
+Indian/Mauritius:Maurice (Île)
+Indian/Maldives:Malé
+America/Mazatlan:Mazatlán
+America/Mexico_City:Mexico
+America/Merida:Mérida
+America/Cancun:Cancún
+Pacific/Noumea:Nouméa
+Pacific/Norfolk:Kingston
+Asia/Katmandu:Katmandou
+Pacific/Nauru:Yaren
+Pacific/Niue:Alofi
+America/Panama:Panamá (Panamá)
+Pacific/Marquesas:Marquises
+Asia/Manila:Manille
+Asia/Karachi:Karâchi
+Europe/Warsaw:Varsovie
+America/Miquelon:Saint-Pierre
+Pacific/Pitcairn:Pitcairn (Île)
+America/Puerto_Rico:Porto Rico
+Atlantic/Azores:Açores
+Atlantic/Madeira:Madère
+Europe/Lisbon:Lisbonne
+Pacific/Palau:Melekeok
+America/Asuncion:Asunción
+Asia/Qatar:Doha
+Indian/Reunion:Réunion (Île de la)
+Europe/Bucharest:Bucarest
+Europe/Moscow:Moscou
+Asia/Yekaterinburg:Ekaterinbourg
+Asia/Novosibirsk:Novossibirsk
+Asia/Krasnoyarsk:Krasnoïarsk
+Asia/Irkutsk:Irkoutsk
+Asia/Yakutsk:Iakoutsk
+Asia/Sakhalin:Sakhaline
+Asia/Kamchatka:Kamtchatka
+Asia/Riyadh:Riyad
+Pacific/Guadalcanal:Honiara
+Indian/Mahe:Mahé
+Asia/Singapore:Singapour
+Atlantic/St_Helena:Sainte-Hélène
+Europe/San_Marino:Saint-Marin
+Africa/Mogadishu:Mogadiscio
+Africa/Sao_Tome:São Tomé
+America/El_Salvador:Salvador
+Asia/Damascus:Damas
+America/Grand_Turk:Cockburn Town
+Indian/Kerguelen:Port-aux-Français
+Africa/Lome:Lomé
+Asia/Dushanbe:Douchanbé
+Asia/Ashgabat:Achgabat
+Pacific/Tongatapu:Nukuʻalofa
+America/Port_of_Spain:Port-d’Espagne
+Europe/Uzhgorod:Oujgorod
+Europe/Zaporozhye:Zaporojie
+America/Anchorage:Alaska
+America/North_Dakota/New_Salem:New Salem, Dakota du Nord
+America/North_Dakota/Center:Central North Dakota
+America/Detroit:Détroit
+Asia/Samarkand:Samarcande
+Asia/Tashkent:Tachkent
+Europe/Vatican:Cité du Vatican
+America/St_Vincent:Saint-Vincent
+America/Tortola:Road Town
+America/St_Thomas:Saint-Thomas
+Asia/Saigon:Hô-Chi-Minh-Ville
+Pacific/Efate:Efaté
+Pacific/Wallis:Matāʻutu
+Indian/Mayotte:Mamoudzou

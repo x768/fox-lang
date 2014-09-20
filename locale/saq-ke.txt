@@ -1,0 +1,4 @@
+langtag:saq_KE
+language:saq
+territory:KE
+bidi:ltr

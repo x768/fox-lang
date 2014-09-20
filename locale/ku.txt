@@ -1,0 +1,4 @@
+langtag:ku
+language:ku
+days_w:دووشەممە	سێشەممە	چوارشەممە				یەکشەممە
+bidi:rtl

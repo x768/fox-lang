@@ -1,0 +1,4 @@
+langtag:dv_MV
+language:dv
+territory:MV
+bidi:ltr

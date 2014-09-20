@@ -1,0 +1,4 @@
+langtag:pt_GW
+language:pt
+territory:GW
+bidi:ltr

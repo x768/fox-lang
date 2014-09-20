@@ -1,0 +1,18 @@
+locale=eu
+Etc/Unknown:Ezezaguna
+Asia/Bahrain:Bahrein
+Atlantic/Bermuda:Bermudak
+Atlantic/Cape_Verde:Cabo Verde
+Africa/Djibouti:Djibuti
+America/Dominica:Dominika
+Atlantic/Canary:Espainia (Kanariak)
+Europe/Madrid:Madril
+America/Guadeloupe:Guadalupe
+America/Jamaica:Jamaika
+Europe/Luxembourg:Luxenburgo
+Europe/Monaco:Monako
+America/Martinique:Martinika
+Indian/Mauritius:Maurizio
+Indian/Maldives:Maldivak
+Asia/Singapore:Singapur
+America/North_Dakota/Center:Ameriketako Estatu Batuak (Erdialdea, Ipar Dakota)

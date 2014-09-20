@@ -1,0 +1,4 @@
+langtag:mt_MT
+language:mt
+territory:MT
+bidi:ltr

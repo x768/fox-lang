@@ -1,0 +1,4 @@
+=Africa/Sao_Tome
+8000000000000000 1616 0 LMT
+fffffd881e3d0380 -2192 0 LMT
+fffffe55d4be1680 0 0 GMT

@@ -1,0 +1,6 @@
+=Asia/Vientiane
+8000000000000000 24624 0 LMT
+fffffe2cf2aaa880 25580 0 SMT
+fffffe4fdebcdc80 25200 0 ICT
+fffffe58423d9a80 28800 0 ICT
+fffffee3d8c66000 25200 0 ICT

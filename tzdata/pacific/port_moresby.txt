@@ -1,0 +1,4 @@
+=Pacific/Port_Moresby
+8000000000000000 35320 0 LMT
+fffffd6ab84faf40 35312 0 PMMT
+fffffdd8f04ad280 36000 0 PGT

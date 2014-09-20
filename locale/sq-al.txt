@@ -1,0 +1,4 @@
+langtag:sq_AL
+language:sq
+territory:AL
+bidi:ltr

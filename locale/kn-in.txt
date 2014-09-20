@@ -1,0 +1,4 @@
+langtag:kn_IN
+language:kn
+territory:IN
+bidi:ltr

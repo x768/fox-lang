@@ -1,0 +1,9 @@
+langtag:bem
+language:bem
+month_w:Januari	Februari	Machi	Epreo	Mei	Juni	Julai	Ogasti	Septemba	Oktoba	Novemba	Disemba
+month:Jan	Feb	Mac	Epr	Mei	Jun	Jul	Oga	Sep	Okt	Nov	Dis
+days_w:Palichimo	Palichibuli	Palichitatu	Palichine	Palichisano	Pachibelushi	Pa Mulungu
+am_pm:uluchelo	akasuba
+date:dd/MM/yyyy	d MMM y	d MMMM y	dddd, d MMMM y
+time:h:mm a	h:mm:ss a	h:mm:ss a z	h:mm:ss a Z
+bidi:ltr

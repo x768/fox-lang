@@ -1,0 +1,4 @@
+langtag:da_DK
+language:da
+territory:DK
+bidi:ltr

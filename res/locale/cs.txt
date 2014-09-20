@@ -1,0 +1,514 @@
+locale=cs
+aa:afarština
+ab:abcházština
+af:afrikánština
+am:amharština
+ar:arabština
+as:assaméština
+ay:aymárština
+az:azerbajdžánština
+ba:baskirština
+be:běloruština
+bg:bulharština
+bh:biharština
+bi:bislámština
+bn:bengálština
+bo:tibetština
+br:bretaňština
+bs:bosenština
+ca:katalánština
+co:korsičtina
+crh:krymská turečtina
+cs:čeština
+cy:velština
+da:dánština
+de:němčina
+dz:bhútánština
+el:řečtina
+en:angličtina
+eo:esperanto
+es:španělština
+et:estonština
+eu:baskičtina
+fa:perština
+fi:finština
+fj:fidži
+fo:faerština
+fr:francouzština
+fy:fríština
+ga:irština
+gd:skotská galština
+gl:haličština
+gn:guaranština
+gu:gujaratština
+gv:manština
+ha:hausa
+he:hebrejština
+hi:hindština
+hr:chorvatština
+hu:maďarština
+hy:arménština
+ia:interlingua
+id:indonéština
+ie:interlingue
+ik:inupiakština
+is:islandština
+it:italština
+iu:inuktitutština
+ja:japonština
+jv:javánština
+ka:gruzínština
+kk:kazachština
+kl:grónština
+km:kambodžština
+kn:kannadština
+ko:korejština
+ks:kašmírština
+ku:kurdština
+ky:kirgizština
+la:latina
+lb:Lucemburština
+ln:lingalština
+lo:laoština
+lt:litevština
+lv:lotyština
+mg:malgaština
+mi:maorština
+mk:makedonština
+ml:malabarština
+mn:mongolština
+mo:moldavština
+mr:marathi
+ms:malajština
+mt:maltština
+my:barmština
+na:nauru
+nb:norština (bokmål)
+nd:ndebele (Zimbabwe)
+ne:nepálština
+nl:nizozemština
+nn:norština (nynorsk)
+no:norština
+nr:ndebele (Jižní Afrika)
+oc:occitan
+om:oromština (Afan)
+or:oriya
+pa:paňdžábština
+pl:polština
+ps:Pashto (Pushto)
+pt:portugalština
+qu:kečuánština
+rm:rétorománština
+rn:kirundi
+ro:rumunština
+ru:ruština
+rw:kinyarwandština
+sa:sanskrt
+sd:sindhi
+sg:sangho
+sh:srbochorvatština
+si:sinhálština
+sk:slovenština
+sl:slovinština
+sm:samoyština
+sn:shona
+so:somálština
+sq:albánština
+sr:srbština
+ss:siswatština
+st:sesotho
+su:sundanština
+sv:švédština
+sw:svahilština
+ta:tamilština
+te:telugština
+tg:tádžičtina
+th:thajština
+ti:tigrinijština
+tk:turkmenština
+tl:tagalog
+tn:setswanština
+to:tonga
+tr:turečtina
+ts:tsonga
+tt:tatarština
+tw:twi
+ug:uighurština
+uk:ukrajinština
+und:neznámý nebo neplatný jazyk
+ur:urdština
+uz:uzbečtina
+vi:vietnamština
+vo:volapuk
+wo:wolof
+xh:xhosa
+yi:jidiš
+yo:yoruba
+za:zhuang
+zh:čínština
+zu:zulu
+Arab:Arabský
+Armn:Arménský
+Bali:Balijský
+Batk:Batacký
+Beng:Bengálský
+Blis:Bliss
+Bopo:Bopomofo
+Brah:Bráhmí
+Brai:Braillovo písmo
+Bugi:Buginský
+Buhd:Buhid
+Cham:Čam
+Cher:Čerokí
+Cirt:Cirth
+Copt:Koptský
+Cyrl:Cyrilice
+Deva:Devanágarí
+Dsrt:Deseret
+Egyd:Egyptský démotický
+Egyh:Egyptský hieratický
+Egyp:Egyptské hieroglyfy
+Ethi:Etiopský
+Glag:Hlaholice
+Goth:Gotický
+Grek:Řecký
+Gujr:Gudžarátí
+Guru:Gurmukhí
+Hang:Hangul
+Hani:Han
+Hano:Hanunoo
+Hans:Han – zjednodušené
+Hant:Han – tradiční
+Hebr:Hebrejský
+Hira:Hiragana
+Hmng:Hmongský
+Hrkt:Katakana nebo Hiragana
+Hung:Staromaďarský
+Inds:Harappský
+Ital:Etruský
+Java:Jávský
+Jpan:Japonský
+Kali:Kayah li
+Kana:Katakana
+Khar:Kháróští
+Khmr:Khmerský
+Knda:Kannadský
+Laoo:Laoský
+Latn:Latinka
+Lepc:Lepčský
+Lina:Lineární A
+Linb:Lineární B
+Mand:Mandejský
+Maya:Mayské hieroglyfy
+Mero:Meroitický
+Mlym:Malajálamský
+Mong:Mongolský
+Mymr:Barmský
+Ogam:Ogham
+Orkh:Orchonský
+Orya:Urijský
+Osma:Osmanský
+Perm:Staropermský
+Phnx:Fénický
+Plrd:Pollardova fonetická abeceda
+Roro:Rongorongo
+Runr:Runové písmo
+Sinh:Sinhálský
+Syrc:Syrský
+Tagb:Tagbanwa
+Taml:Tamilský
+Telu:Telužský
+Teng:Tengwar
+Tglg:Tagalský
+Thaa:Thaana
+Thai:Thajský
+Tibt:Tibetský
+Ugar:Ugaritské klínové písmo
+Vaii:Vai
+Visp:Viditelná řeč
+Xpeo:Staroperské klínové písmo
+Xsux:Sumero-akkadské klínové písmo
+Yiii:Yi
+Zyyy:Obecný
+Zzzz:Neznámý nebo neplatný skript
+001:Svět
+002:Afrika
+003:003
+005:Jižní Amerika
+009:Oceánie
+011:Západní Afrika
+013:Střední Amerika
+014:Východní Afrika
+015:Severní Afrika
+017:Střední Afrika
+018:Jižní Afrika
+019:Amerika
+021:Severní Amerika
+029:Karibik
+030:Východní Asie
+034:Jižní Asie
+035:Jihovýchodní Asie
+039:Jižní Evropa
+053:Austrálie a Nový Zéland
+054:Melanésie
+057:Mikronésie
+061:Polynésie
+062:Jižní a centrální Asie
+142:Asie
+143:Střední Asie
+145:Západní Asie
+150:Evropa
+151:Východní Evropa
+154:Severní Evropa
+155:Západní Evropa
+200:Československo
+419:Latinská Amerika a Karibské moře
+830:Normanské ostrovy
+AD:Andorra
+AE:Spojené arabské emiráty
+AF:Afghánistán
+AG:Antigua a Barbuda
+AI:Anguila
+AL:Albánie
+AM:Arménie
+AN:Nizozemské Antily
+AO:Angola
+AQ:Antarktida
+AR:Argentina
+AS:Americká Samoa
+AT:Rakousko
+AU:Austrálie
+AW:Aruba
+AX:Alandy
+AZ:Ázerbájdžán
+BA:Bosna a Hercegovina
+BB:Barbados
+BD:Bangladéš
+BE:Belgie
+BF:Burkina Faso
+BG:Bulharsko
+BH:Bahrajn
+BI:Burundi
+BJ:Benin
+BM:Bermudy
+BN:Brunej Darussalam
+BO:Bolívie
+BR:Brazílie
+BS:Bahamy
+BT:Bhútán
+BV:Ostrov Bouvet
+BW:Botswana
+BY:Bělorusko
+BZ:Belize
+CA:Kanada
+CC:Kokosové ostrovy
+CD:Demokratická republika Kongo
+CF:Středoafrická republika
+CG:Kongo
+CH:Švýcarsko
+CI:Pobřeží slonoviny
+CK:Cookovy ostrovy
+CL:Chile
+CM:Kamerun
+CN:Čína
+CO:Kolumbie
+CR:Kostarika
+CS:Srbsko a Černá Hora
+CU:Kuba
+CV:Kapverdy
+CX:Vánoční ostrovy
+CY:Kypr
+CZ:Česká republika
+DE:Německo
+DJ:Džibuti
+DK:Dánsko
+DM:Dominika
+DO:Dominikánská republika
+DZ:Alžírsko
+EC:Ekvádor
+EE:Estonsko
+EG:Egypt
+EH:Západní Sahara
+ER:Eritrea
+ES:Španělsko
+ET:Etiopie
+EU:Evropská unie
+FI:Finsko
+FJ:Fidži
+FK:Falklandské ostrovy
+FM:Mikronézie
+FO:Faerské ostrovy
+FR:Francie
+GA:Gabon
+GB:Velká Británie
+GD:Grenada
+GE:Gruzie
+GF:Francouzská Guyana
+GG:Guernsey
+GH:Ghana
+GI:Gibraltar
+GL:Grónsko
+GM:Gambie
+GN:Guinea
+GP:Guadeloupe
+GQ:Rovníková Guinea
+GR:Řecko
+GS:Jižní Georgie a Jižní Sandwichovy ostrovy
+GT:Guatemala
+GU:Guam
+GW:Guinea-Bissau
+GY:Guyana
+HK:Hongkong, zvláštní administrativní oblast Číny
+HM:Ostrovy Heard a McDonald
+HN:Honduras
+HR:Chorvatsko
+HT:Haiti
+HU:Maďarsko
+ID:Indonésie
+IE:Irsko
+IL:Izrael
+IM:Ostrov Man
+IN:Indie
+IO:Britské území v Indickém oceánu
+IQ:Irák
+IR:Írán
+IS:Island
+IT:Itálie
+JE:Jersey
+JM:Jamajka
+JO:Jordánsko
+JP:Japonsko
+KE:Keňa
+KG:Kyrgyzstán
+KH:Kambodža
+KI:Kiribati
+KM:Komory
+KN:Svatý Kitts a Nevis
+KP:Severní Korea
+KR:Jižní Korea
+KW:Kuvajt
+KY:Kajmanské ostrovy
+KZ:Kazachstán
+LA:Lidově demokratická republika Laos
+LB:Libanon
+LC:Svatá Lucie
+LI:Lichtenštejnsko
+LK:Srí Lanka
+LR:Libérie
+LS:Lesotho
+LT:Litva
+LU:Lucembursko
+LV:Lotyšsko
+LY:Libye
+MA:Maroko
+MC:Monako
+MD:Moldavsko, republika
+ME:Černá Hora
+MG:Madagaskar
+MH:Marshallovy ostrovy
+MK:Macedonia
+ML:Mali
+MM:Myanmar
+MN:Mongolsko
+MO:Zvláštní administrativní oblast Číny Macao
+MP:Severní Mariany
+MQ:Martinik
+MR:Mauritánie
+MS:Montserrat
+MT:Malta
+MU:Mauricius
+MV:Maladivy
+MW:Malawi
+MX:Mexiko
+MY:Malajsie
+MZ:Mosambik
+NA:Namibie
+NC:Nová Kaledonie
+NE:Niger
+NF:Norfolk
+NG:Nigérie
+NI:Nikaragua
+NL:Nizozemsko
+NO:Norsko
+NP:Nepál
+NR:Nauru
+NU:Niue
+NZ:Nový Zéland
+OM:Omán
+PA:Panama
+PE:Peru
+PF:Francouzská Polynésie
+PG:Papua-Nová Guinea
+PH:Filipíny
+PK:Pákistán
+PL:Polsko
+PM:Svatý Pierre a Miquelon
+PN:Pitcairn
+PR:Portoriko
+PS:Palestinian Territory
+PT:Portugalsko
+PW:Palau
+PY:Paraguay
+QA:Katar
+QO:Vnější Oceánie
+RE:Réunion
+RO:Rumunsko
+RS:Srbsko
+RU:Rusko
+RW:Rwanda
+SA:Saúdská Arábie
+SB:Šalamounovy ostrovy
+SC:Seychely
+SD:Súdán
+SE:Švédsko
+SG:Singapur
+SH:Svatá Helena
+SI:Slovinsko
+SJ:Svalbard a Jan Mayen
+SK:Slovensko
+SL:Sierra Leone
+SM:San Marino
+SN:Senegal
+SO:Somálsko
+SR:Surinam
+ST:Svatý Tomáš
+SV:El Salvador
+SY:Sýrie
+SZ:Svazijsko
+TC:Ostrovy Caicos a Turks
+TD:Čad
+TF:Francouzská jižní teritoria
+TG:Togo
+TH:Thajsko
+TJ:Tádžikistán
+TK:Tokelau
+TL:Východní Timor
+TM:Turkmenistán
+TN:Tunisko
+TO:Tonga
+TR:Turecko
+TT:Trinidad a Tobago
+TV:Tuvalu
+TW:Tchaj-wan
+TZ:Tanzanie
+UA:Ukrajina
+UG:Uganda
+UM:Menší odlehlé ostrovy USA
+US:Spojené státy
+UY:Uruguay
+UZ:Uzbekistán
+VA:Svatý stolec
+VC:Svatý Vincent a Grenadiny
+VE:Venezuela
+VG:Britské Panenské ostrovy
+VI:Americké Panenské ostrovy
+VN:Vietnam
+VU:Vanuatu
+WF:Wallis a Futuna
+WS:Samoa
+YE:Jemen
+YT:Mayotte
+ZA:Jihoafrická republika
+ZM:Zambie
+ZW:Zimbabwe
+ZZ:Neznámá nebo neplatná oblast

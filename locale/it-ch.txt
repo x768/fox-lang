@@ -1,0 +1,7 @@
+langtag:it_CH
+language:it
+territory:CH
+date:dd.MM.yy	d-MMM-y	d MMMM y	dddd, d MMMM y
+decimal:.
+group:'
+bidi:ltr

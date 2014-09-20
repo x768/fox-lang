@@ -1,0 +1,11 @@
+langtag:brx
+language:brx
+month_w:जानुवारी	फेब्रुवारी	मार्स	एफ्रिल	मे	जुन	जुलाइ	आगस्थ	सेबथेज्ब़र	अखथबर	नबेज्ब़र	दिसेज्ब़र
+days_w:समबार	मंगलबार	बुदबार	बिसथिबार	सुखुरबार	सुनिबार	रबिबार
+days:सम	मंगल	बुद	बिसथि	सुखुर	सुनि	रबि
+am_pm:फुं	बेलासे
+date:M/d/yy	MMM d, y	MMMM d, y	dddd, MMMM d, y
+time:h:mm a	h:mm:ss a	h:mm:ss a z	h:mm:ss a Z
+decimal:.
+group:,
+bidi:ltr

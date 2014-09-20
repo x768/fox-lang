@@ -1,0 +1,10 @@
+langtag:kam
+language:kam
+month_w:Mwai wa mbee	Mwai wa kelĩ	Mwai wa katatũ	Mwai wa kana	Mwai wa katano	Mwai wa thanthatũ	Mwai wa muonza	Mwai wa nyaanya	Mwai wa kenda	Mwai wa ĩkumi	Mwai wa ĩkumi na ĩmwe	Mwai wa ĩkumi na ilĩ
+month:Mbe	Kel	Ktũ	Kan	Ktn	Tha	Moo	Nya	Knd	Ĩku	Ĩkm	Ĩkl
+days_w:Wa kwambĩlĩlya	Wa kelĩ	Wa katatũ	Wa kana	Wa katano	Wa thanthatũ	Wa kyumwa
+days:Wkw	Wkl	Wtũ	Wkn	Wtn	Wth	Wky
+am_pm:Ĩyakwakya	Ĩyawĩoo
+date:dd/MM/yyyy	d MMM y	d MMMM y	dddd, d MMMM y
+time:h:mm a	h:mm:ss a	h:mm:ss a z	h:mm:ss a Z
+bidi:ltr

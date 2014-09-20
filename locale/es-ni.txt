@@ -1,0 +1,6 @@
+langtag:es_NI
+language:es
+territory:NI
+decimal:.
+group:,
+bidi:ltr

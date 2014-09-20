@@ -1,0 +1,4 @@
+langtag:mg_MG
+language:mg
+territory:MG
+bidi:ltr

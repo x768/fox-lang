@@ -1,0 +1,12 @@
+langtag:it
+language:it
+month_w:gennaio	febbraio	marzo	aprile	maggio	giugno	luglio	agosto	settembre	ottobre	novembre	dicembre
+month:gen	feb	mar	apr	mag	giu	lug	ago	set	ott	nov	dic
+days_w:lunedì	martedì	mercoledì	giovedì	venerdì	sabato	domenica
+days:lun	mar	mer	gio	ven	sab	dom
+am_pm:m.	p.
+date:dd/MM/yy	dd/MMM/y	dd MMMM y	dddd d MMMM y
+time:HH:mm	HH:mm:ss	HH:mm:ss z	HH:mm:ss Z
+decimal:,
+group:.
+bidi:ltr

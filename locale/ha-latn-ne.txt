@@ -1,0 +1,5 @@
+langtag:ha_Latn_NE
+language:ha
+script:Latn
+territory:NE
+bidi:ltr

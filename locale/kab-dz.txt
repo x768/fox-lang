@@ -1,0 +1,4 @@
+langtag:kab_DZ
+language:kab
+territory:DZ
+bidi:ltr

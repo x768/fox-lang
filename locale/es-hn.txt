@@ -1,0 +1,6 @@
+langtag:es_HN
+language:es
+territory:HN
+decimal:.
+group:,
+bidi:ltr

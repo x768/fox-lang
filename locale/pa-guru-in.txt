@@ -1,0 +1,5 @@
+langtag:pa_Guru_IN
+language:pa
+script:Guru
+territory:IN
+bidi:ltr

@@ -1,0 +1,8 @@
+langtag:nso
+language:nso
+month_w:Janaware	Feberware	Matšhe	Aporele	Mei	June	Julae	Agostose	Setemere	Oktobore	Nofemere	Disemere
+month:Jan	Feb	Mat	Apo	Mei	Jun	Jul	Ago	Set	Okt	Nof	Dis
+days_w:Mosupalogo	Labobedi	Laboraro	Labone	Labohlano	Mokibelo	Sontaga
+days:Mos	Bed	Rar	Ne	Hla	Mok	Son
+decimal:,
+bidi:ltr

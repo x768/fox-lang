@@ -1,0 +1,4 @@
+langtag:ak_GH
+language:ak
+territory:GH
+bidi:ltr

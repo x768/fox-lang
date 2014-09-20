@@ -45,6 +45,7 @@ static int fox_clear_history(Value *vret, Value *v, RefNode *node)
 	clear_history();
 	return TRUE;
 }
+#if 0
 static int fox_remove_history(Value *vret, Value *v, RefNode *node)
 {
 	int err = FALSE;
@@ -75,6 +76,7 @@ static int fox_hisotry_list(Value *vret, Value *v, RefNode *node)
 
 	return TRUE;
 }
+#endif
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -91,11 +93,13 @@ static void define_function(RefNode *m)
 	n = fs->define_identifier(m, m, "clear_hisotry", NODE_FUNC_N, 0);
 	fs->define_native_func_a(n, fox_clear_history, 0, 0, NULL);
 
+#if 0
 	n = fs->define_identifier(m, m, "remove_hisotry", NODE_FUNC_N, 0);
 	fs->define_native_func_a(n, fox_remove_history, 1, 1, NULL, fs->cls_int);
 
 	n = fs->define_identifier(m, m, "hisotry_list", NODE_FUNC_N, 0);
 	fs->define_native_func_a(n, fox_hisotry_list, 0, 0, NULL);
+#endif
 }
 
 void define_module(RefNode *m, const FoxStatic *a_fs, FoxGlobal *a_fg)

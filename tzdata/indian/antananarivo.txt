@@ -1,0 +1,5 @@
+=Indian/Antananarivo
+8000000000000000 11404 0 LMT
+fffffe52205c8120 10800 0 EAT
+ffffff8b9a28ee00 14400 1 EAST
+ffffff8d6ecba200 10800 0 EAT

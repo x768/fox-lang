@@ -1,0 +1,4 @@
+langtag:dav_KE
+language:dav
+territory:KE
+bidi:ltr

@@ -1,0 +1,12 @@
+langtag:vi
+language:vi
+month_w:tháng một	tháng hai	tháng ba	tháng tư	tháng năm	tháng sáu	tháng bảy	tháng tám	tháng chín	tháng mười	tháng mười một	tháng mười hai
+month:thg 1	thg 2	thg 3	thg 4	thg 5	thg 6	thg 7	thg 8	thg 9	thg 10	thg 11	thg 12
+days_w:Thứ hai	Thứ ba	Thứ tư	Thứ năm	Thứ sáu	Thứ bảy	Chủ nhật
+days:Th 2	Th 3	Th 4	Th 5	Th 6	Th 7	CN
+am_pm:SA	CH
+date:dd/MM/yyyy	dd-MM-yyyy	'Ngày' dd 'tháng' M 'năm' y	dddd, 'ngày' dd MMMM 'năm' y
+time:HH:mm	HH:mm:ss	HH:mm:ss z	HH:mm:ss Z
+decimal:,
+group:.
+bidi:ltr

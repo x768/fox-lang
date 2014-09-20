@@ -1,0 +1,4 @@
+langtag:el_POLYTON
+language:el
+variant:POLYTON
+bidi:ltr

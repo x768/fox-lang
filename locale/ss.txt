@@ -1,0 +1,8 @@
+langtag:ss
+language:ss
+month_w:Bhimbidvwane	iNdlovana	iNdlovu-lenkhulu	Mabasa	iNkhwekhweti	iNhlaba	Kholwane	iNgci	iNyoni	iMphala	Lweti	iNgongoni
+month:Bhi	Van	Vol	Mab	Nkh	Nhl	Kho	Ngc	Nyo	Mph	Lwe	Ngo
+days_w:uMsombuluko	Lesibili	Lesitsatfu	Lesine	Lesihlanu	uMgcibelo	Lisontfo
+days:Mso	Bil	Tsa	Ne	Hla	Mgc	Son
+decimal:,
+bidi:ltr

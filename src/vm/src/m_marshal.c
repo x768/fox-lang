@@ -839,7 +839,7 @@ static char *read_str(Str *val, Value r)
 
 	rd_size = 1;
 	if (!stream_read_data(r, NULL, (char*)&size, &rd_size, FALSE, TRUE)) {
-		return FALSE;
+		return NULL;
 	}
 	if (size == 0) {
 		throw_errorf(mod_marshal, "MarshalLoadError", "MarshalDumpHeader is broken");
@@ -849,7 +849,7 @@ static char *read_str(Str *val, Value r)
 	rd_size = size;
 	ptr = malloc(size);
 	if (!stream_read_data(r, NULL, ptr, &rd_size, FALSE, TRUE)) {
-		return FALSE;
+		return NULL;
 	}
 	*val = Str_new(ptr, size);
 	return ptr;

@@ -1,0 +1,5 @@
+langtag:ha_Arab_NG
+language:ha
+script:Arab
+territory:NG
+bidi:ltr

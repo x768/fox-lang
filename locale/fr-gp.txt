@@ -1,0 +1,4 @@
+langtag:fr_GP
+language:fr
+territory:GP
+bidi:ltr

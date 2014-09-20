@@ -1,0 +1,4 @@
+langtag:ta_IN
+language:ta
+territory:IN
+bidi:ltr

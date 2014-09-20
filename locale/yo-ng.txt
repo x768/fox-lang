@@ -1,0 +1,4 @@
+langtag:yo_NG
+language:yo
+territory:NG
+bidi:ltr

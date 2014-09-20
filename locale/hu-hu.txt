@@ -1,0 +1,4 @@
+langtag:hu_HU
+language:hu
+territory:HU
+bidi:ltr

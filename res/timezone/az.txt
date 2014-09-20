@@ -1,0 +1,155 @@
+locale=az
+Etc/Unknown:Bilinmir
+Antarctica/Rothera:rofera
+Antarctica/South_Pole:çənub polus
+Antarctica/Syowa:syova
+Antarctica/Mawson:moson
+Antarctica/Davis:Deyvis
+Antarctica/Vostok:vostok
+Antarctica/Casey:Keysi
+Antarctica/DumontDUrville:Dumont de Urvile
+Antarctica/McMurdo:makmurdo
+America/Argentina/Rio_Gallegos:rio qayegos
+America/Mendoza:mendoza
+America/Argentina/San_Juan:san xuan
+America/Argentina/Ushuaia:uşuya
+America/Argentina/La_Rioja:La Rioha
+America/Argentina/San_Luis:san luis
+America/Catamarca:Katamarka
+America/Jujuy:Cucuy
+America/Argentina/Tucuman:tukuman
+America/Cordoba:Kordoba
+America/Buenos_Aires:Buenos Ayres
+Australia/Perth:perf
+Australia/Eucla:Yukla
+Australia/Darwin:Darvin
+Australia/Adelaide:Adelayd
+Australia/Broken_Hill:Broken Hil
+Australia/Currie:Kuriye
+Australia/Melbourne:melburn
+Australia/Sydney:sidney
+Australia/Brisbane:Brisbeyn
+Australia/Lord_Howe:Lord Hove
+America/Eirunepe:İrunepe
+America/Rio_Branco:Rio Branko
+America/Porto_Velho:porto velo
+America/Cuiaba:Kuyaba
+America/Campo_Grande:Kampo Qrande
+America/Araguaina:Araguayna
+America/Sao_Paulo:sao paulo
+America/Bahia:Bahiya
+America/Maceio:Maseyo
+America/Recife:resif
+America/Noronha:noronha
+America/Dawson:Douson
+America/Whitehorse:vaythors
+America/Inuvik:İnuvik
+America/Vancouver:vənkuver
+America/Dawson_Creek:Douson Krik
+America/Yellowknife:yelounayf
+America/Edmonton:Edmondton
+America/Swift_Current:svift kurent
+America/Cambridge_Bay:Kəmbric Bey
+America/Regina:recina
+America/Winnipeg:vinipeq
+America/Resolute:resolut
+America/Rainy_River:reyni river
+America/Rankin_Inlet:rankin inlet
+America/Coral_Harbour:Koral Harbor
+America/Thunder_Bay:funder bey
+America/Nipigon:nipiqon
+America/Toronto:toronto
+America/Montreal:montreal
+America/Iqaluit:İqalut
+America/Pangnirtung:panqnirtanq
+America/Moncton:monkton
+America/Halifax:Halifaks
+America/Goose_Bay:Qus Bey
+America/Glace_Bay:Qleys Bey
+America/Blanc-Sablon:Blank-Sablon
+America/St_Johns:St Johns
+Africa/Kinshasa:Kinşasa
+Africa/Lubumbashi:Lubumbaşi
+Pacific/Easter:İster
+Asia/Kashgar:Kaşqar
+Asia/Urumqi:urumçi
+Asia/Chongqing:Conqinq
+Pacific/Galapagos:Qalapaqos
+Atlantic/Canary:Kanari
+Africa/Ceuta:Seuta
+Pacific/Ponape:ponape
+Pacific/Kosrae:Kosraye
+America/Thule:tul
+America/Scoresbysund:skoresbisund
+America/Danmarkshavn:Danmarkşavn
+Asia/Jakarta:Cakarta
+Asia/Pontianak:pontiyanak
+Asia/Makassar:Makasar
+Asia/Jayapura:Cayapura
+Pacific/Enderbury:Enderböri
+Pacific/Kiritimati:Kirimati
+Pacific/Tarawa:tarava
+Asia/Aqtau:Aktau
+Asia/Qyzylorda:qüzülorda
+Asia/Almaty:Almati
+Pacific/Kwajalein:Kvajaleyn
+Pacific/Majuro:Maxiro
+Asia/Ulaanbaatar:ulanbatar
+Asia/Choibalsan:Coybalsan
+America/Tijuana:tixuana
+America/Hermosillo:Hermosilo
+America/Mazatlan:mazaltan
+America/Chihuahua:Cihuvava
+America/Monterrey:monterey
+America/Mexico_City:mexiko
+America/Cancun:Kankun
+Asia/Kuching:Kuçinq
+Pacific/Chatham:Çatam
+Pacific/Marquesas:Markuyesas
+Pacific/Gambier:Qambiyer
+Atlantic/Madeira:Madeyra
+Europe/Kaliningrad:Kalininqrad
+Europe/Moscow:moskva
+Europe/Volgograd:volqoqrad
+Europe/Samara:samara
+Asia/Yekaterinburg:yekaterinburq
+Asia/Novosibirsk:novosibirsk
+Asia/Irkutsk:İrkutsk
+Asia/Yakutsk:yakutsk
+Asia/Vladivostok:vladivostok
+Asia/Sakhalin:saxalin
+Asia/Magadan:Maqadan
+Asia/Kamchatka:Kamçatka
+Asia/Anadyr:Anadır
+Europe/Uzhgorod:ujgorod
+Europe/Kiev:Kiyev
+Europe/Simferopol:simferopol
+Europe/Zaporozhye:zaporojye
+Pacific/Midway:midvey
+Pacific/Johnston:Conston
+Pacific/Wake:veyk
+America/Nome:nom
+America/Anchorage:Ankorac
+America/Yakutat:yakutat
+America/Juneau:Cüneau
+America/Los_Angeles:Los Anceles
+America/Boise:Boyse
+America/Phoenix:finiks
+America/Shiprock:şiprok
+America/North_Dakota/New_Salem:nyu salem
+America/North_Dakota/Center:Orta, Şimal Dakota
+America/Chicago:Cikaqo
+America/Menominee:menomini
+America/Indiana/Vincennes:vinsenes
+America/Indiana/Petersburg:pitersburq
+America/Indiana/Tell_City:tell şəhəri
+America/Indiana/Knox:Noks
+America/Indiana/Winamac:vinamak
+America/Indiana/Marengo:Marenqo
+America/Indianapolis:İndianapolis
+America/Louisville:Luisvil
+America/Indiana/Vevay:vevey
+America/Kentucky/Monticello:montiçelo
+America/Detroit:Detroyt
+America/New_York:nyu york
+Asia/Samarkand:səmərkənd

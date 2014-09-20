@@ -1,0 +1,4 @@
+langtag:ln_CD
+language:ln
+territory:CD
+bidi:ltr

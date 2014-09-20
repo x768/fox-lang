@@ -1,0 +1,9 @@
+message=%usage: fox [%options...] %source [%arg...]\n%options\n  -e srccode: %immediate\n  -c: %validate\n  -help: %show_help\n  -v: %show_version\n
+usage=Usage
+options=Options
+source=source-code-filename
+arg=Arguments
+immediate=Execute "srccode" immediately.
+validate=Validate syntax only.
+show_help=Show help.
+show_version=Show version information.

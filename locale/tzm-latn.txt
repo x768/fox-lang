@@ -1,0 +1,4 @@
+langtag:tzm_Latn
+language:tzm
+script:Latn
+bidi:ltr

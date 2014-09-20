@@ -1,0 +1,5 @@
+langtag:ug_Arab_CN
+language:ug
+script:Arab
+territory:CN
+bidi:ltr

@@ -1,0 +1,50 @@
+locale=fil
+el:Griyego
+es:Espanyol
+hi:Hindi
+it:Italyano
+ja:Japanese
+nl:Olandes
+ru:Russian
+sl:Slovenian
+sr:Serbian
+sv:Swedish
+swb:Comorian
+tr:Turkish
+uk:Ukranian
+yue:Cantonese
+zh:Chinese
+AC:Acsencion island
+AL:Albania
+CD:Congo - Kinshasa
+CG:Congo - Brazzaville
+CI:Côte d'Ivoire
+CP:Clipperton Island
+DG:Diego Garcia
+EA:Ceuta and Melilla
+FK:Falkland Islands
+GE:Georgia
+GS:South Georgia and The South Sandwich Islands
+HK:Hong Kong SAR China
+IC:Canary Island
+ID:Indonesia
+KP:North Korea
+MH:Marshall Islands
+MK:Macedonia
+MM:Myanmar
+MO:Macau SAR China
+PL:Poland
+PN:Pitcairn
+PS:Palestinian Territory
+RU:Russian Federation
+SH:St. Helena
+SJ:Svalbard and Jan Mayen Islands
+TA:Tristan de Cunha
+TL:Timor-Leste
+TT:Trinidad and Tobago
+UM:Mga Minor Outlying Island ng Estados Unidos
+US:Estados Unidos
+VC:Saint Vincent and the Grenadines
+VN:Vietnam
+WF:Wallis and the Futuna Islands
+ZA:South Africa

@@ -1,0 +1,2 @@
+locale=as
+Asia/Calcutta:এলাহাৱাদ

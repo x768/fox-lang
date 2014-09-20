@@ -1,0 +1,11 @@
+langtag:ko
+language:ko
+month_w:1월	2월	3월	4월	5월	6월	7월	8월	9월	10월	11월	12월
+days_w:월요일	화요일	수요일	목요일	금요일	토요일	일요일
+days:월	화	수	목	금	토	일
+am_pm:오전	오후
+date:yy. M. d.	yyyy. M. d.	y년 M월 d일	y년 M월 d일 dddd
+time:a h:mm	a h:mm:ss	a h시 m분 s초 z	a h시 m분 s초 Z
+decimal:.
+group:,
+bidi:ltr

@@ -1,0 +1,14 @@
+locale=ta
+Australia/Brisbane:பிரிஸ்பேன்
+America/Campo_Grande:கேம்போ கிராண்டே
+America/Cambridge_Bay:கேம்பிரிட்ஜ் பே
+Pacific/Easter:ஈஸ்டர்
+Asia/Jakarta:ஜகார்த்தா
+Asia/Jayapura:ஜெயபூரா
+America/Los_Angeles:லாஸ் ஏஞ்சல்ஸ்
+America/Phoenix:ஃபோனிக்ஸ்
+America/Denver:தேன்வர்
+America/North_Dakota/Center:மையம், வடக்கு டகோடா
+America/Chicago:சிகாகோ
+America/Indianapolis:இந்தியானாபோலிஸ்
+America/New_York:நியூயார்க்

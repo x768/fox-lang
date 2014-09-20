@@ -1,0 +1,108 @@
+locale=tr
+Etc/Unknown:Bilinmeyen
+Asia/Kabul:Kabil
+Europe/Tirane:Tiran
+Antarctica/South_Pole:Güney Kutbu
+Antarctica/DumontDUrville:Dumont D'Urville
+Europe/Vienna:Viyana
+Australia/Sydney:Sidney
+Asia/Baku:Bakü
+Europe/Brussels:Brüksel
+Europe/Sofia:Sofya
+Asia/Bahrain:Bahreyn
+Africa/Kinshasa:Kinşasa
+Europe/Zurich:Zürih
+Asia/Kashgar:Kaşgar
+Asia/Urumqi:Urumçi
+Asia/Chongqing:Çunking
+Asia/Shanghai:Şangay
+America/Costa_Rica:Kosta Rika
+Indian/Christmas:Noel
+Asia/Nicosia:Lefkoşa
+Africa/Djibouti:Cibuti
+Europe/Copenhagen:Kopenhag
+America/Dominica:Dominik
+Africa/Algiers:Cezayir
+Africa/Cairo:Kahire
+Africa/El_Aaiun:El Ayun
+Atlantic/Canary:Kanarya Adaları
+Africa/Ceuta:Septe
+Europe/London:Londra
+Asia/Tbilisi:Tiflis
+Europe/Gibraltar:Cebelitarık
+Europe/Athens:Atina
+Atlantic/South_Georgia:Güney Gürcistan
+Europe/Budapest:Budapeşte
+Asia/Jakarta:Cakarta
+Asia/Jerusalem:Kudüs
+Asia/Baghdad:Bağdat
+Asia/Tehran:Tahran
+Europe/Rome:Roma
+America/Jamaica:Jameika
+Asia/Bishkek:Bişkek
+America/St_Kitts:St. Kitts
+Asia/Seoul:Seul
+Asia/Kuwait:Kuveyt
+America/Cayman:Kayman
+Asia/Aqtau:Aktav
+Asia/Oral:Uralsk
+Asia/Aqtobe:Aktöbe
+Asia/Qyzylorda:Kızılorda
+Asia/Almaty:Almatı
+Asia/Beirut:Beyrut
+America/St_Lucia:St. Lucia
+Asia/Colombo:Kolombo
+Europe/Luxembourg:Lüksemburg
+Africa/Tripoli:Trablus
+Africa/Casablanca:Kazablanka
+Europe/Monaco:Monako
+Asia/Hovd:Kobdo
+Asia/Ulaanbaatar:Ulan Batur
+Asia/Choibalsan:Çoybalsan
+Asia/Macau:Makau
+America/Martinique:Martinik
+Indian/Mauritius:Moritus
+Indian/Maldives:Maldivler
+America/Mexico_City:Meksiko City
+Asia/Kuching:Kuçing
+Pacific/Nauru:Nauru Adası
+Pacific/Marquesas:Markiz Adaları
+Asia/Karachi:Karaçi
+Europe/Warsaw:Varşova
+Pacific/Pitcairn:Pitcairn Adaları
+America/Puerto_Rico:Porto Riko
+Asia/Gaza:Gazze
+Atlantic/Azores:Azor Adaları
+Europe/Lisbon:Lizbon
+Asia/Qatar:Katar
+Indian/Reunion:Reunion Adası
+Europe/Bucharest:Bükreş
+Europe/Moscow:Moskova
+Asia/Irkutsk:İrkutsk
+Asia/Sakhalin:Sahalin
+Asia/Kamchatka:Kamçatka
+Asia/Anadyr:Anadır
+Asia/Riyadh:Riyad
+Africa/Khartoum:Kartum
+Europe/Stockholm:Stokholm
+Asia/Singapore:Singapur
+America/El_Salvador:Salvador
+Asia/Damascus:Şam
+Asia/Dushanbe:Duşanbe
+Asia/Ashgabat:Aşkabat
+Africa/Tunis:Tunus
+Europe/Istanbul:İstanbul
+America/Port_of_Spain:İspanya Limanı
+Europe/Uzhgorod:Ujgorod
+Europe/Simferopol:Akmescit
+Europe/Zaporozhye:Zaporojye
+America/North_Dakota/New_Salem:New Salem, Kuzey Dakota
+America/North_Dakota/Center:Merkez, Kuzey Dakota
+America/Indiana/Knox:Knox
+America/Indiana/Marengo:Marengo
+Asia/Samarkand:Semerkand
+Asia/Tashkent:Taşkent
+America/St_Vincent:St. Vincent
+America/St_Thomas:St. Thomas
+Asia/Saigon:Saygon
+Indian/Mayotte:Mayote

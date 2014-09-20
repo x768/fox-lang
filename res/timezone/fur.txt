@@ -1,0 +1,8 @@
+locale=fur
+Etc/Unknown:No cognossude
+America/Sao_Paulo:San Pauli dal Brasîl
+Atlantic/Canary:Canariis
+Atlantic/Azores:Azoris
+Europe/Lisbon:Lisbone
+Europe/Moscow:Mosche
+America/New_York:Gnove York

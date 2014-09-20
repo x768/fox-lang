@@ -1,0 +1,10 @@
+langtag:kln
+language:kln
+month_w:Mulgul	Ng'atyato	Kiptamo	Iwat kut	Ng'eiyet	Waki	Roptui	Kipkogaga	Buret	Epeso	Kipsunde netai	Kipsunde nebo aeng
+month:Mul	Nga	Kip	Iwa	Nge	Wak	Rop	Kog	Bur	Epe	Tai	Aen
+days_w:Betut netai	Betutab aeng'	Betutab somok	Betutab ang'wan	Betutab mut	Betutab lo	Betutab tisap
+days:Tai	Aen	Som	Ang	Mut	Loh	Tis
+am_pm:BE	KE
+date:dd/MM/yyyy	d MMM y	d MMMM y	dddd, d MMMM y
+time:h:mm a	h:mm:ss a	h:mm:ss a z	h:mm:ss a Z
+bidi:ltr

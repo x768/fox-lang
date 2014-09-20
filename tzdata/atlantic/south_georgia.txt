@@ -1,0 +1,3 @@
+=Atlantic/South_Georgia
+8000000000000000 -8768 0 LMT
+fffffdb4374f3600 -7200 0 GST

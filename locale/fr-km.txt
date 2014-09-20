@@ -1,0 +1,4 @@
+langtag:fr_KM
+language:fr
+territory:KM
+bidi:ltr

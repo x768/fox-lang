@@ -1,0 +1,4 @@
+langtag:fa_IR
+language:fa
+territory:IR
+bidi:ltr

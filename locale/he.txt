@@ -1,0 +1,12 @@
+langtag:he
+language:he
+month_w:ינואר	פברואר	מרץ	אפריל	מאי	יוני	יולי	אוגוסט	ספטמבר	אוקטובר	נובמבר	דצמבר
+month:ינו	פבר׳	מרץ	אפר׳	מאי	יונ׳	יול׳	אוג׳	ספט׳	אוק׳	נוב׳	דצמ׳
+days_w:יום שני	יום שלישי	יום רביעי	יום חמישי	יום שישי	יום שבת	יום ראשון
+days:יום ב׳	יום ג׳	יום ד׳	יום ה׳	יום ו׳	שבת	יום א׳
+am_pm:לפנה״צ	אחה״צ
+date:dd/MM/yy	d בMMM yyyy	d בMMMM y	dddd, d בMMMM y
+time:HH:mm	HH:mm:ss	HH:mm:ss z	HH:mm:ss Z
+decimal:.
+group:,
+bidi:rtl

@@ -1,0 +1,12 @@
+langtag:sg
+language:sg
+month_w:Nyenye	Fulundïgi	Mbängü	Ngubùe	Bêläwü	Föndo	Lengua	Kükürü	Mvuka	Ngberere	Nabändüru	Kakauka
+month:Nye	Ful	Mbä	Ngu	Bêl	Fön	Len	Kük	Mvu	Ngb	Nab	Kak
+days_w:Bïkua-ûse	Bïkua-ptâ	Bïkua-usïö	Bïkua-okü	Lâpôsö	Lâyenga	Bikua-ôko
+days:Bk2	Bk3	Bk4	Bk5	Lâp	Lây	Bk1
+am_pm:ND	LK
+date:d/M/yyyy	d MMM, y	d MMMM y	dddd d MMMM y
+time:HH:mm	HH:mm:ss	HH:mm:ss z	HH:mm:ss Z
+decimal:,
+group:.
+bidi:ltr

@@ -1,0 +1,12 @@
+langtag:trv
+language:trv
+month_w:Kingal idas	Dha idas	Tru idas	Spat idas	Rima idas	Mataru idas	Empitu idas	Maspat idas	Mngari idas	Maxal idas	Maxal kingal idas	Maxal dha idas
+month:Kii	Dhi	Tri	Spi	Rii	Mti	Emi	Mai	Mni	Mxi	Mxk	Mxd
+days_w:tgKingal jiyax iyax sngayan	tgDha jiyax iyax sngayan	tgTru jiyax iyax sngayan	tgSpac jiyax iyax sngayan	tgRima jiyax iyax sngayan	tgMataru jiyax iyax sngayan	Jiyax sngayan
+days:Kin	Dha	Tru	Spa	Rim	Mat	Emp
+am_pm:Brax kndaax	Baubau kndaax
+date:yyyy-MM-dd	y MMM d	y MMMM d	dddd, y MMMM dd
+time:HH:mm	HH:mm:ss	HH:mm:ss z	HH:mm:ss Z
+decimal:.
+group:,
+bidi:ltr

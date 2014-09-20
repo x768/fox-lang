@@ -1,0 +1,3 @@
+=Africa/Mbabane
+8000000000000000 7464 0 LMT
+fffffe14e47aafc0 7200 0 SAST

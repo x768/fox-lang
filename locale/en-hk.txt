@@ -1,0 +1,5 @@
+langtag:en_HK
+language:en
+territory:HK
+date:d/M/yy	d MMM, y	d MMMM, y	dddd, d MMMM, y
+bidi:ltr

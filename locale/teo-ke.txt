@@ -1,0 +1,4 @@
+langtag:teo_KE
+language:teo
+territory:KE
+bidi:ltr

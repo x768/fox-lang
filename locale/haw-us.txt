@@ -1,0 +1,4 @@
+langtag:haw_US
+language:haw
+territory:US
+bidi:ltr

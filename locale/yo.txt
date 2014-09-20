@@ -1,0 +1,10 @@
+langtag:yo
+language:yo
+month_w:Oṣù Ṣẹ́rẹ́	Oṣù Èrèlè	Oṣù Ẹrẹ̀nà	Oṣù Ìgbé	Oṣù Ẹ̀bibi	Oṣù Òkúdu	Oṣù Agẹmọ	Oṣù Ògún	Oṣù Owewe	Oṣù Ọ̀wàrà	Oṣù Bélú	Oṣù Ọ̀pẹ̀
+month:Ṣẹ́rẹ́	Èrèlè	Ẹrẹ̀nà	Ìgbé	Ẹ̀bibi	Òkúdu	Agẹmọ	Ògún	Owewe	Ọ̀wàrà	Bélú	Ọ̀pẹ̀
+days_w:Ọjọ́ Ajé	Ọjọ́ Ìsẹ́gun	Ọjọ́rú	Ọjọ́bọ	Ọjọ́ Ẹtì	Ọjọ́ Àbámẹ́ta	Ọjọ́ Àìkú
+days:Ajé	Ìsẹ́gun	Ọjọ́rú	Ọjọ́bọ	Ẹtì	Àbámẹ́ta	Àìkú
+am_pm:Àárọ̀	Ọ̀sán
+date:dd/MM/yyyy	d MMM y	d MMMM y	dddd, d MMMM y
+time:h:mm a	h:mm:ss a	h:mm:ss a z	h:mm:ss a Z
+bidi:ltr

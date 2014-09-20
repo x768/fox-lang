@@ -1,0 +1,5 @@
+langtag:en_BW
+language:en
+territory:BW
+date:dd/MM/yy		dd MMMM y	dddd dd MMMM y
+bidi:ltr

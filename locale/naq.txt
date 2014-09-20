@@ -1,0 +1,10 @@
+langtag:naq
+language:naq
+month_w:ǃKhanni	ǃKhanǀgôab	ǀKhuuǁkhâb	ǃHôaǂkhaib	ǃKhaitsâb	Gamaǀaeb	ǂKhoesaob	Aoǁkhuumûǁkhâb	Taraǀkhuumûǁkhâb	ǂNûǁnâiseb	ǀHooǂgaeb	Hôasoreǁkhâb
+month:Jan	Feb	Mar	Apr	May	Jun	Jul	Aug	Sep	Oct	Nov	Dec
+days_w:Mantaxtsees	Denstaxtsees	Wunstaxtsees	Dondertaxtsees	Fraitaxtsees	Satertaxtsees	Sontaxtsees
+days:Ma	De	Wu	Do	Fr	Sat	Son
+am_pm:ǁgoagas	ǃuias
+date:dd/MM/yyyy	d MMM y	d MMMM y	dddd, d MMMM y
+time:h:mm a	h:mm:ss a	h:mm:ss a z	h:mm:ss a Z
+bidi:ltr

@@ -1,0 +1,4 @@
+langtag:mfe_MU
+language:mfe
+territory:MU
+bidi:ltr

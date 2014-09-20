@@ -1,0 +1,5 @@
+locale=nl_BE
+lv:Lets
+oc:Occitaans (na 1500); Provençaals
+sh:Servo-Kroatisch
+IM:Het Eiland Man

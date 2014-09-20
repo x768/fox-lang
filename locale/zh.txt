@@ -1,0 +1,12 @@
+langtag:zh
+language:zh
+month_w:1月	2月	3月	4月	5月	6月	7月	8月	9月	10月	11月	12月
+month:1月	2月	3月	4月	5月	6月	7月	8月	9月	10月	11月	12月
+days_w:星期一	星期二	星期三	星期四	星期五	星期六	星期日
+days:周一	周二	周三	周四	周五	周六	周日
+am_pm:上午	下午
+date:yy-M-d	yyyy-M-d	y年M月d日	y年M月d日dddd
+time:ah:mm	ah:mm:ss	zah时mm分ss秒	Zah时mm分ss秒
+decimal:.
+group:,
+bidi:ltr

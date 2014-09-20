@@ -1,0 +1,5 @@
+langtag:ha_Latn_GH
+language:ha
+script:Latn
+territory:GH
+bidi:ltr

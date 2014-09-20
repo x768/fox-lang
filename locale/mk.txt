@@ -1,0 +1,12 @@
+langtag:mk
+language:mk
+month_w:јануари	февруари	март	април	мај	јуни	јули	август	септември	октомври	ноември	декември
+month:јан.	фев.	мар.	апр.	мај	јун.	јул.	авг.	септ.	окт.	ноем.	декем.
+days_w:понеделник	вторник	среда	четврток	петок	сабота	недела
+days:пон.	вт.	сре.	чет.	пет.	саб.	нед.
+am_pm:претпладне	попладне
+date:dd.M.yy	dd.M.yyyy	dd MMMM y	dddd, dd MMMM y
+time:HH:mm	HH:mm:ss	HH:mm:ss z	HH:mm:ss Z
+decimal:,
+group:.
+bidi:ltr

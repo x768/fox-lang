@@ -1,0 +1,4 @@
+langtag:uz_Cyrl
+language:uz
+script:Cyrl
+bidi:ltr

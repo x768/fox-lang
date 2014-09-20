@@ -1,0 +1,6 @@
+langtag:es_SV
+language:es
+territory:SV
+decimal:.
+group:,
+bidi:ltr

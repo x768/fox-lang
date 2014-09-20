@@ -1,0 +1,4 @@
+langtag:en_MU
+language:en
+territory:MU
+bidi:ltr

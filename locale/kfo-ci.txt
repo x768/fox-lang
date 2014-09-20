@@ -1,0 +1,4 @@
+langtag:kfo_CI
+language:kfo
+territory:CI
+bidi:ltr

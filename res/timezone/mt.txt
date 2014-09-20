@@ -1,0 +1,4 @@
+locale=mt
+Etc/Unknown:Mhux Magħruf
+Europe/London:Londra
+Europe/Malta:Valletta

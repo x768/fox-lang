@@ -1,0 +1,6 @@
+langtag:de_CH
+language:de
+territory:CH
+decimal:.
+group:'
+bidi:ltr

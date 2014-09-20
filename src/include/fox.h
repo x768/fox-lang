@@ -573,7 +573,6 @@ struct FoxStatic
 
 	void (*init_stream_ref)(Ref *r, int mode);
 	StrBuf *(*bytesio_get_strbuf)(Value v);
-	Str (*bytesio_get_str)(Value v);
 	int (*stream_read_data)(Value v, StrBuf *sb, char *p, int *psize, int keep, int read_all);
 	int (*stream_write_data)(Value v, const char *p, int size);
 	int (*stream_seek_sub)(Value v, int64_t pos);
@@ -617,6 +616,11 @@ struct FoxGlobal
 };
 
 ////////////////////////////////////////////////////////////////////////////////
+
+#define FOX_VERSION_MAJOR    0
+#define FOX_VERSION_MINOR    4
+#define FOX_VERSION_REVISION 0
+
 
 extern const char *fox_ctype_flags;
 

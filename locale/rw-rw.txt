@@ -1,0 +1,4 @@
+langtag:rw_RW
+language:rw
+territory:RW
+bidi:ltr

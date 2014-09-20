@@ -1,0 +1,2 @@
+locale=ps
+Asia/Kabul:کابل

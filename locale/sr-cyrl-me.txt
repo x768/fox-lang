@@ -1,0 +1,5 @@
+langtag:sr_Cyrl_ME
+language:sr
+script:Cyrl
+territory:ME
+bidi:ltr

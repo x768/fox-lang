@@ -1,0 +1,5 @@
+langtag:mi
+language:mi
+month_w:Hānuere	Pēpuere	Māehe	Āperira	Mei	Hune	Hūrae	Ākuhata	Hepetema	Oketopa	Noema	Tīhema
+days_w:Mane	Tūrei	Wenerei	Tāite	Paraire	Hātarei	Rātapu
+bidi:ltr

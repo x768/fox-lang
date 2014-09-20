@@ -1,0 +1,6 @@
+langtag:ms_BN
+language:ms
+territory:BN
+decimal:,
+group:.
+bidi:ltr

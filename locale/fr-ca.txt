@@ -1,0 +1,5 @@
+langtag:fr_CA
+language:fr
+territory:CA
+date:yy-MM-dd	yyyy-MM-dd		
+bidi:ltr

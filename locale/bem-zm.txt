@@ -1,0 +1,4 @@
+langtag:bem_ZM
+language:bem
+territory:ZM
+bidi:ltr

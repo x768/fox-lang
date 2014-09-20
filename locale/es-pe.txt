@@ -1,0 +1,7 @@
+langtag:es_PE
+language:es
+territory:PE
+date:d/MM/yy			
+decimal:.
+group:,
+bidi:ltr

@@ -16,7 +16,7 @@ CFLAGS = -I../../include
 LFLAGS = $(COMMON_DLFLAGS)
 endif
 
-DEST = ../../../import/xml.so
+DEST = ../../../import/markup/xml.so
 VPATH = ../../common
 
 OBJS = \

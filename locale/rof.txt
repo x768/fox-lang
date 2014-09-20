@@ -1,0 +1,10 @@
+langtag:rof
+language:rof
+month_w:Mweri wa kwanza	Mweri wa kaili	Mweri wa katatu	Mweri wa kaana	Mweri wa tanu	Mweri wa sita	Mweri wa saba	Mweri wa nane	Mweri wa tisa	Mweri wa ikumi	Mweri wa ikumi na moja	Mweri wa ikumi na mbili
+month:M1	M2	M3	M4	M5	M6	M7	M8	M9	M10	M11	M12
+days_w:Ijumatatu	Ijumanne	Ijumatano	Alhamisi	Ijumaa	Ijumamosi	Ijumapili
+days:Ijt	Ijn	Ijt	Alh	Iju	Ijm	Ijp
+am_pm:kang'ama	kingoto
+date:dd/MM/yyyy	d MMM y	d MMMM y	dddd, d MMMM y
+time:h:mm a	h:mm:ss a	h:mm:ss a z	h:mm:ss a Z
+bidi:ltr

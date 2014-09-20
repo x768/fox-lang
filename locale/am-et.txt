@@ -1,0 +1,4 @@
+langtag:am_ET
+language:am
+territory:ET
+bidi:ltr

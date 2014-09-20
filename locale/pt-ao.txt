@@ -1,0 +1,4 @@
+langtag:pt_AO
+language:pt
+territory:AO
+bidi:ltr

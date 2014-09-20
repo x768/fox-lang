@@ -1,10 +1,3 @@
-/*
- * quantize.c
- *
- *  Created on: 2012/07/21
- *      Author: frog
- */
-
 #include "image.h"
 #include <stdlib.h>
 #include <stdio.h>

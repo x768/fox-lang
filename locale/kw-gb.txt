@@ -1,0 +1,4 @@
+langtag:kw_GB
+language:kw
+territory:GB
+bidi:ltr

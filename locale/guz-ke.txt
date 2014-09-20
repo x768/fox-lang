@@ -1,0 +1,4 @@
+langtag:guz_KE
+language:guz
+territory:KE
+bidi:ltr

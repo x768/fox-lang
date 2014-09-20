@@ -1,0 +1,11 @@
+langtag:rw
+language:rw
+month_w:Mutarama	Gashyantare	Werurwe	Mata	Gicuransi	Kamena	Nyakanga	Kanama	Nzeli	Ukwakira	Ugushyingo	Ukuboza
+month:mut.	gas.	wer.	mat.	gic.	kam.	nya.	kan.	nze.	ukw.	ugu.	uku.
+days_w:Kuwa mbere	Kuwa kabiri	Kuwa gatatu	Kuwa kane	Kuwa gatanu	Kuwa gatandatu	Ku cyumweru
+days:mbe.	kab.	gtu.	kan.	gnu.	gnd.	cyu.
+date:yy/MM/dd	y MMM d	y MMMM d	dddd, y MMMM dd
+time:HH:mm	HH:mm:ss	HH:mm:ss z	HH:mm:ss Z
+decimal:,
+group:.
+bidi:ltr

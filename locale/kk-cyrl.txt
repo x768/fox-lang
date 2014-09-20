@@ -1,0 +1,4 @@
+langtag:kk_Cyrl
+language:kk
+script:Cyrl
+bidi:ltr

@@ -1,0 +1,3 @@
+locale=kl
+kl:kalaallisut
+GL:Kalaallit Nunaat

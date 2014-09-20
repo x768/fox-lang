@@ -1,0 +1,5 @@
+langtag:sr_Latn_ME
+language:sr
+script:Latn
+territory:ME
+bidi:ltr

@@ -1,0 +1,5 @@
+=Africa/Niamey
+8000000000000000 508 0 LMT
+fffffe55d494e3a0 -3600 0 WAT
+fffffef89d57a280 0 0 GMT
+ffffffb683a13400 3600 0 WAT

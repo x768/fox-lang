@@ -1,0 +1,11 @@
+langtag:pt
+language:pt
+month_w:janeiro	fevereiro	março	abril	maio	junho	julho	agosto	setembro	outubro	novembro	dezembro
+month:jan	fev	mar	abr	mai	jun	jul	ago	set	out	nov	dez
+days_w:segunda-feira	terça-feira	quarta-feira	quinta-feira	sexta-feira	sábado	domingo
+days:seg	ter	qua	qui	sex	sáb	dom
+date:dd/MM/yy	dd/MM/yyyy	d 'de' MMMM 'de' y	dddd, d 'de' MMMM 'de' y
+time:HH:mm	HH:mm:ss	HH'h'mm'min'ss's' z	HH'h'mm'min'ss's' Z
+decimal:,
+group:.
+bidi:ltr

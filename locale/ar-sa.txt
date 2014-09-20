@@ -1,0 +1,5 @@
+langtag:ar_SA
+language:ar
+territory:SA
+days:الاثنين	الثلاثاء	الأربعاء	الخميس	الجمعة	السبت	الأحد
+bidi:ltr

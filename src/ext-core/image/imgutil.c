@@ -1,10 +1,3 @@
-/*
- * imgutil.c
- *
- *  Created on: 2012/07/15
- *      Author: frog
- */
-
 #include "image.h"
 #include <math.h>
 #include <string.h>

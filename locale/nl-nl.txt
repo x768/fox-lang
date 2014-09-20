@@ -1,0 +1,4 @@
+langtag:nl_NL
+language:nl
+territory:NL
+bidi:ltr

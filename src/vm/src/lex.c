@@ -904,8 +904,16 @@ static void Tok_parse_heredoc(TokValue *v, Tok *tk)
 		return;
 	}
 	if (*tk->p != '\n') {
-		throw_errorf(fs->mod_lang, "TokenError", "Unknown character after <<<");
-		v->type = T_ERR;
+#ifdef DEBUGGER
+		if (tk->is_test) {
+			v->type = T_WANTS_NEXT;
+		} else {
+#endif
+			throw_errorf(fs->mod_lang, "TokenError", "Unknown character after <<<");
+			v->type = T_ERR;
+#ifdef DEBUGGER
+		}
+#endif
 		return;
 	}
 	tk->p++;

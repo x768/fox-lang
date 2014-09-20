@@ -1,0 +1,4 @@
+langtag:fr_NE
+language:fr
+territory:NE
+bidi:ltr

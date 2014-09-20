@@ -1,0 +1,4 @@
+langtag:ar_AE
+language:ar
+territory:AE
+bidi:ltr

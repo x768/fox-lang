@@ -1,0 +1,5 @@
+=Africa/Dar_es_Salaam
+8000000000000000 9428 0 LMT
+fffffee16ff2d7e0 10800 0 EAT
+ffffff5e573b4480 9900 0 BEAUT
+ffffffbddfe1ac20 10800 0 EAT

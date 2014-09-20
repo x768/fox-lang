@@ -1,0 +1,4 @@
+langtag:gl_ES
+language:gl
+territory:ES
+bidi:ltr

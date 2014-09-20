@@ -1,0 +1,60 @@
+locale=gl
+Etc/Unknown:Descoñecido
+America/Anguilla:Anguila
+Antarctica/South_Pole:Polo Sul
+Antarctica/DumontDUrville:Dumont-d'Urville
+America/Argentina/Rio_Gallegos:Río Gallegos
+America/Argentina/Tucuman:Tucumán
+America/Cordoba:Córdoba
+America/Buenos_Aires:Bos Aires
+Atlantic/Bermuda:Bermudas
+America/Belem:Belém
+America/Sao_Paulo:São Paulo
+America/Maceio:Maceió
+America/Belize:Belice
+America/St_Johns:St Johns
+Pacific/Easter:Illa de Pascua
+Atlantic/Cape_Verde:Cabo Verde
+Africa/Djibouti:Xubuti
+Pacific/Galapagos:Illas Galápagos
+Atlantic/Canary:Illas Canarias
+Pacific/Fiji:Fidxi
+Europe/Paris:París
+America/Grenada:Granada
+Europe/Gibraltar:Xibraltar
+America/Guadeloupe:Guadalupe
+America/Guyana:Güiana
+Asia/Jakarta:Iacarta
+America/Jamaica:Xamaica
+Europe/Luxembourg:Luxemburgo
+Europe/Monaco:Mónaco
+Asia/Ulaanbaatar:Ulan Bator
+America/Martinique:Martinica
+Indian/Mauritius:Mauricio
+Indian/Maldives:Maldivas
+America/Mazatlan:Mazatlán
+America/Monterrey:Monterrei
+America/Mexico_City:Cidade de México
+America/Merida:Mérida
+America/Cancun:Cancún
+America/Panama:Panamá
+America/Puerto_Rico:Porto Rico
+Indian/Reunion:Reunión
+Europe/Kaliningrad:Kaliningrado
+Europe/Moscow:Moscova
+Europe/Volgograd:Volgogrado
+Asia/Yekaterinburg:Ecaterinburgo
+Asia/Singapore:Singapur
+America/El_Salvador:O Salvador
+Pacific/Honolulu:Honolulú
+America/North_Dakota/New_Salem:New Salem
+America/North_Dakota/Center:Central
+America/Indiana/Vincennes:Vincennes
+America/Indiana/Petersburg:Petersburg
+America/Indiana/Tell_City:Tell City
+America/Indiana/Knox:Knox
+America/Indiana/Winamac:Winamac
+America/Indiana/Marengo:Marengo
+America/Indiana/Vevay:Vevay
+America/Kentucky/Monticello:Monticello
+Asia/Samarkand:Samarcanda

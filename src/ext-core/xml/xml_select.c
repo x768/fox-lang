@@ -1,10 +1,3 @@
-/*
- * xml_select.c
- *
- *  Created on: 2012/05/27
- *      Author: frog
- */
-
 #include "m_xml.h"
 #include <stdio.h>
 #include <string.h>
@@ -476,7 +469,7 @@ static int select_xml_match_node(Ref *r, XMLPattern *pat)
 		case XT_ANY:
 			break;
 		case XT_NAME: {
-			RefStr *name = Value_vp(r->v[INDEX_NAME]);
+			RefStr *name = Value_vp(r->v[INDEX_ELEM_NAME]);
 			if (!str_eq(name->c, name->size, attr->val.p, attr->val.size)) {
 				return FALSE;
 			}
@@ -491,7 +484,7 @@ static int select_xml_match_node(Ref *r, XMLPattern *pat)
 
 			key = fs->cstr_Value(fs->cls_str, attr->key.p, attr->key.size);
 			// Str#_op_eqでは、例外が発生しないのでチェックを省略
-			fs->refmap_get(&he, Value_vp(r->v[INDEX_ATTR]), key);
+			fs->refmap_get(&he, Value_vp(r->v[INDEX_ELEM_ATTR]), key);
 			if (he == NULL) {
 				return FALSE;
 			}
@@ -590,7 +583,7 @@ static void select_xml_nodes_sub(RefArray *ra, XMLPatternList *pl, uint8_t *mask
 	}
 
 	{
-		RefArray *ra2 = Value_vp(r->v[INDEX_CHILDREN]);
+		RefArray *ra2 = Value_vp(r->v[INDEX_ELEM_CHILDREN]);
 		for (i = 0; i < ra2->size; i++) {
 			select_xml_nodes_sub(ra, pl, mask2, ra2->p[i]);
 		}

@@ -1,0 +1,4 @@
+langtag:rof_TZ
+language:rof
+territory:TZ
+bidi:ltr

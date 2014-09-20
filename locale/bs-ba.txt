@@ -1,0 +1,4 @@
+langtag:bs_BA
+language:bs
+territory:BA
+bidi:ltr

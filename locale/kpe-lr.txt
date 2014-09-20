@@ -1,0 +1,4 @@
+langtag:kpe_LR
+language:kpe
+territory:LR
+bidi:ltr

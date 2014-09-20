@@ -1,0 +1,5 @@
+langtag:uz_Latn_UZ
+language:uz
+script:Latn
+territory:UZ
+bidi:ltr

@@ -1,0 +1,5 @@
+langtag:ru_UA
+language:ru
+territory:UA
+time:HH:mm	HH:mm:ss	HH:mm:ss z	HH:mm:ss Z
+bidi:ltr

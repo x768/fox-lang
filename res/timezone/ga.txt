@@ -1,0 +1,4 @@
+locale=ga
+Etc/Unknown:Anaithnid
+Europe/London:Londain
+Europe/Dublin:Baile Átha Cliath

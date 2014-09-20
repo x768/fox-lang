@@ -1,0 +1,2 @@
+locale=ii
+Etc/Unknown:ꅉꀋꐚꌠ

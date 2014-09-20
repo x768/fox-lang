@@ -1,0 +1,13 @@
+locale=trv
+Etc/Unknown:Ini klayi ka Jikan hini
+America/Rio_Branco:Jikan alang Purank
+America/Campo_Grande:Jikan alang Grad
+America/Sao_Paulo:Jikan alang Snpaurow
+Pacific/Honolulu:Jikan alang Honoruru
+America/Anchorage:Jikan alang Ankriji
+America/Los_Angeles:Jikan alang Rosanci
+America/Phoenix:Jikan alang Bonhuan
+America/Denver:Jikan alang Tanbo
+America/Chicago:Jikan alang Jiciak
+America/Indianapolis:Jikan alang Intiannaporis
+America/New_York:Jikan alang Niuyue

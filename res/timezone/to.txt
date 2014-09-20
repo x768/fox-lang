@@ -1,0 +1,19 @@
+locale=to
+Etc/Unknown:Halaʻata
+Antarctica/South_Pole:pole tonga
+Australia/Adelaide:Atelaite
+Australia/Melbourne:Melipoane
+Australia/Sydney:Senē
+Australia/Brisbane:Pelisipane
+America/Rio_Branco:Houa Palāsili (Rio Branco)
+America/Campo_Grande:Houa Palāsili (Campo Grande)
+America/Sao_Paulo:Houa Palāsili (Sao Paulo)
+Pacific/Easter:Lapanui
+Pacific/Honolulu:Houa Puleʻanga fakataha ʻAmelika (Honolulu)
+America/Anchorage:Houa Puleʻanga fakataha ʻAmelika (Anchorage)
+America/Los_Angeles:Houa Puleʻanga fakataha ʻAmelika (Los Angeles)
+America/Phoenix:Houa Puleʻanga fakataha ʻAmelika (Phoenix)
+America/Denver:Houa Puleʻanga fakataha ʻAmelika (Denver)
+America/Chicago:Houa Puleʻanga fakataha ʻAmelika (Chicago)
+America/Indianapolis:Houa Puleʻanga fakataha ʻAmelika (Indianapolis)
+America/New_York:Houa Puleʻanga fakataha ʻAmelika (New York)

@@ -1,0 +1,4 @@
+langtag:es_CR
+language:es
+territory:CR
+bidi:ltr

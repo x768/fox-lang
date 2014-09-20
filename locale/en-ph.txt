@@ -1,0 +1,4 @@
+langtag:en_PH
+language:en
+territory:PH
+bidi:ltr

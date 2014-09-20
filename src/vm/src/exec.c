@@ -203,6 +203,10 @@ void dispose_opcode(RefNode *func)
 	OpCode *code = func->u.f.u.op;
 	int pc = 0;
 
+	if (code == NULL) {
+		return;
+	}
+
 	for (;;) {
 		OpCode *p = &code[pc];
 		if (p->type == OP_NONE) {
@@ -217,7 +221,7 @@ void dispose_opcode(RefNode *func)
 			pc += 1;
 		}
 	}
-	free(code);
+//	free(code);
 	func->u.f.u.op = NULL;
 }
 
@@ -489,8 +493,6 @@ int invoke_code(RefNode *func, int pc)
 NORMAL:
 	for (;;) {
 		p = &code[pc];
-//		fprintf(stderr, "%2d : ", pc);
-//		show_code(p);
 
 		switch (p->type) {
 		case OP_INIT_GENR: {  // Generatorインスタンスを返す

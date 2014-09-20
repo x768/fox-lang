@@ -1,0 +1,4 @@
+langtag:tig_ER
+language:tig
+territory:ER
+bidi:ltr

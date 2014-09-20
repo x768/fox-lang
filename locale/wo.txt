@@ -1,0 +1,3 @@
+langtag:wo
+language:wo
+bidi:ltr

@@ -1,0 +1,381 @@
+locale=hi
+Etc/Unknown:अज्ञात
+Europe/Andorra:अंडोरा
+Asia/Dubai:दुबई
+Asia/Kabul:काबूल
+America/Antigua:एंटिगुआ
+America/Anguilla:एंग्विला
+Europe/Tirane:टिरेन
+Asia/Yerevan:येरेवन
+America/Curacao:क्यूराकाओ
+Africa/Luanda:लूएंडा
+Antarctica/Rothera:रोथेरा
+Antarctica/Palmer:पॉमर
+Antarctica/South_Pole:दक्षिणी ध्रुव
+Antarctica/Syowa:स्योवा
+Antarctica/Mawson:मॉसन
+Antarctica/Davis:डेविस
+Antarctica/Vostok:वोस्तोक
+Antarctica/Casey:क़ेसी
+Antarctica/DumontDUrville:डुमोंट ड'अर्विल
+Antarctica/McMurdo:मैकमुर्डो
+America/Argentina/Rio_Gallegos:रियो गालेगोस
+America/Mendoza:मेंडोजा
+America/Argentina/San_Juan:सान जुआन
+America/Argentina/Ushuaia:उशूयिया
+America/Argentina/La_Rioja:ला रिओजा
+America/Argentina/San_Luis:सान लुईस
+America/Catamarca:कटामार्का
+America/Jujuy:जुजोए
+America/Argentina/Tucuman:टोकूमन
+America/Cordoba:कोर्डोवा
+America/Buenos_Aires:ब्यूनस आयरस
+Pacific/Pago_Pago:पागो पागो
+Europe/Vienna:वियना
+Australia/Perth:पर्थ
+Australia/Eucla:यूक्ला
+Australia/Darwin:डार्विन्
+Australia/Adelaide:एडिलेड
+Australia/Broken_Hill:ब्रोकन हिल
+Australia/Currie:क्यूरी
+Australia/Melbourne:मेलबोर्न
+Australia/Hobart:होबर्ट्
+Australia/Lindeman:लिंडेमान
+Australia/Sydney:सिडनी
+Australia/Brisbane:ब्रिसबेन
+Australia/Lord_Howe:लोर्ड होवे
+America/Aruba:अरूबा
+Asia/Baku:बाकू
+America/Barbados:बारबाडोस
+Asia/Dhaka:ढाका
+Europe/Brussels:ब्रसल्स
+Africa/Ouagadougou:ओआगदूगू
+Europe/Sofia:सोफ़िया
+Asia/Bahrain:बहरीन
+Africa/Bujumbura:बुजुम्बुरा
+Africa/Porto-Novo:पोर्टो-नोवो
+Atlantic/Bermuda:बरमूडा
+Asia/Brunei:ब्रूनेइ
+America/La_Paz:ला पाज़
+America/Eirunepe:ईरुनेपे
+America/Rio_Branco:रियो ब्रान्को
+America/Porto_Velho:पोर्टो वेल्हो
+America/Boa_Vista:बोआ विस्ता
+America/Manaus:मनौस
+America/Cuiaba:कूईआबा
+America/Campo_Grande:केम्पो ग्रान्दे
+America/Belem:बेलेम
+America/Araguaina:ऐरेग्वेना
+America/Sao_Paulo:साओ पॉलो
+America/Bahia:बहिया
+America/Fortaleza:फ़ोर्टालेज़ा
+America/Maceio:मेसीओ
+America/Recife:रेचीफ़े
+America/Noronha:नोरोन्हा
+America/Nassau:नस्साउ
+Asia/Thimphu:थिम्फू
+Africa/Gaborone:गैबोरोन
+Europe/Minsk:मिंस्क
+America/Belize:बेलिज़े
+America/Dawson:डौसन
+America/Whitehorse:व्हाईटहोर्स
+America/Inuvik:इनूविक
+America/Vancouver:वांकूवर
+America/Dawson_Creek:डौसन क्रिक
+America/Yellowknife:येलोनाईफ
+America/Edmonton:एडमंटन
+America/Swift_Current:स्विफ्ट करंट
+America/Cambridge_Bay:केम्ब्रिज खाड़ी
+America/Regina:रेजिना
+America/Winnipeg:विनीपेग
+America/Resolute:रिसोल्यूट
+America/Rainy_River:रेनी नदी
+America/Rankin_Inlet:रेंकिन इंलेट
+America/Coral_Harbour:कोरल बन्दरगाह
+America/Thunder_Bay:थंडर खाडी
+America/Nipigon:निपिगन
+America/Toronto:टोरंटो
+America/Montreal:मोंट्रियल
+America/Iqaluit:इक्याल्यूईत
+America/Pangnirtung:पंग्निर्टंग्
+America/Moncton:मोंक्ट्न
+America/Halifax:हेलिफेक्स
+America/Goose_Bay:गूस खा़ड़ी
+America/Glace_Bay:ग्लेस खा़ड़ी
+America/Blanc-Sablon:ब्लांक-सेबलोन
+America/St_Johns:सेंट जोंस
+Indian/Cocos:कोकोस
+Africa/Kinshasa:किन्शासा
+Africa/Lubumbashi:लुबुमबाशी
+Africa/Bangui:बैंगुइ
+Africa/Brazzaville:ब्राज़ाविल
+Europe/Zurich:ज़्यूरिक
+Africa/Abidjan:अबिद्जान
+Pacific/Rarotonga:रारोटोंगा
+Pacific/Easter:ईस्टर
+America/Santiago:सेंटिएगो
+Africa/Douala:दोआला
+Asia/Kashgar:काश्गर
+Asia/Urumqi:उरम्ची
+Asia/Chongqing:चोंग्पिंग
+Asia/Harbin:हर्बिन
+America/Bogota:बोगोटा
+America/Costa_Rica:कोस्टा रिका
+America/Havana:हवाना
+Atlantic/Cape_Verde:केप वर्डे
+Indian/Christmas:क्रिसमस
+Asia/Nicosia:निकोसिया
+Europe/Berlin:बर्लिन
+Africa/Djibouti:डिजिबौटी
+Europe/Copenhagen:कोपनहेगन
+America/Dominica:डॉमिनिका
+America/Santo_Domingo:संटो डोमिंगो
+Africa/Algiers:अल्जीरिया
+Pacific/Galapagos:गेलापगोस
+America/Guayaquil:ग्वायाक्विल
+Europe/Tallinn:टैलिन
+Africa/Cairo:कायरो
+Africa/El_Aaiun:एल आइउन
+Africa/Asmera:असमेरा
+Atlantic/Canary:कैनेरी
+Africa/Ceuta:क्यूटा
+Europe/Madrid:मैड्रिड
+Africa/Addis_Ababa:ऐडिस अबाबा
+Europe/Helsinki:हेल्सिंकी
+Pacific/Fiji:फ़िजी
+Atlantic/Stanley:स्टैन्ली
+Pacific/Truk:ट्रुक
+Pacific/Ponape:पोनापे
+Pacific/Kosrae:कोसराए
+Atlantic/Faeroe:फ़ैरो
+Europe/Paris:पेरिस
+Africa/Libreville:लिबरविल
+Europe/London:लंदन
+America/Grenada:ग्रेनाडा
+Asia/Tbilisi:बिलिसी
+America/Cayenne:कयेन
+Africa/Accra:ऐक्रा
+Europe/Gibraltar:जिब्राल्टर
+America/Thule:थ्यूले
+America/Godthab:गॉडथैब
+America/Scoresbysund:स्कोर्सबाइसंड
+America/Danmarkshavn:डेनमार्क्षवन
+Africa/Banjul:बनजुल
+Africa/Conakry:कोनाक्री
+America/Guadeloupe:गौडलोप
+Africa/Malabo:मालाबो
+Europe/Athens:एथेंस
+Atlantic/South_Georgia:साउथ जॉर्जिया
+America/Guatemala:ग्वाटेमाला
+Pacific/Guam:ग्वाम
+Africa/Bissau:बिस्साउ
+America/Guyana:गुयाना
+Asia/Hong_Kong:हाँगकाँग
+America/Port-au-Prince:पोर्ट-आउ-प्रिंस
+Europe/Budapest:बुडापेस्ट
+Asia/Jakarta:जकार्ता
+Asia/Pontianak:पोंतिआंक
+Asia/Makassar:मकस्सर
+Asia/Jayapura:जयापुरा
+Europe/Dublin:डबलिन
+Asia/Jerusalem:येरुसलम
+Indian/Chagos:चागोस
+Asia/Baghdad:बगदाद
+Asia/Tehran:तेहरान
+Atlantic/Reykjavik:रेक्याविक
+Europe/Rome:रोम
+America/Jamaica:जमैका
+Asia/Amman:अम्मान
+Asia/Tokyo:टोक्यो
+Africa/Nairobi:नैरोबी
+Asia/Bishkek:बिश्केक
+Asia/Phnom_Penh:नोम पेन्ह
+Pacific/Enderbury:एंडरबेरी
+Pacific/Kiritimati:किरीतिमाति
+Pacific/Tarawa:टरावा
+Indian/Comoro:कोमोरो
+America/St_Kitts:सेंट किट्ट्स
+Asia/Pyongyang:प्योंगयांग
+Asia/Seoul:सोल
+Asia/Kuwait:कुवैत
+America/Cayman:केमन
+Asia/Aqtau:अक्ताउ
+Asia/Oral:ओरल
+Asia/Aqtobe:अक्टोब
+Asia/Qyzylorda:केज़ेलोर्डा
+Asia/Almaty:अल्माटी
+Asia/Vientiane:वियंतियेन
+Asia/Beirut:बेरुत
+America/St_Lucia:सेंट लुसीया
+Europe/Vaduz:वादुज़
+Asia/Colombo:कोलंबो
+Africa/Monrovia:मोन्रोविया
+Africa/Maseru:मसेरू
+Europe/Vilnius:विल्निअस
+Europe/Luxembourg:लक्ज़मबर्ग
+Europe/Riga:रिगा
+Africa/Tripoli:त्रिपोली
+Africa/Casablanca:कैसाब्लैंका
+Europe/Monaco:मोनाको
+Europe/Chisinau:चिसीनौ
+Indian/Antananarivo:ऐंटनानरीवो
+Pacific/Kwajalein:क्वजलेन
+Pacific/Majuro:मजूरो
+Africa/Bamako:बमाको
+Asia/Rangoon:रंगून
+Asia/Hovd:होव्ड
+Asia/Ulaanbaatar:उलानबाटर
+Asia/Choibalsan:चोइबालसन
+Asia/Macau:मकाऊ
+Pacific/Saipan:सइपान
+America/Martinique:मारटीनीक
+Africa/Nouakchott:नौवाक्चॉट
+America/Montserrat:मोन्त्सेरत
+Europe/Malta:माल्टा
+Indian/Mauritius:मॉरिशस
+Indian/Maldives:मालदीव
+Africa/Blantyre:ब्लैंटायर
+America/Tijuana:टिज्यूआना
+America/Hermosillo:हर्मोसिल्लो
+America/Mazatlan:म्जाटलान
+America/Chihuahua:चिहुआहुआ
+America/Monterrey:मोंटेरे
+America/Mexico_City:मेक्सिको सिटी
+America/Merida:मेरिडा
+America/Cancun:कैन्कन
+Asia/Kuala_Lumpur:क्वाला लम्पुर
+Asia/Kuching:कूचिंग
+Africa/Maputo:माइपुटो
+Africa/Windhoek:विन्डोएक
+Pacific/Noumea:नूमिया
+Africa/Niamey:न्यामे
+Pacific/Norfolk:नोर्फ़ोक
+Africa/Lagos:लागोस
+America/Managua:मनागुआ
+Europe/Amsterdam:ऐम्स्टरडम
+Europe/Oslo:ओस्लो
+Asia/Katmandu:काठमांडू
+Pacific/Nauru:नौरू
+Pacific/Niue:नियु
+Pacific/Chatham:चाथम
+Pacific/Auckland:औकलैंड
+Asia/Muscat:मस्कट
+America/Panama:पनामा
+America/Lima:लीमा
+Pacific/Tahiti:टहीटि
+Pacific/Marquesas:मार्केसस
+Pacific/Gambier:गैम्बियर
+Pacific/Port_Moresby:पोर्ट मोरेस्बाइ
+Asia/Manila:मनीला
+Asia/Karachi:कराची
+Europe/Warsaw:वॉरसा
+America/Miquelon:मिक्वेलोन
+Pacific/Pitcairn:पिट्कैर्न
+America/Puerto_Rico:प्योर्तो रिको
+Asia/Gaza:गाज़ा
+Atlantic/Azores:अज़ोरस
+Atlantic/Madeira:मडेएरा
+Europe/Lisbon:लिस्बन
+Pacific/Palau:पलाऊ
+America/Asuncion:ऐसन्क्षन
+Asia/Qatar:क़तर
+Indian/Reunion:रियूनियन
+Europe/Bucharest:बुक्कारेस्ट
+Europe/Kaliningrad:कालिनिंग्राड
+Europe/Moscow:मॉस्को
+Europe/Volgograd:वोल्गोग्रेड
+Europe/Samara:समारा
+Asia/Yekaterinburg:येकांतिरिंबर्ग
+Asia/Omsk:ओम्स्क
+Asia/Novosibirsk:नॉवोसिविर्स्क्
+Asia/Krasnoyarsk:क्रास्नोयार्स्क
+Asia/Irkutsk:ईर्कुत्स्क
+Asia/Yakutsk:याकूत्स्क
+Asia/Vladivostok:ब्लाडिवोस्टोक
+Asia/Sakhalin:सखालिन
+Asia/Magadan:मगादन
+Asia/Kamchatka:कमचटका
+Asia/Anadyr:अनाडाइर
+Africa/Kigali:किगालि
+Asia/Riyadh:रियाध
+Pacific/Guadalcanal:ग्वाडलकनाल
+Indian/Mahe:माहे
+Africa/Khartoum:खार्तूम
+Europe/Stockholm:स्टॉकहोम
+Asia/Singapore:सिंगापुर
+Atlantic/St_Helena:सेंट हेलेना
+Africa/Freetown:फ़्रीटाउन
+Africa/Dakar:डकार
+Africa/Mogadishu:मोगाडिशू
+America/Paramaribo:परामरीबो
+Africa/Sao_Tome:साओ टोम
+America/El_Salvador:सैल्वेडोर
+Asia/Damascus:दमास्कस
+Africa/Mbabane:म्बाबेन
+America/Grand_Turk:ग्रैँड तुर्क
+Africa/Ndjamena:जमेना
+Indian/Kerguelen:कर्ग्वेलेन
+Africa/Lome:लोम
+Asia/Bangkok:बैंगकॉक
+Asia/Dushanbe:दुशांबे
+Pacific/Fakaofo:फ़काओफ़ो
+Asia/Dili:डिली
+Asia/Ashgabat:अश्गाबात
+Africa/Tunis:ट्यूनिस
+Pacific/Tongatapu:टोंगाटापू
+Europe/Istanbul:इस्तानबुल
+America/Port_of_Spain:पोर्ट ऑफ़ स्पेन
+Pacific/Funafuti:फ़ुनाफ़ूटी
+Asia/Taipei:ताइपेइ
+Africa/Dar_es_Salaam:दार एस सलाम
+Europe/Uzhgorod:उझ्गोरोड्
+Europe/Kiev:कीव
+Europe/Simferopol:सिम्फेरोपोल
+Europe/Zaporozhye:झापोरोझे
+Africa/Kampala:कम्पाला
+Pacific/Midway:मिडवे
+Pacific/Johnston:जॉनस्टन
+Pacific/Wake:वेक
+America/Adak:अडक
+America/Nome:नोम
+Pacific/Honolulu:हॉनॉलुलु
+America/Anchorage:अलास्का
+America/Yakutat:यकूतत
+America/Juneau:जुनेऔ
+America/Los_Angeles:लोस एंजिलेस
+America/Boise:बोईस
+America/Phoenix:फोनिक्स
+America/Shiprock:शिपरेक
+America/Denver:डेनवर
+America/North_Dakota/New_Salem:न्यू सालेम
+America/North_Dakota/Center:मध्य, उत्तरी दाकोता
+America/Chicago:शिकागो
+America/Menominee:मेनोमिनी
+America/Indiana/Vincennes:विंसिनेस
+America/Indiana/Petersburg:पिटर्स्वर्ग
+America/Indiana/Tell_City:टेल सिटी
+America/Indiana/Knox:नौक्स, इंडियाना
+America/Indiana/Winamac:विनामेक
+America/Indiana/Marengo:मारेंगो
+America/Indianapolis:इन्डियानापोलिस
+America/Louisville:लोईसविले
+America/Indiana/Vevay:विवे
+America/Kentucky/Monticello:मोंटीसेलो
+America/Detroit:डेट्रोईट
+America/New_York:न्यूयार्क
+America/Montevideo:मोन्टेवीडियो
+Asia/Samarkand:समरकंड
+Asia/Tashkent:ताशकंद
+America/St_Vincent:सेंट विंसेंट
+America/Caracas:काराकस
+America/Tortola:टॉरटोला
+America/St_Thomas:सेंट टॉमस
+Asia/Saigon:साइगॉन
+Pacific/Efate:एफ़ेट
+Pacific/Wallis:वालिस
+Pacific/Apia:एपिया
+Asia/Aden:ऐडेन
+Indian/Mayotte:मायोत्ते
+Africa/Johannesburg:जोहानसबर्ग
+Africa/Lusaka:लुसाका
+Africa/Harare:हरारे

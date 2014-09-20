@@ -1,0 +1,4 @@
+langtag:fr_CI
+language:fr
+territory:CI
+bidi:ltr

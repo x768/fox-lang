@@ -1,0 +1,4 @@
+langtag:lag_TZ
+language:lag
+territory:TZ
+bidi:ltr

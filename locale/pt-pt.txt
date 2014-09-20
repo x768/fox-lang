@@ -1,0 +1,8 @@
+langtag:pt_PT
+language:pt
+territory:PT
+month_w:Janeiro	Fevereiro	Março	Abril	Maio	Junho	Julho	Agosto	Setembro	Outubro	Novembro	Dezembro
+month:Jan	Fev	Mar	Abr	Mai	Jun	Jul	Ago	Set	Out	Nov	Dez
+days_w:segunda-feira	terça-feira	quarta-feira	quinta-feira	sexta-feira	sábado	domingo
+am_pm:Manhã	Tarde
+bidi:ltr

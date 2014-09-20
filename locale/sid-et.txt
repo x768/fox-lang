@@ -1,0 +1,4 @@
+langtag:sid_ET
+language:sid
+territory:ET
+bidi:ltr

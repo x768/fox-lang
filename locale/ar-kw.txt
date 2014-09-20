@@ -1,0 +1,4 @@
+langtag:ar_KW
+language:ar
+territory:KW
+bidi:ltr

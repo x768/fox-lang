@@ -1,0 +1,11 @@
+langtag:eo
+language:eo
+month_w:januaro	februaro	marto	aprilo	majo	junio	julio	aŭgusto	septembro	oktobro	novembro	decembro
+month:jan	feb	mar	apr	maj	jun	jul	aŭg	sep	okt	nov	dec
+days_w:lundo	mardo	merkredo	ĵaŭdo	vendredo	sabato	dimanĉo
+days:lu	ma	me	ĵa	ve	sa	di
+am_pm:atm	ptm
+date:yy-MM-dd	y-MMM-dd	y-MMMM-dd	dddd, d-'a' 'de' MMMM y
+time:HH:mm	HH:mm:ss	HH:mm:ss z	H-'a' 'horo' 'kaj' m:ss Z
+decimal:,
+bidi:ltr

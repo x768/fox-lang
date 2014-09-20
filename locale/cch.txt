@@ -1,0 +1,9 @@
+langtag:cch
+language:cch
+month_w:Pen Dyon	Pen Ba'a	Pen Atat	Pen Anas	Pen Atyon	Pen Achirim	Pen Atariba	Pen Awurr	Pen Shadon	Pen Shakur	Pen Kur Naba	Pen Kur Natat
+month:Dyon	Baa	Atat	Anas	Atyo	Achi	Atar	Awur	Shad	Shak	Naba	Nata
+days_w:Wai Tunga	Toki Gitung	Tsam Kasuwa	Wai Na Nas	Wai Na Tiyon	Wai Na Chirim	Wai Yoka Bawai
+days:Tung	T. Tung	Tsan	Nas	Nat	Chir	Yok
+date:yy/MM/dd	y MMM d	y MMMM d	dddd, y MMMM dd
+time:HH:mm	HH:mm:ss	HH:mm:ss z	HH:mm:ss Z
+bidi:ltr

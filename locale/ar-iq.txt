@@ -1,0 +1,4 @@
+langtag:ar_IQ
+language:ar
+territory:IQ
+bidi:ltr

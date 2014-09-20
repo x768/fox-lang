@@ -1,0 +1,50 @@
+locale=sk
+Etc/Unknown:Neznáme časové pásmo
+Antarctica/South_Pole:Južný pól
+Antarctica/DumontDUrville:Dumont D'Urville
+Atlantic/Bermuda:Bermudy
+Pacific/Easter:Veľkonočné ostrovy
+Asia/Shanghai:Šanghaj
+America/Costa_Rica:Kostarika
+Atlantic/Cape_Verde:Kapverdy
+Africa/Djibouti:Džibutsko
+America/Dominica:Dominika
+Pacific/Galapagos:Galapágy
+Atlantic/Canary:Kanárske ostrovy
+Pacific/Fiji:Fidži
+Europe/London:Londýn
+Europe/Gibraltar:Gibraltár
+Asia/Hong_Kong:Hongkong
+America/Jamaica:Jamajka
+America/St_Kitts:St. Kitts
+Asia/Kuwait:Kuvajt
+America/St_Lucia:St. Lucia
+Europe/Luxembourg:Luxembursko
+Europe/Monaco:Monako
+Asia/Ulaanbaatar:Ulanbátar
+Asia/Macau:Macao
+America/Martinique:Martinik
+Indian/Mauritius:Maurícius
+Indian/Maldives:Maledivy
+Pacific/Pitcairn:Pitcairnove ostrovy
+America/Puerto_Rico:Portoriko
+Atlantic/Azores:Azorské ostrovy
+Europe/Lisbon:Lisabon
+Asia/Qatar:Katar
+Europe/Moscow:Moskva
+Asia/Yekaterinburg:Jekaterinburg
+Asia/Krasnoyarsk:Krasnojarsko
+Asia/Irkutsk:Irkutsko
+Asia/Yakutsk:Jakutsko
+Asia/Sakhalin:Sachalin
+Asia/Kamchatka:Kamčatka
+Asia/Singapore:Singapur
+America/El_Salvador:Salvádor
+Europe/Uzhgorod:Užhorod
+Europe/Kiev:Kyjev
+Europe/Zaporozhye:Záporožie
+America/Anchorage:Aljaška
+America/North_Dakota/New_Salem:New Salem, Severná Dakota
+Asia/Tashkent:Taškent
+America/St_Vincent:St. Vincent
+America/St_Thomas:St. Thomas

@@ -1,0 +1,5 @@
+=Africa/Gaborone
+8000000000000000 6220 0 LMT
+fffffd8f7ace4b20 7200 0 CAT
+ffffff3edc5fa400 10800 1 CAST
+ffffff42856e1d80 7200 0 CAT

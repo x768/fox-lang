@@ -1,0 +1,5 @@
+=Africa/Bamako
+8000000000000000 -1920 0 LMT
+fffffe55d4b9f000 0 0 GMT
+fffffef89d20b400 -3600 0 WAT
+ffffffb9f4779680 0 0 GMT

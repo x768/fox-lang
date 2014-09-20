@@ -1,0 +1,10 @@
+langtag:ebu
+language:ebu
+month_w:Mweri wa mbere	Mweri wa kaĩri	Mweri wa kathatũ	Mweri wa kana	Mweri wa gatano	Mweri wa gatantatũ	Mweri wa mũgwanja	Mweri wa kanana	Mweri wa kenda	Mweri wa ikũmi	Mweri wa ikũmi na ũmwe	Mweri wa ikũmi na Kaĩrĩ
+month:Mbe	Kai	Kat	Kan	Gat	Gan	Mug	Knn	Ken	Iku	Imw	Igi
+days_w:Njumatatu	Njumaine	Njumatano	Aramithi	Njumaa	NJumamothii	Kiumia
+days:Tat	Ine	Tan	Arm	Maa	NMM	Kma
+am_pm:KI	UT
+date:dd/MM/yyyy	d MMM y	d MMMM y	dddd, d MMMM y
+time:h:mm a	h:mm:ss a	h:mm:ss a z	h:mm:ss a Z
+bidi:ltr

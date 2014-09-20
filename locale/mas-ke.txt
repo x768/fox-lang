@@ -1,0 +1,4 @@
+langtag:mas_KE
+language:mas
+territory:KE
+bidi:ltr

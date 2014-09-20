@@ -1,0 +1,11 @@
+langtag:gsw
+language:gsw
+month_w:Januar	Februar	März	April	Mai	Juni	Juli	Auguscht	Septämber	Oktoober	Novämber	Dezämber
+month:Jan	Feb	Mär	Apr	Mai	Jun	Jul	Aug	Sep	Okt	Nov	Dez
+days_w:Määntig	Ziischtig	Mittwuch	Dunschtig	Friitig	Samschtig	Sunntig
+days:Mä.	Zi.	Mi.	Du.	Fr.	Sa.	Su.
+am_pm:v.m.	n.m.
+date:dd.MM.yy	dd.MM.yyyy	d. MMMM y	dddd, d. MMMM y
+time:HH:mm	HH:mm:ss	HH:mm:ss z	HH:mm:ss Z
+decimal:.
+bidi:ltr

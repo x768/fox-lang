@@ -1,0 +1,11 @@
+langtag:kab
+language:kab
+month_w:Yennayer	Fuṛar	Meɣres	Yebrir	Mayyu	Yunyu	Yulyu	Ɣuct	Ctembeṛ	Tubeṛ	Nunembeṛ	Duǧembeṛ
+month:Yen	Fur	Meɣ	Yeb	May	Yun	Yul	Ɣuc	Cte	Tub	Nun	Duǧ
+days_w:Sanass	Kraḍass	Kuẓass	Samass	Sḍisass	Sayass	Yanass
+days:San	Kraḍ	Kuẓ	Sam	Sḍis	Say	Yan
+am_pm:n tufat	n tmeddit
+date:d/M/yyyy	d MMM, y	d MMMM y	dddd d MMMM y
+time:HH:mm	HH:mm:ss	HH:mm:ss z	HH:mm:ss Z
+decimal:,
+bidi:ltr

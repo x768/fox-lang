@@ -1,0 +1,5 @@
+langtag:ku_Arab_IQ
+language:ku
+script:Arab
+territory:IQ
+bidi:ltr

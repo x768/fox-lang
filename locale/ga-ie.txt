@@ -1,0 +1,4 @@
+langtag:ga_IE
+language:ga
+territory:IE
+bidi:ltr

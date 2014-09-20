@@ -1,0 +1,4 @@
+langtag:en_ZZ
+language:en
+territory:ZZ
+bidi:ltr

@@ -1,0 +1,4 @@
+langtag:ee_TG
+language:ee
+territory:TG
+bidi:ltr

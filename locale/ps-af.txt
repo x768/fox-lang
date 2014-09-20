@@ -1,0 +1,4 @@
+langtag:ps_AF
+language:ps
+territory:AF
+bidi:ltr

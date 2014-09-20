@@ -1,0 +1,5 @@
+langtag:zh_Hans_HK
+language:zh
+script:Hans
+territory:HK
+bidi:ltr

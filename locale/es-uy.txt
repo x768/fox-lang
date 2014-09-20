@@ -1,0 +1,4 @@
+langtag:es_UY
+language:es
+territory:UY
+bidi:ltr

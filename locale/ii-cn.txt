@@ -1,0 +1,4 @@
+langtag:ii_CN
+language:ii
+territory:CN
+bidi:ltr

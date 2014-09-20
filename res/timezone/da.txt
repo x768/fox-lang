@@ -1,0 +1,34 @@
+locale=da
+Etc/Unknown:Ukendt
+Antarctica/South_Pole:Sydpolen
+Antarctica/DumontDUrville:Dumont d’Urville
+Europe/Vienna:Wien
+Europe/Brussels:Bruxelles
+America/St_Johns:St. Johns
+Europe/Zurich:Zürich
+Pacific/Easter:Påskeøen
+Atlantic/Cape_Verde:Kap Verde
+Indian/Christmas:Juleøen
+Europe/Copenhagen:København
+Africa/Algiers:Algier
+Atlantic/Canary:De Kanariske Øer
+Atlantic/Faeroe:Færøerne
+America/Godthab:Nuuk
+Europe/Athens:Athen
+Asia/Hong_Kong:Hongkong
+Asia/Tehran:Teheran
+Europe/Rome:Rom
+America/St_Kitts:St. Kitts
+America/St_Lucia:St. Lucia
+Asia/Macau:Macao
+Indian/Maldives:Maldiverne
+Europe/Warsaw:Warszawa
+Atlantic/Azores:Azorerne
+Europe/Lisbon:Lissabon
+Indian/Reunion:Réunion
+Europe/Bucharest:Bukarest
+Europe/Moscow:Moskva
+America/El_Salvador:Salvador
+America/Anchorage:Alaska
+America/St_Vincent:St. Vincent
+America/St_Thomas:St. Thomas

@@ -1,0 +1,4 @@
+langtag:gu_IN
+language:gu
+territory:IN
+bidi:ltr

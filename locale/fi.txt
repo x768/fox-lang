@@ -1,0 +1,11 @@
+langtag:fi
+language:fi
+month_w:tammikuuta	helmikuuta	maaliskuuta	huhtikuuta	toukokuuta	kesäkuuta	heinäkuuta	elokuuta	syyskuuta	lokakuuta	marraskuuta	joulukuuta
+month:tam	hel	maalis'ta	huh	touko'ta	kesä'ta	hei	elo	syy	loka'ta	mar	joulu'ta
+days_w:maanantaina	tiistaina	keskiviikkona	torstaina	perjantaina	lauantaina	sunnuntaina
+days:ma	ti	ke	to	pe	la	su
+am_pm:a.p.	i.p.
+date:d.M.yyyy	d.M.yyyy	d. MMMM y	dddd d. MMMM y
+time:H.mm	H.mm.ss	H.mm.ss z	H.mm.ss Z
+decimal:,
+bidi:ltr

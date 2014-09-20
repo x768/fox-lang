@@ -1,0 +1,5 @@
+langtag:en_US_POSIX
+language:en
+territory:US
+variant:POSIX
+bidi:ltr

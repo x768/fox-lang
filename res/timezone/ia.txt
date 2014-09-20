@@ -1,0 +1,12 @@
+locale=ia
+Atlantic/Cape_Verde:Capo Verde
+Africa/Djibouti:Djibuti
+America/Grenada:Granada
+Asia/Hong_Kong:Hongkong
+Europe/Luxembourg:Luxemburg
+America/Martinique:Martinica
+Indian/Mauritius:Mauritio
+Indian/Maldives:Maldivas
+Pacific/Pitcairn:Insula Pitcairn
+America/Puerto_Rico:Porto Rico
+Indian/Mayotte:Mayotta

@@ -1,0 +1,4 @@
+=Africa/Luanda
+8000000000000000 3176 0 LMT
+fffffdc2e5fb4dc0 3124 0 AOT
+fffffe516775e8e0 3600 0 WAT

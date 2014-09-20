@@ -1,0 +1,4 @@
+langtag:ee_GH
+language:ee
+territory:GH
+bidi:ltr

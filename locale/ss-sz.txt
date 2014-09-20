@@ -1,0 +1,4 @@
+langtag:ss_SZ
+language:ss
+territory:SZ
+bidi:ltr

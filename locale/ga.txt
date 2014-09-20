@@ -1,0 +1,12 @@
+langtag:ga
+language:ga
+month_w:Eanáir	Feabhra	Márta	Aibreán	Bealtaine	Meitheamh	Iúil	Lúnasa	Meán Fómhair	Deireadh Fómhair	Samhain	Nollaig
+month:Ean	Feabh	Márta	Aib	Beal	Meith	Iúil	Lún	MFómh	DFómh	Samh	Noll
+days_w:Dé Luain	Dé Máirt	Dé Céadaoin	Déardaoin	Dé hAoine	Dé Sathairn	Dé Domhnaigh
+days:Luan	Máirt	Céad	Déar	Aoine	Sath	Domh
+am_pm:a.m.	p.m.
+date:dd/MM/yyyy	d MMM y	d MMMM y	dddd d MMMM y
+time:HH:mm	HH:mm:ss	HH:mm:ss z	HH:mm:ss Z
+decimal:.
+group:,
+bidi:ltr

@@ -1,0 +1,13 @@
+locale=pt_PT
+America/Argentina/Tucuman:Tucumán
+America/Cuiaba:Cuibá
+America/Araguaina:Araguaina
+America/Bahia:Baía
+America/St_Johns:São João da Terra Nova
+Europe/Madrid:Madrid
+Africa/Casablanca:Marrocos
+Asia/Ulaanbaatar:Ulan Bator
+America/Cancun:Cancun
+Europe/Moscow:Moscovo
+Asia/Sakhalin:Sacalina
+America/North_Dakota/Center:Center

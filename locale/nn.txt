@@ -1,0 +1,11 @@
+langtag:nn
+language:nn
+month_w:januar	februar	mars	april	mai	juni	juli	august	september	oktober	november	desember
+month:jan	feb	mar	apr	mai	jun	jul	aug	sep	okt	nov	des
+days_w:måndag	tysdag	onsdag	torsdag	fredag	laurdag	søndag
+days:mån	tys	ons	tor	fre	lau	søn
+am_pm:f.m.	e.m.
+date:dd.MM.yy	d. MMM. y	d. MMMM y	dddd d. MMMM y
+time:HH:mm	HH:mm:ss	HH:mm:ss z	'kl'. HH:mm:ss Z
+decimal:,
+bidi:ltr

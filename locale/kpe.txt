@@ -1,0 +1,3 @@
+langtag:kpe
+language:kpe
+bidi:ltr

@@ -1,0 +1,10 @@
+langtag:guz
+language:guz
+month_w:Chanuari	Feburari	Machi	Apiriri	Mei	Juni	Chulai	Agosti	Septemba	Okitoba	Nobemba	Disemba
+month:Can	Feb	Mac	Apr	Mei	Jun	Cul	Agt	Sep	Okt	Nob	Dis
+days_w:Chumatato	Chumaine	Chumatano	Aramisi	Ichuma	Esabato	Chumapiri
+days:Ctt	Cmn	Cmt	Ars	Icm	Est	Cpr
+am_pm:Ma/Mo	Mambia/Mog
+date:dd/MM/yyyy	d MMM y	d MMMM y	dddd, d MMMM y
+time:h:mm a	h:mm:ss a	h:mm:ss a z	h:mm:ss a Z
+bidi:ltr

@@ -1,0 +1,4 @@
+=Africa/Dakar
+8000000000000000 -4184 0 LMT
+fffffe55d4dc7bc0 -3600 0 WAT
+ffffff2df6b8b280 0 0 GMT

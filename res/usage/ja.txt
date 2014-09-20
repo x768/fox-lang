@@ -1,0 +1,9 @@
+locale=ja
+usage=使用方法
+options=オプション
+source=ソースコードファイル名
+arg=引数
+immediate="srccode"をfoxスクリプトとして実行
+validate=文法チェックのみ行う
+show_help=ヘルプを表示
+show_version=バージョン情報を表示

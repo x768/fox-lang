@@ -1,0 +1,4 @@
+langtag:az_Arab
+language:az
+script:Arab
+bidi:ltr

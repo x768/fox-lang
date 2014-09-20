@@ -1,0 +1,4 @@
+langtag:tr_TR
+language:tr
+territory:TR
+bidi:ltr

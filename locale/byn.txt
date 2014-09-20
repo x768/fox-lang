@@ -1,0 +1,10 @@
+langtag:byn
+language:byn
+month_w:ልደትሪ	ካብኽብቲ	ክብላ	ፋጅኺሪ	ክቢቅሪ	ምኪኤል ትጟኒሪ	ኰርኩ	ማርያም ትሪ	ያኸኒ መሳቅለሪ	መተሉ	ምኪኤል መሽወሪ	ተሕሳስሪ
+month:ልደት	ካብኽ	ክብላ	ፋጅኺ	ክቢቅ	ም/ት	ኰር	ማርያ	ያኸኒ	መተሉ	ም/ም	ተሕሳ
+days_w:ሰኑ	ሰሊጝ	ለጓ ወሪ ለብዋ	ኣምድ	ኣርብ	ሰንበር ሽጓዅ	ሰንበር ቅዳዅ
+days:ሰኑ	ሰሊጝ	ለጓ	ኣምድ	ኣርብ	ሰ/ሽ	ሰ/ቅ
+am_pm:ፋዱስ ጃብ	ፋዱስ ደምቢ
+date:dd/MM/yy	dd-MMM-y	dd MMMM y	dddd፡ dd MMMM ግርጋ y 
+time:h:mm a	h:mm:ss a	h:mm:ss a z	h:mm:ss a Z
+bidi:ltr

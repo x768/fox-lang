@@ -1,0 +1,4 @@
+langtag:luy_KE
+language:luy
+territory:KE
+bidi:ltr

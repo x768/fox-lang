@@ -1,0 +1,4 @@
+langtag:el_GR
+language:el
+territory:GR
+bidi:ltr

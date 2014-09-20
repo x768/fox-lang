@@ -1,0 +1,12 @@
+langtag:fo
+language:fo
+month_w:januar	februar	mars	apríl	mai	juni	juli	august	september	oktober	november	desember
+month:jan	feb	mar	apr	mai	jun	jul	aug	sep	okt	nov	des
+days_w:mánadagur	týsdagur	mikudagur	hósdagur	fríggjadagur	leygardagur	sunnudagur
+days:mán	týs	mik	hós	frí	ley	sun
+am_pm:f.p.	s.p.
+date:dd-MM-yy	dd-MM-yyyy	d. MMM y	dddd dd MMMM y
+time:HH:mm	HH:mm:ss	HH:mm:ss z	HH:mm:ss Z
+decimal:,
+group:.
+bidi:ltr

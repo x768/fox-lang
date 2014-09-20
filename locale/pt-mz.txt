@@ -1,0 +1,4 @@
+langtag:pt_MZ
+language:pt
+territory:MZ
+bidi:ltr

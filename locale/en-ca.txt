@@ -1,0 +1,5 @@
+langtag:en_CA
+language:en
+territory:CA
+date:yy-MM-dd	yyyy-MM-dd	d MMMM, y	dddd, d MMMM, y
+bidi:ltr

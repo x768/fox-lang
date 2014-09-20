@@ -1,0 +1,4 @@
+langtag:ur_PK
+language:ur
+territory:PK
+bidi:ltr

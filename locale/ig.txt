@@ -1,0 +1,10 @@
+langtag:ig
+language:ig
+month_w:Jenụwarị	Febrụwarị	Maachị	Eprel	Mee	Juun	Julaị	Ọgọọst	Septemba	Ọktoba	Novemba	Disemba
+month:Jen	Feb	Maa	Epr	Mee	Juu	Jul	Ọgọ	Sep	Ọkt	Nov	Dis
+days_w:Mọnde	Tiuzdee	Wenezdee	Tọọzdee	Fraịdee	Satọdee	Mbọsị Ụka
+days:Mọn	Tiu	Wen	Tọọ	Fraị	Sat	Ụka
+am_pm:A.M.	P.M.
+date:dd/MM/yyyy	d MMM y	d MMMM y	dddd, d MMMM y
+time:h:mm a	h:mm:ss a	h:mm:ss a z	h:mm:ss a Z
+bidi:ltr

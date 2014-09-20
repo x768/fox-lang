@@ -1,0 +1,4 @@
+langtag:byn_ER
+language:byn
+territory:ER
+bidi:ltr

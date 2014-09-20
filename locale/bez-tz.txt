@@ -1,0 +1,4 @@
+langtag:bez_TZ
+language:bez
+territory:TZ
+bidi:ltr

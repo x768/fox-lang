@@ -954,6 +954,8 @@ static int file_writefile(Value *vret, Value *v, RefNode *node)
 	Value v2 = v[2];
 	StrBuf sbuf;
 	RefNode *type = Value_type(v2);
+	const char *write_p;
+	int write_size;
 	Str s;
 
 	Str path_s;
@@ -988,9 +990,13 @@ static int file_writefile(Value *vret, Value *v, RefNode *node)
 		}
 	} else {
 		if (type == fs->cls_bytes) {
-			s = Value_str(v2);
+			RefStr *rs = Value_vp(v2);
+			write_p = rs->c;
+			write_size = rs->size;
 		} else if (type == fs->cls_bytesio) {
-			s = bytesio_get_str(v2);
+			RefBytesIO *bio = Value_vp(v2);
+			write_p = bio->buf.p;
+			write_size = bio->buf.size;
 		} else if (is_subclass(type, fs->cls_streamio)) {
 			if (!file_write_stream_sub(path, v2, FUNC_INT(node))) {
 				return FALSE;
@@ -1001,7 +1007,7 @@ static int file_writefile(Value *vret, Value *v, RefNode *node)
 			return FALSE;
 		}
 	}
-	if (!write_to_file(path, s, FUNC_INT(node))) {
+	if (!write_to_file(path, write_p, write_size, FUNC_INT(node))) {
 		throw_error_select(THROW_CANNOT_OPEN_FILE__STR, path_s);
 		return FALSE;
 	}

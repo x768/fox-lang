@@ -1,0 +1,4 @@
+langtag:ar_LY
+language:ar
+territory:LY
+bidi:ltr

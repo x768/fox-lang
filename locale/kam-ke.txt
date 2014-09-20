@@ -1,0 +1,4 @@
+langtag:kam_KE
+language:kam
+territory:KE
+bidi:ltr

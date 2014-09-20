@@ -1,0 +1,7 @@
+=America/Puerto_Rico
+8000000000000000 -15865 0 LMT
+fffffdf814b8daa8 -14400 0 AST
+ffffff34b9b63e00 -10800 0 AWT
+ffffff4cdc72d580 -10800 1 APT
+ffffff4dcaa0f480 -14400 0 AST
+ffffff4fa9597200 -14400 0 AST

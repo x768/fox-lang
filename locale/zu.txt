@@ -1,0 +1,10 @@
+langtag:zu
+language:zu
+month_w:Januwari	Februwari	Mashi	Apreli	Meyi	Juni	Julayi	Agasti	Septhemba	Okthoba	Novemba	Disemba
+month:Jan	Feb	Mas	Apr	Mey	Jun	Jul	Aga	Sep	Okt	Nov	Dis
+days_w:Msombuluko	Lwesibili	Lwesithathu	uLwesine	Lwesihlanu	Mgqibelo	Sonto
+days:Mso	Bil	Tha	Sin	Hla	Mgq	Son
+date:yyyy-MM-dd	d MMM y	d MMMM y	dddd dd MMMM y
+time:h:mm a	h:mm:ss a	h:mm:ss a z	h:mm:ss a Z
+decimal:,
+bidi:ltr

@@ -1,0 +1,6 @@
+langtag:fr_BE
+language:fr
+territory:BE
+date:d/MM/yy			
+group:.
+bidi:ltr

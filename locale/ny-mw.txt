@@ -1,0 +1,4 @@
+langtag:ny_MW
+language:ny
+territory:MW
+bidi:ltr

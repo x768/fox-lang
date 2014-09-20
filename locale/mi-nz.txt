@@ -1,0 +1,4 @@
+langtag:mi_NZ
+language:mi
+territory:NZ
+bidi:ltr

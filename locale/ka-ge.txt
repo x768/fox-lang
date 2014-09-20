@@ -1,0 +1,4 @@
+langtag:ka_GE
+language:ka
+territory:GE
+bidi:ltr

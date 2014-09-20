@@ -1,0 +1,10 @@
+langtag:ak
+language:ak
+month_w:Sanda-Ɔpɛpɔn	Kwakwar-Ɔgyefuo	Ebɔw-Ɔbenem	Ebɔbira-Oforisuo	Esusow Aketseaba-Kɔtɔnimba	Obirade-Ayɛwohomumu	Ayɛwoho-Kitawonsa	Difuu-Ɔsandaa	Fankwa-Ɛbɔ	Ɔbɛsɛ-Ahinime	Ɔberɛfɛw-Obubuo	Mumu-Ɔpɛnimba
+month:S-Ɔ	K-Ɔ	E-Ɔ	E-O	E-K	O-A	A-K	D-Ɔ	F-Ɛ	Ɔ-A	Ɔ-O	M-Ɔ
+days_w:Dwowda	Benada	Wukuda	Yawda	Fida	Memeneda	Kwesida
+days:Dwo	Ben	Wuk	Yaw	Fia	Mem	Kwe
+am_pm:AN	EW
+date:yy/MM/dd	y MMM d	y MMMM d	dddd, y MMMM dd
+time:HH:mm	HH:mm:ss	HH:mm:ss z	HH:mm:ss Z
+bidi:ltr

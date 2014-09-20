@@ -1,0 +1,5 @@
+langtag:sr_Cyrl_RS
+language:sr
+script:Cyrl
+territory:RS
+bidi:ltr

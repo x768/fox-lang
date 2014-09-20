@@ -1,0 +1,4 @@
+langtag:gez_ET
+language:gez
+territory:ET
+bidi:ltr

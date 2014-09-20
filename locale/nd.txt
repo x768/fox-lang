@@ -1,0 +1,9 @@
+langtag:nd
+language:nd
+month_w:Zibandlela	Nhlolanja	Mbimbitho	Mabasa	Nkwenkwezi	Nhlangula	Ntulikazi	Ncwabakazi	Mpandula	Mfumfu	Lwezi	Mpalakazi
+month:Zib	Nhl	Mbi	Mab	Nkw	Nhl	Ntu	Ncw	Mpa	Mfu	Lwe	Mpa
+days_w:Mvulo	Sibili	Sithathu	Sine	Sihlanu	Mgqibelo	Sonto
+days:Mvu	Sib	Sit	Sin	Sih	Mgq	Son
+date:dd/MM/yyyy	d MMM y	d MMMM y	dddd, d MMMM y
+time:h:mm a	h:mm:ss a	h:mm:ss a z	h:mm:ss a Z
+bidi:ltr

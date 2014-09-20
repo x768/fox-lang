@@ -1,0 +1,4 @@
+langtag:or_IN
+language:or
+territory:IN
+bidi:ltr

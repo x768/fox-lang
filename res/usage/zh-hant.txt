@@ -1,0 +1,6 @@
+locale=zh_Hant
+options=選項
+source=源碼文件名稱
+validate=驗證文法錯誤
+show_help=顯示此幫助信息
+show_version=顯示版本信息

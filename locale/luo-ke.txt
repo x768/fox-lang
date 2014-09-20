@@ -1,0 +1,4 @@
+langtag:luo_KE
+language:luo
+territory:KE
+bidi:ltr

@@ -1,0 +1,33 @@
+locale=en_Dsrt
+Etc/Unknown:𐐊𐑌𐑌𐐬𐑌
+Antarctica/South_Pole:𐐝𐐵𐑃 𐐑𐐬𐑊
+Pacific/Midway:𐐣𐐮𐐼𐐶𐐩
+Pacific/Johnston:𐐖𐐪𐑌𐑅𐐻𐐲𐑌
+Pacific/Wake:𐐎𐐩𐐿
+America/Adak:𐐈𐐼𐐰𐐿
+America/Nome:𐐤𐐬𐑋
+Pacific/Honolulu:𐐐𐐪𐑌𐐲𐑊𐐭𐑊𐐭
+America/Anchorage:𐐁𐑍𐐿𐐲𐑉𐐮𐐾
+America/Yakutat:𐐏𐐰𐐿𐐭𐐻𐐰𐐻
+America/Juneau:𐐖𐐭𐑌𐐬
+America/Los_Angeles:𐐢𐐱𐑅 𐐈𐑌𐐾𐐲𐑊𐑅
+America/Boise:𐐒𐐱𐐮𐑆𐐨
+America/Phoenix:𐐙𐐨𐑌𐐮𐐿𐑅
+America/Shiprock:𐐟𐐮𐐹𐑉𐐱𐐿
+America/Denver:𐐔𐐯𐑌𐑂𐐲𐑉
+America/North_Dakota/New_Salem:𐐤𐐭 𐐝𐐩𐑊𐐲𐑋, 𐐤𐐱𐑉𐑃 𐐔𐐲𐐿𐐬𐐼𐐲
+America/North_Dakota/Center:𐐝𐐯𐑌𐐻𐐲𐑉, 𐐤𐐱𐑉𐑃 𐐔𐐲𐐿𐐬𐐼𐐲
+America/Chicago:𐐟𐐮𐐿𐐪𐑀𐐬
+America/Menominee:𐐣𐐲𐑌𐐪𐑋𐐲𐑌𐐨
+America/Indiana/Vincennes:𐐚𐐮𐑌𐑅𐐯𐑌𐑆, 𐐆𐑌𐐼𐐨𐐰𐑌𐐲
+America/Indiana/Petersburg:𐐑𐐨𐐻𐐲𐑉𐑆𐐺𐐲𐑉𐑀, 𐐆𐑌𐐼𐐨𐐰𐑌𐐲
+America/Indiana/Tell_City:𐐓𐐯𐑊 𐐝𐐮𐐼𐐨, 𐐆𐑌𐐼𐐨𐐰𐑌𐐲
+America/Indiana/Knox:𐐤𐐪𐐿𐑅, 𐐆𐑌𐐼𐐨𐐰𐑌𐐲
+America/Indiana/Winamac:𐐎𐐮𐑌𐐲𐑋𐐰𐐿, 𐐆𐑌𐐼𐐨𐐰𐑌𐐲
+America/Indiana/Marengo:𐐣𐐲𐑉𐐯𐑍𐑀𐐬, 𐐆𐑌𐐼𐐨𐐰𐑌𐐲
+America/Indianapolis:𐐆𐑌𐐼𐐨𐐲𐑌𐐰𐐹𐐬𐑊𐐲𐑅
+America/Louisville:𐐢𐐭𐐶𐐨𐑂𐐮𐑊
+America/Indiana/Vevay:𐐚𐐯𐑂𐐩, 𐐆𐑌𐐼𐐨𐐰𐑌𐐲
+America/Kentucky/Monticello:𐐣𐐪𐑌𐐻𐐲𐑅𐐯𐑊𐐬, 𐐗𐐲𐑌𐐻𐐲𐐿𐐨
+America/Detroit:𐐔𐐲𐐻𐑉𐐱𐐮𐐻
+America/New_York:𐐤𐐭 𐐏𐐱𐑉𐐿

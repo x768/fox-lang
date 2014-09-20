@@ -1,0 +1,4 @@
+langtag:es_GQ
+language:es
+territory:GQ
+bidi:ltr

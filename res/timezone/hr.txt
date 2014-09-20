@@ -1,0 +1,61 @@
+locale=hr
+Etc/Unknown:Nepoznat ili nevažeći grad
+Europe/Andorra:Andora
+Antarctica/South_Pole:Južni pol
+Antarctica/DumontDUrville:Dumont D'Urville
+Europe/Vienna:Beć
+Europe/Sofia:Sofija
+Asia/Bahrain:Bahrein
+Africa/Kinshasa:Kinšasa
+Africa/Lubumbashi:Lubumbaši
+Pacific/Easter:Uskrsni Otok
+Asia/Shanghai:Šangaj
+America/Costa_Rica:Kostarika
+Atlantic/Cape_Verde:Zelenortska Republika
+Indian/Christmas:Božić
+Asia/Nicosia:Nikozija
+Africa/Djibouti:Džibuti
+America/Dominica:Dominika
+Africa/Algiers:Alžir
+Atlantic/Canary:Kanarska Otočja
+Pacific/Fiji:Fidži
+Europe/Paris:Pariz
+Europe/Athens:Atena
+Atlantic/South_Georgia:Južna Georgia
+America/Guatemala:Gvatemala
+America/Guyana:Gvajana
+Europe/Budapest:Budimpešta
+Europe/Rome:Rim
+America/Jamaica:Jamajka
+Asia/Tokyo:Tokio
+America/St_Kitts:St. Kitts
+Asia/Kuwait:Kuvajt
+America/St_Lucia:Sveta Lucija
+Europe/Luxembourg:Luksemburg
+Europe/Monaco:Monako
+Indian/Mauritius:Mauricijus
+Indian/Maldives:Maldivi
+Europe/Warsaw:Varšava
+America/Puerto_Rico:Portoriko
+Atlantic/Azores:Azorski otoci
+Europe/Lisbon:Lisabon
+Asia/Qatar:Katar
+Indian/Reunion:Réunion
+Europe/Bucharest:Bukurešt
+Europe/Kaliningrad:Kalinjingrad
+Europe/Moscow:Moskva
+Asia/Krasnoyarsk:Krasnojarsk
+Asia/Kamchatka:Kamčatka
+Asia/Anadyr:Anadir
+Asia/Singapore:Singapur
+Atlantic/St_Helena:Sveta Helena
+America/El_Salvador:Salvador
+Europe/Uzhgorod:Uzgorod
+Europe/Kiev:Kijev
+Europe/Zaporozhye:Zaporožje
+America/Anchorage:Alaska vremenska zona
+America/North_Dakota/New_Salem:New Salem, Sjeverna Dakota
+America/North_Dakota/Center:Središnja, Sjeverna Dakota
+Asia/Tashkent:Taškent
+America/St_Vincent:Sveti Vincent
+America/St_Thomas:Sveti Thomas

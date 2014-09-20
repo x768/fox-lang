@@ -194,10 +194,6 @@ typedef struct
 
 /////////////////////////////////////////////////////////////////////////////////////
 
-#define FOX_VERSION_MAJOR    0
-#define FOX_VERSION_MINOR    3
-#define FOX_VERSION_REVISION 0
-
 #define Value_isint(v)   (((v) & 0xFFFFFFFFULL) == 5ULL)
 #define int32_hash(v) (((v) * 31) & INT32_MAX)
 
@@ -283,7 +279,7 @@ int StrBuf_add_v(StrBuf *s, Value v);
 
 char *read_from_file(int *psize, const char *path, Mem *mem);
 int read_all_from_file(StrBuf *buf, int fd, int limit);
-int write_to_file(const char *path, Str s, int append);
+int write_to_file(const char *path, const char *write_p, int write_size, int append);
 int make_directory(const char *path);
 
 int IniTok_load(IniTok *tk, const char *path);
@@ -472,7 +468,6 @@ void init_file_module_1(void);
 char *file_value_to_path(Str *ret, Value v, int argn);
 int value_to_streamio(Value *stream, Value v, int writemode, int argn);
 StrBuf *bytesio_get_strbuf(Value v);
-Str bytesio_get_str(Value v);
 int stream_gets_sub(StrBuf *sb, Value v, int sep);
 
 void init_stream_ref(Ref *r, int mode);

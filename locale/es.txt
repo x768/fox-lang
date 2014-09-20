@@ -1,0 +1,12 @@
+langtag:es
+language:es
+month_w:enero	febrero	marzo	abril	mayo	junio	julio	agosto	septiembre	octubre	noviembre	diciembre
+month:ene	feb	mar	abr	may	jun	jul	ago	sep	oct	nov	dic
+days_w:lunes	martes	miércoles	jueves	viernes	sábado	domingo
+days:lun	mar	mié	jue	vie	sáb	dom
+am_pm:a.m.	p.m.
+date:dd/MM/yy	dd/MM/yyyy	d 'de' MMMM 'de' y	dddd d 'de' MMMM 'de' y
+time:HH:mm	HH:mm:ss	HH:mm:ss z	HH:mm:ss Z
+decimal:,
+group:.
+bidi:ltr

@@ -1,0 +1,11 @@
+langtag:ff
+language:ff
+month_w:siilo	colte	mbooy	seeɗto	duujal	korse	morso	juko	siilto	yarkomaa	jolal	bowte
+month:sii	col	mbo	see	duu	kor	mor	juk	slt	yar	jol	bow
+days_w:aaɓnde	mawbaare	njeslaare	naasaande	mawnde	hoore-biir	dewo
+days:aaɓ	maw	nje	naa	mwd	hbi	dew
+am_pm:subaka	kikiiɗe
+date:d/M/yyyy	d MMM, y	d MMMM y	dddd d MMMM y
+time:HH:mm	HH:mm:ss	HH:mm:ss z	HH:mm:ss Z
+decimal:,
+bidi:ltr

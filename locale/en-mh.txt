@@ -1,0 +1,4 @@
+langtag:en_MH
+language:en
+territory:MH
+bidi:ltr

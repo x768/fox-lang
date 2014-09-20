@@ -1,0 +1,9 @@
+langtag:kfo
+language:kfo
+month_w:Fai Weyene	Fai Fani	Fai Tataka	Fai Nangra	Fai Tuyo	Fai Tsoyi	Fai Tafaka	Fai Warachi	Fai Kunobok	Fai Bansok	Fai Kom	Fai Sauk
+month:Wey	Fan	Tat	Nan	Tuy	Tso	Taf	War	Kun	Ban	Kom	Sau
+days_w:Je-Kubacha	Je-Gbai	Tansati	Je-Yei	Je-Koye	Sati	Lahadi
+days:Kub	Gba	Tan	Yei	Koy	Sat	Lah
+date:yy/MM/dd	y MMM d	y MMMM d	dddd, y MMMM dd
+time:HH:mm	HH:mm:ss	HH:mm:ss z	HH:mm:ss Z
+bidi:ltr

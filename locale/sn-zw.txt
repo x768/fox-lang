@@ -1,0 +1,4 @@
+langtag:sn_ZW
+language:sn
+territory:ZW
+bidi:ltr

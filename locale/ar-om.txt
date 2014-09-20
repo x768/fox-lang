@@ -1,0 +1,4 @@
+langtag:ar_OM
+language:ar
+territory:OM
+bidi:ltr

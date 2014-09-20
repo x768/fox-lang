@@ -1,0 +1,4 @@
+langtag:fr_ML
+language:fr
+territory:ML
+bidi:ltr

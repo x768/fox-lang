@@ -72,6 +72,55 @@ typedef struct {
 	Value *body_vm;
 } HTMLDoc;
 
+int ch_get_category(int ch)
+{
+	static const uint8_t cate[] = {
+		// 0x20
+		CATE_Zs, CATE_Po, CATE_Po, CATE_Po,
+		CATE_Sc, CATE_Po, CATE_Po, CATE_Po,
+		CATE_Ps, CATE_Pe, CATE_Po, CATE_Sm,
+		CATE_Po, CATE_Pd, CATE_Po, CATE_Po,
+		// 0x30
+		CATE_Nd, CATE_Nd, CATE_Nd, CATE_Nd,
+		CATE_Nd, CATE_Nd, CATE_Nd, CATE_Nd,
+		CATE_Nd, CATE_Nd, CATE_Po, CATE_Po,
+		CATE_Sm, CATE_Sm, CATE_Sm, CATE_Po,
+		// 0x40
+		CATE_Po, CATE_Lu, CATE_Lu, CATE_Lu,
+		CATE_Lu, CATE_Lu, CATE_Lu, CATE_Lu,
+		CATE_Lu, CATE_Lu, CATE_Lu, CATE_Lu,
+		CATE_Lu, CATE_Lu, CATE_Lu, CATE_Lu,
+		// 0x50
+		CATE_Lu, CATE_Lu, CATE_Lu, CATE_Lu,
+		CATE_Lu, CATE_Lu, CATE_Lu, CATE_Lu,
+		CATE_Lu, CATE_Lu, CATE_Lu, CATE_Ps,
+		CATE_Po, CATE_Pe, CATE_Sk, CATE_Pc,
+		// 0x60
+		CATE_Sk, CATE_Ll, CATE_Ll, CATE_Ll,
+		CATE_Ll, CATE_Ll, CATE_Ll, CATE_Ll,
+		CATE_Ll, CATE_Ll, CATE_Ll, CATE_Ll,
+		CATE_Ll, CATE_Ll, CATE_Ll, CATE_Ll,
+		// 0x70
+		CATE_Ll, CATE_Ll, CATE_Ll, CATE_Ll,
+		CATE_Ll, CATE_Ll, CATE_Ll, CATE_Ll,
+		CATE_Ll, CATE_Ll, CATE_Ll, CATE_Ps,
+		CATE_Sm, CATE_Pe, CATE_Sm, CATE_Cc,
+	};
+	static int (*fn)(int ch) = NULL;
+
+	if (ch < 0x20) {
+		return CATE_Cc;
+	} else if (ch < 0x80) {
+		return cate[ch - ch];
+	}
+	if (fn == NULL) {
+		RefNode *mod_unicode = fs->get_module_by_name("text.unicode", -1, TRUE, FALSE);
+		UnicodeStatic *uni = mod_unicode->u.m.ext;
+		fn = uni->ch_get_category;
+	}
+	return fn(ch);
+}
+
 static Str get_elem_name(XMLTok *tk)
 {
 	int first = TRUE;
@@ -83,7 +132,7 @@ static Str get_elem_name(XMLTok *tk)
 	if (tk->p < tk->end) {
 		for (;;) {
 			int ch = fs->utf8_codepoint_at(tk->p);
-			int type = uni->ch_get_category(ch);
+			int type = ch_get_category(ch);
 
 			if (first) {
 				if (type < CATE_Ll || type > CATE_Mn) {
@@ -113,7 +162,7 @@ static int is_valid_elem_name(Str s)
 
 	while (p < end) {
 		int ch = fs->utf8_codepoint_at(p);
-		int type = uni->ch_get_category(ch);
+		int type = ch_get_category(ch);
 
 		if (first) {
 			if (type < CATE_Ll || type > CATE_Mn) {
@@ -532,20 +581,20 @@ static void xml_elem_init(Value *v, RefArray **p_ra, Value **p_vm, const char *n
 	Ref *r = fs->new_ref(cls_elem);
 	RefArray *ra = fs->refarray_new(0);
 
-	r->v[INDEX_CHILDREN] = vp_Value(ra);
+	r->v[INDEX_ELEM_CHILDREN] = vp_Value(ra);
 	*v = vp_Value(r);
 
 	ra->rh.type = cls_nodelist;
 	if (p_ra != NULL) {
-		*p_ra = Value_vp(r->v[INDEX_CHILDREN]);
+		*p_ra = Value_vp(r->v[INDEX_ELEM_CHILDREN]);
 	}
 
-	r->v[INDEX_ATTR] = vp_Value(fs->refmap_new(0));
+	r->v[INDEX_ELEM_ATTR] = vp_Value(fs->refmap_new(0));
 	if (p_vm != NULL) {
-		*p_vm = &r->v[INDEX_ATTR];
+		*p_vm = &r->v[INDEX_ELEM_ATTR];
 	}
 
-	r->v[INDEX_NAME] = fs->cstr_Value(fs->cls_str, name_p, name_size);
+	r->v[INDEX_ELEM_NAME] = fs->cstr_Value(fs->cls_str, name_p, name_size);
 }
 /**
  *  vの子要素にvbaseがあればTRUE
@@ -557,7 +606,7 @@ static int xml_elem_has_elem_sub(Value vbase, RefArray *ra)
 		Value pv = ra->p[i];
 		if (fs->Value_type(pv) == cls_elem) {
 			Ref *r2 = Value_vp(pv);
-			RefArray *ra2 = Value_vp(r2->v[INDEX_CHILDREN]);
+			RefArray *ra2 = Value_vp(r2->v[INDEX_ELEM_CHILDREN]);
 			if (xml_elem_has_elem_sub(vbase, ra2)) {
 				return TRUE;
 			}
@@ -572,7 +621,7 @@ static int xml_elem_has_elem(Value vbase, Value v)
 	}
 	if (fs->Value_type(v) == cls_elem) {
 		Ref *r = Value_vp(v);
-		RefArray *ra = Value_vp(r->v[INDEX_CHILDREN]);
+		RefArray *ra = Value_vp(r->v[INDEX_ELEM_CHILDREN]);
 		if (xml_elem_has_elem_sub(vbase, ra)) {
 			return TRUE;
 		}
@@ -2040,9 +2089,9 @@ static int node_tostr_xml(StrBuf *buf, Value v, int html, int ascii, int level)
 		}
 	} else {
 		Ref *r = Value_vp(v);
-		RefArray *ra = Value_vp(r->v[INDEX_CHILDREN]);
-		RefMap *rm = Value_vp(r->v[INDEX_ATTR]);
-		Str tag_name = fs->Value_str(r->v[INDEX_NAME]);
+		RefArray *ra = Value_vp(r->v[INDEX_ELEM_CHILDREN]);
+		RefMap *rm = Value_vp(r->v[INDEX_ELEM_ATTR]);
+		Str tag_name = fs->Value_str(r->v[INDEX_ELEM_NAME]);
 		int i;
 
 		if (ascii && !Str_isascii(tag_name)) {
@@ -2124,7 +2173,7 @@ static int node_tostr_xml(StrBuf *buf, Value v, int html, int ascii, int level)
 						}
 					} else if (html) {
 						Ref *rp = Value_vp(vp);
-						int type2 = get_tag_type_icase(fs->Value_str(rp->v[INDEX_NAME]));
+						int type2 = get_tag_type_icase(fs->Value_str(rp->v[INDEX_ELEM_NAME]));
 						if ((type2 & TTYPE_BLOCK) != 0) {
 							has_block = TRUE;
 						}
@@ -2307,19 +2356,19 @@ static int xml_elem_new(Value *vret, Value *v, RefNode *node)
 		return FALSE;
 	}
 
-	r->v[INDEX_NAME] = fs->Value_cp(v[1]);
+	r->v[INDEX_ELEM_NAME] = fs->Value_cp(v[1]);
 
 	ra = fs->refarray_new(0);
-	r->v[INDEX_CHILDREN] = vp_Value(ra);
+	r->v[INDEX_ELEM_CHILDREN] = vp_Value(ra);
 	ra->rh.type = cls_nodelist;
 
-	r->v[INDEX_ATTR] = vp_Value(fs->refmap_new(0));
+	r->v[INDEX_ELEM_ATTR] = vp_Value(fs->refmap_new(0));
 
 	if (fg->stk_top > v + 2) {
 		Value pv = v[2];
 		if (fs->Value_type(pv) == fs->cls_map) {
 			RefMap *map = Value_vp(pv);
-			RefMap *rm_dst = Value_vp(r->v[INDEX_ATTR]);
+			RefMap *rm_dst = Value_vp(r->v[INDEX_ELEM_ATTR]);
 			int i;
 			for (i = 0; i < map->entry_num; i++) {
 				HashValueEntry *ep;
@@ -2368,7 +2417,7 @@ static int xml_elem_index_key(Value *vret, Value *v, RefNode *node)
 	Ref *r = Value_vp(*v);
 	RefStr *key = Value_vp(v[1]);
 	RefArray *ra = fs->refarray_new(0);
-	RefArray *rch = Value_vp(r->v[INDEX_CHILDREN]);
+	RefArray *rch = Value_vp(r->v[INDEX_ELEM_CHILDREN]);
 
 	*vret = vp_Value(ra);
 	ra->rh.type = cls_nodelist;
@@ -2377,7 +2426,7 @@ static int xml_elem_index_key(Value *vret, Value *v, RefNode *node)
 		Value vk = rch->p[i];
 		if (fs->Value_type(vk) == cls_elem) {
 			Ref *rk = Value_vp(vk);
-			RefStr *k = Value_vp(rk->v[INDEX_NAME]);
+			RefStr *k = Value_vp(rk->v[INDEX_ELEM_NAME]);
 			if (str_eq(key->c, key->size, k->c, k->size)) {
 				Value *ve = fs->refarray_push(ra);
 				*ve = fs->Value_cp(vk);
@@ -2430,7 +2479,7 @@ static int xml_elem_push(Value *vret, Value *v, RefNode *node)
 
 	{
 		Ref *r = Value_vp(*v);
-		RefArray *ra = Value_vp(r->v[INDEX_CHILDREN]);
+		RefArray *ra = Value_vp(r->v[INDEX_ELEM_CHILDREN]);
 
 		if (fg->stk_top > v + 2) {
 			// insert
@@ -2470,7 +2519,7 @@ static int xml_elem_index(Value *vret, Value *v, RefNode *node)
 		return xml_elem_index_key(vret, v, node);
 	} else if (v1_type == fs->cls_int) {
 		Ref *r = Value_vp(*v);
-		RefArray *ra = Value_vp(r->v[INDEX_CHILDREN]);
+		RefArray *ra = Value_vp(r->v[INDEX_ELEM_CHILDREN]);
 		int64_t idx = fs->Value_int(v[1], NULL);
 
 		if (idx < 0) {
@@ -2493,13 +2542,13 @@ static int xml_elem_iterator(Value *vret, Value *v, RefNode *node)
 	int (*array_iterator)(Value *, Value *, RefNode *) = get_function_ptr(fs->cls_list, fs->str_iterator);
 	Ref *r = Value_vp(*v);
 
-	array_iterator(vret, &r->v[INDEX_CHILDREN], node);
+	array_iterator(vret, &r->v[INDEX_ELEM_CHILDREN], node);
 	return TRUE;
 }
 static int xml_elem_tagname(Value *vret, Value *v, RefNode *node)
 {
 	Ref *r = Value_vp(*v);
-	*vret = fs->Value_cp(r->v[INDEX_NAME]);
+	*vret = fs->Value_cp(r->v[INDEX_ELEM_NAME]);
 	return TRUE;
 }
 static int xml_elem_attr(Value *vret, Value *v, RefNode *node)
@@ -2525,7 +2574,7 @@ static int xml_elem_attr(Value *vret, Value *v, RefNode *node)
 				Value p = vp[i];
 				if (fs->Value_type(p) == cls_elem) {
 					Ref *pr = Value_vp(p);
-					HashValueEntry *ve = fs->refmap_add(Value_vp(pr->v[INDEX_ATTR]), v[1], TRUE, FALSE);
+					HashValueEntry *ve = fs->refmap_add(Value_vp(pr->v[INDEX_ELEM_ATTR]), v[1], TRUE, FALSE);
 					if (ve == NULL) {
 						return TRUE;
 					}
@@ -2538,7 +2587,7 @@ static int xml_elem_attr(Value *vret, Value *v, RefNode *node)
 				Value p = vp[i];
 				if (fs->Value_type(p) == cls_elem) {
 					Ref *pr = Value_vp(p);
-					if (!fs->refmap_del(vret,  Value_vp(pr->v[INDEX_ATTR]), v[1])) {
+					if (!fs->refmap_del(vret,  Value_vp(pr->v[INDEX_ELEM_ATTR]), v[1])) {
 						return FALSE;
 					}
 				}
@@ -2556,7 +2605,7 @@ static int xml_elem_attr(Value *vret, Value *v, RefNode *node)
 			Value p = vp[i];
 			if (fs->Value_type(p) == cls_elem) {
 				Ref *pr = Value_vp(p);
-				if (!fs->refmap_get(&he, Value_vp(pr->v[INDEX_ATTR]), v[1])) {
+				if (!fs->refmap_get(&he, Value_vp(pr->v[INDEX_ELEM_ATTR]), v[1])) {
 					return FALSE;
 				}
 				if (he != NULL) {
@@ -2585,7 +2634,7 @@ static int node_text_xml(StrBuf *buf, Value v)
 		}
 	} else {
 		Ref *r = Value_vp(v);
-		RefArray *ra = Value_vp(r->v[INDEX_CHILDREN]);
+		RefArray *ra = Value_vp(r->v[INDEX_ELEM_CHILDREN]);
 		int i;
 		for (i = 0; i < ra->size; i++) {
 			if (!node_text_xml(buf, ra->p[i])) {
@@ -2742,12 +2791,12 @@ static int xml_node_list_index_key(Value *vret, Value *v, RefNode *node)
 		ra->rh.type = cls_nodelist;
 		for (i = 0; i < rch->size; i++) {
 			Value vch2 = rch->p[i];
-			RefArray *rch2 = Value_vp(Value_ref_memb(vch2, INDEX_CHILDREN));
+			RefArray *rch2 = Value_vp(Value_ref_memb(vch2, INDEX_ELEM_CHILDREN));
 
 			for (j = 0; j < rch2->size; j++) {
 				Value vk = rch2->p[j];
 				if (fs->Value_type(vk) == cls_elem) {
-					RefStr *k = Value_vp(Value_ref_memb(vk, INDEX_NAME));
+					RefStr *k = Value_vp(Value_ref_memb(vk, INDEX_ELEM_NAME));
 					if (str_eq(key->c, key->size, k->c, k->size)) {
 						Value *ve = fs->refarray_push(ra);
 						*ve = fs->Value_cp(vk);
@@ -2854,7 +2903,6 @@ static void define_class(RefNode *m)
 
 	// XMLElem
 	cls = cls_elem;
-	cls->u.c.n_memb = 4;
 	n = fs->define_identifier_p(m, cls, fs->str_new, NODE_NEW_N, 0);
 	fs->define_native_func_a(n, xml_elem_new, 1, -1, NULL, fs->cls_str);
 
@@ -2874,6 +2922,7 @@ static void define_class(RefNode *m)
 	fs->define_native_func_a(n, xml_elem_attr, 1, 2, (void*) FALSE, fs->cls_str, NULL);
 	n = fs->define_identifier(m, cls, "select", NODE_FUNC_N, 0);
 	fs->define_native_func_a(n, xml_elem_css, 1, 1, NULL, fs->cls_str);
+	cls->u.c.n_memb = INDEX_ELEM_NUM;
 	fs->extends_method(cls, cls_node);
 
 	// XMLText
@@ -2892,14 +2941,9 @@ static void define_class(RefNode *m)
 
 void define_module(RefNode *m, const FoxStatic *a_fs, FoxGlobal *a_fg)
 {
-	RefNode *mod_unicode;
-
 	fs = a_fs;
 	fg = a_fg;
 	mod_xml = m;
-
-	mod_unicode = fs->get_module_by_name("foxtk", -1, TRUE, FALSE);
-	uni = mod_unicode->u.m.ext;
 
 	define_class(m);
 	define_func(m);

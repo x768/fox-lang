@@ -861,14 +861,15 @@ static int stream_write_s(Value *vret, Value *v, RefNode *node)
 	RefNode *v1_type = Value_type(v1);
 
 	if (v1_type == fs->cls_bytesio) {
-		Str s = bytesio_get_str(v1);
+		RefBytesIO *bio = Value_vp(v1);
+		int size = bio->buf.size;
 		if (fg->stk_top > v + 2) {
 			int64_t limit = Value_int(v[2], NULL);
-			if (limit < s.size) {
-				s.size = limit;
+			if (size > limit) {
+				size = limit;
 			}
 		}
-		if (!stream_write_data(*v, s.p, s.size)) {
+		if (!stream_write_data(*v, bio->buf.p, size)) {
 			return FALSE;
 		}
 	} else {
@@ -1543,11 +1544,6 @@ StrBuf *bytesio_get_strbuf(Value v)
 	RefBytesIO *mb = Value_vp(v);
 	return &mb->buf;
 }
-Str bytesio_get_str(Value v)
-{
-	RefBytesIO *mb = Value_vp(v);
-	return Str_new(mb->buf.p + mb->cur, mb->buf.size - mb->cur);
-}
 
 RefBytesIO *bytesio_new_sub(const char *src, int size)
 {
@@ -1829,14 +1825,15 @@ static int bytesio_write_s(Value *vret, Value *v, RefNode *node)
 	RefNode *v1_type = Value_type(v1);
 
 	if (v1_type == fs->cls_bytesio) {
-		Str s = bytesio_get_str(v1);
+		RefBytesIO *bio = Value_vp(v1);
+		int size = bio->buf.size;
 		if (fg->stk_top > v + 2) {
 			int64_t limit = Value_int(v[2], NULL);
-			if (limit < s.size) {
-				s.size = limit;
+			if (size > limit) {
+				size = limit;
 			}
 		}
-		if (!StrBuf_add(&mb->buf, s.p, s.size)) {
+		if (!StrBuf_add(&mb->buf, bio->buf.p, size)) {
 			goto ERROR_END;
 		}
 	} else {

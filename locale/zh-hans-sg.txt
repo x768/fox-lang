@@ -1,0 +1,7 @@
+langtag:zh_Hans_SG
+language:zh
+script:Hans
+territory:SG
+date:dd/MM/yy			
+time:ahh:mm		ahh:mm:ssz	
+bidi:ltr

@@ -1,0 +1,10 @@
+langtag:tg
+language:tg
+month_w:Январ	Феврал	Март	Апрел	Май	Июн	Июл	Август	Сентябр	Октябр	Ноябр	Декабр
+month:Янв	Фев	Мар	Апр	Май	Июн	Июл	Авг	Сен	Окт	Ноя	Дек
+days_w:Душанбе	Сешанбе	Чоршанбе	Панҷшанбе	Ҷумъа	Шанбе	Якшанбе
+days:Дшб	Сшб	Чшб	Пшб	Ҷмъ	Шнб	Яшб
+am_pm:пе. чо.	па. чо.
+date:yy/MM/dd	y MMM d	y MMMM d	dddd, y MMMM dd
+time:HH:mm	HH:mm:ss	HH:mm:ss z	HH:mm:ss Z
+bidi:ltr

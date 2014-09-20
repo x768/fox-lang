@@ -1,0 +1,7 @@
+langtag:ti_ER
+language:ti
+territory:ER
+month_w:ጥሪ	ለካቲት	መጋቢት	ሚያዝያ	ግንቦት	ሰነ	ሓምለ	ነሓሰ	መስከረም	ጥቅምቲ	ሕዳር	ታሕሳስ
+month:ጥሪ	ለካቲ	መጋቢ	ሚያዝ	ግንቦ	ሰነ	ሓምለ	ነሓሰ	መስከ	ጥቅም	ሕዳር	ታሕሳ
+days_w:ሰኑይ	ሰሉስ	ረቡዕ	ሓሙስ	ዓርቢ	ቀዳም	ሰንበት
+bidi:ltr

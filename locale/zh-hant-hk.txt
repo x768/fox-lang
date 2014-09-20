@@ -1,0 +1,6 @@
+langtag:zh_Hant_HK
+language:zh
+script:Hant
+territory:HK
+date:yy年M月d日	y年M月d日	y年M月d日	y年M月d日dddd
+bidi:ltr

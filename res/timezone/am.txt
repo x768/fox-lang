@@ -1,0 +1,169 @@
+locale=am
+Antarctica/Rothera:ሮተራ
+Antarctica/Palmer:ፓልመር
+Antarctica/South_Pole:South_Pole
+Antarctica/Syowa:ስዮዋ
+Antarctica/Mawson:ማውሰን
+Antarctica/Davis:ዴቪስ
+Antarctica/Vostok:ቮስቱክ
+Antarctica/Casey:ቼሲ
+Antarctica/DumontDUrville:ዱሞንትዱርቪል
+Antarctica/McMurdo:ማክሙርዶ
+America/Argentina/Rio_Gallegos:Rio_Gallegos
+America/Mendoza:ሜንዶዛ
+America/Argentina/San_Juan:San_Juan
+America/Argentina/La_Rioja:La_Rioja
+America/Catamarca:ካታማርካ
+America/Jujuy:ጁጁይ
+America/Cordoba:ኮርዶባ
+America/Buenos_Aires:ቡኤኖስ-ኤይሪስ
+Australia/Perth:ፕርዝ
+Australia/Darwin:ዳርዊን
+Australia/Adelaide:አዴላኢደ
+Australia/Broken_Hill:ብሮከን ሂል
+Australia/Melbourne:ሜልቦኡመ
+Australia/Hobart:ሆባርት
+Australia/Lindeman:ሊንደማን
+Australia/Sydney:ሲድኒ
+Australia/Brisbane:ቢሪስባን
+Australia/Lord_Howe:ሎርድ ሆዌ
+America/Eirunepe:ኢሩኔፕ
+America/Rio_Branco:ሪኦ ብራንኮ
+America/Porto_Velho:ፖርቶ ቨልሆ
+America/Boa_Vista:ቦአ ቪስታ
+America/Manaus:ማናኡስ
+America/Cuiaba:ኩባ
+America/Campo_Grande:Campo_Grande
+America/Belem:በለም
+America/Araguaina:አራጉአኢና
+America/Sao_Paulo:ሳኦ ፓውሎ
+America/Bahia:America/Bahia
+America/Fortaleza:ፎርታለዛ
+America/Maceio:ማቺዎ
+America/Recife:ሪሲፋይ
+America/Noronha:ኖሮሃ
+America/Dawson:ዳውሰን
+America/Whitehorse:ሁዋይትሆርስ
+America/Inuvik:ኢኑቪክ
+America/Vancouver:ቫንኩቨር
+America/Dawson_Creek:ዳውሰን ክሪክ
+America/Yellowknife:የሎውናይፍ
+America/Edmonton:ኤድመንተን
+America/Swift_Current:ስዊፍት ከረንት
+America/Cambridge_Bay:ካምብሪጅ ቤይ
+America/Regina:ሬጂና
+America/Winnipeg:ዊኒፔግ
+America/Rainy_River:ሬኒ ሪቨር
+America/Rankin_Inlet:ራንኪን ኢንሌት
+America/Thunder_Bay:ተንደር ቤይ
+America/Nipigon:ኒፒጎን
+America/Toronto:ቶሮንቶ
+America/Montreal:ሞንትሪያል
+America/Iqaluit:ኢካሊኡት
+America/Pangnirtung:ፓንግኒርቱንግ
+America/Halifax:ሀሊፋክስ
+America/Goose_Bay:ጉዝ ቤይ
+America/Glace_Bay:ግሌስ ቤይ
+America/St_Johns:ሴንት ጆንስ
+Africa/Kinshasa:ኪንሻሳ
+Africa/Lubumbashi:ሉቡምባሺ
+Pacific/Easter:ኢስተር
+America/Santiago:ሳንቲያጎ
+Asia/Kashgar:ካሽጋር
+Asia/Urumqi:ኡሩምኪ
+Asia/Chongqing:ቾንግኪንግ
+Asia/Shanghai:ሻንጋይ
+Asia/Harbin:ባርቢን
+Pacific/Galapagos:ጋላፓጎስ
+America/Guayaquil:ጓያኪል
+Atlantic/Canary:ካናሪ
+Africa/Ceuta:ኬውታ
+Europe/Madrid:ማርድሪድ
+Pacific/Truk:ትሩክ
+Pacific/Ponape:ፖኔፕ
+Pacific/Kosrae:ኮስራይ
+Europe/London:ሎንዶን
+America/Thule:ቱለ
+America/Godthab:ጐድታኽብ
+America/Scoresbysund:ስኮረስቢሱንድ
+America/Danmarkshavn:ዴንማርክ
+Asia/Jakarta:ጃካርታ
+Asia/Pontianak:ፖንቲአንካ
+Asia/Makassar:ማካሳር
+Asia/Jayapura:ጃያፑራ
+Pacific/Enderbury:እንደርቡርይ
+Pacific/Kiritimati:ኪሪቲማቲ
+Pacific/Tarawa:ታራዋ
+Asia/Aqtau:አክታው
+Asia/Oral:ኦራል
+Asia/Aqtobe:አክቶቤ
+Asia/Qyzylorda:ኪዝያሎርዳ
+Asia/Almaty:አልማቲ
+Pacific/Kwajalein:ክዋጃላይን
+Pacific/Majuro:ማጁሮ
+Africa/Bamako:ባማኮ
+Asia/Hovd:ሆቭድ
+Asia/Ulaanbaatar:ኡላንባታር
+Asia/Choibalsan:ቾይባልሳን
+America/Tijuana:ቲጁአና
+America/Hermosillo:ሄርሞሲሎ
+America/Mazatlan:ማዛቲአን
+America/Chihuahua:ቺኽዋኽዋ
+America/Monterrey:ሞንተሪ
+America/Mexico_City:ሜክሲኮ ሲቲ
+America/Merida:ሜሪዳ
+America/Cancun:ካንኩን
+Asia/Kuala_Lumpur:ኳላልምፑር
+Asia/Kuching:ኩቺንግ
+Pacific/Chatham:ቻትሃም
+Pacific/Auckland:ኦክላንድ
+Pacific/Tahiti:ታሂቲ
+Pacific/Marquesas:ማሩኩሳስ
+Pacific/Gambier:ጋምባየር
+Atlantic/Azores:አዞረስ
+Atlantic/Madeira:ማዴኢራ
+Europe/Lisbon:ሊስቦን
+Europe/Kaliningrad:ካሊኒንጋርድ
+Europe/Moscow:ማስኮ
+Europe/Samara:ሳማራ
+Asia/Yekaterinburg:የካተሪንበርግ
+Asia/Omsk:ኦምስክ
+Asia/Novosibirsk:ኖቮሲቢርስክ
+Asia/Krasnoyarsk:ክራስኖያሽክ
+Asia/Irkutsk:ኢርኩትስክ
+Asia/Yakutsk:ያኩትስክ
+Asia/Vladivostok:ቭላዲቮስቱክ
+Asia/Sakhalin:ሳክሃሊን
+Asia/Magadan:ማጋዳን
+Asia/Kamchatka:ካምቻትካ
+Asia/Anadyr:አናዲር
+Europe/Uzhgorod:ኡዝጎሩድ
+Europe/Kiev:ካይቭ
+Europe/Simferopol:ሲምፈሮፖል
+Europe/Zaporozhye:ዛፖሮዝሂይ
+Pacific/Midway:ሚድዌ
+Pacific/Johnston:ጆንስቶን
+Pacific/Wake:ዌክ
+America/Adak:አዳክ
+America/Nome:ኖሜ
+Pacific/Honolulu:ሆኖሉሉ
+America/Anchorage:አንኮራጅ
+America/Yakutat:ያኩታት
+America/Juneau:ጁነአኡ
+America/Los_Angeles:ሎስ አንጀለስ
+America/Boise:ቦይስ
+America/Phoenix:ፎኔክስ
+America/Denver:ዴንቨር
+America/North_Dakota/Center:መካከል
+America/Chicago:ቺካጐ
+America/Menominee:መኖሚኔ
+America/Indiana/Knox:ክኖክስ
+America/Indiana/Marengo:ማሬንጎ
+America/Indianapolis:ኢንዲያናፖሊስ
+America/Louisville:ሉዊስቪለ
+America/Indiana/Vevay:ቬቫይ
+America/Kentucky/Monticello:ሞንቲሴሎ
+America/Detroit:ዲትሮይት
+America/New_York:ኒውዮርክ
+Asia/Samarkand:ሳማርካንድ
+Asia/Tashkent:ታሽኬንት

@@ -1,0 +1,4 @@
+=America/Cayenne
+8000000000000000 -12560 0 LMT
+fffffe5221ca2a80 -14400 0 GFT
+ffffffef7289f600 -10800 0 GFT

@@ -1,0 +1,12 @@
+langtag:is
+language:is
+month_w:janúar	febrúar	mars	apríl	maí	júní	júlí	ágúst	september	október	nóvember	desember
+month:jan	feb	mar	apr	maí	jún	júl	ágú	sep	okt	nóv	des
+days_w:mánudagur	þriðjudagur	miðvikudagur	fimmtudagur	föstudagur	laugardagur	sunnudagur
+days:mán	þri	mið	fim	fös	lau	sun
+am_pm:f.h.	e.h.
+date:d.M.yyyy	d.M.yyyy	d. MMMM y	dddd, d. MMMM y
+time:HH:mm	HH:mm:ss	HH:mm:ss z	HH:mm:ss Z
+decimal:,
+group:.
+bidi:ltr

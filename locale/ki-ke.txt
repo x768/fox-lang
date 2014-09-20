@@ -1,0 +1,4 @@
+langtag:ki_KE
+language:ki
+territory:KE
+bidi:ltr

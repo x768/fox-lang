@@ -1,0 +1,9 @@
+langtag:ti
+language:ti
+month_w:ጃንዩወሪ	ፌብሩወሪ	ማርች	ኤፕረል	ሜይ	ጁን	ጁላይ	ኦገስት	ሴፕቴምበር	ኦክተውበር	ኖቬምበር	ዲሴምበር
+month:ጃንዩ	ፌብሩ	ማርች	ኤፕረ	ሜይ	ጁን	ጁላይ	ኦገስ	ሴፕቴ	ኦክተ	ኖቬም	ዲሴም
+days_w:ሰኑይ	ሠሉስ	ረቡዕ	ኃሙስ	ዓርቢ	ቀዳም	ሰንበት
+am_pm:ንጉሆ ሰዓተ	ድሕር ሰዓት
+date:dd/MM/yy	dd-MMM-y	dd MMMM y	dddd፣ dd MMMM መዓልቲ y 
+time:h:mm a	h:mm:ss a	h:mm:ss a z	h:mm:ss a Z
+bidi:ltr

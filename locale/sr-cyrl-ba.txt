@@ -1,0 +1,7 @@
+langtag:sr_Cyrl_BA
+language:sr
+script:Cyrl
+territory:BA
+date:yy-MM-dd	yyyy-MM-dd		
+time:HH:mm	HH:mm:ss		HH 'часова', mm 'минута', ss 'секунди' Z
+bidi:ltr

@@ -108,7 +108,6 @@ static OpCode *OpBuf_prev(OpBuf *buf)
 {
 	if (buf->prev < 0) {
 		fatal_errorf(NULL, "OpBuf_prev:cannot rewind");
-		exit(1);
 	}
 	return buf->p + buf->prev;
 }

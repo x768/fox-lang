@@ -1,0 +1,4 @@
+langtag:mas_TZ
+language:mas
+territory:TZ
+bidi:ltr

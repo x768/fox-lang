@@ -1,0 +1,2 @@
+locale=so
+Etc/Unknown:Far aan la aqoon amase aan saxnayn

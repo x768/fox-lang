@@ -1,0 +1,4 @@
+langtag:hr_HR
+language:hr
+territory:HR
+bidi:ltr

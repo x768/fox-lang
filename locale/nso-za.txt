@@ -1,0 +1,4 @@
+langtag:nso_ZA
+language:nso
+territory:ZA
+bidi:ltr

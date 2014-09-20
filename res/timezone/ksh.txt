@@ -1,0 +1,35 @@
+locale=ksh
+Etc/Unknown:- weße mer nit -
+Antarctica/South_Pole:Södpol
+Antarctica/Syowa:Schoowa-Schtazjohn op dä Ensel Onjul
+Antarctica/Vostok:Wostok
+Antarctica/DumontDUrville:Dumont-d'Urville-Schtazjohn
+America/St_Johns:Zint John's
+Asia/Urumqi:Urrumptschi
+Pacific/Galapagos:Jalapagos
+Atlantic/Canary:Kannaare
+Asia/Aqtobe:Aqtöbe
+Asia/Qyzylorda:Qysylorda
+Asia/Ulaanbaatar:Ulan Bator
+America/Mexico_City:Schtadt Mexiko
+Atlantic/Azores:Azoore
+Europe/Moscow:Moskau
+Europe/Volgograd:Wolgograd
+Asia/Yekaterinburg:Jekaterinburg
+Asia/Krasnoyarsk:Krasnojarsk
+Asia/Yakutsk:Jakutsk
+Asia/Vladivostok:Wladiwostok
+Asia/Kamchatka:Kamschattka
+Europe/Uzhgorod:Uschjorod
+Europe/Zaporozhye:Saporischschja
+Pacific/Honolulu:Honululu
+America/North_Dakota/New_Salem:Neu Salem en Nood Dakota
+America/North_Dakota/Center:Zenter in Nord-Dakota
+America/Indiana/Vincennes:Vincennes en Indiana
+America/Indiana/Petersburg:Petersburg en Indiana
+America/Indiana/Tell_City:Tell City en Indiana
+America/Indiana/Knox:Knox en Indiana
+America/Indiana/Winamac:Winamac en Indiana
+America/Indiana/Marengo:Marengo en Indiana
+America/Indiana/Vevay:Vevay en Indiana
+America/Kentucky/Monticello:Monticello en Kentucky

@@ -1,0 +1,4 @@
+langtag:sk_SK
+language:sk
+territory:SK
+bidi:ltr

@@ -1,0 +1,6 @@
+langtag:es_MX
+language:es
+territory:MX
+decimal:.
+group:,
+bidi:ltr

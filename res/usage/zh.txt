@@ -1,0 +1,8 @@
+locale=zh
+usage=用法
+options=选项
+source=源码文件名称
+arg=参数
+validate=验证文法错误
+show_help=显示此帮助信息
+show_version=显示版本信息

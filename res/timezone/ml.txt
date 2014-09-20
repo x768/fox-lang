@@ -1,0 +1,174 @@
+locale=ml
+Etc/Unknown:അറിയപ്പെടാത്ത നഗരം
+Antarctica/Rothera:റൊതീറ
+Antarctica/Palmer:പാമര്‍
+Antarctica/South_Pole:ദക്ഷിണ ധ്രൂവം
+Antarctica/Syowa:സ്യോവ
+Antarctica/Mawson:മാവ്സണ്‍
+Antarctica/Davis:ഡെയ്‌വിസ്
+Antarctica/Vostok:വോസ്റ്റോക്
+Antarctica/Casey:കാസെ
+Antarctica/DumontDUrville:ഡ്യൂമണ്ട് ഡി യുര്‍വില്‍
+Antarctica/McMurdo:മാക്മര്‍ഡോ
+America/Argentina/Rio_Gallegos:റിയോ ഗ്യാലഗോസ്
+America/Mendoza:മെന്‍ഡോസ
+America/Argentina/San_Juan:സാന്‍ ജുവാന്‍
+America/Argentina/Ushuaia:ഉഷിയ
+America/Argentina/La_Rioja:ലാ റിയോജ
+America/Argentina/San_Luis:സാന്‍ ലൂയിസ്
+America/Catamarca:‍ക്യാറ്റമാര്‍ക്ക
+America/Jujuy:ജുജുയ്
+America/Argentina/Tucuman:റ്റുകുമാന്‍
+America/Cordoba:കൊര്‍ദോവ
+America/Buenos_Aires:ബ്യൂനസ് ഐറിസ്
+Australia/Perth:പെര്‍ത്ത്
+Australia/Eucla:യൂക്ല
+Australia/Darwin:ഡാര്‍വിന്‍
+Australia/Adelaide:അഡലെയ്ഡ്
+Australia/Broken_Hill:ബ്രോക്കണ്‍ ഹില്‍
+Australia/Currie:ക്യൂറി
+Australia/Melbourne:മെല്‍ബണ്‍
+Australia/Hobart:ഹൊബാര്‍ട്ട്
+Australia/Lindeman:ലിന്‍ഡെമാന്‍
+Australia/Sydney:സിഡ്നി
+Australia/Brisbane:ബ്രിസ്‌ബേയ്ന്‍
+Australia/Lord_Howe:ലോഡ് ഹോവ്
+America/Eirunepe:യെറുനീപ്പെ
+America/Rio_Branco:റിയോ ബ്രാങ്കോ
+America/Porto_Velho:പോര്‍ട്ടോ വെല്ലോ
+America/Boa_Vista:ബോവ വിസ്റ്റ
+America/Manaus:മനൌസ്
+America/Cuiaba:കുയ്ബ
+America/Campo_Grande:ക്യാന്പോ ഗ്രാന്‍ഡെ
+America/Belem:ബെലം
+America/Araguaina:അറഗ്വൈന
+America/Sao_Paulo:സാവോ പോലോ
+America/Bahia:ബഹിയ
+America/Fortaleza:ഫോര്‍ട്ടലീസ
+America/Maceio:മാസിയോ
+America/Recife:റെസീഫെ
+America/Noronha:നൊറോന
+America/Dawson:ഡോവ്സണ്‍
+America/Whitehorse:വൈറ്റ്ഹോഴ്സ്
+America/Inuvik:ഇനുവിക്
+America/Vancouver:വാന്‍‌കൂവര്‍
+America/Dawson_Creek:ഡോവ്സണ്‍ ക്രീക്ക്
+America/Yellowknife:യെല്ലോനൈഫ്
+America/Edmonton:എഡ്മോണ്‍ടണ്‍
+America/Swift_Current:സ്വിഫ്റ്റ് കറന്‍റ്
+America/Cambridge_Bay:കെയ്ന്പ്രിഡ്ജ് ബേ
+America/Regina:റിജീന
+America/Winnipeg:വിന്നിപെഗ്
+America/Resolute:റെസല്യൂട്ട്
+America/Rainy_River:റെയ്നി റിവര്‍
+America/Rankin_Inlet:റാങ്കിന്‍ ഇന്‍ലെറ്റ്
+America/Coral_Harbour:കോറല്‍ ഹാര്‍ബര്‍
+America/Thunder_Bay:തണ്ടര്‍ ബേ
+America/Nipigon:നിപ്പിഗോണ്‍
+America/Toronto:ടൊറണ്ടോ
+America/Montreal:മോണ്ട്രിയാല്‍
+America/Iqaluit:ഇഖാലിത്
+America/Pangnirtung:പാന്‍ഗ്‌നിറ്റങ്
+America/Moncton:മോങ്റ്റണ്‍
+America/Halifax:ഹാലിഫാക്സ്
+America/Goose_Bay:ഗൂസ് ബേ
+America/Glace_Bay:ഗ്ലെയ്സ് ബേ
+America/Blanc-Sablon:ബ്ലാങ്ക് സാബ്ലോണ്‍
+America/St_Johns:സെയ്ന്‍റ് ജോണ്‍സ്
+Africa/Kinshasa:കിന്‍ഷാസ
+Africa/Lubumbashi:ലൂബുംബാഷി
+Pacific/Easter:ഈസ്റ്റര്‍
+Asia/Kashgar:കാഷ്ഗര്‍
+Asia/Urumqi:ഉറുംഖി
+Asia/Chongqing:ചോങ്ഖിങ്
+Asia/Harbin:ഹാര്‍ബിന്‍
+Pacific/Galapagos:ഗാലപ്പാഗോസ്
+Atlantic/Canary:ക്യാനറി
+Africa/Ceuta:ക്യൂട്ട
+Pacific/Truk:ട്രക്
+Pacific/Ponape:പൊനാപ്
+Pacific/Kosrae:കൊസ്രേ
+America/Thule:തൂളി
+America/Scoresbysund:സ്കോര്‍സ്ബൈസണ്ട്
+America/Danmarkshavn:ഡാന്‍മാര്‍ക്ക്ഷാവ്ന്‍
+Asia/Jakarta:ജക്കാര്‍ത്ത
+Asia/Pontianak:പൊന്‍റിയാനക്
+Asia/Makassar:മകസ്സര്‍
+Asia/Jayapura:ജയപുര
+Pacific/Enderbury:എന്‍ഡബറി
+Pacific/Kiritimati:കിരിതിമാത്തി
+Pacific/Tarawa:തരാവ
+Asia/Aqtau:അഖ്തൌ
+Asia/Oral:ഓറല്‍
+Asia/Aqtobe:അഖ്തോബ്
+Asia/Qyzylorda:ഖിസിലോര്‍ഡ
+Asia/Almaty:അല്‍മതി
+Pacific/Kwajalein:ക്വാജലെയ്ന്‍
+Pacific/Majuro:മജൂറോ
+Asia/Hovd:ഹൌഡ്
+Asia/Ulaanbaatar:ഉലാന്‍ബട്ടൂര്‍
+Asia/Choibalsan:ചൊയ്ബല്‍സന്‍
+America/Tijuana:തിയുവാന
+America/Hermosillo:ഹെര്‍മോസില്ലോ
+America/Mazatlan:മാസറ്റ്ലാന്‍
+America/Chihuahua:ചിവാവു
+America/Monterrey:മോണ്ടര്‍‌റേ
+America/Mexico_City:മെക്സിക്കോ സിറ്റി
+America/Merida:മെരിഡ
+America/Cancun:കന്‍കൂന്‍
+Asia/Kuching:കുചിങ്
+Pacific/Chatham:ചാത്തം
+Pacific/Marquesas:മാര്‍ക്യുസാസ്
+Pacific/Gambier:ഗാന്പിയര്‍
+Atlantic/Azores:എയ്സോര്‍സ്
+Atlantic/Madeira:മഡെയ്റ
+Europe/Kaliningrad:ക്യാലിനിന്‍ഗ്രാഡ്
+Europe/Moscow:മോസ്കോ
+Europe/Volgograd:വോള്‍ഗോഗ്രാഡ്
+Europe/Samara:സമാറ
+Asia/Yekaterinburg:യാകാറ്റെറിന്‍ബര്‍ഗ്
+Asia/Omsk:ഒംസ്ക്
+Asia/Novosibirsk:നൊവോസിബിര്‍സ്ക്
+Asia/Krasnoyarsk:ക്രാസ്നോയാസ്ക്
+Asia/Irkutsk:ഇര്‍കസ്ക്
+Asia/Yakutsk:യാകസ്ക്
+Asia/Vladivostok:വ്ളാഡിവോസ്റ്റോക്
+Asia/Sakhalin:സഖാലിന്‍
+Asia/Magadan:മഗഡാന്‍
+Asia/Kamchatka:കാംചട്ക
+Asia/Anadyr:അനാഡിര്‍
+Europe/Uzhgorod:ഉസ്ഗൊറോഡ്
+Europe/Kiev:കീവ്
+Europe/Simferopol:സിംഫെറോപോള്‍
+Europe/Zaporozhye:സാപ്പറോസൈ
+Pacific/Midway:മിഡ്‌വേ
+Pacific/Johnston:ജോണ്‍സ്റ്റണ്‍
+Pacific/Wake:വെയ്ക്
+America/Adak:അഡാക്
+America/Nome:നൌം
+Pacific/Honolulu:ഹോണലൂലു
+America/Anchorage:ആങ്കറേജ്
+America/Yakutat:യാകുറ്റാറ്റ്
+America/Juneau:ജുനിയു
+America/Los_Angeles:ലോസ് എയ്ഞ്ചലസ്
+America/Boise:ബൊയ്സി
+America/Phoenix:ഫീനിക്സ്
+America/Shiprock:ഷിപ്പ്റോക്ക്
+America/Denver:ഡെന്‍‌വര്‍
+America/North_Dakota/New_Salem:ന്യൂ സെയ്‌ലം, നോര്‍ത്ത് ഡക്കോട്ട
+America/North_Dakota/Center:സെന്‍റര്‍, നോര്‍ത്ത് ഡക്കോട്ട
+America/Chicago:ചിക്കാഗോ
+America/Menominee:മെനോമിനീ
+America/Indiana/Vincennes:വിന്‍സെന്‍സ്, ഇന്‍ഡ്യാന
+America/Indiana/Petersburg:പീറ്റേഴ്സ്ബര്‍ഗ്, ഇന്‍ഡ്യാന
+America/Indiana/Tell_City:റ്റെല്‍ സിറ്റി, ഇന്‍ഡ്യാന
+America/Indiana/Knox:നോക്സ്, ഇന്‍ഡ്യാന
+America/Indiana/Winamac:വിനാമാക്, ഇന്‍ഡ്യാന
+America/Indiana/Marengo:മരെങ്കോ, ഇന്‍ഡ്യാനാ
+America/Indianapolis:ഇന്‍ഡ്യാനാപോലീസ്
+America/Louisville:ലൂയിവില്‍
+America/Indiana/Vevay:വിവെയ്, ഇന്‍ഡ്യാന
+America/Kentucky/Monticello:മോണ്ടിസെല്ലോ, കെന്‍റക്കി
+America/Detroit:ഡെട്രോയിറ്റ്
+America/New_York:ന്യൂയോര്‍ക്ക്
+Asia/Samarkand:സമര്‍ക്കന്ദ്

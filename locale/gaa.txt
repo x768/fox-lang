@@ -1,0 +1,10 @@
+langtag:gaa
+language:gaa
+month_w:Aharabata	Oflo	Ochokrikri	Abeibee	Agbeinaa	Otukwadan	Maawe	Manyawale	Gbo	Anton	Alemle	Afuabee
+month:Aha	Ofl	Och	Abe	Agb	Otu	Maa	Man	Gbo	Ant	Ale	Afu
+days_w:Dzu	Dzufo	Sho	Soo	Sohaa	Ho	Hogbaa
+days:Dzu	Dzf	Sho	Soo	Soh	Ho	Ho
+am_pm:LB	SN
+date:yy/MM/dd	y MMM d	y MMMM d	dddd, y MMMM dd
+time:HH:mm	HH:mm:ss	HH:mm:ss z	HH:mm:ss Z
+bidi:ltr

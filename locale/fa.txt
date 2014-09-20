@@ -1,0 +1,9 @@
+langtag:fa
+language:fa
+month_w:ژانویهٔ	فوریهٔ	مارس	آوریل	می	جون	جولای	آگوست	سپتامبر	اکتبر	نوامبر	دسامبر
+month:ژانویهٔ	فوریهٔ	مارس	آوریل	می	جون	جولای	اوت	سپتامبر	اکتبر	نوامبر	دسامبر
+days_w:دوشنبه	سه‌شنبه	چهارشنبه	پنجشنبه	جمعه	شنبه	یکشنبه
+am_pm:قبل از ظهر	بعد از ظهر
+date:M/d/yy	MMM d, y	MMMM d, y	dddd, MMMM d, y
+time:H:mm	H:mm:ss	H:mm:ss (z)	H:mm:ss (Z)
+bidi:rtl

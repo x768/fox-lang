@@ -1,0 +1,5 @@
+langtag:ar_DZ
+language:ar
+territory:DZ
+date:yyyy/M/d	yyyy/MM/dd		
+bidi:ltr

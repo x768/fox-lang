@@ -1,0 +1,4 @@
+=America/St_Vincent
+8000000000000000 -14696 0 LMT
+fffffdb437a9aa40 -14696 0 KMT
+fffffe55d57ce240 -14400 0 AST

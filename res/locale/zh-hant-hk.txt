@@ -1,0 +1,2 @@
+locale=zh_Hant_HK
+Hang:韓文字母
