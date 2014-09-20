@@ -198,7 +198,7 @@ static void SelectorTok_next(SelectorTok *tk)
 			tk->val.p = tk->p;
 			for (;;) {
 				int ch2 = fs->utf8_codepoint_at(tk->p);
-				int type = uni->ch_get_category(ch2);
+				int type = ch_get_category(ch2);
 
 				if (type < CATE_Ll || type > CATE_No) {
 					if (ch2 != '-' && ch2 != '_') {

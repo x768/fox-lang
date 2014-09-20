@@ -619,7 +619,7 @@ struct FoxGlobal
 
 #define FOX_VERSION_MAJOR    0
 #define FOX_VERSION_MINOR    4
-#define FOX_VERSION_REVISION 0
+#define FOX_VERSION_REVISION 1
 
 
 extern const char *fox_ctype_flags;

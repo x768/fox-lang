@@ -709,7 +709,7 @@ int read_all_from_file(StrBuf *buf, int fd, int limit)
 
 	return TRUE;
 }
-int write_to_file(const char *path, Str s, int append)
+int write_to_file(const char *path, const char *write_p, int write_size, int append)
 {
 	int fd = open_fox(path, (append ? O_CREAT|O_WRONLY|O_APPEND : O_CREAT|O_WRONLY|O_TRUNC), DEFAULT_PERMISSION);
 	int ret;
@@ -717,7 +717,7 @@ int write_to_file(const char *path, Str s, int append)
 	if (fd == -1) {
 		return FALSE;
 	}
-	ret = (write_fox(fd, s.p, s.size) == s.size);
+	ret = (write_fox(fd, write_p, write_size) == write_size);
 	close_fox(fd);
 
 	return ret;

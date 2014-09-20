@@ -954,9 +954,8 @@ static int file_writefile(Value *vret, Value *v, RefNode *node)
 	Value v2 = v[2];
 	StrBuf sbuf;
 	RefNode *type = Value_type(v2);
-	const char *write_p;
-	int write_size;
-	Str s;
+	const char *write_p = NULL;
+	int write_size = 0;
 
 	Str path_s;
 	char *path = file_value_to_path(&path_s, v1, 1);
@@ -971,7 +970,9 @@ static int file_writefile(Value *vret, Value *v, RefNode *node)
 		// 引数が2つ以上ある場合は文字列
 		if (type == fs->cls_str) {
 			RefCharset *cs = Value_vp(v[3]);
+			Str s;
 			int alt = FALSE;
+
 			if (fg->stk_top > v + 3 && Value_bool(v[4])) {
 				alt = TRUE;
 			}
@@ -984,6 +985,8 @@ static int file_writefile(Value *vret, Value *v, RefNode *node)
 				}
 				s = Str_new(sbuf.p, sbuf.size);
 			}
+			write_p = s.p;
+			write_size = s.size;
 		} else {
 			throw_error_select(THROW_ARGMENT_TYPE__NODE_NODE_INT, fs->cls_str, type, 2);
 			return FALSE;
