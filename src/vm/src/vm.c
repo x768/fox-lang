@@ -119,8 +119,10 @@ void init_so_func(void)
 	fs->utf8_next = utf8_next;
 	fs->utf8_codepoint_at = utf8_codepoint_at;
 	fs->get_charset_from_name = get_charset_from_name;
-	fs->convert_str_to_bin_sub = convert_str_to_bin_sub;
-	fs->convert_bin_to_str_sub = convert_bin_to_str_sub;
+
+	fs->IconvIO_open = IconvIO_open;
+	fs->IconvIO_close = IconvIO_close;
+	fs->IconvIO_conv = IconvIO_conv;
 
 	fs->call_function = call_function;
 	fs->call_function_obj = call_function_obj;
@@ -558,14 +560,14 @@ void fox_error_dump(StrBuf *sb, FileHandle fh, const RefCharset *cs, int log_sty
 		stacktrace_to_str(sb, fg->error, sep);
 	} else {
 		IconvIO ic;
-		if (IconvIO_open(&ic, fs->cs_utf8, fs->cs_stdio, TRUE)) {
+		if (IconvIO_open(&ic, fs->cs_utf8, fs->cs_stdio, "?")) {
 			StrBuf buf2;
 			StrBuf_init(&buf2, 0);
 
 			StrBuf_add(&buf2, cbuf, -1);
 			stacktrace_to_str(&buf2, fg->error, sep);
 
-			IconvIO_conv_b(&ic, sb, buf2.p, buf2.size);
+			IconvIO_conv(&ic, sb, buf2.p, buf2.size, TRUE, FALSE);
 			StrBuf_close(&buf2);
 			IconvIO_close(&ic);
 		} else {

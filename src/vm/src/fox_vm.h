@@ -416,16 +416,15 @@ void init_cgi_module_1(void);
 RefCharset *get_charset_from_name(const char *name_p, int name_size);
 RefCharset *get_charset_from_cp(int cp);
 
-int convert_str_to_bin_sub(Value *dst, StrBuf *dst_buf, const char *src_p, int src_size, RefCharset *cs, int alt_b);
-int convert_str_to_bin(Value *dst, StrBuf *dst_buf, Value src, int arg);
-int convert_bin_to_str_sub(Value *dst, StrBuf *dst_buf, const char *src_p, int src_size, RefCharset *cs, int alt_b);
-int convert_bin_to_str(Value *dst, Value *src, const Str *src_str, int arg);
+int convert_str_to_bin_sub(StrBuf *dst_buf, const char *src_p, int src_size, RefCharset *cs, const char *alt_s);
+int convert_str_to_bin(Value *dst, StrBuf *dst_buf, int arg);
+int convert_bin_to_str_sub(StrBuf *dst_buf, const char *src_p, int src_size, RefCharset *cs, int alt_b);
+int convert_bin_to_str(Value *dst, const Str *src_str, int arg);
 
-int IconvIO_open(IconvIO *ic, RefCharset *from, RefCharset *to, int trans);
+int IconvIO_open(IconvIO *ic, RefCharset *from, RefCharset *to, const char *trans);
 void IconvIO_close(IconvIO *ic);
 int IconvIO_next(IconvIO *ic);
-int IconvIO_conv_s(IconvIO *ic, StrBuf *dst, const char *src_p, int src_size);
-int IconvIO_conv_b(IconvIO *ic, StrBuf *dst, const char *src_p, int src_size);
+int IconvIO_conv(IconvIO *ic, StrBuf *dst, const char *src_p, int src_size, int from_uni, int raise_error);
 void define_charset_class(RefNode *m);
 
 

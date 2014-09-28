@@ -211,8 +211,9 @@ void dispose_opcode(RefNode *func)
 		OpCode *p = &code[pc];
 		if (p->type == OP_NONE) {
 			break;
-		} else if (p->type == OP_LITERAL_P) {
+		} else if (p->type == OP_LITERAL) {
 			Value_dec(p->op[0]);
+			pc += 2;
 		} else if (p->type > OP_SIZE_3) {
 			pc += 3;
 		} else if (p->type > OP_SIZE_2) {
@@ -511,7 +512,7 @@ NORMAL:
 		}
 		case OP_YIELD_VAL: { // yield value
 			// スタックの値を退避
-			Ref *r = Value_vp(fg->stk_base[-1]);
+			Ref *r = Value_ref(fg->stk_base[-1]);
 			fg->stk_top--;
 			r->v[INDEX_GENERATOR_PC] = int32_Value(pc + 1);
 			r->v[INDEX_GENERATOR_NSTACK] = int32_Value(fg->stk_top - fg->stk_base);
@@ -615,7 +616,7 @@ NORMAL:
 		}
 		case OP_LOCAL_FN: {  // ローカル変数をstktopの関数オブジェクトにコピー
 			Value v = fg->stk_top[-1];
-			Ref *r = Value_vp(v);
+			Ref *r = Value_ref(v);
 			int idx = (intptr_t)p->op[0];
 			r->v[INDEX_FUNC_LOCAL + idx] = Value_cp(fg->stk_base[p->s]);
 			pc += 2;
@@ -688,14 +689,14 @@ NORMAL:
 			break;
 		case OP_GET_FIELD: {
 			RefNode *klass = Value_vp(p->op[0]);
-			Ref *r = Value_vp(*fg->stk_base);
+			Ref *r = Value_ref(*fg->stk_base);
 			*fg->stk_top++ = Value_cp(r->v[p->s + klass->u.c.n_offset]);
 			pc += 2;
 			break;
 		}
 		case OP_SET_FIELD: {
 			RefNode *klass = Value_vp(p->op[0]);
-			Ref *r = Value_vp(*fg->stk_base);
+			Ref *r = Value_ref(*fg->stk_base);
 			Value *v = &r->v[p->s + klass->u.c.n_offset];
 			Value_dec(*v);
 			fg->stk_top--;
@@ -1253,7 +1254,7 @@ int call_function(RefNode *node, int argc)
 int call_function_obj(int argc)
 {
 	Value *v = fg->stk_top - argc - 1;
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 
 	if (r->rh.n_memb > 0) {
 		RefNode *node = Value_vp(r->v[INDEX_FUNC_FN]);

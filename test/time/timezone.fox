@@ -1,0 +1,15 @@
+#FOX_TZ=Asia/Japan
+import util.assert
+import time
+
+assert_equal TimeZone.UTC, TimeZone('Etc/UTC')
+assert_equal TimeZone.LOCAL, TimeZone('Asia/Tokyo')
+
+let time = Time(2014, 1, 1, 12, 0, 0)
+assert_equal time.timezone, TimeZone('Asia/Tokyo')
+assert_equal time.offset, TimeDelta(0, 9)
+
+// "サンマータイム法" 1949〜1951施行
+let time2 = Time(1949, 6, 1, 12, 0, 0)
+assert_equal time2.zone_abbr, 'JDT'
+assert_equal time2.offset, TimeDelta(0, 10)

@@ -442,7 +442,7 @@ static int breakiter_new(Value *vret, Value *v, RefNode *node)
 }
 static int breakiter_next(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 	int src_begin = Value_integral(r->v[BREAKITER_BEGIN]);
 	int src_end = Value_integral(r->v[BREAKITER_END]);
 	Str src = fs->Value_str(r->v[BREAKITER_SRC]);
@@ -902,7 +902,7 @@ static void define_class(RefNode *m)
 	fs->extends_method(cls, fs->cls_iterator);
 }
 
-static UnicodeStatic *newUnicodeStatic(void)
+static UnicodeStatic *UnicodeStatic_new(void)
 {
 	UnicodeStatic *f = fs->Mem_get(&fg->st_mem, sizeof(UnicodeStatic));
 
@@ -917,7 +917,7 @@ void define_module(RefNode *m, const FoxStatic *a_fs, FoxGlobal *a_fg)
 	fg = a_fg;
 	mod_unicode = m;
 
-	m->u.m.ext = newUnicodeStatic();
+	m->u.m.ext = UnicodeStatic_new();
 
 	define_class(m);
 	define_func(m);

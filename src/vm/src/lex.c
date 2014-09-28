@@ -305,10 +305,9 @@ static void Tok_parse_ident(TokValue *v, Tok *tk)
 		break;
 	}
 }
-static void Tok_parse_doller(TokValue *v, Tok *tk)
+static void Tok_parse_ident_var(TokValue *v, Tok *tk)
 {
 	v->p = tk->p;
-
 	tk->p++;
 
 	while (isalnumu_fox(*tk->p)) {
@@ -538,7 +537,7 @@ static void Tok_parse_double_str(TokValue *v, Tok *tk, int cat, int term)
 						return;
 					}
 
-					if (!str_add_codepoint(&dst, ch, "TokenError")) {
+					if (!str_add_codepoint(&dst, ch2, "TokenError")) {
 						v->type = T_ERR;
 						return;
 					}
@@ -1413,7 +1412,8 @@ START:
 		}
 		break;
 	case '$':
-		Tok_parse_doller(v, tk);
+	case '@':
+		Tok_parse_ident_var(v, tk);
 		break;
 	default: {
 		char ch2;

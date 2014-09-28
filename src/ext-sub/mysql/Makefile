@@ -3,25 +3,42 @@ include ../../Makefile.common
 
 .PHONY: clean
 
+
+OBJS_COMMON = \
+	m_net.o \
+	strutil.o \
+	compat_$(TARGET).o \
+
+
 ifeq ($(TARGET),posix)
-CFLAGS = -I../../include -fPIC `mysql_config --cflags`
-LFLAGS = $(COMMON_DLFLAGS) `mysql_config --libs`
+CFLAGS = -I../../include -fPIC
+LFLAGS = $(COMMON_DLFLAGS)
+OBJS = \
+	$(OBJS_COMMON) \
+	net_posix.o \
+
 endif
 ifeq ($(TARGET),win)
-CFLAGS = -I../../include -I/usr/local/include -I../lib/mysql-connector/include
-LFLAGS = $(COMMON_DLFLAGS) -L../lib/mysql-connector/lib-mingw -lmysql
+CFLAGS = -I../../include -I/usr/local/include
+LFLAGS = $(COMMON_DLFLAGS) -lws2_32 -liphlpapi
+OBJS = \
+	$(OBJS_COMMON) \
+	net_win.o \
+
 endif
 ifeq ($(TARGET),osx)
-CFLAGS = -I../../include `mysql_config --cflags`
-LFLAGS = $(COMMON_DLFLAGS) `mysql_config --libs`
+CFLAGS = -I../../include
+LFLAGS = $(COMMON_DLFLAGS)
+OBJS = \
+	$(OBJS_COMMON) \
+	net_posix.o \
+
 endif
 
-DEST = ../../../import/db/mysql.so
+
+DEST = ../../../import/io/net.so
 VPATH = ../../common
 
-OBJS = \
-	m_mysql.o \
-	strutil.o \
 
 
 all: $(OBJS)

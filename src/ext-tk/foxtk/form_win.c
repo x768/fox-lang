@@ -225,7 +225,7 @@ void connect_widget_events(WndHandle window)
 // v : FormのサブクラスでValue_new_ref済みの値を渡す
 void create_form_window(Value *v, WndHandle parent, int *size)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 	HWND window = NULL;
 	DWORD style;
 
@@ -661,7 +661,7 @@ static void init_image_pane_class()
 
 void create_image_pane_window(Value *v, WndHandle parent)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 	HWND window = NULL;
 	ImagePaneData *ipd;
 	init_image_pane_class();
@@ -883,7 +883,7 @@ static void CALLBACK timeout_callback(HWND hwnd, UINT msg, UINT_PTR id, DWORD ti
 	Value *sender_v = GuiHash_get_p(&timer_entry, (const void*)id);
 
 	if (sender_v != NULL) {
-		Ref *sender_r = Value_vp(*sender_v);
+		Ref *sender_r = Value_ref(*sender_v);
 		Value fn = sender_r->v[INDEX_TIMER_FN];
 		Value *stk_top = fg->stk_top;
 		int ret_code;

@@ -92,7 +92,7 @@ static int lzmaio_new(Value *vret, Value *v, RefNode *node)
 	if (fs->Value_type(v1) == fs->cls_bytesio) {
 		flags = STREAM_READ|STREAM_WRITE;
 	} else {
-		Ref *r1 = Value_vp(v1);
+		Ref *r1 = Value_ref(v1);
 		// 引数のStreamに応じて読み書き可能モードを設定する
 		if (Value_integral(r1->v[INDEX_READ_MAX]) >= 0) {
 			flags = STREAM_READ;
@@ -172,7 +172,7 @@ static int lzma_init_write(Ref *r, char *out_buf, int out_len, Str data)
 }
 static int lzmaio_close(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 	lzma_stream *zs = Value_ptr(r->v[INDEX_LZMA_OUT]);
 	int out_len = Value_integral(r->v[INDEX_WRITE_MAX]);
 	char *mb_buf = malloc(out_len);
@@ -238,7 +238,7 @@ static int invoke_read(char *buf, int *size, Value v)
 }
 static int lzmaio_read(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 	lzma_stream *zs = Value_ptr(r->v[INDEX_LZMA_IN]);
 	uint8_t *buf = Value_ptr(r->v[INDEX_LZMA_IN_BUF]);
 	RefBytesIO *mb = Value_vp(v[1]);
@@ -311,7 +311,7 @@ static int lzmaio_read(Value *vret, Value *v, RefNode *node)
 }
 static int lzmaio_write(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 	lzma_stream *zs = Value_ptr(r->v[INDEX_LZMA_OUT]);
 	int out_len = Value_integral(r->v[INDEX_WRITE_MAX]);
 	RefBytesIO *mb = Value_vp(v[1]);

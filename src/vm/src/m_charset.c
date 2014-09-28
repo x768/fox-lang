@@ -9,6 +9,9 @@
 #include <windows.h>
 #endif
 
+enum {
+	ALT_MAX_LEN = 32,
+};
 
 static int load_charset_file(IniTok *tk, RefStr *name)
 {
@@ -135,101 +138,55 @@ RefCharset *get_charset_from_cp(int cp)
 	return get_charset_from_name(buf, -1);
 }
 
-RefCharset *Value_to_charset(Value v, int argn)
-{
-	const RefNode *v_type = Value_type(v);
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-	if (v_type == fs->cls_charset) {
-		return Value_vp(v);
-	} else if (v_type == fs->cls_str) {
-		RefStr *rs = Value_vp(v);
-		RefCharset *cs = get_charset_from_name(rs->c, rs->size);
-		if (cs == NULL) {
-			throw_errorf(fs->mod_lang, "ValueError", "Unknown encoding name %q", rs->c);
-			return NULL;
-		}
-		return cs;
-	} else {
-		throw_error_select(THROW_ARGMENT_TYPE2__NODE_NODE_NODE_INT, fs->cls_charset, fs->cls_str, v_type, argn + 1);
-		return NULL;
+int convert_str_to_bin_sub(StrBuf *dst_buf, const char *src_p, int src_size, RefCharset *cs, const char *alt_s)
+{
+	if (src_size < 0) {
+		src_size = strlen(src_p);
 	}
-}
 
-int convert_str_to_bin_sub(Value *dst, StrBuf *dst_buf, const char *src_p, int src_size, RefCharset *cs, int alt_b)
-{
-	if (cs->utf8) {
+	if (cs == NULL || cs->utf8) {
 		// そのまま
-		if (dst != NULL) {
-			*dst = cstr_Value(fs->cls_bytes, src_p, src_size);
-		}
-		if (dst_buf != NULL) {
-			if (!StrBuf_add(dst_buf, src_p, src_size)) {
-				return FALSE;
-			}
+		if (!StrBuf_add(dst_buf, src_p, src_size)) {
+			return FALSE;
 		}
 		return TRUE;
 	} else {
 		// UTF-8 -> 任意の文字コード変換
 		IconvIO ic;
-		StrBuf *buf;
-		StrBuf str_buf;
-		char *c_buf = malloc(BUFFER_SIZE);
 		int result = TRUE;
 
-		if (!IconvIO_open(&ic, fs->cs_utf8, cs, alt_b)) {
+		if (!IconvIO_open(&ic, fs->cs_utf8, cs, alt_s)) {
 			return FALSE;
 		}
 
-		if (dst_buf == NULL) {
-			StrBuf_init(&str_buf, 0);
-			buf = &str_buf;
-		} else {
-			buf = dst_buf;
-		}
-		if (!IconvIO_conv_b(&ic, buf, src_p, src_size)) {
+		if (!IconvIO_conv(&ic, dst_buf, src_p, src_size, TRUE, TRUE)) {
 			result = FALSE;
 		}
 		IconvIO_close(&ic);
-
-		if (dst != NULL) {
-			*dst = cstr_Value(fs->cls_bytes, buf->p, buf->size);
-		}
-		if (dst_buf == NULL) {
-			StrBuf_close(&str_buf);
-		}
-		free(c_buf);
 
 		return result;
 	}
 }
 
-// dst : optional
-// dst_buf : optional
-// src   : Str|Bytes
-// arg   : Charset|Str (default : UTF-8)
-// arg+1 : Bool(optional)
-int convert_str_to_bin(Value *dst, StrBuf *dst_buf, Value src, int arg)
+/**
+ * dst     : optional
+ * dst_buf : optional
+ * arg     : Str
+ * arg+1   : Charset (default: UTF-8)
+ * arg+2   : Bool(optional)
+ */
+int convert_str_to_bin(Value *dst, StrBuf *dst_buf, int arg)
 {
 	Value *v = fg->stk_base;
-	const RefNode *src_type = Value_type(src);
 	RefCharset *cs;
 	RefStr *rs;
 	int alt_b;
 
 	if (fg->stk_top > v + arg + 1) {
-		if (src_type != fs->cls_str) {
-			throw_error_select(THROW_ARGMENT_TYPE__NODE_NODE_INT, fs->cls_str, src_type, arg);
-			return FALSE;
-		}
-		cs = Value_to_charset(v[arg + 1], arg);
-		if (cs == NULL) {
-			return FALSE;
-		}
+		cs = Value_vp(v[arg + 1]);
 	} else {
-		if (src_type != fs->cls_bytes) {
-			throw_error_select(THROW_ARGMENT_TYPE__NODE_NODE_INT, fs->cls_bytes, src_type, arg);
-			return FALSE;
-		}
 		cs = fs->cs_utf8;
 	}
 	if (fg->stk_top > v + arg + 2) {
@@ -237,98 +194,96 @@ int convert_str_to_bin(Value *dst, StrBuf *dst_buf, Value src, int arg)
 	} else {
 		alt_b = FALSE;
 	}
+	rs = Value_vp(v[arg]);
 
-	rs = Value_vp(src);
-	return convert_str_to_bin_sub(dst, dst_buf, rs->c, rs->size, cs, alt_b);
+	if (cs == fs->cs_utf8) {
+		if (dst_buf != NULL) {
+			if (!StrBuf_add(dst_buf, rs->c, rs->size)) {
+				return FALSE;
+			}
+		} else {
+			*dst = cstr_Value(fs->cls_bytes, rs->c, rs->size);
+		}
+	} else {
+		if (dst_buf != NULL) {
+			if (!convert_str_to_bin_sub(dst_buf, rs->c, rs->size, cs, alt_b ? "?" : NULL)) {
+				return FALSE;
+			}
+		} else {
+			StrBuf sb_tmp;
+			StrBuf_init_refstr(&sb_tmp, 64);
+			if (!convert_str_to_bin_sub(&sb_tmp, rs->c, rs->size, cs, alt_b ? "?" : NULL)) {
+				StrBuf_close(&sb_tmp);
+				return FALSE;
+			}
+			*dst = StrBuf_str_Value(&sb_tmp, fs->cls_bytes);
+		}
+	}
+	return TRUE;
 }
 
 /*
  * 出力先にdstとdst_bufどちらか一方を指定
  */
-int convert_bin_to_str_sub(Value *dst, StrBuf *dst_buf, const char *src_p, int src_size, RefCharset *cs, int alt_b)
+int convert_bin_to_str_sub(StrBuf *dst_buf, const char *src_p, int src_size, RefCharset *cs, int alt_b)
 {
 	if (src_size < 0) {
 		src_size = strlen(src_p);
 	}
-	if (cs->utf8) {
+
+	if (cs == NULL || cs->utf8) {
 		// なるべくそのまま
 		if (invalid_utf8_pos(src_p, src_size) >= 0) {
 			if (alt_b) {
-				if (dst_buf != NULL) {
-					StrBuf_alloc(dst_buf, src_size);
-					alt_utf8_string(dst_buf, src_p, src_size);
-					*dst = cstr_Value(fs->cls_str, dst_buf->p, dst_buf->size);
-				}
-				if (dst != NULL) {
-					StrBuf d_buf;
-					StrBuf_init(&d_buf, src_size);
-					alt_utf8_string(&d_buf, src_p, src_size);
-					*dst = cstr_Value(fs->cls_str, d_buf.p, d_buf.size);
-					StrBuf_close(&d_buf);
-				}
+				alt_utf8_string(dst_buf, src_p, src_size);
 			} else {
 				throw_error_select(THROW_INVALID_UTF8);
 				return FALSE;
 			}
 		} else {
-			if (dst_buf != NULL) {
-				StrBuf_add(dst_buf, src_p, src_size);
-			}
-			if (dst != NULL) {
-				*dst = cstr_Value(fs->cls_str, src_p, src_size);
-			}
+			StrBuf_add(dst_buf, src_p, src_size);
 		}
 		return TRUE;
 	} else {
 		IconvIO ic;
-		StrBuf d_buf;
 		int result = TRUE;
 
-		if (!IconvIO_open(&ic, cs, fs->cs_utf8, alt_b)) {
+		if (!IconvIO_open(&ic, cs, fs->cs_utf8, alt_b ? UTF8_ALTER_CHAR : NULL)) {
 			return FALSE;
 		}
-
-		if (dst_buf == NULL) {
-			StrBuf_init(&d_buf, 0);
-		}
-		if (!IconvIO_conv_s(&ic, (dst_buf != NULL ? dst_buf : &d_buf), src_p, src_size)) {
+		if (!IconvIO_conv(&ic, dst_buf, src_p, src_size, FALSE, TRUE)) {
 			result = FALSE;
 		}
 		IconvIO_close(&ic);
 
-		if (dst_buf == NULL) {
-			*dst = cstr_Value(fs->cls_str, d_buf.p, d_buf.size);
-			StrBuf_close(&d_buf);
-		}
 		return result;
 	}
 }
 
-// dst : needed
-// src   : optional
-// src_str : needed if src == NULL
-// arg   : Charset|Str (省略時はBytesのまま)
-// arg+1 : Bool(optional)
-int convert_bin_to_str(Value *dst, Value *src, const Str *src_str, int arg)
+/**
+ * dst     : needed
+ * src_str : optional
+ * arg     : Str needed if src_str == NULL
+ * arg+1   : Charset (省略時はBytesのまま)
+ * arg+1   : Bool (optional)
+ */
+int convert_bin_to_str(Value *dst, const Str *src_str, int arg)
 {
 	Value *v = fg->stk_base;
 	RefCharset *cs;
 	int alt_b;
 	const char *src_p;
 	int src_size;
+	StrBuf sbuf;
 
 	if (fg->stk_top > v + arg + 1) {
-		cs = Value_to_charset(v[arg + 1], arg);
-		if (cs == NULL) {
-			return FALSE;
-		}
+		cs = Value_vp(v[arg + 1]);
 	} else {
 		// そのまま返す
-		if (src != NULL) {
-			RefStr *rs = Value_vp(*src);
-			*dst = cstr_Value(fs->cls_bytes, rs->c, rs->size);
-		} else {
+		if (src_str != NULL) {
 			*dst = cstr_Value(fs->cls_bytes, src_str->p, src_str->size);
+		} else {
+			*dst = Value_cp(v[arg]);
 		}
 		return TRUE;
 	}
@@ -337,22 +292,29 @@ int convert_bin_to_str(Value *dst, Value *src, const Str *src_str, int arg)
 	} else {
 		alt_b = FALSE;
 	}
-	if (src != NULL) {
-		RefStr *rs = Value_vp(*src);
-		src_p = rs->c;
-		src_size = rs->size;
-	} else {
+	if (src_str != NULL) {
 		src_p = src_str->p;
 		src_size = src_str->size;
+	} else {
+		RefStr *rs = Value_vp(v[arg]);
+		src_p = rs->c;
+		src_size = rs->size;
 	}
-	return convert_bin_to_str_sub(dst, NULL, src_p, src_size, cs, alt_b);
+
+	StrBuf_init_refstr(&sbuf, src_size);
+	if (!convert_bin_to_str_sub(&sbuf, src_p, src_size, cs, alt_b)) {
+		StrBuf_close(&sbuf);
+		return FALSE;
+	}
+	*dst = StrBuf_str_Value(&sbuf, fs->cls_str);
+	return TRUE;
 }
 int get_charset_from_args(RefCharset **cs, int *alt_b, int arg)
 {
 	Value *v = fg->stk_base;
 
 	if (fg->stk_top > v + arg + 1) {
-		*cs = Value_to_charset(v[arg + 1], arg);
+		*cs = Value_vp(v[arg + 1]);
 		if (*cs == NULL) {
 			return FALSE;
 		}
@@ -370,9 +332,20 @@ int get_charset_from_args(RefCharset **cs, int *alt_b, int arg)
 
 static int charset_new(Value *vret, Value *v, RefNode *node)
 {
-	RefCharset *cs = Value_to_charset(v[1], 0);
+	RefNode *v_type = Value_type(v[1]);
+	RefCharset *cs;
 
-	if (cs == NULL) {
+	if (v_type == fs->cls_charset) {
+		cs = Value_vp(v[1]);
+	} else if (v_type == fs->cls_str) {
+		RefStr *rs = Value_vp(v[1]);
+		cs = get_charset_from_name(rs->c, rs->size);
+		if (cs == NULL) {
+			throw_errorf(fs->mod_lang, "ValueError", "Unknown encoding name %q", rs->c);
+			return FALSE;
+		}
+	} else {
+		throw_error_select(THROW_ARGMENT_TYPE2__NODE_NODE_NODE_INT, fs->cls_charset, fs->cls_str, v_type, 1);
 		return FALSE;
 	}
 	*vret = vp_Value(cs);
@@ -380,7 +353,7 @@ static int charset_new(Value *vret, Value *v, RefNode *node)
 }
 static int charset_marshal_read(Value *vret, Value *v, RefNode *node)
 {
-	Value r = Value_ref_memb(v[1], INDEX_MARSHALDUMPER_SRC);
+	Value r = Value_ref(v[1])->v[INDEX_MARSHALDUMPER_SRC];
 	RefCharset *cs;
 	uint32_t size;
 	int rd_size;
@@ -415,7 +388,7 @@ static int charset_marshal_write(Value *vret, Value *v, RefNode *node)
 {
 	RefCharset *cs = Value_vp(*v);
 	RefStr *name = cs->name;
-	Value w = Value_ref_memb(v[1], INDEX_MARSHALDUMPER_SRC);
+	Value w = Value_ref(v[1])->v[INDEX_MARSHALDUMPER_SRC];
 
 	if (!write_int32(name->size, w)) {
 		return FALSE;
@@ -462,7 +435,7 @@ static void RefStr_copy(char *dst, RefStr *src, int max)
 	memcpy(dst, src->c, size);
 	dst[size] = '\0';
 }
-int IconvIO_open(IconvIO *ic, RefCharset *from, RefCharset *to, int trans)
+int IconvIO_open(IconvIO *ic, RefCharset *from, RefCharset *to, const char *trans)
 {
 	enum {
 		MAX_LEN = 32,
@@ -508,86 +481,66 @@ int IconvIO_next(IconvIO *ic)
 	}
 	return ICONV_OK;
 }
-// Bytes -> Str
-int IconvIO_conv_s(IconvIO *ic, StrBuf *dst, const char *src_p, int src_size)
+static int make_alt_string(char *dst, const char *alt, int ch)
 {
 	enum {
-		ALT_SIZE = 3,
+		SURROGATE_NONE = 0,
+		SURROGATE_DONE = -1,
 	};
-	const char *alt = "\xEF\xBF\xBD";
-	char *tmp_buf = malloc(BUFFER_SIZE);
-
-	ic->inbuf = src_p;
-	ic->inbytesleft = src_size;
-	ic->outbuf = tmp_buf;
-	ic->outbytesleft = BUFFER_SIZE;
+	const char *p = alt;
+	const char *top = dst;
+	int lo_sur = SURROGATE_NONE;  // Low Surrogate
 
 	for (;;) {
-		switch (IconvIO_next(ic)) {
-		case ICONV_OK:
-			if (ic->inbuf != NULL) {
-				ic->inbuf = NULL;
+		switch (*p) {
+		case '\0':
+			if (lo_sur > 0) {
+				p = alt;
+				ch = lo_sur;
+				lo_sur = SURROGATE_DONE;
 			} else {
-				goto BREAK;
+				return dst - top;
 			}
 			break;
-		case ICONV_OUTBUF:
-			if (!StrBuf_add(dst, tmp_buf, BUFFER_SIZE - ic->outbytesleft)) {
-				return FALSE;
-			}
-			ic->outbuf = tmp_buf;
-			ic->outbytesleft = BUFFER_SIZE;
+		case 'd':
+			sprintf(dst, "%d", ch);
+			dst += strlen(dst);
+			p++;
 			break;
-		case ICONV_INVALID:
-			if (ic->trans) {
-				if (ic->outbytesleft < ALT_SIZE) {
-					if (!StrBuf_add(dst, tmp_buf, BUFFER_SIZE - ic->outbytesleft)) {
-						return FALSE;
-					}
-					ic->outbuf = tmp_buf;
-					ic->outbytesleft = BUFFER_SIZE;
+		case 'x':
+			sprintf(dst, "%02X", ch);
+			dst += strlen(dst);
+			p++;
+			break;
+		case 'u':
+			if (lo_sur == SURROGATE_NONE) {
+				if (ch > 0x10000) {
+					ch -= 0x10000;
+					lo_sur = ch % 0x400 + 0xDC00;
+					ch = ch / 0x400 + 0xD800;
 				}
-				{
-					char *pdst = ic->outbuf;
-
-					memcpy(pdst, alt, ALT_SIZE);
-					ic->outbuf += ALT_SIZE;
-					ic->outbytesleft -= ALT_SIZE;
-
-					ic->inbuf++;
-					ic->inbytesleft--;
-				}
-			} else {
-				throw_errorf(fs->mod_lang, "CharsetError", "Invalid byte sequence detected (%r)", ic->cs_from->name);
-				free(tmp_buf);
-				return FALSE;
 			}
+			sprintf(dst, "%04X", ch);
+			dst += strlen(dst);
+			p++;
+			break;
+		case 'U':
+			sprintf(dst, "%04X", ch);
+			dst += strlen(dst);
+			p++;
+			break;
+		default:
+			*dst++ = *p;
+			p++;
 			break;
 		}
 	}
-BREAK:
-	if (!StrBuf_add(dst, tmp_buf, BUFFER_SIZE - ic->outbytesleft)) {
-		free(tmp_buf);
-		return FALSE;
-	}
-	free(tmp_buf);
-
-	if (ic->inbytesleft > 0) {
-		if (ic->trans) {
-			if (!StrBuf_add(dst, alt, ALT_SIZE)) {
-				return FALSE;
-			}
-		} else {
-			throw_errorf(fs->mod_lang, "CharsetError", "Invalid byte sequence detected (%r)", ic->cs_from->name);
-			return FALSE;
-		}
-	}
-	return TRUE;
 }
-// Str -> Bytes
-int IconvIO_conv_b(IconvIO *ic, StrBuf *dst, const char *src_p, int src_size)
+int IconvIO_conv(IconvIO *ic, StrBuf *dst, const char *src_p, int src_size, int from_uni, int raise_error)
 {
 	char *tmp_buf = malloc(BUFFER_SIZE);
+	char alt[ALT_MAX_LEN];
+	int alt_size;
 
 	ic->inbuf = src_p;
 	ic->inbytesleft = src_size;
@@ -611,30 +564,46 @@ int IconvIO_conv_b(IconvIO *ic, StrBuf *dst, const char *src_p, int src_size)
 			ic->outbytesleft = BUFFER_SIZE;
 			break;
 		case ICONV_INVALID:
-			if (ic->trans) {
-				if (ic->outbytesleft < 1) {
+			if (ic->trans != NULL) {
+				const char *psrc;
+				char *pdst;
+
+				if (from_uni) {
+					alt_size = make_alt_string(alt, ic->trans, utf8_codepoint_at(ic->inbuf));
+				} else {
+					alt_size = make_alt_string(alt, ic->trans, *ic->inbuf);
+				}
+				if (ic->outbytesleft < alt_size) {
 					if (!StrBuf_add(dst, tmp_buf, BUFFER_SIZE - ic->outbytesleft)) {
 						return FALSE;
 					}
 					ic->outbuf = tmp_buf;
 					ic->outbytesleft = BUFFER_SIZE;
 				}
-				{
-					const char *psrc = ic->inbuf;
-					char *pdst = ic->outbuf;
+				psrc = ic->inbuf;
+				pdst = ic->outbuf;
 
-					*pdst = '?';
-					ic->outbuf++;
-					ic->outbytesleft--;
+				memcpy(pdst, alt, alt_size);
+				ic->outbuf += alt_size;
+				ic->outbytesleft -= alt_size;
 
-					// 1文字進める
+				if (from_uni) {
 					utf8_next(&psrc, psrc + ic->inbytesleft);
-					ic->inbytesleft -= psrc - ic->inbuf;
-					ic->inbuf = psrc;
+				} else {
+					psrc++;
 				}
+
+				ic->inbytesleft -= psrc - ic->inbuf;
+				ic->inbuf = psrc;
 			} else {
-				int ch = utf8_codepoint_at(ic->inbuf);
-				throw_errorf(fs->mod_lang, "CharsetError", "Cannot convert to %r (%U)", ic->cs_to->name, ch);
+				if (raise_error) {
+					if (from_uni) {
+						int ch = utf8_codepoint_at(ic->inbuf);
+						throw_errorf(fs->mod_lang, "CharsetError", "Cannot convert to %r (%U)", ic->cs_to->name, ch);
+					} else {
+						throw_errorf(fs->mod_lang, "CharsetError", "Invalid byte sequence detected (%r)", ic->cs_from->name);
+					}
+				}
 				free(tmp_buf);
 				return FALSE;
 			}

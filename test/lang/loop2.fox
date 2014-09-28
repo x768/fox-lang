@@ -1,0 +1,19 @@
+import util.assert
+
+
+let while_log = []
+let for_log = []
+
+try {
+	let iter = (1...3).iterator()
+	while let i = iter.next() {
+		while_log.push i
+	}
+} catch e:StopIteration {
+}
+
+for i in 1...3 {
+	for_log.push i
+}
+
+assert_equal while_log, for_log

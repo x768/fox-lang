@@ -938,7 +938,7 @@ static int write_str(RefStr *rs, Value w)
 
 static int marshaldump_read(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 	Value rd = r->v[INDEX_MARSHALDUMPER_SRC];
 	char *ptr;
 	Str name_s;
@@ -1030,13 +1030,13 @@ ERROR_END:
 }
 static int marshaldump_write(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 	Value w = r->v[INDEX_MARSHALDUMPER_SRC];
 	Value v1 = v[1];
 
 	if (Value_isref(v1)) {
 		RefLoopValidator *lv = Value_vp(r->v[INDEX_MARSHALDUMPER_CYCLREF]);
-		Ref *r1 = Value_vp(v1);
+		Ref *r1 = Value_ref(v1);
 		HashEntry *he = Hash_get_add_entry(&lv->hash, &lv->mem, (RefStr*)r1);
 
 		if (he->p != NULL) {
@@ -1089,7 +1089,7 @@ static int marshaldump_write(Value *vret, Value *v, RefNode *node)
 }
 static int marshaldump_stream(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 	*vret = Value_cp(r->v[INDEX_MARSHALDUMPER_SRC]);
 	return TRUE;
 }
@@ -1102,7 +1102,7 @@ static int marshaldump_stream(Value *vret, Value *v, RefNode *node)
 static int value_has_loop_sub(Value v, Hash *hash, Mem *mem)
 {
 	HashEntry *he;
-	Ref *r = Value_vp(v);
+	Ref *r = Value_ref(v);
 	const RefNode *type = r->rh.type;
 
 	if (type == NULL) {
@@ -1199,7 +1199,7 @@ static int loopref_push(Value *vret, Value *v, RefNode *node)
 	Value v1 = v[1];
 
 	if (Value_isref(v1)) {
-		Ref *r = Value_vp(v1);
+		Ref *r = Value_ref(v1);
 		HashEntry *he = Hash_get_add_entry(&lv->hash, &lv->mem, (RefStr*)r);
 
 		if (he->p != NULL) {
@@ -1217,7 +1217,7 @@ static int loopref_pop(Value *vret, Value *v, RefNode *node)
 	Value v1 = v[1];
 
 	if (Value_isref(v1)) {
-		Ref *r = Value_vp(v1);
+		Ref *r = Value_ref(v1);
 		HashEntry *he = Hash_get_add_entry(&lv->hash, &lv->mem, (RefStr*)r);
 
 		if (he->p == NULL) {

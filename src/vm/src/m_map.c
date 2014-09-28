@@ -215,6 +215,7 @@ int refmap_del(Value *val, RefMap *rm, Value key)
 			Value_dec(ep->val);
 		}
 		free(ep);
+		rm->count--;
 	} else {
 		if (val != NULL) {
 			*val = VALUE_NULL;
@@ -286,7 +287,7 @@ int map_dispose(Value *vret, Value *v, RefNode *node)
 static int map_marshal_read(Value *vret, Value *v, RefNode *node)
 {
 	Value dumper = v[1];
-	Value r = Value_ref_memb(dumper, INDEX_MARSHALDUMPER_SRC);
+	Value r = Value_ref(dumper)->v[INDEX_MARSHALDUMPER_SRC];
 	int is_map = FUNC_INT(node);
 	RefMap *rm;
 	uint32_t size;
@@ -350,7 +351,7 @@ static int map_marshal_read(Value *vret, Value *v, RefNode *node)
 static int map_marshal_write(Value *vret, Value *v, RefNode *node)
 {
 	Value dumper = v[1];
-	Value w = Value_ref_memb(dumper, INDEX_MARSHALDUMPER_SRC);
+	Value w = Value_ref(dumper)->v[INDEX_MARSHALDUMPER_SRC];
 
 	RefMap *rm = Value_vp(*v);
 	int is_map = FUNC_INT(node);
@@ -528,7 +529,7 @@ ERROR_END:
 static int map_add_entry(Value *vret, Value *v, RefNode *node)
 {
 	RefMap *rm = Value_vp(*v);
-	Ref *r = Value_vp(v[1]);
+	Ref *r = Value_ref(v[1]);
 	HashValueEntry *ve;
 
 	if (rm->lock_count > 0) {
@@ -626,7 +627,7 @@ int map_dup(Value *vret, Value *v, RefNode *node)
 
 static int mapiter_next(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 	RefMap *map = Value_vp(r->v[INDEX_MAPITER_VAL]);
 	int idx = Value_integral(r->v[INDEX_MAPITER_IDX]);
 	HashValueEntry *ep = Value_ptr(r->v[INDEX_MAPITER_PTR]);
@@ -666,7 +667,7 @@ static int mapiter_next(Value *vret, Value *v, RefNode *node)
 }
 static int mapiter_dispose(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 	RefMap *rm = Value_vp(r->v[INDEX_MAPITER_VAL]);
 	rm->lock_count--;
 
@@ -693,7 +694,7 @@ static int mapentry_cmp(Value *vret, Value *v, RefNode *node)
 	Value v2 = v[1];
 	Value vr;
 
-	Value_push("vv", Value_ref_memb(v1, INDEX_ENTRY_KEY), Value_ref_memb(v2, INDEX_ENTRY_KEY));
+	Value_push("vv", Value_ref(v1)->v[INDEX_ENTRY_KEY], Value_ref(v2)->v[INDEX_ENTRY_KEY]);
 	if (!call_member_func(fs->symbol_stock[T_CMP], 1, TRUE)) {
 		return FALSE;
 	}
@@ -702,7 +703,7 @@ static int mapentry_cmp(Value *vret, Value *v, RefNode *node)
 	if (Value_isint(vr) && Value_integral(vr) == 0) {
 		Value_pop();
 		// keyが同じなら、valueを比較
-		Value_push("vv", Value_ref_memb(v1, INDEX_ENTRY_VAL), Value_ref_memb(v2, INDEX_ENTRY_VAL));
+		Value_push("vv", Value_ref(v1)->v[INDEX_ENTRY_VAL], Value_ref(v2)->v[INDEX_ENTRY_VAL]);
 		if (!call_member_func(fs->symbol_stock[T_CMP], 1, TRUE)) {
 			return FALSE;
 		}
@@ -714,7 +715,7 @@ static int mapentry_cmp(Value *vret, Value *v, RefNode *node)
 }
 static int mapentry_tostr(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 	StrBuf buf;
 
 	StrBuf_init(&buf, 0);

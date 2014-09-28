@@ -122,14 +122,14 @@ void define_native_func_a(RefNode *node, NativeFunc func, int argc_min, int argc
 }
 int native_get_member(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 	int idx = FUNC_INT(node);
 	*vret = Value_cp(r->v[idx]);
 	return TRUE;
 }
 int native_set_member(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 	int idx = FUNC_INT(node);
 	r->v[idx] = Value_cp(v[1]);
 	return TRUE;
@@ -205,7 +205,7 @@ static int bool_new(Value *vret, Value *v, RefNode *node)
 }
 static int bool_marshal_read(Value *vret, Value *v, RefNode *node)
 {
-	Value r = Value_ref_memb(v[1], INDEX_MARSHALDUMPER_SRC);
+	Value r = Value_ref(v[1])->v[INDEX_MARSHALDUMPER_SRC];
 	int size = 1;
 	char buf;
 
@@ -217,7 +217,7 @@ static int bool_marshal_read(Value *vret, Value *v, RefNode *node)
 }
 static int bool_marshal_write(Value *vret, Value *v, RefNode *node)
 {
-	Value w = Value_ref_memb(v[1], INDEX_MARSHALDUMPER_SRC);
+	Value w = Value_ref(v[1])->v[INDEX_MARSHALDUMPER_SRC];
 	char b = Value_bool(*v) ? 1 : 0;
 
 	if (!stream_write_data(w, &b, 1)) {
@@ -254,7 +254,7 @@ static int bool_empty(Value *vret, Value *v, RefNode *node)
 
 static RefNode *function_get_nodeptr(Value v)
 {
-	Ref *r = Value_vp(v);
+	Ref *r = Value_ref(v);
 
 	if (r->rh.n_memb > 0) {
 		return Value_vp(r->v[INDEX_FUNC_FN]);
@@ -306,15 +306,15 @@ static int ref_new(Value *vret, Value *v, RefNode *node)
 }
 static int ref_tohash(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r1 = Value_vp(*v);
+	Ref *r1 = Value_ref(*v);
 	int32_t hash = int32_hash(Value_integral(r1->v[0]));
 	*vret = int32_Value(hash);
 	return TRUE;
 }
 static int ref_eq(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r1 = Value_vp(*v);
-	Ref *r2 = Value_vp(v[1]);
+	Ref *r1 = Value_ref(*v);
+	Ref *r2 = Value_ref(v[1]);
 	*vret = bool_Value(r1->v[0] == r2->v[0]);
 	return TRUE;
 }
@@ -350,7 +350,7 @@ static int weakref_new(Value *vret, Value *v, RefNode *node)
 
 static int weakref_alive(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 	int inv = FUNC_INT(node);
 	int ret = Value_bool(r->v[1]);
 	if (inv) {
@@ -362,7 +362,7 @@ static int weakref_alive(Value *vret, Value *v, RefNode *node)
 }
 static int weakref_value(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 
 	if (Value_bool(r->v[INDEX_WEAKREF_ALIVE])) {
 		*vret = Value_cp(r->v[INDEX_WEAKREF_REF]);
@@ -472,7 +472,7 @@ static int cls_in(Value *vret, Value *v, RefNode *node)
 static int error_new(Value *vret, Value *v, RefNode *node)
 {
 	RefNode *type = FUNC_VP(node);
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 
 	if (*v == VALUE_NULL || r->rh.n_memb == 0) {
 		r = new_ref(type);
@@ -489,7 +489,7 @@ static int error_new(Value *vret, Value *v, RefNode *node)
 }
 static int error_tostr(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 	RefNode *type = r->rh.type;
 	Str msg = Value_str(r->v[ERROR_MESSAGE]);
 
@@ -502,7 +502,7 @@ static int error_tostr(Value *vret, Value *v, RefNode *node)
 }
 static int error_dispose(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 	PtrList *pl = Value_ptr(r->v[ERROR_STACKTRACE]);
 	PtrList_close(pl);
 	r->v[ERROR_STACKTRACE] = VALUE_NULL;
@@ -511,7 +511,7 @@ static int error_dispose(Value *vret, Value *v, RefNode *node)
 }
 void stacktrace_to_str(StrBuf *buf, Value v, char sep)
 {
-	Ref *r = Value_vp(v);
+	Ref *r = Value_ref(v);
 	RefNode *type = r->rh.type;
 	PtrList *p = Value_ptr(r->v[ERROR_STACKTRACE]);
 
@@ -581,7 +581,7 @@ static int error_stacktrace(Value *vret, Value *v, RefNode *node)
 }
 static int error_message(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 	*vret = Value_cp(r->v[ERROR_MESSAGE]);
 	return TRUE;
 }
@@ -596,7 +596,7 @@ void add_stack_trace(RefNode *module, RefNode *func, int line)
 		fatal_errorf(NULL, "add_stack_trace while throwing no errors at %n", func);
 		return;
 	} else {
-		Ref *r = Value_vp(fg->error);
+		Ref *r = Value_ref(fg->error);
 		PtrList *p = Value_ptr(r->v[ERROR_STACKTRACE]);
 		PtrList *pl = PtrList_push(&p, sizeof(StackTrace), NULL);
 

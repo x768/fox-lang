@@ -16,7 +16,7 @@ CFLAGS = -I../../include
 LFLAGS = $(COMMON_DLFLAGS)
 endif
 
-DEST = ../../../import/markup/markdown.so
+DEST = ../../../import/datafmt/markdown.so
 VPATH = ../../common
 
 OBJS = \

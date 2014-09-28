@@ -347,7 +347,6 @@ static int col_eq_sub(int *ret, Value v1, Value v2, Hash *hash1, Hash *hash2, Me
 		he1->p = (void*)1;
 		he2->p = (void*)1;
 
-		// 途中で要素を削除されても最低限落ちないようにする
 		for (idx = 0; idx < r1->entry_num; idx++) {
 			int i;
 			for (i = 0; ; i++) {
@@ -556,7 +555,7 @@ static int array_marshal_read(Value *vret, Value *v, RefNode *node)
 	uint32_t size;
 	int i;
 
-	if (!read_int32(&size, Value_ref_memb(d, INDEX_MARSHALDUMPER_SRC))) {
+	if (!read_int32(&size, Value_ref(d)->v[INDEX_MARSHALDUMPER_SRC])) {
 		return FALSE;
 	}
 	if (size > 0xffffff) {
@@ -592,7 +591,7 @@ static int array_marshal_write(Value *vret, Value *v, RefNode *node)
 	int i;
 
 	ra->lock_count++;
-	if (!write_int32(ra->size, Value_ref_memb(d, INDEX_MARSHALDUMPER_SRC))) {
+	if (!write_int32(ra->size, Value_ref(d)->v[INDEX_MARSHALDUMPER_SRC])) {
 		goto ERROR_END;
 	}
 	for (i = 0; i < ra->size; i++) {
@@ -977,8 +976,7 @@ static int array_join_sub(StrBuf *buf, Value v, int is_str)
 
 	if (is_str) {
 		if (v_type == cls_strio) {
-			Value vbio = Value_ref_memb(v, INDEX_TEXTIO_STREAM);
-			RefBytesIO *bio = Value_vp(vbio);
+			RefBytesIO *bio = Value_vp(Value_ref(v)->v[INDEX_TEXTIO_STREAM]);
 			if (!StrBuf_add(buf, bio->buf.p, bio->buf.size)) {
 				return FALSE;
 			}
@@ -994,8 +992,7 @@ static int array_join_sub(StrBuf *buf, Value v, int is_str)
 				return FALSE;
 			}
 		} else if (v_type == fs->cls_bytesio) {
-			Value vbio = Value_ref_memb(v, INDEX_TEXTIO_STREAM);
-			RefBytesIO *bio = Value_vp(vbio);
+			RefBytesIO *bio = Value_vp(Value_ref(v)->v[INDEX_TEXTIO_STREAM]);
 			if (!StrBuf_add(buf, bio->buf.p, bio->buf.size)) {
 				return FALSE;
 			}
@@ -1506,7 +1503,7 @@ static int array_index_of(Value *vret, Value *v, RefNode *node)
 
 static int arrayiter_next(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 	RefArray *ra = Value_vp(r->v[INDEX_LISTITER_VAL]);
 	int type = Value_integral(r->v[INDEX_LISTITER_TYPE]);
 	int idx = Value_integral(r->v[INDEX_LISTITER_IDX]);
@@ -1533,7 +1530,7 @@ static int arrayiter_next(Value *vret, Value *v, RefNode *node)
 }
 static int arrayiter_dispose(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 	RefArray *ra = Value_vp(r->v[INDEX_LISTITER_VAL]);
 	ra->lock_count--;
 	return TRUE;
@@ -1544,7 +1541,7 @@ static int arrayiter_dispose(Value *vret, Value *v, RefNode *node)
 int pairvalue_hash(Value *vret, Value *v, RefNode *node)
 {
 	int32_t h1, h2;
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 
 	if (!Value_hash(r->v[0], &h1) || !Value_hash(r->v[1], &h2)) {
 		return FALSE;
@@ -1555,8 +1552,8 @@ int pairvalue_hash(Value *vret, Value *v, RefNode *node)
 }
 int pairvalue_eq(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r1 = Value_vp(*v);
-	Ref *r2 = Value_vp(v[1]);
+	Ref *r1 = Value_ref(*v);
+	Ref *r2 = Value_ref(v[1]);
 
 	RefNode *t_k1 = Value_type(r1->v[0]);
 	RefNode *t_v1 = Value_type(r1->v[1]);
@@ -1637,7 +1634,7 @@ int range_marshal_read(Value *vret, Value *v, RefNode *node)
 
 	Ref *r = new_ref(fs->cls_range);
 	Value d = v[1];
-	Value rd = Value_ref_memb(*v, INDEX_MARSHALDUMPER_SRC);
+	Value rd = Value_ref(*v)->v[INDEX_MARSHALDUMPER_SRC];
 
 	*vret = vp_Value(r);
 
@@ -1665,9 +1662,9 @@ int range_marshal_read(Value *vret, Value *v, RefNode *node)
 }
 int range_marshal_write(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 	Value d = v[1];
-	Value w = Value_ref_memb(*v, INDEX_MARSHALDUMPER_SRC);
+	Value w = Value_ref(*v)->v[INDEX_MARSHALDUMPER_SRC];
 	int i;
 	char is_dec = Value_bool(r->v[INDEX_RANGE_IS_DEC]) ? 1 : 0;
 	char is_open = Value_bool(r->v[INDEX_RANGE_OPEN]) ? 1 : 0;
@@ -1724,7 +1721,7 @@ ERROR_END:
 }
 static int range_empty(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 	int dec = Value_bool(r->v[INDEX_RANGE_IS_DEC]);
 
 	switch (value_cmp_invoke(r->v[INDEX_RANGE_BEGIN], r->v[INDEX_RANGE_END], VALUE_NULL)) {
@@ -1746,7 +1743,7 @@ static int range_empty(Value *vret, Value *v, RefNode *node)
 
 static int range_in(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 	Value v1 = v[1];
 	int ret = TRUE;
 	Value begin;
@@ -1786,7 +1783,7 @@ static int range_in(Value *vret, Value *v, RefNode *node)
 static int range_iter(Value *vret, Value *v, RefNode *node)
 {
 	int i;
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 	RefNode *rangeiter = FUNC_VP(node);
 	Ref *r2 = new_ref(rangeiter);
 	Value *r2v = r2->v;
@@ -1803,7 +1800,7 @@ static int range_iter(Value *vret, Value *v, RefNode *node)
 
 static int range_get(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 	int idx = FUNC_INT(node);
 	*vret = Value_cp(r->v[idx]);
 	return TRUE;
@@ -1811,9 +1808,21 @@ static int range_get(Value *vret, Value *v, RefNode *node)
 
 ///////////////////////////////////////////////////////////////////////////////////////////
 
+static int rangeiter_inf(Value *vret, Value *v, RefNode *node)
+{
+	RefNode *rangeiter = FUNC_VP(node);
+	Ref *r = new_ref(rangeiter);
+	*vret = vp_Value(r);
+
+	r->v[INDEX_RANGE_BEGIN] = Value_cp(v[1]);
+	if (fg->stk_top > v + 2) {
+		r->v[INDEX_RANGE_STEP] = Value_cp(v[2]);
+	}
+	return TRUE;
+}
 static int rangeiter_next(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 	Value *pbegin = &r->v[INDEX_RANGE_BEGIN];
 	Value begin = *pbegin;
 	Value end = r->v[INDEX_RANGE_END];
@@ -1863,32 +1872,36 @@ static int rangeiter_next(Value *vret, Value *v, RefNode *node)
 	}
 
 	// endに達していたらfalseを返す
-	switch (value_cmp_invoke(begin, end, VALUE_NULL)) {
-	case VALUE_CMP_ERROR:
-		return FALSE;
-	case VALUE_CMP_LT:
-		if (dec) {
+	if (end != VALUE_NULL) {
+		switch (value_cmp_invoke(begin, end, VALUE_NULL)) {
+		case VALUE_CMP_ERROR:
+			return FALSE;
+		case VALUE_CMP_LT:
+			if (dec) {
+				goto STOP_ITER;
+			} else {
+				*vret = Value_cp(begin);
+			}
+			break;
+		case VALUE_CMP_GT:
+			if (dec) {
+				*vret = Value_cp(begin);
+			} else {
+				goto STOP_ITER;
+			}
+			break;
+		case VALUE_CMP_EQ:
+			if (is_open) {
+				*vret = Value_cp(begin);
+			} else {
+				goto STOP_ITER;
+			}
+			break;
+		default:
 			goto STOP_ITER;
-		} else {
-			*vret = Value_cp(begin);
 		}
-		break;
-	case VALUE_CMP_GT:
-		if (dec) {
-			*vret = Value_cp(begin);
-		} else {
-			goto STOP_ITER;
-		}
-		break;
-	case VALUE_CMP_EQ:
-		if (is_open) {
-			*vret = Value_cp(begin);
-		} else {
-			goto STOP_ITER;
-		}
-		break;
-	default:
-		goto STOP_ITER;
+	} else {
+		*vret = Value_cp(begin);
 	}
 
 	return TRUE;
@@ -2238,7 +2251,7 @@ static int iterator_sort(Value *vret, Value *v, RefNode *node)
 }
 static int itermap_next(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 
 	Value_push("vv", r->v[INDEX_ITERFILTER_FUNC], r->v[INDEX_ITERFILTER_ITER]);
 	if (!call_member_func(fs->str_next, 0, TRUE)) {
@@ -2254,7 +2267,7 @@ static int itermap_next(Value *vret, Value *v, RefNode *node)
 }
 static int iterfilter_next(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 	Value it = r->v[INDEX_ITERFILTER_ITER];
 	Value fn = r->v[INDEX_ITERFILTER_FUNC];
 
@@ -2280,7 +2293,7 @@ static int iterfilter_next(Value *vret, Value *v, RefNode *node)
 }
 static int iterlimit_next(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 	Value it = r->v[INDEX_ITERFILTER_ITER];
 	int last = Value_integral(r->v[INDEX_ITERFILTER_FUNC]);
 
@@ -2302,7 +2315,7 @@ static int iterlimit_next(Value *vret, Value *v, RefNode *node)
 }
 static int generator_next(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 	int pc = Value_integral(r->v[INDEX_GENERATOR_PC]);
 	int nstack = Value_integral(r->v[INDEX_GENERATOR_NSTACK]);
 	RefNode *func = Value_vp(r->v[INDEX_GENERATOR_FUNC]);
@@ -2328,12 +2341,12 @@ static int generator_next(Value *vret, Value *v, RefNode *node)
 
 	return TRUE;
 }
-static int container_new(Value *vret, Value *v, RefNode *node)
+static int iterable_new(Value *vret, Value *v, RefNode *node)
 {
 	*vret = Value_cp(*v);
 	return TRUE;
 }
-static int container_invoke(Value *vret, Value *v, RefNode *node)
+static int iterable_invoke(Value *vret, Value *v, RefNode *node)
 {
 	int argc = fg->stk_top - v - 1;
 	int i;
@@ -2442,37 +2455,37 @@ void define_lang_col_class(RefNode *m)
 
 	// Iterable
 	cls = fs->cls_iterable;
-	n = define_identifier_p(m, cls, fs->str_new, NODE_NEW_N, 0);
-	define_native_func_a(n, container_new, 0, 0, NULL);
+	n = define_identifier(m, cls, "_new", NODE_NEW_N, 0);
+	define_native_func_a(n, iterable_new, 0, 0, NULL);
 
 	n = define_identifier(m, cls, "to_list", NODE_FUNC_N, 0);
-	define_native_func_a(n, container_invoke, 0, 0, NULL);
+	define_native_func_a(n, iterable_invoke, 0, 0, NULL);
 	n = define_identifier(m, cls, "to_set", NODE_FUNC_N, 0);
-	define_native_func_a(n, container_invoke, 0, 0, NULL);
+	define_native_func_a(n, iterable_invoke, 0, 0, NULL);
 	n = define_identifier(m, cls, "join", NODE_FUNC_N, 0);
-	define_native_func_a(n, container_invoke, 1, 1, NULL, fs->cls_sequence);
+	define_native_func_a(n, iterable_invoke, 1, 1, NULL, fs->cls_sequence);
 	n = define_identifier(m, cls, "count", NODE_FUNC_N, 0);
-	define_native_func_a(n, container_invoke, 1, 1, NULL, NULL);
+	define_native_func_a(n, iterable_invoke, 1, 1, NULL, NULL);
 	n = define_identifier(m, cls, "count_if", NODE_FUNC_N, 0);
-	define_native_func_a(n, container_invoke, 1, 1, NULL, fs->cls_fn);
+	define_native_func_a(n, iterable_invoke, 1, 1, NULL, fs->cls_fn);
 	n = define_identifier(m, cls, "map", NODE_FUNC_N, 0);
-	define_native_func_a(n, container_invoke, 1, 1, NULL, fs->cls_fn);
+	define_native_func_a(n, iterable_invoke, 1, 1, NULL, fs->cls_fn);
 	n = define_identifier(m, cls, "select", NODE_FUNC_N, 0);
-	define_native_func_a(n, container_invoke, 1, 1, NULL, fs->cls_fn);
+	define_native_func_a(n, iterable_invoke, 1, 1, NULL, fs->cls_fn);
 	n = define_identifier(m, cls, "each", NODE_FUNC_N, 0);
-	define_native_func_a(n, container_invoke, 1, 1, NULL, fs->cls_fn);
+	define_native_func_a(n, iterable_invoke, 1, 1, NULL, fs->cls_fn);
 	n = define_identifier(m, cls, "sort", NODE_FUNC_N, 0);
-	define_native_func_a(n, container_invoke, 0, 1, NULL, fs->cls_fn);
+	define_native_func_a(n, iterable_invoke, 0, 1, NULL, fs->cls_fn);
 	n = define_identifier(m, cls, "sort_by", NODE_FUNC_N, 0);
-	define_native_func_a(n, container_invoke, 0, 1, NULL, fs->cls_fn);
+	define_native_func_a(n, iterable_invoke, 0, 1, NULL, fs->cls_fn);
 	n = define_identifier(m, cls, "reverse", NODE_FUNC_N, 0);
-	define_native_func_a(n, container_invoke, 0, 0, NULL);
+	define_native_func_a(n, iterable_invoke, 0, 0, NULL);
 	n = define_identifier(m, cls, "reduce", NODE_FUNC_N, 0);
-	define_native_func_a(n, container_invoke, 2, 2, NULL, NULL, fs->cls_fn);
+	define_native_func_a(n, iterable_invoke, 2, 2, NULL, NULL, fs->cls_fn);
 	n = define_identifier(m, cls, "all", NODE_FUNC_N, 0);
-	define_native_func_a(n, container_invoke, 1, 1, NULL, fs->cls_fn);
+	define_native_func_a(n, iterable_invoke, 1, 1, NULL, fs->cls_fn);
 	n = define_identifier(m, cls, "any", NODE_FUNC_N, 0);
-	define_native_func_a(n, container_invoke, 1, 1, NULL, fs->cls_fn);
+	define_native_func_a(n, iterable_invoke, 1, 1, NULL, fs->cls_fn);
 	extends_method(cls, fs->cls_obj);
 
 
@@ -2598,6 +2611,9 @@ void define_lang_col_class(RefNode *m)
 	// RangeIter
 	cls = cls_rangeiter;
 	cls->u.c.n_memb = INDEX_RANGEITER_NUM;
+	n = define_identifier(m, cls, "inf", NODE_NEW_N, 0);
+	define_native_func_a(n, rangeiter_inf, 1, 2, cls, NULL, NULL);
+
 	n = define_identifier_p(m, cls, fs->str_next, NODE_FUNC_N, 0);
 	define_native_func_a(n, rangeiter_next, 0, 0, NULL);
 	extends_method(cls, fs->cls_iterator);

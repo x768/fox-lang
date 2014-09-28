@@ -163,7 +163,7 @@ static int ssl_ctx_add_ca(Value *vret, Value *v, RefNode *node)
 
 static int sslsocket_read(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 	SSL *ssl = Value_ptr(r->v[INDEX_SSL_SSL]);
 	RefBytesIO *mb = Value_vp(v[1]);
 	int size = fs->Value_int(v[2], NULL);
@@ -180,7 +180,7 @@ static int sslsocket_read(Value *vret, Value *v, RefNode *node)
 }
 static int sslsocket_write(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 	SSL *ssl = Value_ptr(r->v[INDEX_SSL_SSL]);
 	RefBytesIO *mb = Value_vp(v[1]);
 
@@ -191,7 +191,7 @@ static int sslsocket_write(Value *vret, Value *v, RefNode *node)
 }
 static int sslsocket_cipher(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 	SSL *ssl = Value_ptr(r->v[INDEX_SSL_SSL]);
 	if (ssl != NULL) {
 		const char *s = "";
@@ -214,7 +214,7 @@ static int sslsocket_cipher(Value *vret, Value *v, RefNode *node)
 }
 static int sslsocket_certificate(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 	SSL *ssl = Value_ptr(r->v[INDEX_SSL_SSL]);
 	RefCertificate *cr = fs->new_buf(cls_cert, sizeof(RefCertificate));
 	*vret = vp_Value(cr);
@@ -224,7 +224,7 @@ static int sslsocket_certificate(Value *vret, Value *v, RefNode *node)
 }
 static int sslsocket_close(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 	SSL *ssl = Value_ptr(r->v[INDEX_SSL_SSL]);
 	RefFileHandle *fh = Value_ptr(r->v[INDEX_FILEIO_HANDLE]);
 

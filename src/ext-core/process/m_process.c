@@ -93,20 +93,20 @@ ERROR_END:
 
 static int process_wait(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 	RefProcessHandle *ph = Value_vp(r->v[INDEX_P_HANDLE]);
 	return process_wait_sub(ph);
 }
 static int process_close(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 	RefProcessHandle *ph = Value_vp(r->v[INDEX_P_HANDLE]);
 	process_close_sub(ph);
 	return TRUE;
 }
 static int process_status(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 	RefProcessHandle *ph = Value_vp(r->v[INDEX_P_HANDLE]);
 	int return_exit_code = FUNC_INT(node);
 
@@ -124,7 +124,7 @@ static int process_status(Value *vret, Value *v, RefNode *node)
 }
 static int pipeio_read(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 	RefProcessHandle *ph = Value_vp(r->v[INDEX_P_HANDLE]);
 	RefBytesIO *mb = Value_vp(v[1]);
 	int64_t max_size = fs->Value_int(v[2], NULL);
@@ -161,7 +161,7 @@ static int pipeio_read(Value *vret, Value *v, RefNode *node)
 }
 static int pipeio_write(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 	RefProcessHandle *ph = Value_vp(r->v[INDEX_P_HANDLE]);
 	RefBytesIO *mb = Value_vp(v[1]);
 
@@ -173,7 +173,7 @@ static int pipeio_write(Value *vret, Value *v, RefNode *node)
 }
 static int pipeio_close(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 	RefProcessHandle *ph = Value_vp(r->v[INDEX_P_HANDLE]);
 
 	pipeio_close_sub(ph);

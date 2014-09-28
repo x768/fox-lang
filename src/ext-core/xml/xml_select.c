@@ -1,4 +1,4 @@
-#include "m_xml.h"
+#include "fox_xml.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -64,7 +64,7 @@ typedef struct XMLPattern {
 	struct XMLPattern *or;
 	struct XMLPattern *next;
 	int index;
-	int subnode;           // 子孫
+	int subnode;           // TRUE:子孫, FALSE:子のみ
 	XMLAttrPattern *attr;  // NULLの場合、子孫セレクタ
 } XMLPattern;
 
@@ -222,14 +222,13 @@ static void SelectorTok_next(SelectorTok *tk)
 
 static void XMLPatternList_set_p_sub(XMLPattern ***ppp, XMLPattern *node)
 {
-	while (node != NULL) {
+	for (; node != NULL; node = node->next) {
 		XMLPattern **pp = *ppp;
 		*pp++ = node;
 		*ppp = pp;
 		if (node->or != NULL) {
 			XMLPatternList_set_p_sub(ppp, node->or);
 		}
-		node = node->next;
 	}
 }
 static void XMLPatternList_set_p(XMLPatternList *pl, Mem *mem)
@@ -286,18 +285,21 @@ static int parse_css_selector_sub(XMLPattern **pp, int *pnum, SelectorTok *tk, M
 	ppat = pp;
 
 	for (;;) {
-		pat = fs->Mem_get(mem, sizeof(*pat));
-		*ppat = pat;
-		ppat = &pat->next;
-		pattr = &pat->attr;
-		pat->index = *pnum;
-		(*pnum)++;
+		if (tk->type != STK_GT) {
+			pat = fs->Mem_get(mem, sizeof(*pat));
+			memset(pat, 0, sizeof(*pat));
+			*ppat = pat;
+			ppat = &pat->next;
+			pattr = &pat->attr;
+			pat->index = *pnum;
+			(*pnum)++;
 
-		if (*pp == NULL) {
-			*pp = pat;
+			if (*pp == NULL) {
+				*pp = pat;
+			}
+			pat->subnode = subnode;
+			subnode = TRUE;
 		}
-		pat->subnode = subnode;
-		subnode = TRUE;
 
 		switch (tk->type) {
 		case STK_STAR:
@@ -305,6 +307,7 @@ static int parse_css_selector_sub(XMLPattern **pp, int *pnum, SelectorTok *tk, M
 			break;
 		case STK_IDENT:
 			attr = fs->Mem_get(mem, sizeof(*attr));
+			memset(attr, 0, sizeof(*attr));
 			*pattr = attr;
 			pattr = &attr->next;
 
@@ -326,6 +329,7 @@ static int parse_css_selector_sub(XMLPattern **pp, int *pnum, SelectorTok *tk, M
 					goto ERROR_END;
 				}
 				attr = fs->Mem_get(mem, sizeof(*attr));
+				memset(attr, 0, sizeof(*attr));
 				*pattr = attr;
 				pattr = &attr->next;
 
@@ -361,6 +365,7 @@ static int parse_css_selector_sub(XMLPattern **pp, int *pnum, SelectorTok *tk, M
 				}
 
 				attr = fs->Mem_get(mem, sizeof(*attr));
+				memset(attr, 0, sizeof(*attr));
 				*pattr = attr;
 				pattr = &attr->next;
 
@@ -545,6 +550,10 @@ static int select_xml_match_node(Ref *r, XMLPattern *pat)
 	}
 	return TRUE;
 }
+/**
+ * v : 探索対象のXML
+ * ra : 結果のXMLElem配列
+ */
 static void select_xml_nodes_sub(RefArray *ra, XMLPatternList *pl, uint8_t *mask, Value v)
 {
 	int i;

@@ -41,7 +41,7 @@ typedef struct {
 struct IconvIO {
 	RefCharset *cs_from;
 	RefCharset *cs_to;
-	int trans;
+	const char *trans;
 	void *ic;
 	const char *inbuf;
 	size_t inbytesleft;

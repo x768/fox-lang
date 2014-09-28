@@ -1,0 +1,29 @@
+import util.assert
+
+
+def *yield_test()
+{
+	yield "Hello"
+	yield ", "
+	yield "world"
+	yield "!"
+}
+def *range(n:Int)
+{
+	for i in 1...n {
+		yield i
+	}
+}
+
+let log = []
+for c in yield_test() {
+	log.push c
+}
+assert_equal log, ["Hello", ", ", "world", "!"]
+
+let log_range = []
+for i in range(5) {
+	log_range.push i
+}
+assert_equal log_range, [1, 2, 3, 4, 5]
+

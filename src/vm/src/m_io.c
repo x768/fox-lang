@@ -19,6 +19,14 @@ enum {
 	URL_HASH,
 	URL_NUM,
 };
+enum {
+	PACK_NONE,
+	PACK_NIL,
+	PACK_INT,
+	PACK_FLOAT,
+	PACK_BIN,
+	PACK_ZBIN,
+};
 
 typedef struct {
 	RefHeader rh;
@@ -35,7 +43,7 @@ static RefStr *str__write;
 static RefStr *str__seek;
 static RefStr *str__close;
 
-#define Value_bytesio(val) ((RefBytesIO*)(uintptr_t)(Value_ref_memb((val), INDEX_TEXTIO_STREAM)))
+#define Value_bytesio(val) ((RefBytesIO*)(uintptr_t)(Value_ref((val))->v[INDEX_TEXTIO_STREAM]))
 
 static int stream_write_sub_s(Value v, StrBuf *sb, const char *s_p, int s_size, RefTextIO *tio);
 
@@ -87,7 +95,7 @@ static RefBytesIO *bytesio_new_streambuf(void)
 
 static int stream_open(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 	int mode = FUNC_INT(node);
 
 	// 必ず継承先でnewするので、初期化されているはず
@@ -100,7 +108,7 @@ static int stream_open(Value *vret, Value *v, RefNode *node)
 // _write -> _close を呼び出す
 static int stream_close(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 	Value *v1 = &r->v[INDEX_READ_MEMIO];
 	Value *v2 = &r->v[INDEX_WRITE_MEMIO];
 
@@ -130,7 +138,7 @@ static int stream_close(Value *vret, Value *v, RefNode *node)
 }
 static int stream_read_buffer(Value v, int *max, int offset)
 {
-	Value v1 = Value_ref_memb(v, INDEX_READ_MEMIO);
+	Value v1 = Value_ref(v)->v[INDEX_READ_MEMIO];
 	RefBytesIO *mb = Value_vp(v1);
 
 	StrBuf_alloc(&mb->buf, BUFFER_SIZE);
@@ -159,7 +167,7 @@ static int stream_read_buffer(Value v, int *max, int offset)
  */
 int stream_read_data(Value v, StrBuf *sb, char *p, int *psize, int keep, int read_all)
 {
-	Ref *r = Value_vp(v);
+	Ref *r = Value_ref(v);
 
 	int cur = Value_integral(r->v[INDEX_READ_CUR]);
 	int max = Value_integral(r->v[INDEX_READ_MAX]);
@@ -308,7 +316,7 @@ int stream_read_data(Value v, StrBuf *sb, char *p, int *psize, int keep, int rea
  */
 int stream_gets_limit(Value v, char *p, int *psize)
 {
-	Ref *r = Value_vp(v);
+	Ref *r = Value_ref(v);
 
 	int cur = Value_integral(r->v[INDEX_READ_CUR]);
 	int max = Value_integral(r->v[INDEX_READ_MAX]);
@@ -416,7 +424,7 @@ int stream_gets_limit(Value v, char *p, int *psize)
  */
 int stream_gets_sub(StrBuf *sb, Value v, int sep)
 {
-	Ref *r = Value_vp(v);
+	Ref *r = Value_ref(v);
 
 	int cur = Value_integral(r->v[INDEX_READ_CUR]);
 	int max = Value_integral(r->v[INDEX_READ_MAX]);
@@ -594,7 +602,7 @@ static int stream_fetch(Value *vret, Value *v, RefNode *node)
 
 int stream_flush_sub(Value v)
 {
-	Ref *r = Value_vp(v);
+	Ref *r = Value_ref(v);
 	Value v1 = r->v[INDEX_WRITE_MEMIO];
 	RefBytesIO *mb;
 
@@ -620,7 +628,7 @@ int stream_flush_sub(Value v)
 }
 int stream_write_data(Value v, const char *s_p, int s_size)
 {
-	Ref *r = Value_vp(v);
+	Ref *r = Value_ref(v);
 	Value *outbuf = &r->v[INDEX_WRITE_MEMIO];
 	int max = Value_integral(r->v[INDEX_WRITE_MAX]);
 	int cur = 0;
@@ -700,11 +708,11 @@ static int stream_write_sub_s(Value v, StrBuf *sb, const char *s_p, int s_size, 
 			return TRUE;
 		} else {
 			if (tio->out.ic == (void*)-1) {
-				if (!IconvIO_open(&tio->out, fs->cs_utf8, tio->cs, tio->trans)) {
+				if (!IconvIO_open(&tio->out, fs->cs_utf8, tio->cs, tio->trans ? "?" : NULL)) {
 					return FALSE;
 				}
 			}
-			if (!IconvIO_conv_b(&tio->out, sb, s_p, s_size)) {
+			if (!IconvIO_conv(&tio->out, sb, s_p, s_size, TRUE, TRUE)) {
 				return FALSE;
 			}
 			return TRUE;
@@ -713,7 +721,7 @@ static int stream_write_sub_s(Value v, StrBuf *sb, const char *s_p, int s_size, 
 		if (tio == NULL || tio->cs->utf8) {
 			return stream_write_data(v, s_p, s_size);
 		} else {
-			Ref *r = Value_vp(v);
+			Ref *r = Value_ref(v);
 			IconvIO *ic = &tio->out;
 			Value *vmb = &r->v[INDEX_WRITE_MEMIO];
 			RefBytesIO *mb;
@@ -724,7 +732,7 @@ static int stream_write_sub_s(Value v, StrBuf *sb, const char *s_p, int s_size, 
 				return FALSE;
 			}
 			if (tio->out.ic == (void*)-1) {
-				if (!IconvIO_open(&tio->out, fs->cs_utf8, tio->cs, tio->trans)) {
+				if (!IconvIO_open(&tio->out, fs->cs_utf8, tio->cs, tio->trans ? "?" : NULL)) {
 					return FALSE;
 				}
 			}
@@ -799,7 +807,7 @@ static int stream_write_sub_s(Value v, StrBuf *sb, const char *s_p, int s_size, 
  */
 static int stream_write_stream_sub(Value v, Value v1, int64_t last)
 {
-	Ref *r = Value_vp(v);
+	Ref *r = Value_ref(v);
 	Value *vmb = &r->v[INDEX_WRITE_MEMIO];
 
 	if (Value_integral(r->v[INDEX_WRITE_MAX]) == -1) {
@@ -885,7 +893,7 @@ static int stream_write_s(Value *vret, Value *v, RefNode *node)
 }
 static int stream_pos(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 	uint64_t ret;
 
 	if (Value_integral(r->v[INDEX_READ_MAX]) == -1) {
@@ -905,7 +913,7 @@ static int stream_seek_sub(Value v, int64_t offset)
 
 	// seek先がbufferの範囲内ならカーソルを移動するだけ
 	{
-		Ref *r = Value_vp(v);
+		Ref *r = Value_ref(v);
 		Value *vmb = &r->v[INDEX_READ_MEMIO];
 		if (*vmb != VALUE_NULL) {
 			RefBytesIO *mb = Value_vp(*vmb);
@@ -932,7 +940,7 @@ static int stream_seek_sub(Value v, int64_t offset)
 
 	// バッファを消去
 	{
-		Ref *r = Value_vp(v);
+		Ref *r = Value_ref(v);
 		int max = Value_integral(r->v[INDEX_READ_MAX]);
 		if (max >= 0) {
 			r->v[INDEX_READ_CUR] = int32_Value(max);
@@ -957,7 +965,7 @@ static int stream_get_buffering(Value *vret, Value *v, RefNode *node)
 	int ret = FALSE;
 
 	if (type != fs->cls_bytesio) {
-		Ref *r = Value_vp(*v);
+		Ref *r = Value_ref(*v);
 		int max = Value_integral(r->v[INDEX_WRITE_MAX]);
 
 		if (max == -1) {
@@ -977,7 +985,7 @@ static int stream_set_buffering(Value *vret, Value *v, RefNode *node)
 	RefNode *type = Value_type(*v);
 
 	if (type != fs->cls_bytesio) {
-		Ref *r = Value_vp(*v);
+		Ref *r = Value_ref(*v);
 		int max = Value_integral(r->v[INDEX_WRITE_MAX]);
 
 		if (max == -1) {
@@ -1140,13 +1148,6 @@ static int pack_format_repeat(const char **pp, const char *end)
 }
 static int stream_pack_sub(Value *v, StrBuf *sb, int argc, const char *fmt_p, int fmt_size)
 {
-	enum {
-		PACK_NONE,
-		PACK_NIL,
-		PACK_INT,
-		PACK_FLOAT,
-		PACK_BIN,
-	};
 	const char *p = fmt_p;
 	const char *end = p + fmt_size;
 	Value *argv;
@@ -1201,6 +1202,10 @@ static int stream_pack_sub(Value *v, StrBuf *sb, int argc, const char *fmt_p, in
 			break;
 		case 'b':
 			type = PACK_BIN;
+			repeat = pack_format_repeat(&p, end);
+			break;
+		case 'z':
+			type = PACK_ZBIN;
 			repeat = pack_format_repeat(&p, end);
 			break;
 		case 'x':
@@ -1270,6 +1275,7 @@ static int stream_pack_sub(Value *v, StrBuf *sb, int argc, const char *fmt_p, in
 				break;
 			}
 			case PACK_BIN:
+			case PACK_ZBIN:
 				if (idx >= argc) {
 					goto ARGUMENT_ERROR;
 				}
@@ -1277,6 +1283,11 @@ static int stream_pack_sub(Value *v, StrBuf *sb, int argc, const char *fmt_p, in
 					return FALSE;
 				}
 				idx++;
+				if (type == PACK_ZBIN) {
+					if (!stream_pack_nil(v, sb)) {
+						return FALSE;
+					}
+				}
 				break;
 			case PACK_NIL:
 				if (!stream_pack_nil(v, sb)) {
@@ -1377,7 +1388,7 @@ static int stream_unpack_float(Value *vret, Value v, int size, int le)
 	}
 	return TRUE;
 }
-static int stream_unpack_bin(Value *vret, Value *v, int size)
+static int stream_unpack_bin(Value *vret, Value v, int size)
 {
 	RefStr *rs;
 	int read_size = size;
@@ -1388,7 +1399,7 @@ static int stream_unpack_bin(Value *vret, Value *v, int size)
 	}
 	rs = new_refstr_n(fs->cls_bytes, size);
 	*vret = vp_Value(rs);
-	if (!stream_read_data(*v, NULL, rs->c, &read_size, FALSE, TRUE)) {
+	if (!stream_read_data(v, NULL, rs->c, &read_size, FALSE, TRUE)) {
 		return FALSE;
 	}
 	rs->c[read_size] = '\0';
@@ -1397,13 +1408,6 @@ static int stream_unpack_bin(Value *vret, Value *v, int size)
 }
 static int stream_unpack(Value *vret, Value *v, RefNode *node)
 {
-	enum {
-		PACK_NONE,
-		PACK_NIL,
-		PACK_INT,
-		PACK_FLOAT,
-		PACK_BIN,
-	};
 	int single = FUNC_INT(node);
 	RefStr *fmt = Value_vp(v[1]);
 	const char *p = fmt->c;
@@ -1464,6 +1468,14 @@ static int stream_unpack(Value *vret, Value *v, RefNode *node)
 				return FALSE;
 			}
 			break;
+		case 'z':
+			if (sign) {
+				throw_errorf(fs->mod_lang, "FormatError", "Unknown option '+'");
+				return FALSE;
+			}
+			type = PACK_ZBIN;
+			size = 0;
+			break;
 		case 'x':
 			if (sign) {
 				throw_errorf(fs->mod_lang, "FormatError", "Unknown option '+'");
@@ -1507,8 +1519,28 @@ static int stream_unpack(Value *vret, Value *v, RefNode *node)
 		}
 		case PACK_BIN: {
 			Value *dst = (single ? vret : refarray_push(ra));
-			if (!stream_unpack_bin(dst, v, size)) {
+			if (!stream_unpack_bin(dst, *v, size)) {
 				return FALSE;
+			}
+			if (single) {
+				return TRUE;
+			}
+			break;
+		}
+		case PACK_ZBIN: {
+			StrBuf sb;
+			RefStr *rs;
+			Value *dst = (single ? vret : refarray_push(ra));
+
+			StrBuf_init_refstr(&sb, 16);
+			if (!stream_gets_sub(&sb, *v, '\0')) {
+				StrBuf_close(&sb);
+				return FALSE;
+			}
+			*dst = StrBuf_str_Value(&sb, fs->cls_bytes);
+			rs = Value_vp(*dst);
+			if (rs->size > 0 && rs->c[rs->size] == '\0') {
+				rs->size--;
 			}
 			if (single) {
 				return TRUE;
@@ -2154,7 +2186,7 @@ static int textio_new(Value *vret, Value *v, RefNode *node)
 }
 static int textio_close(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 	RefTextIO *tio = Value_vp(r->v[INDEX_TEXTIO_TEXTIO]);
 
 	if (tio != NULL) {
@@ -2218,14 +2250,14 @@ static int textio_gets_sub(Value *vret, Ref *ref, int trim)
 		} else {
 			StrBuf buf2;
 			if (tio->in.ic == (void*)-1) {
-				if (!IconvIO_open(&tio->in, tio->cs, fs->cs_utf8, tio->trans)) {
+				if (!IconvIO_open(&tio->in, tio->cs, fs->cs_utf8, tio->trans ? UTF8_ALTER_CHAR : NULL)) {
 					ret = FALSE;
 					goto FINALLY;
 				}
 			}
 
 			StrBuf_init(&buf2, result.size);
-			if (!IconvIO_conv_s(&tio->in, &buf2, result.p, result.size)) {
+			if (!IconvIO_conv(&tio->in, &buf2, result.p, result.size, FALSE, TRUE)) {
 				StrBuf_close(&buf2);
 				ret = FALSE;
 				goto FINALLY;
@@ -2244,7 +2276,7 @@ FINALLY:
 }
 static int textio_gets(Value *vret, Value *v, RefNode *node)
 {
-	Ref *ref = Value_vp(*v);
+	Ref *ref = Value_ref(*v);
 	int trim = FUNC_INT(node);
 
 	if (!textio_gets_sub(vret, ref, trim)) {
@@ -2254,7 +2286,7 @@ static int textio_gets(Value *vret, Value *v, RefNode *node)
 }
 static int textio_next(Value *vret, Value *v, RefNode *node)
 {
-	Ref *ref = Value_vp(*v);
+	Ref *ref = Value_ref(*v);
 
 	if (!textio_gets_sub(vret, ref, TRUE)) {
 		return FALSE;
@@ -2274,7 +2306,7 @@ static int textio_print_sub(Value v_textio, StrBuf *sb, Value v, RefLocale *loc)
 	RefTextIO *tio;
 
 	if (v_textio != VALUE_NULL) {
-		Ref *ref = Value_vp(v_textio);
+		Ref *ref = Value_ref(v_textio);
 		vb = ref->v[INDEX_TEXTIO_STREAM];
 		tio = Value_vp(ref->v[INDEX_TEXTIO_TEXTIO]);
 	} else {
@@ -2340,7 +2372,7 @@ static int textio_print_sub(Value v_textio, StrBuf *sb, Value v, RefLocale *loc)
 
 static int textio_print(Value *vret, Value *v, RefNode *node)
 {
-	Ref *ref = Value_vp(*v);
+	Ref *ref = Value_ref(*v);
 	Value *varg = v + 1;
 	int new_line = FUNC_INT(node);
 	Value stream = ref->v[INDEX_TEXTIO_STREAM];
@@ -2397,7 +2429,7 @@ static int textio_printf_sub(Value v, StrBuf *sb, Str fmt_src, int start_arg, Re
 	RefTextIO *tio;
 
 	if (v != VALUE_NULL) {
-		Ref *ref = Value_vp(v);
+		Ref *ref = Value_ref(v);
 		stream = ref->v[INDEX_TEXTIO_STREAM];
 		tio = Value_vp(ref->v[INDEX_TEXTIO_TEXTIO]);
 	} else {
@@ -2633,7 +2665,7 @@ static int textio_printf(Value *vret, Value *v, RefNode *node)
 }
 int textio_flush(Value *vret, Value *v, RefNode *node)
 {
-	Ref *ref = Value_vp(*v);
+	Ref *ref = Value_ref(*v);
 	Value stream = ref->v[INDEX_TEXTIO_STREAM];
 	RefNode *s_type = Value_type(stream);
 
@@ -2647,7 +2679,7 @@ int textio_flush(Value *vret, Value *v, RefNode *node)
 }
 int textio_charset(Value *vret, Value *v, RefNode *node)
 {
-	Ref *ref = Value_vp(*v);
+	Ref *ref = Value_ref(*v);
 	RefTextIO *tio = Value_vp(ref->v[INDEX_TEXTIO_TEXTIO]);
 	RefCharset *cs = (tio != NULL ? tio->cs : NULL);
 
@@ -2658,7 +2690,7 @@ int textio_charset(Value *vret, Value *v, RefNode *node)
 }
 int textio_translit(Value *vret, Value *v, RefNode *node)
 {
-	Ref *ref = Value_vp(*v);
+	Ref *ref = Value_ref(*v);
 	RefTextIO *tio = Value_vp(ref->v[INDEX_TEXTIO_TEXTIO]);
 	*vret = bool_Value(tio != NULL && tio->trans);
 
@@ -3070,7 +3102,7 @@ ERROR_END:
 
 ////////////////////////////////////////////////////////////////////////////////
 
-static void v_ctextio_init()
+static void v_ctextio_init(void)
 {
 	Ref *ref = new_ref(fs->cls_textio);
 
@@ -3104,10 +3136,8 @@ static int stdout_print(Value *vret, Value *v, RefNode *node)
 		}
 		varg++;
 	}
-	if (new_line) {
-		if (!stream_write_data(fg->v_cio, "\n", 1)) {
-			return FALSE;
-		}
+	if (new_line && !stream_write_data(fg->v_cio, "\n", 1)) {
+		return FALSE;
 	}
 
 	return TRUE;
@@ -3220,9 +3250,13 @@ static void define_io_class(RefNode *m)
 	cls_nullio = cls;
 	n = define_identifier_p(m, cls, fs->str_new, NODE_NEW_N, 0);
 	define_native_func_a(n, nullio_new, 0, 0, NULL);
+	n = define_identifier_p(m, cls, fs->str_marshal_read, NODE_NEW_N, 0);
+	define_native_func_a(n, nullio_new, 1, 1, NULL, fs->cls_marshaldumper);
+
 	n = define_identifier(m, cls, "empty", NODE_FUNC_N, NODEOPT_PROPERTY);
 	define_native_func_a(n, native_return_bool, 0, 0, (void*)TRUE);
-
+	n = define_identifier_p(m, cls, fs->str_marshal_write, NODE_FUNC_N, 0);
+	define_native_func_a(n, native_return_null, 1, 1, NULL, fs->cls_marshaldumper);
 	n = define_identifier_p(m, cls, str__read, NODE_FUNC_N, 0);
 	define_native_func_a(n, native_return_null, 2, 2, NULL, fs->cls_bytesio, fs->cls_int);
 	n = define_identifier_p(m, cls, str__write, NODE_FUNC_N, 0);

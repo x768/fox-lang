@@ -249,7 +249,7 @@ static int socket_new(Value *vret, Value *v, RefNode *node)
 
 static int socket_read(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 	RefBytesIO *mb = Value_vp(v[1]);
 	int size = fs->Value_int(v[2], NULL);
 	RefFileHandle *fh = Value_vp(r->v[INDEX_FILEIO_HANDLE]);
@@ -269,7 +269,7 @@ static int socket_read(Value *vret, Value *v, RefNode *node)
  */
 static int socket_write(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 	RefBytesIO *mb = Value_vp(v[1]);
 	RefFileHandle *fh = Value_vp(r->v[INDEX_FILEIO_HANDLE]);
 
@@ -281,7 +281,7 @@ static int socket_write(Value *vret, Value *v, RefNode *node)
 }
 static int socket_close(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 	RefFileHandle *fh = Value_vp(r->v[INDEX_FILEIO_HANDLE]);
 	int ret = fs->stream_flush_sub(*v);
 
@@ -295,7 +295,7 @@ static int socket_close(Value *vret, Value *v, RefNode *node)
 }
 static int socket_empty(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 	RefFileHandle *fh = Value_vp(r->v[INDEX_FILEIO_HANDLE]);
 
 	if (fh->fd_read != -1 || fh->fd_write != -1) {
@@ -360,7 +360,7 @@ static int ifaddr_new(Value *vret, Value *v, RefNode *node)
 }
 static int ifaddr_get(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 	int idx = FUNC_INT(node);
 	*vret = fs->Value_cp(r->v[idx]);
 	return TRUE;

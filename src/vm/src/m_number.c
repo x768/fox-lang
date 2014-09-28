@@ -204,7 +204,7 @@ static int read_int16_array(uint16_t *data, int n, Value r)
 }
 static int integer_marshal_read(Value *vret, Value *v, RefNode *node)
 {
-	Value r = Value_ref_memb(v[1], INDEX_MARSHALDUMPER_SRC);
+	Value r = Value_ref(v[1])->v[INDEX_MARSHALDUMPER_SRC];
 	char minus;
 	uint32_t digits;
 	int rd_size;
@@ -289,7 +289,7 @@ static int write_int16_array(uint16_t *data, int n, Value w)
 }
 static int integer_marshal_write(Value *vret, Value *v, RefNode *node)
 {
-	Value w = Value_ref_memb(v[1], INDEX_MARSHALDUMPER_SRC);
+	Value w = Value_ref(v[1])->v[INDEX_MARSHALDUMPER_SRC];
 	char minus = 0;
 	int32_t digits;
 	uint16_t *data = NULL;
@@ -1466,7 +1466,7 @@ static int frac_marshal_read(Value *vret, Value *v, RefNode *node)
 	uint32_t digits;
 	int rd_size = 1;
 	RefFrac *md = new_buf(fs->cls_frac, sizeof(RefFrac));
-	Value r = Value_ref_memb(v[1], INDEX_MARSHALDUMPER_SRC);
+	Value r = Value_ref(v[1])->v[INDEX_MARSHALDUMPER_SRC];
 
 	*vret = vp_Value(md);
 
@@ -1508,7 +1508,7 @@ static int frac_marshal_read(Value *vret, Value *v, RefNode *node)
 }
 static int frac_marshal_write(Value *vret, Value *v, RefNode *node)
 {
-	Value w = Value_ref_memb(v[1], INDEX_MARSHALDUMPER_SRC);
+	Value w = Value_ref(v[1])->v[INDEX_MARSHALDUMPER_SRC];
 	char minus = 0;
 	RefFrac *md = Value_vp(*v);
 
@@ -2082,7 +2082,7 @@ static int float_marshal_read(Value *vret, Value *v, RefNode *node)
 	int i;
 
 	RefFloat *rd = new_buf(fs->cls_float, sizeof(RefFloat));
-	Value r = Value_ref_memb(v[1], INDEX_MARSHALDUMPER_SRC);
+	Value r = Value_ref(v[1])->v[INDEX_MARSHALDUMPER_SRC];
 
 	*vret = vp_Value(rd);
 
@@ -2108,7 +2108,7 @@ static int float_marshal_write(Value *vret, Value *v, RefNode *node)
 		double d;
 	} u;
 	RefFloat *rd = Value_vp(*v);
-	Value w = Value_ref_memb(v[1], INDEX_MARSHALDUMPER_SRC);
+	Value w = Value_ref(v[1])->v[INDEX_MARSHALDUMPER_SRC];
 	char data[8];
 	int i;
 

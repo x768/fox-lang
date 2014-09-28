@@ -8,7 +8,7 @@
 
 static WndHandle Value_widget_handle(Value v)
 {
-	Ref *r = Value_vp(v);
+	Ref *r = Value_ref(v);
 	return Value_handle(r->v[INDEX_WIDGET_HANDLE]);
 }
 static int check_already_closed(void *handle)
@@ -389,7 +389,7 @@ static int widget_set_visible(Value *vret, Value *v, RefNode *node)
 
 static int widget_handler(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 	RefStr *name;
 
 	if (fg->stk_top > v + 1) {
@@ -414,7 +414,7 @@ static int value_to_winhandle(WndHandle *pwh, Value v, int argc, RefNode *a_type
 	RefNode *type = fs->Value_type(v);
 
 	if (fs->is_subclass(type, a_type)) {
-		Ref *r = Value_vp(v);
+		Ref *r = Value_ref(v);
 		*pwh = Value_handle(r->v[INDEX_WIDGET_HANDLE]);
 	} else if (type == fs->cls_null) {
 		*pwh = NULL;
@@ -518,7 +518,7 @@ static int form_set_icon(Value *vret, Value *v, RefNode *node)
 }
 static int form_get_opacity(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 	WndHandle window = Value_handle(r->v[INDEX_WIDGET_HANDLE]);
 	if (!check_already_closed(window)) {
 		return FALSE;
@@ -529,7 +529,7 @@ static int form_get_opacity(Value *vret, Value *v, RefNode *node)
 }
 static int form_set_opacity(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 	WndHandle window = Value_handle(r->v[INDEX_WIDGET_HANDLE]);
 	double opacity = fs->Value_float(v[1]);
 
@@ -597,9 +597,9 @@ static int form_keep_above(Value *vret, Value *v, RefNode *node)
 }
 static int form_add_menu(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 	WndHandle window = Value_handle(r->v[INDEX_WIDGET_HANDLE]);
-	Ref *r2 = Value_vp(v[2]);
+	Ref *r2 = Value_ref(v[2]);
 	MenuHandle menu = Value_handle(r2->v[INDEX_MENU_HANDLE]);
 	MenuHandle menubar = NULL;
 	Str text = fs->Value_str(v[1]);
@@ -624,7 +624,7 @@ static int form_add_menu(Value *vret, Value *v, RefNode *node)
 }
 static int form_wait(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 	int loop = TRUE;
 
 	if (!check_already_closed(Value_handle(r->v[INDEX_WIDGET_HANDLE]))) {
@@ -647,7 +647,7 @@ static int form_wait(Value *vret, Value *v, RefNode *node)
 }
 static int form_handler_dropped(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 	WndHandle window = Value_handle(r->v[INDEX_WIDGET_HANDLE]);
 	RefStr *name;
 
@@ -714,7 +714,7 @@ static int timer_new(Value *vret, Value *v, RefNode *node)
 }
 static int timer_wait(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 	int loop = TRUE;
 
 	while (loop) {
@@ -732,7 +732,7 @@ static int timer_wait(Value *vret, Value *v, RefNode *node)
 }
 static int timer_close(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 
 	if (r->v[INDEX_TIMER_ID] != VALUE_NULL) {
 		native_timer_remove(r);
@@ -762,7 +762,7 @@ static int filemonitor_new(Value *vret, Value *v, RefNode *node)
 }
 static int filemonitor_wait(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 	int loop = TRUE;
 
 	if (r->v[INDEX_FILEMONITOR_STRUCT] == VALUE_NULL) {
@@ -786,7 +786,7 @@ static int filemonitor_wait(Value *vret, Value *v, RefNode *node)
 }
 static int filemonitor_close(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 	if (r->v[INDEX_FILEMONITOR_STRUCT] != VALUE_NULL) {
 		native_filemonitor_remove(r);
 	}
@@ -813,7 +813,7 @@ static int menu_new(Value *vret, Value *v, RefNode *node)
 				if (v2_type == fs->cls_fn) {
 					Menu_add_item(menu, v[i], text);
 				} else if (v2_type == cls_menu) {
-					Ref *menu_r = Value_vp(v[i]);
+					Ref *menu_r = Value_ref(v[i]);
 					if (Value_bool(menu_r->v[INDEX_MENU_HAS_PARENT])) {
 						fs->throw_errorf(mod_gui, "GuiError", "The menu already has a parent");
 						return FALSE;
@@ -851,7 +851,7 @@ static int menu_close(Value *vret, Value *v, RefNode *node)
 }
 static int menu_add(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 	MenuHandle menu = Value_handle(r->v[INDEX_MENU_HANDLE]);
 	Str text = fs->Value_str(v[1]);
 	RefNode *v2_type = fs->Value_type(v[2]);
@@ -859,7 +859,7 @@ static int menu_add(Value *vret, Value *v, RefNode *node)
 	if (v2_type == fs->cls_fn) {
 		Menu_add_item(menu, v[2], text);
 	} else if (v2_type == cls_menu) {
-		Ref *menu_r = Value_vp(v[2]);
+		Ref *menu_r = Value_ref(v[2]);
 		if (Value_bool(menu_r->v[INDEX_MENU_HAS_PARENT])) {
 			fs->throw_errorf(mod_gui, "GuiError", "The menu already has a parent");
 			return FALSE;
@@ -875,7 +875,7 @@ static int menu_add(Value *vret, Value *v, RefNode *node)
 }
 static int menu_add_separator(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 	MenuHandle menu = Value_handle(r->v[INDEX_MENU_HANDLE]);
 	Menu_add_separator(menu);
 	return TRUE;
@@ -931,7 +931,7 @@ static int evthandler_del(Value *vret, Value *v, RefNode *node)
 {
 	RefArray *ra = Value_vp(*v);
 	Value fn = v[1];
-	Ref *rfn = Value_vp(fn);
+	Ref *rfn = Value_ref(fn);
 	int fn_r;
 	RefNode *nfn;
 	int i;
@@ -946,7 +946,7 @@ static int evthandler_del(Value *vret, Value *v, RefNode *node)
 
 	for (i = ra->size - 1; i >= 0; i--) {
 		Value f = ra->p[i];
-		Ref *rf = Value_vp(f);
+		Ref *rf = Value_ref(f);
 		RefNode *nf;
 
 		if (fn_r) {

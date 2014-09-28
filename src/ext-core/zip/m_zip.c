@@ -85,7 +85,7 @@ static int deflateio_new(Value *vret, Value *v, RefNode *node)
 	if (fs->Value_type(v1) == fs->cls_bytesio) {
 		flags = STREAM_READ|STREAM_WRITE;
 	} else {
-		Ref *r1 = Value_vp(v1);
+		Ref *r1 = Value_ref(v1);
 		// 引数のStreamに応じて読み書き可能モードを設定する
 		if (Value_integral(r1->v[INDEX_READ_MAX]) >= 0) {
 			flags = STREAM_READ;
@@ -153,7 +153,7 @@ static int deflateio_init_write(Ref *r, char *out_buf, int out_len, Str data)
 }
 static int deflateio_close(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 	z_stream *zs = Value_ptr(r->v[INDEX_Z_OUT]);
 	int out_len = Value_integral(r->v[INDEX_WRITE_MAX]);
 	char *mb_buf = malloc(out_len);
@@ -196,7 +196,7 @@ ERROR_END:
 // 圧縮しながら書き込み
 static int deflateio_write(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 	z_stream *zs = Value_ptr(r->v[INDEX_Z_OUT]);
 	int out_len = Value_integral(r->v[INDEX_WRITE_MAX]);
 	RefBytesIO *mb = Value_vp(v[1]);
@@ -277,7 +277,7 @@ static int invoke_read(char *buf, int *size, Value v)
 // 展開して読み込み
 static int deflateio_read(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 	z_stream *zs = Value_ptr(r->v[INDEX_Z_IN]);
 	Bytef *buf = Value_ptr(r->v[INDEX_Z_IN_BUF]);
 	RefBytesIO *mb = Value_vp(v[1]);
@@ -400,7 +400,7 @@ static int zip_randomreader_new(Value *vret, Value *v, RefNode *node)
 }
 static int zip_randomreader_close(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 	CentralDirEnd *cdir = Value_ptr(r->v[INDEX_ZIPREADER_CDIR]);
 
 	if (cdir != NULL) {
@@ -412,7 +412,7 @@ static int zip_randomreader_close(Value *vret, Value *v, RefNode *node)
 }
 static int zip_randomreader_size(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 	CentralDirEnd *cdir = Value_ptr(r->v[INDEX_ZIPREADER_CDIR]);
 
 	if (cdir == NULL) {
@@ -447,7 +447,7 @@ static int zip_randomreader_index(Value *vret, Value *v, RefNode *node)
 	RefNode *v_type = fs->Value_type(v[1]);
 
 	if (v_type == fs->cls_int) {
-		Ref *r = Value_vp(*v);
+		Ref *r = Value_ref(*v);
 		CentralDirEnd *cdir = Value_ptr(r->v[INDEX_ZIPREADER_CDIR]);
 		int64_t idx = fs->Value_int(v[1], NULL);
 
@@ -464,7 +464,7 @@ static int zip_randomreader_index(Value *vret, Value *v, RefNode *node)
 		}
 		zipentry_new_sub(vret, *v, &cdir->cdir[idx]);
 	} else if (v_type == fs->cls_str || v_type == fs->cls_bytes) {
-		Ref *r = Value_vp(*v);
+		Ref *r = Value_ref(*v);
 		CentralDirEnd *cdir = Value_ptr(r->v[INDEX_ZIPREADER_CDIR]);
 		RefStr *name = Value_vp(v[1]);
 		StrBuf sb;
@@ -474,15 +474,17 @@ static int zip_randomreader_index(Value *vret, Value *v, RefNode *node)
 		fs->StrBuf_init(&sb, 0);
 		// 文字コードを変換
 		if (cdir->cs != fs->cs_utf8) {
-			if (fs->convert_str_to_bin_sub(NULL, &sb, name->c, name->size, cdir->cs, FALSE)) {
-				local_str = TRUE;
-			} else {
-				fs->Value_dec(fg->error);
-				fg->error = VALUE_NULL;
+			IconvIO ic;
+			if (fs->IconvIO_open(&ic, fs->cs_utf8, cdir->cs, "?")) {
+				if (fs->IconvIO_conv(&ic, &sb, name->c, name->size, TRUE, FALSE)) {
+					local_str = TRUE;
+				}
+				fs->IconvIO_close(&ic);
 			}
 		}
 		for (i = 0; i < cdir->cdir_size; i++) {
 			CentralDir *cd = &cdir->cdir[i];
+			// 設定された文字コードがUTF-8以外で、ファイル名にUTF-8フラグが立っていない
 			if (cdir->cs != fs->cs_utf8 && (cd->flags & CDIR_FLAG_UTF8) == 0) {
 				if (local_str) {
 					if (sb.size == cd->filename.size && memcmp(sb.p, cd->filename.p, sb.size) == 0) {
@@ -552,7 +554,7 @@ static int zipreader_close(Value *vret, Value *v, RefNode *node)
 }
 static int zipreader_next(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 	Value reader = r->v[INDEX_ZIPREADER_READER];
 
 	if (!move_next_file_entry(reader)) {
@@ -597,7 +599,7 @@ static int zipwriter_new(Value *vret, Value *v, RefNode *node)
 }
 static int zipwriter_close(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 	CentralDirEnd *cdir = Value_ptr(r->v[INDEX_ZIPWRITER_CDIR]);
 
 	if (cdir != NULL) {
@@ -616,7 +618,7 @@ static int zipentry_finish_sub(CentralDir *cd);
 
 static int zipwriter_write(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 	CentralDirEnd *cdir = Value_ptr(r->v[INDEX_ZIPWRITER_CDIR]);
 	Value v1 = v[1];
 	RefNode *v1_type = fs->Value_type(v1);
@@ -632,7 +634,7 @@ static int zipwriter_write(Value *vret, Value *v, RefNode *node)
 			return FALSE;
 		}
 	} else if (v1_type == cls_zipentry) {
-		Ref *r1 = Value_vp(v1);
+		Ref *r1 = Value_ref(v1);
 		CentralDir *cd = Value_ptr(r1->v[INDEX_ZIPENTRY_CDIR]);
 		if (cd == NULL) {
 			fs->throw_errorf(fs->mod_lang, "ZipError", "ZipEntry already closed");
@@ -743,7 +745,7 @@ static int zipentry_new(Value *vret, Value *v, RefNode *node)
 }
 static int zipentry_close(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 	CentralDir *cd = Value_ptr(r->v[INDEX_ZIPENTRY_CDIR]);
 	void *in_buf = Value_ptr(r->v[INDEX_ZIPENTRY_IN_BUF]);
 
@@ -831,9 +833,9 @@ static int zipentry_read_sub(char *dst, int *psize, Ref *r, Value reader)
 }
 static int zipentry_read(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 	CentralDir *cd = Value_ptr(r->v[INDEX_ZIPENTRY_CDIR]);
-	Ref *zr = Value_vp(r->v[INDEX_ZIPENTRY_REF]);
+	Ref *zr = Value_ref(r->v[INDEX_ZIPENTRY_REF]);
 	RefBytesIO *mb = Value_vp(v[1]);
 	int size_read = fs->Value_int(v[2], NULL);
 
@@ -942,7 +944,7 @@ static int zipentry_write_sub(CentralDir *cd, const char *p, int size)
 }
 static int zipentry_write(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 	CentralDir *cd = Value_ptr(r->v[INDEX_ZIPENTRY_CDIR]);
 	RefBytesIO *mb = Value_vp(v[1]);
 
@@ -966,7 +968,7 @@ static int zipentry_write(Value *vret, Value *v, RefNode *node)
 }
 static int zipentry_finish(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 	CentralDir *cd = Value_ptr(r->v[INDEX_ZIPENTRY_CDIR]);
 
 	if (r->v[INDEX_ZIPENTRY_REF] != VALUE_NULL || cd->data.p == NULL) {
@@ -986,7 +988,7 @@ static int zipentry_finish(Value *vret, Value *v, RefNode *node)
 }
 static int zipentry_size(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 	CentralDir *cd = Value_ptr(r->v[INDEX_ZIPENTRY_CDIR]);
 	int val;
 
@@ -1005,7 +1007,7 @@ static int zipentry_size(Value *vret, Value *v, RefNode *node)
 }
 static int zipentry_filename(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 	CentralDir *cd = Value_ptr(r->v[INDEX_ZIPENTRY_CDIR]);
 
 	if (FUNC_INT(node)) {
@@ -1018,16 +1020,14 @@ static int zipentry_filename(Value *vret, Value *v, RefNode *node)
 			// UTF-8フラグが立っていなければZipReaderの引数で指定した文字コード
 			cs = cd->cs;
 		}
-		if (!fs->convert_bin_to_str_sub(vret, NULL, cd->filename.p, cd->filename.size, cs, TRUE)) {
-			return FALSE;
-		}
+		*vret = fs->cstr_Value_conv(cd->filename.p, cd->filename.size, cs);
 	}
 
 	return TRUE;
 }
 static int zipentry_set_filename(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 	CentralDir *cd = Value_ptr(r->v[INDEX_ZIPENTRY_CDIR]);
 	StrBuf *sb;
 	Str name = fs->Value_str(v[1]);
@@ -1049,7 +1049,7 @@ static int zipentry_set_filename(Value *vret, Value *v, RefNode *node)
 }
 static int zipentry_mtime(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 	CentralDir *cd = Value_ptr(r->v[INDEX_ZIPENTRY_CDIR]);
 
 	if (cd->time_valid) {
@@ -1061,7 +1061,7 @@ static int zipentry_mtime(Value *vret, Value *v, RefNode *node)
 }
 static int zipentry_set_mtime(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 	CentralDir *cd = Value_ptr(r->v[INDEX_ZIPENTRY_CDIR]);
 	RefInt64 *rt = Value_vp(v[1]);
 
@@ -1072,7 +1072,7 @@ static int zipentry_set_mtime(Value *vret, Value *v, RefNode *node)
 }
 static int zipentry_method(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 	CentralDir *cd = Value_ptr(r->v[INDEX_ZIPENTRY_CDIR]);
 	const char *name;
 
@@ -1093,7 +1093,7 @@ static int zipentry_method(Value *vret, Value *v, RefNode *node)
 }
 static int zipentry_crypt(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 	CentralDir *cd = Value_ptr(r->v[INDEX_ZIPENTRY_CDIR]);
 	const char *name;
 
@@ -1111,8 +1111,8 @@ static int zipentry_crypt(Value *vret, Value *v, RefNode *node)
 
 static int zipentryiter_next(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(*v);
-	Ref *rref = Value_vp(r->v[INDEX_ZIPENTRYITER_REF]);
+	Ref *r = Value_ref(*v);
+	Ref *rref = Value_ref(r->v[INDEX_ZIPENTRYITER_REF]);
 	Value v_idx = r->v[INDEX_ZIPENTRYITER_INDEX];
 
 	if (v_idx == VALUE_NULL) {

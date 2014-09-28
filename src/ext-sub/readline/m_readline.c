@@ -21,13 +21,30 @@ static int fox_readline(Value *vret, Value *v, RefNode *node)
 	fs->stream_flush_sub(fg->v_cio);
 
 	if (fg->stk_top > v + 1) {
-		RefStr *rs = Value_vp(v[1]);
-		prompt = rs->c;
+		prompt = Value_cstr(v[1]);
 	} else {
 		prompt = "";
 	}
-	line = readline(prompt);
+	if (fs->cs_stdio != NULL && fs->cs_stdio != fs->cs_utf8) {
+		IconvIO ic;
+		StrBuf buf;
 
+		if (!fs->IconvIO_open(&ic, fs->cs_utf8, fs->cs_stdio, "?")) {
+			return FALSE;
+		}
+		fs->StrBuf_init(&buf, strlen(prompt));
+		if (!fs->IconvIO_conv(&ic, &buf, prompt, -1, TRUE, TRUE)) {
+			StrBuf_close(&buf);
+			return FALSE;
+		}
+		fs->StrBuf_add_c(&buf, '\0');
+		fs->IconvIO_close(&ic);
+
+		line = readline(buf.p);
+		StrBuf_close(&buf);
+	} else {
+		line = readline(prompt);
+	}
 	if (line != NULL) {
 		*vret = fs->cstr_Value_conv(line, -1, NULL);
 		free(line);
@@ -36,8 +53,7 @@ static int fox_readline(Value *vret, Value *v, RefNode *node)
 }
 static int fox_add_history(Value *vret, Value *v, RefNode *node)
 {
-	RefStr *rs = Value_vp(v[1]);
-	add_history(rs->c);
+	add_history(Value_cstr(v[1]));
 	return TRUE;
 }
 static int fox_clear_history(Value *vret, Value *v, RefNode *node)

@@ -124,6 +124,7 @@ double Value_float(Value v)
 /**
  * typeof(v) == Fracに限る
  * 10進数文字列表現
+ * max_frac : 小数部の最大桁数 / -1:循環小数はエラー
  */
 char *Value_frac_s(Value v, int max_frac)
 {
@@ -147,6 +148,9 @@ char *Value_frac_s(Value v, int max_frac)
 		mp_int rem2;
 
 		if (get_recurrence(recr, &md->md[1])) {
+			if (max_frac < 0) {
+				return NULL;
+			}
 			n_ex = max_frac;
 		} else {
 			n_ex = recr[0];
@@ -493,10 +497,10 @@ Value cstr_Value_conv(const char *p, int size, RefCharset *cs)
 		}
 	} else {
 		IconvIO ic;
-		if (IconvIO_open(&ic, cs, fs->cs_utf8, TRUE)) {
+		if (IconvIO_open(&ic, cs, fs->cs_utf8, UTF8_ALTER_CHAR)) {
 			StrBuf buf;
 			StrBuf_init_refstr(&buf, 0);
-			IconvIO_conv_s(&ic, &buf, p, size);
+			IconvIO_conv(&ic, &buf, p, size, FALSE, TRUE);
 			IconvIO_close(&ic);
 			return StrBuf_str_Value(&buf, fs->cls_str);
 		}

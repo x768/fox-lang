@@ -26,7 +26,7 @@ typedef struct MapReplace {
 	Str val;
 } MapReplace;
 
-#define VALUE_GET_REGEX(val) (Value_ptr(Value_ref_memb((val), INDEX_REGEX_PTR)))
+#define Value_pcre_ptr(val) (Value_ptr(Value_ref((val))->v[INDEX_REGEX_PTR]))
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -344,7 +344,7 @@ int sequence_iter(Value *vret, Value *v, RefNode *node)
 static int sequence_marshal_read(Value *vret, Value *v, RefNode *node)
 {
 	int is_str = FUNC_INT(node);
-	Value r = Value_ref_memb(v[1], INDEX_MARSHALDUMPER_SRC);
+	Value r = Value_ref(v[1])->v[INDEX_MARSHALDUMPER_SRC];
 	uint32_t size;
 	int rd_size;
 	RefStr *rs;
@@ -379,7 +379,7 @@ static int sequence_marshal_read(Value *vret, Value *v, RefNode *node)
 }
 static int sequence_marshal_write(Value *vret, Value *v, RefNode *node)
 {
-	Value w = Value_ref_memb(v[1], INDEX_MARSHALDUMPER_SRC);
+	Value w = Value_ref(v[1])->v[INDEX_MARSHALDUMPER_SRC];
 	RefStr *rs = Value_vp(*v);
 
 	if (!write_int32(rs->size, w)) {
@@ -469,7 +469,7 @@ static int sequence_find(Value *vret, Value *v, RefNode *node)
 		Str s2 = Value_str(v1);
 		idx = sequence_find_sub(s1, s2, 0);
 	} else if (v1_type == fs->cls_regex) {
-		pcre *re = VALUE_GET_REGEX(v1);
+		pcre *re = Value_pcre_ptr(v1);
 		int *matches = NULL;
 		int m_count = 0, m_size = 0;
 
@@ -513,7 +513,7 @@ static int sequence_match(Value *vret, Value *v, RefNode *node)
 			r->count = 1;
 		}
 	} else if (v1_type == fs->cls_regex) {
-		pcre *re = VALUE_GET_REGEX(v1);
+		pcre *re = Value_pcre_ptr(v1);
 		int m_count = 0, m_size = 0, n_match;
 
 		pcre_fullinfo(re, NULL, PCRE_INFO_CAPTURECOUNT, &m_count);
@@ -654,7 +654,7 @@ static int sequence_replace(Value *vret, Value *v, RefNode *node)
 			}
 		}
 	} else if (v1_type == fs->cls_regex) {
-		pcre *re = VALUE_GET_REGEX(v1);
+		pcre *re = Value_pcre_ptr(v1);
 		int prev = 0;
 		int m_count = 0, m_size = 0;
 		int *matches = NULL;
@@ -841,7 +841,7 @@ static int sequence_split(Value *vret, Value *v, RefNode *node)
 			}
 		}
 	} else if (v1_type == fs->cls_regex) {
-		pcre *re = VALUE_GET_REGEX(v1);
+		pcre *re = Value_pcre_ptr(v1);
 		int prev = 0;
 		int m_count = 0, m_size = 0;
 		int *matches = NULL;
@@ -1017,7 +1017,7 @@ static int sequence_count(Value *vret, Value *v, RefNode *node)
 			}
 		}
 	} else if (v1_type == fs->cls_regex) {
-		pcre *re = VALUE_GET_REGEX(v1);
+		pcre *re = Value_pcre_ptr(v1);
 		int *matches = NULL;
 		int m_count = 0, m_size = 0;
 
@@ -1071,7 +1071,7 @@ static int sequence_is_valid_encoding(Value *vret, Value *v, RefNode *node)
 		}
 
 		// エラーがないかどうか調べるだけ
-		if (IconvIO_open(&ic, cs_from, cs_to, FALSE)) {
+		if (IconvIO_open(&ic, cs_from, cs_to, NULL)) {
 			char *tmp_buf = malloc(BUFFER_SIZE);
 			result = TRUE;
 
@@ -1115,7 +1115,7 @@ static int sequence_is_valid_encoding(Value *vret, Value *v, RefNode *node)
 
 static int seqiter_next(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 	int i = Value_integral(r->v[INDEX_SEQITER_CUR]);
 	Str s = Value_str(r->v[INDEX_SEQITER_SRC]);
 	int ret;
@@ -1151,7 +1151,7 @@ static int string_new(Value *vret, Value *v, RefNode *node)
 			throw_error_select(THROW_ARGMENT_TYPE__NODE_NODE_INT, fs->cls_bytes, type, 1);
 			return FALSE;
 		}
-		if (!convert_bin_to_str(vret, v + 1, NULL, 1)) {
+		if (!convert_bin_to_str(vret, NULL, 1)) {
 			return FALSE;
 		}
 	} else if (fg->stk_top > v + 1) {
@@ -1341,7 +1341,7 @@ static int string_substr(Value *vret, Value *v, RefNode *node)
 }
 static int string_tobytes(Value *vret, Value *v, RefNode *node)
 {
-	if (!convert_str_to_bin(vret, NULL, *v, 0)) {
+	if (!convert_str_to_bin(vret, NULL, 0)) {
 		return FALSE;
 	}
 	return TRUE;
@@ -1548,7 +1548,7 @@ static int regex_new(Value *vret, Value *v, RefNode *node)
 }
 static int regex_dispose(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 
 	free(Value_ptr(r->v[INDEX_REGEX_PTR]));
 	r->v[INDEX_REGEX_PTR] = VALUE_NULL;
@@ -1567,7 +1567,7 @@ static int regex_marshal_read(Value *vret, Value *v, RefNode *node)
 	const char *errptr = NULL;
 	int erroffset;
 
-	Value rd = Value_ref_memb(v[1], INDEX_MARSHALDUMPER_SRC);
+	Value rd = Value_ref(v[1])->v[INDEX_MARSHALDUMPER_SRC];
 	Ref *r = new_ref(fs->cls_regex);
 	*vret = vp_Value(r);
 
@@ -1616,8 +1616,8 @@ static int regex_marshal_read(Value *vret, Value *v, RefNode *node)
  */
 static int regex_marshal_write(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(*v);
-	Value w = Value_ref_memb(v[1], INDEX_MARSHALDUMPER_SRC);
+	Ref *r = Value_ref(*v);
+	Value w = Value_ref(v[1])->v[INDEX_MARSHALDUMPER_SRC];
 	Value src = r->v[INDEX_REGEX_SRC];
 	RefStr *src_s = Value_vp(src);
 	int opt = Value_integral(r->v[INDEX_REGEX_OPT]);
@@ -1639,13 +1639,13 @@ static int regex_marshal_write(Value *vret, Value *v, RefNode *node)
 }
 static int regex_source(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 	*vret = Value_cp(r->v[INDEX_REGEX_SRC]);
 	return TRUE;
 }
 static int regex_tostr(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 	Str source = Value_str(r->v[INDEX_REGEX_SRC]);
 	int flags = Value_integral(r->v[INDEX_REGEX_OPT]);
 	StrBuf buf;
@@ -1673,7 +1673,7 @@ static int regex_tostr(Value *vret, Value *v, RefNode *node)
 }
 static int regex_capture_count(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 	pcre *re = Value_ptr(r->v[INDEX_REGEX_PTR]);
 	int count = 0;
 
@@ -1769,7 +1769,7 @@ static int str_base64encode(Value *vret, Value *v, RefNode *node)
 	int size;
 
 	StrBuf_init(&buf, 0);
-	if (!convert_str_to_bin(NULL, &buf, v[1], 1)) {
+	if (!convert_str_to_bin(NULL, &buf, 1)) {
 		StrBuf_close(&buf);
 		return FALSE;
 	}
@@ -1799,7 +1799,10 @@ static int str_base64decode(Value *vret, Value *v, RefNode *node)
 	rs->c[size] = '\0';
 	rs->size = size;
 
-	if (!convert_bin_to_str(vret, v, NULL, 1)) {
+	Value_dec(v[1]);
+	v[1] = vp_Value(rs);
+
+	if (!convert_bin_to_str(vret, NULL, 1)) {
 		return FALSE;
 	}
 
@@ -1812,7 +1815,7 @@ static int str_hexencode(Value *vret, Value *v, RefNode *node)
 	RefStr *rs;
 
 	StrBuf_init(&buf, 0);
-	if (!convert_str_to_bin(NULL, &buf, v[1], 1)) {
+	if (!convert_str_to_bin(NULL, &buf, 1)) {
 		StrBuf_close(&buf);
 		return FALSE;
 	}
@@ -1828,18 +1831,18 @@ static int str_hexencode(Value *vret, Value *v, RefNode *node)
 
 static int str_hexdecode(Value *vret, Value *v, RefNode *node)
 {
-	Str src = Value_str(v[1]);
+	RefStr *src = Value_vp(v[1]);
 	int isrc = 0, idst = 0;
 	RefStr *rs;
 
-	if (src.size % 2 != 0) {
+	if (src->size % 2 != 0) {
 		goto ERROR_END;
 	}
-	rs = new_refstr_n(fs->cls_bytes, src.size / 2);
+	rs = new_refstr_n(fs->cls_bytes, src->size / 2);
 
-	while (isrc + 1 < src.size) {
-		int i = char2hex(src.p[isrc]);
-		int j = char2hex(src.p[isrc + 1]);
+	while (isrc + 1 < src->size) {
+		int i = char2hex(src->c[isrc]);
+		int j = char2hex(src->c[isrc + 1]);
 		if (i < 0 || j < 0) {
 			goto ERROR_END;
 		}
@@ -1849,9 +1852,9 @@ static int str_hexdecode(Value *vret, Value *v, RefNode *node)
 	}
 	rs->c[rs->size] = '\0';
 
-	Value_dec(*v);
-	*v = vp_Value(rs);
-	if (!convert_bin_to_str(vret, v, NULL, 1)) {
+	Value_dec(v[1]);
+	v[1] = vp_Value(rs);
+	if (!convert_bin_to_str(vret, NULL, 1)) {
 		return FALSE;
 	}
 
@@ -1869,7 +1872,7 @@ static int str_urlencode(Value *vret, Value *v, RefNode *node)
 	StrBuf buf2;
 
 	StrBuf_init(&buf, 0);
-	if (!convert_str_to_bin(NULL, &buf, v[1], 1)) {
+	if (!convert_str_to_bin(NULL, &buf, 1)) {
 		StrBuf_close(&buf);
 		return FALSE;
 	}
@@ -1892,7 +1895,7 @@ static int str_urldecode(Value *vret, Value *v, RefNode *node)
 	urldecode_sub(&buf, src.p, src.size);
 	str = Str_new(buf.p, buf.size);
 
-	if (!convert_bin_to_str(vret, NULL, &str, 1)) {
+	if (!convert_bin_to_str(vret, &str, 1)) {
 		StrBuf_close(&buf);
 		return FALSE;
 	}

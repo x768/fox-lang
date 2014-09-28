@@ -176,7 +176,7 @@ static int mongo_select_db(Value *vret, Value *v, RefNode *node)
 }
 static int mongodb_select_col(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r_src = Value_vp(*v);
+	Ref *r_src = Value_ref(*v);
 	Ref *r_dst;
 	RefStr *name_base = Value_vp(r_src->v[INDEX_MONGODB_NAMESPACE]);
 	RefStr *name = Value_vp(v[1]);
@@ -198,7 +198,7 @@ static int mongodb_select_col(Value *vret, Value *v, RefNode *node)
 static int mongodb_tostr(Value *vret, Value *v, RefNode *node)
 {
 	const char *name = FUNC_VP(node);
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 	RefMongoDB *mon = Value_vp(r->v[INDEX_MONGODB_DB]);
 	RefStr *path = Value_vp(r->v[INDEX_MONGODB_NAMESPACE]);
 
@@ -244,7 +244,7 @@ static void throw_mongo_error(bson_error_t *err)
 
 static int get_mongo_conn(mongoc_client_t **pmongo, char **path_pp, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 	RefMongoDB *mon = Value_vp(r->v[INDEX_MONGODB_DB]);
 	RefStr *path = Value_vp(r->v[INDEX_MONGODB_NAMESPACE]);
 
@@ -938,7 +938,7 @@ static int bsonregex_new(Value *vret, Value *v, RefNode *node)
 	*vret = vp_Value(r);
 
 	if (v1_type == fs->cls_regex) {
-		Ref *r2 = Value_vp(v[1]);
+		Ref *r2 = Value_ref(v[1]);
 		src = &r2->v[INDEX_REGEX_SRC];
 		opts = Value_integral(r2->v[INDEX_REGEX_OPT]);
 	} else if (v1_type == fs->cls_str) {
@@ -973,7 +973,7 @@ static int bsonregex_new(Value *vret, Value *v, RefNode *node)
 }
 static int bsonregex_tostr(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 	RefStr *source = Value_vp(r->v[INDEX_REGEX_SRC]);
 	int flags = Value_integral(r->v[INDEX_REGEX_OPT]);
 	const char *opt_s;
@@ -998,7 +998,7 @@ static int bsonregex_tostr(Value *vret, Value *v, RefNode *node)
 }
 static int bsonregex_source(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 	*vret = fs->Value_cp(r->v[INDEX_REGEX_SRC]);
 
 	return TRUE;

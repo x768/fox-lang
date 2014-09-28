@@ -13,8 +13,13 @@ def assert_true(b)
 }
 def assert_equal(a, b)
 {
+	let t1 = typeof(a)
+	let t2 = typeof(b)
+	if t1 != t2 {
+		throw AssertError("$t1 value expected but $t2")
+	}
 	if a != b {
-		throw AssertError(sprintf("%1 expected but %0", a, b))
+		throw AssertError("$b expected but $a")
 	}
 }
 def assert_error(f:Function, ex:Class)
@@ -26,8 +31,8 @@ def assert_error(f:Function, ex:Class)
 		if t in ex {
 			return
 		}
-		throw AssertError(sprintf("%0 error expected thrown but %1", ex, t))
+		throw AssertError("$ex error expected but $t thrown")
 	}
-	throw AssertError("No error thrown")
+	throw AssertError("$ex error expected but no error thrown")
 }
 

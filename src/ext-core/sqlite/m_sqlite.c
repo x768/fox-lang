@@ -156,7 +156,7 @@ static int conn_memory(Value *vret, Value *v, RefNode *node)
 }
 static int conn_close(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 	sqlite3 *conn = Value_ptr(r->v[INDEX_SQLITE_CONN]);
 
 	if (conn != NULL) {
@@ -254,7 +254,7 @@ static int conn_prepare_sub(sqlite3_stmt **stmt, sqlite3 *conn, Value *v)
 }
 static int conn_exec(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 	sqlite3 *conn = Value_ptr(r->v[INDEX_SQLITE_CONN]);
 	int result;
 	int count;
@@ -283,7 +283,7 @@ static int conn_exec(Value *vret, Value *v, RefNode *node)
 
 static int conn_query(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 	sqlite3 *conn = Value_ptr(r->v[INDEX_SQLITE_CONN]);
 
 	sqlite3_stmt *stmt = NULL;
@@ -306,7 +306,7 @@ static int conn_query(Value *vret, Value *v, RefNode *node)
  */
 static int conn_single(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 	sqlite3 *conn = Value_ptr(r->v[INDEX_SQLITE_CONN]);
 
 	sqlite3_stmt *stmt = NULL;
@@ -508,7 +508,7 @@ static Value *conn_create_function_reg(Ref *r, Value v)
  */
 static int conn_create_function(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 	sqlite3 *conn = Value_ptr(r->v[INDEX_SQLITE_CONN]);
 	RefStr *name = Value_vp(v[1]);
 	Value v2 = v[2];

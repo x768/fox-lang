@@ -25,7 +25,7 @@ static gboolean draw_callback(GtkWidget *widget, cairo_t *cr, gpointer data)
 
 void create_editor_pane_window(Value *v, WndHandle parent)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 
 	GtkWidget *window = gtk_drawing_area_new();
 	g_object_set_data(G_OBJECT(window), WINDOW_DATA_KEY, r);

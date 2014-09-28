@@ -502,7 +502,7 @@ void print_last_error()
 				stream_write_data(fg->v_cio, sb2.p, sb2.size);
 			} else {
 				sb.size = 0;
-				convert_str_to_bin_sub(NULL, &sb, sb2.p, sb2.size, fs->cs_stdio, TRUE);
+				convert_str_to_bin_sub(&sb, sb2.p, sb2.size, fs->cs_stdio, "?");
 				stream_write_data(fg->v_cio, sb.p, sb.size);
 			}
 

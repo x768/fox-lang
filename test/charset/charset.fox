@@ -1,0 +1,6 @@
+import util.assert
+
+
+assert_equal Charset("utf8"), Charset.UTF8
+assert_equal Charset("latin-1"), Charset("ISO_8859-1")
+

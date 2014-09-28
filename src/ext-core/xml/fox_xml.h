@@ -1,23 +1,9 @@
-/*
- * m_xml.h
- *
- *  Created on: 2012/03/18
- *      Author: frog
- */
-
-#ifndef M_XML_H_
-#define M_XML_H_
+#ifndef FOX_XML_H_
+#define FOX_XML_H_
 
 #include "fox_io.h"
+#include "m_xml.h"
 #include "m_unicode.h"
-
-
-enum {
-	INDEX_ELEM_NAME,
-	INDEX_ELEM_ATTR,
-	INDEX_ELEM_CHILDREN,
-	INDEX_ELEM_NUM,
-};
 
 #ifdef DEFINE_GLOBALS
 #define extern
@@ -46,4 +32,4 @@ int delete_css(Value *vret, Value *v, int num, Str sel);
 int delete_nodelist(Value *vret, Value *v, int num, RefArray *ra);
 
 
-#endif /* M_XML_H_ */
+#endif /* FOX_XML_H_ */

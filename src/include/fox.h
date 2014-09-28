@@ -586,8 +586,11 @@ struct FoxStatic
 	void (*utf8_next)(const char **pp, const char *end);
 	int (*utf8_codepoint_at)(const char *p);
 	RefCharset *(*get_charset_from_name)(const char *name_p, int name_size);
-	int (*convert_str_to_bin_sub)(Value *dst, StrBuf *dst_buf, const char *src_p, int src_size, RefCharset *cs, int alt_b);
-	int (*convert_bin_to_str_sub)(Value *dst, StrBuf *dst_buf, const char *src_p, int src_size, RefCharset *cs, int alt_b);
+
+	int (*IconvIO_open)(IconvIO *ic, RefCharset *from, RefCharset *to, const char *trans);
+	void (*IconvIO_close)(IconvIO *ic);
+	int (*IconvIO_next)(IconvIO *ic);
+	int (*IconvIO_conv)(IconvIO *ic, StrBuf *dst, const char *src_p, int src_size, int from_uni, int raise_error);
 
 	RefArray *(*refarray_new)(int size);
 	Value *(*refarray_push)(RefArray *r);
@@ -618,8 +621,8 @@ struct FoxGlobal
 ////////////////////////////////////////////////////////////////////////////////
 
 #define FOX_VERSION_MAJOR    0
-#define FOX_VERSION_MINOR    4
-#define FOX_VERSION_REVISION 1
+#define FOX_VERSION_MINOR    5
+#define FOX_VERSION_REVISION 0
 
 
 extern const char *fox_ctype_flags;
@@ -654,7 +657,7 @@ extern const char *fox_ctype_flags;
 #define Value_uint62(v)      ((v) >> 2)
 #define Value_float2(v)      (((RefFloat*)Value_vp(v))->d)
 #define Value_ref_header(v)  ((RefHeader*)(uintptr_t)(v))
-#define Value_ref_memb(w, m) (((Ref*)(uintptr_t)(w))->v[m])
+#define Value_ref(v)         ((Ref*)(uintptr_t)(v))
 #define Value_cstr(v)        (((RefStr*)(uintptr_t)(v))->c)
 
 #define vp_Value(ptr)        ((uint64_t)(uintptr_t)(ptr))
@@ -667,6 +670,8 @@ extern const char *fox_ctype_flags;
 #define StrBuf_close(s) (free((s)->p))
 #define FUNC_VP(node) ((node)->u.f.vp)
 #define FUNC_INT(node) ((int)(intptr_t)((node)->u.f.vp))
+
+#define UTF8_ALTER_CHAR "\xEF\xBF\xBD"
 
 
 // strutil.c

@@ -135,7 +135,7 @@ void send_headers()
 				if (fs->cs_stdio == fs->cs_utf8) {
 					StrBuf_add(&buf, val->c, val->size);
 				} else {
-					convert_str_to_bin_sub(NULL, &buf, val->c, val->size, fs->cs_stdio, TRUE);
+					convert_str_to_bin_sub(&buf, val->c, val->size, fs->cs_stdio, "?");
 				}
 			} else {
 				StrBuf_add(&buf, "Content-Type: text/plain; charset=", -1);
@@ -156,7 +156,7 @@ void send_headers()
 					if (fs->cs_stdio == fs->cs_utf8) {
 						StrBuf_add(&buf, val->c, val->size);
 					} else {
-						convert_str_to_bin_sub(NULL, &buf, val->c, val->size, fs->cs_stdio, TRUE);
+						convert_str_to_bin_sub(&buf, val->c, val->size, fs->cs_stdio, "?");
 					}
 					StrBuf_add_c(&buf, '\n');
 				}

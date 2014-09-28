@@ -1,0 +1,10 @@
+import util.assert
+
+
+assert_equal readfile("sjis.txt", Charset("shift_jis")), "プログラミング言語"
+assert_equal "プログラミング言語".to_bytes(Charset("ascii"), true), b"?????????"
+assert_error () => "プログラミング言語".to_bytes(Charset("ascii")), CharsetError
+
+let sjis_bytes = readfile("sjis.txt")
+assert_equal Str(sjis_bytes, Charset("shift_jis")), "プログラミング言語"
+

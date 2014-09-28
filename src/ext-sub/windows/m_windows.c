@@ -900,7 +900,7 @@ static int regkey_setmultistr(Value *vret, Value *v, RefNode *node)
 
 static int regiter_next(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 	int32_t cur = Value_integral(r->v[INDEX_REGITER_CUR]);
 	RefRegKey *r_p = Value_vp(r->v[INDEX_REGITER_PARENT]);
 	HKEY hKey = r_p->hkey;

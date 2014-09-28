@@ -168,7 +168,7 @@ static int font_new(Value *vret, Value *v, RefNode *node)
 }
 static int font_close(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 	FT_Face face = Value_ptr(r->v[FONT_INDEX_FACE]);
 
 	if (face != NULL) {
@@ -180,7 +180,7 @@ static int font_close(Value *vret, Value *v, RefNode *node)
 }
 static int font_attr(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 	FT_Face face = Value_ptr(r->v[FONT_INDEX_FACE]);
 	int mask = FUNC_INT(node);
 
@@ -194,7 +194,7 @@ static int font_attr(Value *vret, Value *v, RefNode *node)
 }
 static int font_family_name(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 	FT_Face face = Value_ptr(r->v[FONT_INDEX_FACE]);
 
 	*vret = fs->cstr_Value(fs->cls_str, face->family_name, -1);
@@ -203,7 +203,7 @@ static int font_family_name(Value *vret, Value *v, RefNode *node)
 }
 static int font_to_str(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 	FT_Face face = Value_ptr(r->v[FONT_INDEX_FACE]);
 	*vret = fs->printf_Value("FontFace(%s)", face->family_name);
 	return TRUE;
@@ -222,7 +222,7 @@ static uint32_t ft_get_char_variant(Value *a_face, int a_face_size, int prev, in
 {
 	int i;
 	for (i = 0; i < a_face_size; i++) {
-		Ref *r_face = Value_vp(a_face[i]);
+		Ref *r_face = Value_ref(a_face[i]);
 		FT_Face face = Value_ptr(r_face->v[FONT_INDEX_FACE]);
 		int index = FT_Face_GetCharVariantIndex(face, prev, ch);
 		if (index != 0) {
@@ -235,7 +235,7 @@ static uint32_t ft_get_char_index(Value *a_face, int a_face_size, int ch)
 {
 	int i;
 	for (i = 0; i < a_face_size; i++) {
-		Ref *r_face = Value_vp(a_face[i]);
+		Ref *r_face = Value_ref(a_face[i]);
 		FT_Face face = Value_ptr(r_face->v[FONT_INDEX_FACE]);
 		int index = FT_Get_Char_Index(face, ch);
 		if (index != 0) {

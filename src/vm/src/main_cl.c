@@ -10,8 +10,9 @@
 
 
 typedef struct {
+#ifdef DEBUGGER
 	int syntax_only;
-
+#endif
 	const char *srcfile;
 	const char *src_raw;
 } ArgumentInfo;
@@ -394,11 +395,17 @@ static int parse_args(ArgumentInfo *ai, int argc, const char **argv)
 					}
 					break;
 				}
+#ifdef DEBUGGER
 				case 'c':
 					ai->syntax_only = TRUE;
 					break;
+#endif
 				case 'v':
+#ifdef DEBUGGER
 					if (ai->syntax_only || argv[i + 1] != NULL) {
+#else
+					if (argv[i + 1] != NULL) {
+#endif
 						throw_errorf(fs->mod_lang, "ArgumentError", "Cannot use '-v' with other options");
 						return FALSE;
 					} else {
@@ -454,6 +461,7 @@ void print_last_error()
 			stream_write_data(fg->v_cio, sb.p, sb.size);
 			StrBuf_close(&sb);
 		} else if (strcmp(fv->err_dst, "stderr") == 0) {
+			stream_flush_sub(fg->v_cio);
 			fox_error_dump(NULL, STDERR_FILENO, fs->cs_stdio, FALSE);
 		} else {
 			fox_error_dump(NULL, -1, fs->cs_utf8, TRUE);
@@ -523,19 +531,19 @@ int main_fox(int argc, const char **argv)
 	if (!fox_link()) {
 		goto ERROR_END;
 	}
-	if (!ai.syntax_only) {
 #ifdef DEBUGGER
+	if (!ai.syntax_only) {
 		if (ai.srcfile != NULL || ai.src_raw != NULL) {
 			fox_debugger(mod);
 		} else {
 			fox_intaractive(mod);
 		}
-#else
-		if (!fox_run(mod)) {
-			goto ERROR_END;
-		}
-#endif
 	}
+#else
+	if (!fox_run(mod)) {
+		goto ERROR_END;
+	}
+#endif
 	ret = TRUE;
 
 ERROR_END:

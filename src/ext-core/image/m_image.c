@@ -568,7 +568,7 @@ ERROR:
 }
 static int color_marshal_read(Value *vret, Value *v, RefNode *node)
 {
-	Value r = Value_ref_memb(v[1], INDEX_MARSHALDUMPER_SRC);
+	Value r = Value_ref(v[1])->v[INDEX_MARSHALDUMPER_SRC];
 	uint32_t ival;
 
 	if (!read_int32(&ival, r)) {
@@ -580,7 +580,7 @@ static int color_marshal_read(Value *vret, Value *v, RefNode *node)
 }
 static int color_marshal_write(Value *vret, Value *v, RefNode *node)
 {
-	Value w = Value_ref_memb(v[1], INDEX_MARSHALDUMPER_SRC);
+	Value w = Value_ref(v[1])->v[INDEX_MARSHALDUMPER_SRC];
 	uint32_t ival = Value_integral(*v);
 
 	if (!write_int32(ival, w)) {
@@ -763,7 +763,7 @@ static int palette_dispose(Value *vret, Value *v, RefNode *node)
 }
 static int palette_marshal_read(Value *vret, Value *v, RefNode *node)
 {
-	Value r = Value_ref_memb(v[1], INDEX_MARSHALDUMPER_SRC);
+	Value r = Value_ref(v[1])->v[INDEX_MARSHALDUMPER_SRC];
 	RefNode *cls_palette = FUNC_VP(node);
 	RefArray *ra = fs->refarray_new(PALETTE_NUM);
 	int i;
@@ -782,7 +782,7 @@ static int palette_marshal_read(Value *vret, Value *v, RefNode *node)
 }
 static int palette_marshal_write(Value *vret, Value *v, RefNode *node)
 {
-	Value w = Value_ref_memb(v[1], INDEX_MARSHALDUMPER_SRC);
+	Value w = Value_ref(v[1])->v[INDEX_MARSHALDUMPER_SRC];
 	RefArray *ra = Value_vp(*v);
 	int i;
 
@@ -1200,7 +1200,7 @@ static int image_marshal_read(Value *vret, Value *v, RefNode *node)
 	uint32_t ival;
 	uint8_t bands;
 	int rd_size = 1;
-	Value r = Value_ref_memb(v[1], INDEX_MARSHALDUMPER_SRC);
+	Value r = Value_ref(v[1])->v[INDEX_MARSHALDUMPER_SRC];
 	RefImage *image = fs->new_buf(cls_image, sizeof(RefImage));
 	*vret = vp_Value(image);
 
@@ -1257,7 +1257,7 @@ static int image_marshal_read(Value *vret, Value *v, RefNode *node)
 }
 static int image_marshal_write(Value *vret, Value *v, RefNode *node)
 {
-	Value w = Value_ref_memb(v[1], INDEX_MARSHALDUMPER_SRC);
+	Value w = Value_ref(v[1])->v[INDEX_MARSHALDUMPER_SRC];
 	RefImage *image = Value_vp(*v);
 	char bands = image->bands;
 

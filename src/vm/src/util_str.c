@@ -304,7 +304,7 @@ void add_backslashes_sub(StrBuf *buf, const char *src_p, int src_size, int mode)
 			default:
 				if (code >= ' ' && code < 0x7F) {
 					StrBuf_add_c(buf, c);
-				} else if (code < 0xFFFF) {  // BMP
+				} else if (code < 0x10000) {  // BMP
 					char c_buf[8];
 					sprintf(c_buf, "\\u%04x", code);
 					StrBuf_add(buf, c_buf, 6);

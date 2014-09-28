@@ -1,0 +1,344 @@
+def _TIFF_HEADER_OFFSET = 12
+
+def _TAGNAME_EXIF_IFD = 34665
+def _TAGNAME_GPSINFO_IFD = 34853
+
+def _TAGTYPE_BYTE = 1
+def _TAGTYPE_ASCII = 2
+def _TAGTYPE_SHORT = 3
+def _TAGTYPE_LONG = 4
+def _TAGTYPE_RATIONAL = 5
+def _TAGTYPE_UNDEFINED = 7
+def _TAGTYPE_SSHORT = 8
+def _TAGTYPE_SLONG = 9
+def _TAGTYPE_SRATIONAL = 10
+
+def _TAG_ELEM_SIZE = [-1, 1, 1, 2, 4, 8, -1, 1, 2, 4, 8]
+def _TAG_NAME = {
+	0:"GPSVersionID",
+	1:"GPSLatitudeRef",
+	2:"GPSLatitude",
+	3:"GPSLongitudeRef",
+	4:"GPSLongitude",
+	5:"GPSAltitudeRef",
+	6:"GPSAltitude",
+	7:"GPSTimeStamp",
+	8:"GPSSatellites ",
+	9:"GPSStatus",
+	10:"GPSMeasureMode",
+	11:"GPSDOP",
+	12:"GPSSpeedRef",
+	13:"GPSSpeed",
+	14:"GPSTrackRef",
+	15:"GPSTrack",
+	16:"GPSImgDirectionRef",
+	17:"GPSImgDirection",
+	18:"GPSMapDatum",
+	19:"GPSDestLatitudeRef",
+	20:"GPSDestLatitude",
+	21:"GPSDestLongitudeRef",
+	22:"GPSDestLongitude",
+	23:"GPSBearingRef",
+	24:"GPSBearing",
+	25:"GPSDestDistanceRef",
+	26:"GPSDestDistance",
+
+	256:"ImageWidth",
+	257:"ImageLength",
+	258:"BitsPerSample",
+	259:"Compression",
+	262:"PhotometricInterpretation",
+	274:"Orientation",
+	277:"SamplesPerPixel",
+	284:"PlanarConfiguration",
+	530:"YCbCrSubSampling",
+	531:"YCbCrPositioning",
+	282:"XResolution",
+	283:"YResolution",
+	296:"ResolutionUnit",
+	273:"StripOffsets",
+	278:"RowsPerStrip",
+	279:"StripByteCounts",
+	513:"JPEGInterchangeFormat",
+	514:"JPEGInterchangeFormatLength",
+	301:"TransferFunction",
+	318:"WhitePoint",
+	319:"PrimaryChromaticities",
+	529:"YCbCrCoefficients",
+	532:"ReferenceBlackWhite",
+	306:"DateTime",
+	270:"ImageDescription",
+	271:"Make",
+	272:"Model",
+	305:"Software",
+	315:"Artist",
+	3432:"Copyright",
+
+	36864:"ExifVersion",
+	40960:"FlashPixVersion",
+	40961:"ColorSpace",
+	37121:"ComponentsConfiguration",
+	37122:"CompressedBitsPerPixel",
+	40962:"PixelXDimension",
+	40963:"PixelYDimension",
+	37500:"MakerNote",
+	37510:"UserComment",
+	40964:"RelatedSoundFile",
+	36867:"DateTimeOriginal",
+	36868:"DateTimeDigitized",
+	37520:"SubSecTime",
+	37521:"SubSecTimeOriginal",
+	37522:"SubSecTimeDigitized",
+	33434:"ExposureTime",
+	33437:"FNumber",
+	34850:"ExposureProgram",
+	34852:"SpectralSensitivity",
+	34855:"ISOSpeedRatings",
+	34856:"OECF",
+	37377:"ShutterSpeedValue",
+	37378:"ApertureValue",
+	37379:"BrightnessValue",
+	37380:"ExposureBiasValue",
+	37381:"MaxApertureValue",
+	37382:"SubjectDistance",
+	37383:"MeteringMode",
+	37384:"LightSource",
+	37385:"Flash",
+	37386:"FocalLength",
+	41483:"FlashEnergy",
+	41484:"SpatialFrequencyResponse",
+	41486:"FocalPlaneXResolution",
+	41487:"FocalPlaneYResolution",
+	41488:"FocalPlaneResolutionUnit",
+	41492:"SubjectLocation",
+	41493:"ExposureIndex",
+	41495:"SensingMethod",
+	41728:"FileSource",
+	41729:"SceneType",
+	41730:"CFAPattern",
+}
+
+def _read_value(data:StreamIO, type:Int, num:Int, int16:Str, int32:Str)
+{
+	let val = []
+
+	if type == _TAGTYPE_ASCII {
+		let b = data.read(num)
+		if b.size > 0 && b[-1] == 0 {
+			return [b.sub(0, -1)]
+		} else {
+			return [b]
+		}
+	} elif type == _TAGTYPE_UNDEFINED {
+		return [data.read(num)]
+	}
+	for i in 0..num {
+		switch type {
+		case _TAGTYPE_BYTE
+			val.push data.peek("c")
+		case _TAGTYPE_SHORT
+			val.push data.peek(int16)
+		case _TAGTYPE_LONG
+			val.push data.peek(int32)
+		case _TAGTYPE_RATIONAL
+			val.push Frac(data.peek(int32), data.peek(int32))
+		case _TAGTYPE_SSHORT
+			val.push data.peek("+$int16")
+		case _TAGTYPE_SLONG
+			val.push data.peek("+$int32")
+		case _TAGTYPE_SRATIONAL
+			val.push Frac(data.peek("+$int32"), data.peek("+$int32"))
+		default
+			val.push null
+		}
+	}
+	return val
+}
+
+class ExifReaderError : Error
+{
+	new(s)
+	{
+		super(s)
+	}
+}
+
+class ExifTag
+{
+	var m_tag
+	var m_value
+
+	new(tag:Int, value) {
+		m_tag = tag
+		m_value = value
+	}
+	def tag => m_tag
+	def tag_name => _TAG_NAME[m_tag] || "$m_tag"
+	def value => m_value.size > 0 ? m_value[0] : null
+	def values => m_value
+}
+class ExifReader : Iterable
+{
+	var m_data
+	var m_int16
+	var m_int32
+	var m_offset_0th_ifd
+	var m_offset_1th_ifd
+	var m_offset_exif_ifd
+	var m_offset_gps_ifd
+
+	/**
+	 * 0: tag
+	 * 1: type
+	 * 2: num_of_value
+	 * 3: value(List) or offset(Int)
+	 */
+	var m_tags
+	var m_tags_map
+
+	new(src) {
+		super._new()
+
+		let type = typeof(src)
+		if type == Str || type == File {
+			m_data = FileIO(src)
+		} elif type in StreamIO {
+			m_data = src
+		} else {
+			throw TypeError("Str, File or StreamIO required but $type")
+		}
+
+		// Validate Exif/JPEG format
+		if m_data.peek("b2") != b"\xFF\xD8" {
+			throw ExifReaderError("No JPEG file")
+		}
+		m_data.peek("x4")
+		if m_data.peek("b6") != b"Exif\0\0" {
+			throw ExifReaderError("No exif data")
+		}
+
+		let endian = m_data.peek("b4")
+		if endian == b"MM\0\x2A" {
+			m_int16 = "S"  // Big Endian
+			m_int32 = "I"
+		} elif endian == b"II\0\x2A" {
+			m_int16 = "s"  // Little Endian
+			m_int32 = "i"
+		} else {
+			throw ExifReaderError("Illigal exif data")
+		}
+
+		m_offset_0th_ifd = m_data.peek(m_int32)
+
+		m_tags = []
+		m_tags_map = {}
+		m_data.pos = _TIFF_HEADER_OFFSET + m_offset_0th_ifd
+		this._parse_exif_tags()
+
+		m_offset_1th_ifd = m_data.peek(m_int32)
+
+		if m_offset_exif_ifd {
+			m_data.pos = _TIFF_HEADER_OFFSET + m_offset_exif_ifd
+			this._parse_exif_tags()
+		}
+		if m_offset_gps_ifd {
+			m_data.pos = _TIFF_HEADER_OFFSET + m_offset_gps_ifd
+			this._parse_exif_tags()
+		}
+	}
+	def _parse_exif_tags() {
+		let exif_tag_format = "$m_int16$m_int16$m_int32"
+		let num_of_tags = m_data.peek(m_int16)
+
+		for i in 0..num_of_tags {
+			let tag = m_data.unpack(exif_tag_format)
+			if tag[1] > 10 {
+				throw ExifReaderError("Illigal exif data")
+			}
+			if tag[0] == _TAGNAME_EXIF_IFD {
+				m_offset_exif_ifd = m_data.peek(m_int32)
+			} elif tag[0] == _TAGNAME_GPSINFO_IFD {
+				m_offset_gps_ifd = m_data.peek(m_int32)
+			} else {
+				let size = _TAG_ELEM_SIZE[tag[1]] * tag[2]
+				if size > 0 && size <= 4 {
+					tag.push _read_value(m_data, tag[1], tag[2], m_int16, m_int32)
+					if size < 4 {
+						m_data.read(4 - size)
+					}
+				} else {
+					tag.push m_data.peek(m_int32)
+				}
+				m_tags.push tag
+
+				m_tags_map[tag[0]] = tag
+				let tag_name = _TAG_NAME[tag[0]]
+				if tag_name {
+					m_tags_map[tag_name] = tag
+				}
+			}
+		}
+	}
+	def op_index(key) {
+		let type = typeof(key)
+		var tag = null
+		if type == Int || type == Str {
+			tag = m_tags_map[key]
+		} else {
+			throw TypeError("Int or Str required but $type")
+		}
+		if tag {
+			if typeof(tag[3]) == Int {
+				m_data.pos = _TIFF_HEADER_OFFSET + tag[3]
+				tag[3] = _read_value(m_data, tag[1], tag[2], m_int16, m_int32)
+			}
+			return tag[3]
+		} else {
+			return null
+		}
+	}
+	def _missing(key) => this.op_index(key)
+	def thumbnail {
+		if m_offset_1th_ifd {
+			// TODO:broken
+			m_data.pos = _TIFF_HEADER_OFFSET + m_offset_1th_ifd
+			return m_data
+		} else {
+			return null
+		}
+	}
+
+	def iterator() => ExifIterator(m_data, m_tags, m_int16, m_int32)
+}
+class ExifIterator : Iterator
+{
+	var m_index
+	var m_data
+	var m_tags
+	var m_int16
+	var m_int32
+
+	new(data:StreamIO, tags:List, int16:Str, int32:Str) {
+		super._new()
+
+		m_index = 0
+		m_data = data
+		m_tags = tags
+		m_int16 = int16
+		m_int32 = int32
+	}
+	def next() {
+		if m_index == m_tags.size {
+			throw StopIteration()
+		}
+		let tag = m_tags[m_index]
+		m_index++
+
+		if typeof(tag[3]) == Int {
+			m_data.pos = _TIFF_HEADER_OFFSET + tag[3]
+			tag[3] = _read_value(m_data, tag[1], tag[2], m_int16, m_int32)
+		}
+		return ExifTag(tag[0], tag[3])
+	}
+}
+

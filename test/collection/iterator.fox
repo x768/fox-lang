@@ -1,0 +1,34 @@
+import util.assert
+
+
+class CountDown : Iterable
+{
+	var m_i
+	new(i:Int) {
+		super._new()
+		m_i = i
+	}
+	def iterator() => CountDownIter(m_i)
+}
+class CountDownIter : Iterator
+{
+	var m_i
+	new(i:Int) {
+		super._new()
+		m_i = i
+	}
+	def next() {
+		m_i--
+		if m_i < 0 {
+			throw StopIteration()
+		}
+		return m_i + 1
+	}
+}
+
+var log = []
+for i in CountDown(3) {
+	log.push i
+}
+assert_equal log, [3, 2, 1]
+

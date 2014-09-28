@@ -82,7 +82,7 @@ static int ref_get_member_list(Value *vret, Value *v, RefNode *node)
 }
 static int get_declaring_class(Value *vret, Value *v, RefNode *node)
 {
-	Ref *fn_obj = Value_vp(v[1]);
+	Ref *fn_obj = Value_ref(v[1]);
 	RefNode *fn;
 	RefNode *cls;
 
@@ -111,7 +111,7 @@ static int get_declaring_module(Value *vret, Value *v, RefNode *node)
 		RefNode *cls = Value_vp(v[1]);
 		module = cls->defined_module;
 	} else if (type == fs->cls_fn) {
-		Ref *fn_obj = Value_vp(v[1]);
+		Ref *fn_obj = Value_ref(v[1]);
 		if (fn_obj->rh.n_memb > 0) {
 			RefNode *fn = Value_vp(fn_obj->v[INDEX_FUNC_FN]);
 			module = fn->defined_module;
@@ -130,7 +130,7 @@ static int get_declaring_module(Value *vret, Value *v, RefNode *node)
 }
 static int ref_get_this(Value *vret, Value *v, RefNode *node)
 {
-	Ref *fn_obj = Value_vp(v[1]);
+	Ref *fn_obj = Value_ref(v[1]);
 
 	if (fn_obj->rh.n_memb == 0) {
 		fs->throw_errorf(fs->mod_lang, "ValueError", "Not a class method");

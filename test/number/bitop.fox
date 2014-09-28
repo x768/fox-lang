@@ -1,0 +1,9 @@
+import util.assert
+
+assert_equal 0b1010, 10
+assert_equal 0o755, 493
+assert_equal 0xDEADBEEF, 3735928559
+
+assert_equal 0b101 << 2, 0b10100
+assert_equal 0b10101 >> 2, 0b101
+

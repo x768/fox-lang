@@ -227,7 +227,7 @@ static int int64_marshal_read(Value *vret, Value *v, RefNode *node)
 	int rd_size = 8;
 	int i;
 
-	Value r = Value_ref_memb(v[1], INDEX_MARSHALDUMPER_SRC);
+	Value r = Value_ref(v[1])->v[INDEX_MARSHALDUMPER_SRC];
 	RefNode *cls = FUNC_VP(node);
 	RefInt64 *rt = new_buf(cls, sizeof(RefInt64));
 	*vret = vp_Value(rt);
@@ -243,7 +243,7 @@ static int int64_marshal_read(Value *vret, Value *v, RefNode *node)
 }
 static int int64_marshal_write(Value *vret, Value *v, RefNode *node)
 {
-	Value w = Value_ref_memb(v[1], INDEX_MARSHALDUMPER_SRC);
+	Value w = Value_ref(v[1])->v[INDEX_MARSHALDUMPER_SRC];
 	RefInt64 *rt = Value_vp(*v);
 	char data[8];
 	int i;
@@ -1625,7 +1625,7 @@ static RefTimeZone *timezone_marshal_read_sub(Value r)
 }
 static int timezone_marshal_read(Value *vret, Value *v, RefNode *node)
 {
-	Value r = Value_ref_memb(v[1], INDEX_MARSHALDUMPER_SRC);
+	Value r = Value_ref(v[1])->v[INDEX_MARSHALDUMPER_SRC];
 	RefTimeZone *tz = timezone_marshal_read_sub(r);
 
 	if (tz == NULL) {
@@ -1637,7 +1637,7 @@ static int timezone_marshal_read(Value *vret, Value *v, RefNode *node)
 }
 static int timezone_marshal_write(Value *vret, Value *v, RefNode *node)
 {
-	Value w = Value_ref_memb(v[1], INDEX_MARSHALDUMPER_SRC);
+	Value w = Value_ref(v[1])->v[INDEX_MARSHALDUMPER_SRC];
 	RefTimeZone *tz = Value_vp(*v);
 	RefStr *name = tz->name;
 
@@ -1820,7 +1820,7 @@ static int date_parse_format(Value *vret, Value *v, RefNode *node)
 static int date_marshal_read(Value *vret, Value *v, RefNode *node)
 {
 	uint32_t uval;
-	Value r = Value_ref_memb(v[1], INDEX_MARSHALDUMPER_SRC);
+	Value r = Value_ref(v[1])->v[INDEX_MARSHALDUMPER_SRC];
 	RefTime *dt = new_buf(fs->cls_time, sizeof(RefTime));
 	*vret = vp_Value(dt);
 
@@ -1844,7 +1844,7 @@ static int date_marshal_read(Value *vret, Value *v, RefNode *node)
 }
 static int date_marshal_write(Value *vret, Value *v, RefNode *node)
 {
-	Value w = Value_ref_memb(v[1], INDEX_MARSHALDUMPER_SRC);
+	Value w = Value_ref(v[1])->v[INDEX_MARSHALDUMPER_SRC];
 	RefTime *dt = Value_vp(*v);
 	RefStr *name = dt->tz->name;
 
@@ -2240,14 +2240,14 @@ static void define_time_class(RefNode *m)
 	define_native_func_a(n, date_get, 0, 0, (void*) GET_MINUTE);
 	n = define_identifier(m, cls, "second", NODE_FUNC_N, NODEOPT_PROPERTY);
 	define_native_func_a(n, date_get, 0, 0, (void*) GET_SECOND);
-	n = define_identifier(m, cls, "msec", NODE_FUNC_N, NODEOPT_PROPERTY);
+	n = define_identifier(m, cls, "millisec", NODE_FUNC_N, NODEOPT_PROPERTY);
 	define_native_func_a(n, date_get, 0, 0, (void*) GET_MILLISEC);
 
 	n = define_identifier(m, cls, "timestamp", NODE_FUNC_N, NODEOPT_PROPERTY);
 	define_native_func_a(n, date_timestamp, 0, 0, NULL);
 	n = define_identifier(m, cls, "timezone", NODE_FUNC_N, NODEOPT_PROPERTY);
 	define_native_func_a(n, date_timezone, 0, 0, NULL);
-	n = define_identifier(m, cls, "zoneabbr", NODE_FUNC_N, NODEOPT_PROPERTY);
+	n = define_identifier(m, cls, "zone_abbr", NODE_FUNC_N, NODEOPT_PROPERTY);
 	define_native_func_a(n, date_zoneabbr, 0, 0, NULL);
 	n = define_identifier(m, cls, "is_dst", NODE_FUNC_N, NODEOPT_PROPERTY);
 	define_native_func_a(n, date_is_dst, 0, 0, NULL);

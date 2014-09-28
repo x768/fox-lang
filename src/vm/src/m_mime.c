@@ -494,7 +494,7 @@ static int mimereader_new(Value *vret, Value *v, RefNode *node)
 }
 static int mimereader_next(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 	RefCharset *cs = Value_vp(r->v[INDEX_MIMEREADER_CHARSET]);
 	Value reader = r->v[INDEX_MIMEREADER_SRC];
 	Str boundary = Value_str(r->v[INDEX_MIMEREADER_BOUNDARY]);
@@ -1164,7 +1164,7 @@ static int mimeheader_write(Value *vret, Value *v, RefNode *node)
 				stream_write_data(v1, val->c, val->size);
 			} else {
 				buf.size = 0;
-				convert_str_to_bin_sub(NULL, &buf, val->c, val->size, fs->cs_stdio, TRUE);
+				convert_str_to_bin_sub(&buf, val->c, val->size, fs->cs_stdio, "?");
 				stream_write_data(v1, buf.p, buf.size);
 			}
 			stream_write_data(v1, "\n", 1);
@@ -1543,14 +1543,14 @@ static int mimedata_new(Value *vret, Value *v, RefNode *node)
 }
 static int mimedata_header(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 	int idx = FUNC_INT(node);
 	*vret = Value_cp(r->v[idx]);
 	return TRUE;
 }
 static int mimedata_headers_iter(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 	RefNode nd;
 	int idx = FUNC_INT(node);
 
@@ -1562,7 +1562,7 @@ static int mimedata_headers_iter(Value *vret, Value *v, RefNode *node)
 
 static int mimedata_read(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 	RefBytesIO *rd = Value_vp(r->v[INDEX_MIMEDATA_BUF]);
 	RefBytesIO *mb = Value_vp(v[1]);
 	int read_size = Value_int(v[2], NULL);
@@ -1582,7 +1582,7 @@ static int mimedata_read(Value *vret, Value *v, RefNode *node)
 
 static int mimedata_write(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 	RefBytesIO *wr = Value_vp(r->v[INDEX_MIMEDATA_BUF]);
 	RefBytesIO *mb = Value_vp(v[1]);
 
@@ -1594,14 +1594,14 @@ static int mimedata_write(Value *vret, Value *v, RefNode *node)
 }
 static int mimedata_get_pos(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 	RefBytesIO *mb = Value_vp(r->v[INDEX_MIMEDATA_BUF]);
 	*vret = int32_Value(mb->cur);
 	return TRUE;
 }
 static int mimedata_set_pos(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 	RefBytesIO *mb = Value_vp(r->v[INDEX_MIMEDATA_BUF]);
 	int64_t offset = Value_int(v[1], NULL);
 
@@ -1615,7 +1615,7 @@ static int mimedata_set_pos(Value *vret, Value *v, RefNode *node)
 }
 static int mimedata_size(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 	RefBytesIO *mb = Value_vp(r->v[INDEX_MIMEDATA_BUF]);
 	*vret = int32_Value(mb->buf.size);
 	return TRUE;

@@ -154,7 +154,7 @@ void connect_widget_events(WndHandle window)
 // v : FormのサブクラスでValue_new_ref済みの値を渡す
 void create_form_window(Value *v, WndHandle parent, int *size)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 	GtkWidget *window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
 
 	// Windowに関連付けたため、+1する
@@ -272,7 +272,7 @@ static gboolean signal_mousewheel_void(GtkWidget *widget, GdkEventScroll *event,
 }
 void create_image_pane_window(Value *v, WndHandle parent)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 	GtkWidget *scroll = gtk_scrolled_window_new(NULL, NULL);
 	GtkWidget *window = gtk_image_new();
 

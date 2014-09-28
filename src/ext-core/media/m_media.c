@@ -41,6 +41,29 @@ static Hash *load_type_function(Mem *mem)
 	return &mods;
 }
 
+/*
+static int read_int8(uint8_t *val, Value r)
+{
+	int size = 1;
+
+	if (!fs->stream_read_data(r, NULL, (char*)val, &size, FALSE, TRUE)) {
+		return FALSE;
+	}
+	return TRUE;
+}
+*/
+static int write_int8(uint32_t val, Value w)
+{
+	uint8_t buf[1];
+
+	buf[0] = val;
+
+	if (!fs->stream_write_data(w, (char*)buf, 1)) {
+		return FALSE;
+	}
+	return TRUE;
+}
+
 ////////////////////////////////////////////////////////////////////////////
 
 int Audio_set_size(RefAudio *snd, int size)
@@ -151,12 +174,27 @@ static int audio_save(Value *vret, Value *v, RefNode *node)
 }
 static int audio_marshal_read(Value *vret, Value *v, RefNode *node)
 {
-	//Value r = Value_ref_memb(v[1], INDEX_MARSHALDUMPER_SRC);
+	//Value r = Value_ref(v[1])->v[INDEX_MARSHALDUMPER_SRC];
 	return TRUE;
 }
 static int audio_marshal_write(Value *vret, Value *v, RefNode *node)
 {
-	//Value w = Value_ref_memb(v[1], INDEX_MARSHALDUMPER_SRC);
+	RefAudio *snd = Value_vp(*v);
+	Value w = Value_ref(v[1])->v[INDEX_MARSHALDUMPER_SRC];
+
+	if (!write_int8(snd->samples, w)) {
+		return FALSE;
+	}
+	if (!write_int8(snd->width, w)) {
+		return FALSE;
+	}
+	if (!write_int8(snd->channels, w)) {
+		return FALSE;
+	}
+	if (!write_int8(snd->length, w)) {
+		return FALSE;
+	}
+
 	return TRUE;
 }
 

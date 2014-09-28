@@ -415,9 +415,55 @@ FINALLY:
 	throw_errorf(fs->mod_file, "DirOpenError", "Cannot open directory %q", path->c);
 	return FALSE;
 }
+static int file_marshal_read(Value *vret, Value *v, RefNode *node)
+{
+	Value r = Value_ref(v[1])->v[INDEX_MARSHALDUMPER_SRC];
+	uint32_t size;
+	int rd_size;
+	RefStr *rs;
+
+	if (!read_int32(&size, r)) {
+		return FALSE;
+	}
+	if (size > 0xffffff) {
+		throw_errorf(fs->mod_lang, "ValueError", "Invalid size number");
+		return FALSE;
+	}
+	if (size > fs->max_alloc) {
+		throw_error_select(THROW_MAX_ALLOC_OVER__INT, fs->max_alloc);
+		return FALSE;
+	}
+
+	rs = new_refstr_n(fs->cls_file, size);
+	*vret = vp_Value(rs);
+	rd_size = size;
+	if (!stream_read_data(r, NULL, rs->c, &rd_size, FALSE, TRUE)) {
+		return FALSE;
+	}
+	rs->c[size] = '\0';
+
+	return TRUE;
+}
+static int file_marshal_write(Value *vret, Value *v, RefNode *node)
+{
+	Value w = Value_ref(v[1])->v[INDEX_MARSHALDUMPER_SRC];
+	RefStr *rs = Value_vp(*v);
+
+	if (!write_int32(rs->size, w)) {
+		return FALSE;
+	}
+	if (!stream_write_data(w, rs->c, rs->size)) {
+		return FALSE;
+	}
+
+	return TRUE;
+}
+
+//////////////////////////////////////////////////////////////////////////////////////
+
 static int diriter_next(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 	DIR *d = Value_ptr(r->v[DIRITER_DIR]);
 	struct dirent *dh;
 	int type = Value_integral(r->v[DIRITER_TYPE]);
@@ -461,7 +507,7 @@ static int diriter_next(Value *vret, Value *v, RefNode *node)
 }
 static int diriter_close(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 	DIR *d = Value_ptr(r->v[DIRITER_DIR]);
 	
 	if (d != NULL) {
@@ -533,7 +579,7 @@ static int fileio_new(Value *vret, Value *v, RefNode *node)
 }
 static int fileio_close(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 	RefFileHandle *fh = Value_vp(r->v[INDEX_FILEIO_HANDLE]);
 
 	if (fh != NULL) {
@@ -554,7 +600,7 @@ static int fileio_close(Value *vret, Value *v, RefNode *node)
 }
 static int fileio_read(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 	RefFileHandle *fh = Value_vp(r->v[INDEX_FILEIO_HANDLE]);
 	RefBytesIO *mb = Value_vp(v[1]);
 	int size = Value_int(v[2], NULL);
@@ -574,7 +620,7 @@ static int fileio_read(Value *vret, Value *v, RefNode *node)
  */
 static int fileio_write(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 	RefFileHandle *fh = Value_vp(r->v[INDEX_FILEIO_HANDLE]);
 	RefBytesIO *mb = Value_vp(v[1]);
 
@@ -586,7 +632,7 @@ static int fileio_write(Value *vret, Value *v, RefNode *node)
 }
 static int fileio_empty(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 	RefFileHandle *fh = Value_vp(r->v[INDEX_FILEIO_HANDLE]);
 
 	if (fh->fd_read != -1 || fh->fd_write != -1) {
@@ -600,7 +646,7 @@ static int fileio_empty(Value *vret, Value *v, RefNode *node)
 
 static int fileio_seek(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 	RefFileHandle *fh = Value_vp(r->v[INDEX_FILEIO_HANDLE]);
 
 	if (fh->fd_read != -1) {
@@ -621,7 +667,7 @@ static int fileio_seek(Value *vret, Value *v, RefNode *node)
 }
 static int fileio_size(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(*v);
+	Ref *r = Value_ref(*v);
 	RefFileHandle *fh = Value_vp(r->v[INDEX_FILEIO_HANDLE]);
 
 	if (fh->fd_read != -1) {
@@ -894,7 +940,7 @@ static int file_readfile(Value *vret, Value *v, RefNode *node)
 			goto ERROR_END;
 		}
 		ret_s = Str_new(buf, size);
-		if (!convert_bin_to_str(vret, NULL, &ret_s, 1)) {
+		if (!convert_bin_to_str(vret, &ret_s, 1)) {
 			return FALSE;
 		}
 		free(buf);
@@ -963,30 +1009,31 @@ static int file_writefile(Value *vret, Value *v, RefNode *node)
 	if (path == NULL) {
 		return FALSE;
 	}
-
 	sbuf.p = NULL;
 
 	if (fg->stk_top > v + 3) {
 		// 引数が2つ以上ある場合は文字列
 		if (type == fs->cls_str) {
 			RefCharset *cs = Value_vp(v[3]);
-			Str s;
+			RefStr *rs;
 			int alt = FALSE;
 
 			if (fg->stk_top > v + 3 && Value_bool(v[4])) {
 				alt = TRUE;
 			}
-			s = Value_str(v2);
+			rs = Value_vp(v2);
 			if (cs != fs->cs_utf8) {
-				StrBuf_init(&sbuf, s.size);
-				if (!convert_str_to_bin_sub(NULL, &sbuf, s.p, s.size, cs, alt)) {
+				StrBuf_init(&sbuf, rs->size);
+				if (!convert_str_to_bin_sub(&sbuf, rs->c, rs->size, cs, alt ? "?" : NULL)) {
 					StrBuf_close(&sbuf);
 					return FALSE;
 				}
-				s = Str_new(sbuf.p, sbuf.size);
+				write_p = sbuf.p;
+				write_size = sbuf.size;
+			} else {
+				write_p = rs->c;
+				write_size = rs->size;
 			}
-			write_p = s.p;
-			write_size = s.size;
 		} else {
 			throw_error_select(THROW_ARGMENT_TYPE__NODE_NODE_INT, fs->cls_str, type, 2);
 			return FALSE;
@@ -1067,6 +1114,8 @@ static void define_file_class(RefNode *m)
 	define_native_func_a(n, file_new, 1, 1, NULL, fs->cls_sequence);
 	n = define_identifier_p(m, cls, fs->str_tostr, NODE_FUNC_N, 0);
 	define_native_func_a(n, file_path, 0, 2, (void*) FILEPATH_PATH, fs->cls_str, fs->cls_locale);
+	n = define_identifier_p(m, cls, fs->str_marshal_read, NODE_NEW_N, 0);
+	define_native_func_a(n, file_marshal_read, 1, 1, NULL, fs->cls_marshaldumper);
 
 	n = define_identifier_p(m, cls, fs->symbol_stock[T_CMP], NODE_FUNC_N, 0);
 	define_native_func_a(n, sequence_cmp, 1, 1, NULL, fs->cls_file);
@@ -1074,6 +1123,8 @@ static void define_file_class(RefNode *m)
 	define_native_func_a(n, file_in, 1, 1, NULL, fs->cls_file);
 	n = define_identifier_p(m, cls, fs->symbol_stock[T_DIV], NODE_FUNC_N, 0);
 	define_native_func_a(n, file_cat, 1, 1, NULL, fs->cls_sequence);
+	n = define_identifier_p(m, cls, fs->str_marshal_write, NODE_FUNC_N, 0);
+	define_native_func_a(n, file_marshal_write, 1, 1, NULL, fs->cls_marshaldumper);
 	n = define_identifier(m, cls, "path", NODE_FUNC_N, NODEOPT_PROPERTY);
 	define_native_func_a(n, file_path, 0, 0, (void*) FILEPATH_PATH);
 	n = define_identifier(m, cls, "filename", NODE_FUNC_N, NODEOPT_PROPERTY);

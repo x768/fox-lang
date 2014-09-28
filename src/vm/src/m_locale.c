@@ -35,7 +35,7 @@ static void make_locale_name(char *dst, int size, Str name)
 	}
 	dst[len] = '\0';
 }
-static RefStr *locale_alias(Str name)
+static RefStr *locale_alias(const char *name_p, int name_size)
 {
 	static Hash locales;
 
@@ -43,7 +43,7 @@ static RefStr *locale_alias(Str name)
 		Hash_init(&locales, &fg->st_mem, 64);
 		load_aliases_file(&locales, "data" SEP_S "locale.txt");
 	}
-	return Hash_get(&locales, name.p, name.size);
+	return Hash_get(&locales, name_p, name_size);
 }
 
 
@@ -90,7 +90,7 @@ static RefStr **get_best_locale_cgi(const char *p)
 		make_locale_name(cbuf, LOCALE_LEN, s1);
 		// localeのエイリアスの解決
 		{
-			RefStr *alias = locale_alias(Str_new(cbuf, -1));
+			RefStr *alias = locale_alias(cbuf, -1);
 			if (alias != NULL) {
 				memcpy(cbuf, alias->c, alias->size);
 				cbuf[alias->size] = '\0';
@@ -167,7 +167,7 @@ RefStr **get_best_locale_list()
 			make_locale_name(cbuf, LOCALE_LEN, s);
 			// localeのエイリアスの解決
 			{
-				RefStr *alias = locale_alias(Str_new(cbuf, -1));
+				RefStr *alias = locale_alias(cbuf, -1);
 				if (alias != NULL) {
 					memcpy(cbuf, alias->c, alias->size);
 					cbuf[alias->size] = '\0';
@@ -335,7 +335,7 @@ static RefLocale *load_locale(Str name)
 
 	// localeのエイリアスの解決
 	if (name.size > 0) {
-		RefStr *alias = locale_alias(Str_new(buf, -1));
+		RefStr *alias = locale_alias(buf, -1);
 		if (alias != NULL) {
 			memcpy(buf, alias->c, alias->size);
 			buf[alias->size] = '\0';
@@ -406,7 +406,7 @@ static int locale_new(Value *vret, Value *v, RefNode *node)
 }
 static int locale_marshal_read(Value *vret, Value *v, RefNode *node)
 {
-	Value r = Value_ref_memb(v[1], INDEX_MARSHALDUMPER_SRC);
+	Value r = Value_ref(v[1])->v[INDEX_MARSHALDUMPER_SRC];
 	uint32_t size;
 	int rd_size;
 	RefLocale *loc;
@@ -434,7 +434,7 @@ static int locale_marshal_write(Value *vret, Value *v, RefNode *node)
 {
 	RefLocale *loc = Value_vp(*v);
 	RefStr *name = loc->tag;
-	Value w = Value_ref_memb(v[1], INDEX_MARSHALDUMPER_SRC);
+	Value w = Value_ref(v[1])->v[INDEX_MARSHALDUMPER_SRC];
 
 	if (!write_int32(name->size, w)) {
 		return FALSE;
@@ -712,7 +712,7 @@ int load_resource(RefResource *res, int *pfound, Str path, Str locale, int no_de
 
 	make_locale_name(file_p, 64, locale);
 	{
-		RefStr *alias = locale_alias(Str_new(file_p, -1));
+		RefStr *alias = locale_alias(file_p, -1);
 		if (alias != NULL) {
 			memcpy(file_p, alias->c, alias->size);
 			file_p[alias->size] = '\0';

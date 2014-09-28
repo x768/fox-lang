@@ -13,7 +13,7 @@ static EditWnd *newEditWnd()
 
 static int editor_pane_new(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = Value_vp(v[1]);
+	Ref *r = Value_ref(v[1]);
 	WndHandle parent = ftk->Value_handle(r->v[INDEX_WIDGET_HANDLE]);
 
 	*vret = vp_Value(fs->new_ref(cls_editor));
