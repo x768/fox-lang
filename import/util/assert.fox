@@ -11,6 +11,12 @@ def assert_true(b)
 		throw AssertError("Assertion fault")
 	}
 }
+def assert_false(b)
+{
+	if b {
+		throw AssertError("Assertion fault")
+	}
+}
 def assert_equal(a, b)
 {
 	let t1 = typeof(a)

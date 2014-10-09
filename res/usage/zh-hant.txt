@@ -1,6 +1,8 @@
 locale=zh_Hant
 options=選項
 source=源碼文件名稱
+immediate=即刻執行"srccode"
 validate=驗證文法錯誤
 show_help=顯示此幫助信息
 show_version=顯示版本信息
+show_version_more=顯示模塊版本和設置信息

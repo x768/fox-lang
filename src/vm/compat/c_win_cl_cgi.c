@@ -4,7 +4,7 @@
 void init_stdio()
 {
 	RefFileHandle *fh;
-	Ref *r = new_ref(cls_fileio);
+	Ref *r = ref_new(fv->cls_fileio);
 	fg->v_cio = vp_Value(r);
 
 	init_stream_ref(r, STREAM_READ|STREAM_WRITE);
@@ -13,7 +13,7 @@ void init_stdio()
 	STDOUT_FILENO = (FileHandle)GetStdHandle(STD_OUTPUT_HANDLE);
 	STDERR_FILENO = (FileHandle)GetStdHandle(STD_ERROR_HANDLE);
 
-	fh = new_buf(NULL, sizeof(RefFileHandle));
+	fh = buf_new(NULL, sizeof(RefFileHandle));
 	r->v[INDEX_FILEIO_HANDLE] = vp_Value(fh);
 	fh->fd_read = STDIN_FILENO;
 	fh->fd_write = STDOUT_FILENO;

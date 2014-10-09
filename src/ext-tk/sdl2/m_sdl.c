@@ -99,7 +99,7 @@ static int sdlwindow_new(Value *vret, Value *v, RefNode *node)
 			return FALSE;
 		}
 	}
-	window = fs->new_buf(cls_window, sizeof(RefSDLWindow));
+	window = fs->buf_new(cls_window, sizeof(RefSDLWindow));
 	*vret = vp_Value(window);
 
 	window->w = SDL_CreateWindow(title->c, x, y, w, h, flags);
@@ -161,7 +161,7 @@ static int sdlwindow_get_surface(Value *vret, Value *v, RefNode *node)
 		throw_sdl_error();
 		return FALSE;
 	}
-	sf = fs->new_buf(cls_surface, sizeof(RefSDLSurface));
+	sf = fs->buf_new(cls_surface, sizeof(RefSDLSurface));
 	sf->sf = s;
 
 	return TRUE;
@@ -172,7 +172,7 @@ static int sdlwindow_get_surface(Value *vret, Value *v, RefNode *node)
 static int sdlevent_new(Value *vret, Value *v, RefNode *node)
 {
 	RefNode *cls_event = FUNC_VP(node);
-	RefSDLEvent *evt = fs->new_buf(cls_event, sizeof(RefSDLEvent));
+	RefSDLEvent *evt = fs->buf_new(cls_event, sizeof(RefSDLEvent));
 
 	*vret = vp_Value(evt);
 	return TRUE;

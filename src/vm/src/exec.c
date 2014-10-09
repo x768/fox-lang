@@ -299,8 +299,8 @@ int call_property(RefStr *name)
 				return call_function(memb, 0);
 			} else {
 				// 内部変数なしのFunctionオブジェクトを生成
-				Ref *r = new_ref_n(fs->cls_fn, INDEX_FUNC_LOCAL);
-				r->v[INDEX_FUNC_FN] = ref_cp_Value(&memb->rh);
+				Ref *r = ref_new_n(fs->cls_fn, INDEX_FUNC_LOCAL);
+				r->v[INDEX_FUNC_FN] = Value_cp(vp_Value(memb));
 				r->v[INDEX_FUNC_THIS] = *v;
 				r->v[INDEX_FUNC_N_LOCAL] = int32_Value(0);
 				*v = vp_Value(r);
@@ -497,12 +497,12 @@ NORMAL:
 
 		switch (p->type) {
 		case OP_INIT_GENR: {  // Generatorインスタンスを返す
-			Ref *r = new_ref_n(cls_generator, func->u.f.max_stack + INDEX_GENERATOR_LOCAL);
+			Ref *r = ref_new_n(fv->cls_generator, func->u.f.max_stack + INDEX_GENERATOR_LOCAL);
 			Value v = vp_Value(r);
 
 			r->v[INDEX_GENERATOR_PC] = int32_Value(1);
 			r->v[INDEX_GENERATOR_NSTACK] = int32_Value(fg->stk_top - fg->stk_base);
-			r->v[INDEX_GENERATOR_FUNC] = ref_cp_Value(&func->rh);
+			r->v[INDEX_GENERATOR_FUNC] = Value_cp(vp_Value(func));
 			memcpy(&r->v[INDEX_GENERATOR_LOCAL], fg->stk_base, (fg->stk_top - fg->stk_base) * sizeof(Value));
 			fg->stk_top = fg->stk_base + 1;
 			*fg->stk_base = v;
@@ -599,13 +599,13 @@ NORMAL:
 			Value *v = fg->stk_base;
 			RefHeader *rh = Value_ref_header(*v);
 			if (rh->type == fs->cls_fn) {
-				*v = vp_Value(new_ref(Value_vp(p->op[0])));
+				*v = vp_Value(ref_new(Value_vp(p->op[0])));
 			}
 			pc += 2;
 			break;
 		}
 		case OP_NEW_FN: {
-			Ref *r = new_ref_n(fs->cls_fn, INDEX_FUNC_LOCAL + p->s);
+			Ref *r = ref_new_n(fs->cls_fn, INDEX_FUNC_LOCAL + p->s);
 
 			r->v[INDEX_FUNC_THIS] = Value_cp(fg->stk_base[0]);
 			r->v[INDEX_FUNC_FN] = Value_cp(p->op[0]);
@@ -635,11 +635,11 @@ NORMAL:
 			fg->stk_top++;
 			if (p->s) {
 				*fg->stk_top++ = VALUE_TRUE;
-				if (!call_function(func_range_new, 3)) {
+				if (!call_function(fv->func_range_new, 3)) {
 					goto THROW;
 				}
 			} else {
-				if (!call_function(func_range_new, 2)) {
+				if (!call_function(fv->func_range_new, 2)) {
 					goto THROW;
 				}
 			}

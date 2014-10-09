@@ -1,7 +1,7 @@
 #ifndef _MEDIA_H_
 #define _MEDIA_H_
 
-#include "m_math.h"
+#include "m_number.h"
 #include "m_media.h"
 
 

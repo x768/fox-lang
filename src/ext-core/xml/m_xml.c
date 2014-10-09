@@ -198,18 +198,6 @@ static int is_valid_elem_name(const char *s_p, int s_size)
 	return TRUE;
 }
 
-static int char2hex(char ch)
-{
-	if (isdigit_fox(ch)) {
-		return ch - '0';
-	} else if (ch >= 'A' && ch <= 'F') {
-		return 10 + ch - 'A';
-	} else if (ch >= 'a' && ch <= 'f') {
-		return 10 + ch - 'a';
-	} else {
-		return -1;
-	}
-}
 static int Str_eqi_head(Str s, const char *p)
 {
 	int i;
@@ -264,41 +252,6 @@ static Str Str_trim(Str src)
 	s.p = src.p + i;
 	s.size = j - i;
 	return s;
-}
-
-/**
- * 16進数として解釈可能なところまでポインタを進める
- *
- * n   : 最大文字数 or -1
- *
- * 変換できなければ-1
- * オーバーフローしたら-2
- */
-static int parse_hex(char **pp, int n)
-{
-	char *p = *pp;
-	int ret = 0;
-	int i = 0;
-
-	if (!isxdigit(*p)) {
-		return -1;
-	}
-
-	while (isxdigit(*p)) {
-		if ((ret & 0xF0000000) != 0) {
-			return -2;
-		}
-		ret = ret << 4 | char2hex(*p);
-		p++;
-		if (n >= 0) {
-			if (++i == n) {
-				break;
-			}
-		}
-	}
-
-	*pp = p;
-	return ret;
 }
 
 static NativeFunc get_function_ptr(RefNode *node, RefStr *name)
@@ -629,7 +582,7 @@ static int resolve_entity(const char *p, const char *end)
 
 static void xml_elem_init(Value *v, RefArray **p_ra, Value **p_vm, const char *name_p, int name_size)
 {
-	Ref *r = fs->new_ref(cls_elem);
+	Ref *r = fs->ref_new(cls_elem);
 	RefArray *ra = fs->refarray_new(0);
 
 	r->v[INDEX_ELEM_CHILDREN] = vp_Value(ra);
@@ -730,7 +683,7 @@ static int XMLTok_parse_entity(char **ppdst, XMLTok *tk)
 		tk->p++;
 		if (*tk->p == 'x' || *tk->p == 'X') {
 			tk->p++;
-			code = parse_hex(&tk->p, 8);
+			code = fs->parse_hex((const char**)&tk->p, NULL, 8);
 			if (code >= 0) {
 				if (*tk->p == ';') {
 					tk->p++;
@@ -2162,26 +2115,28 @@ static int node_tostr_xml(StrBuf *buf, Value dst, Value v, XMLOutputFormat *xof,
 			return FALSE;
 		}
 
-		for (i = 0; i < rm->entry_num; i++) {
-			HashValueEntry *h = rm->entry[i];
-			for (; h != NULL; h = h->next) {
-				Str key = fs->Value_str(h->key);
-				if (xof->html && html_attr_no_value(key)) {
-					if (!fs->StrBuf_add_c(buf, ' ') ||
-						!fs->StrBuf_add(buf, key.p, key.size)) {
-						return FALSE;
-					}
-				} else {
-					if (!fs->StrBuf_add_c(buf, ' ') ||
-						!fs->StrBuf_add(buf, key.p, key.size) ||
-						!fs->StrBuf_add(buf, "=\"", 2)) {
-						return FALSE;
-					}
-					if (!text_convert_html(buf, fs->Value_str(h->val), TRUE, xof)) {
-						return FALSE;
-					}
-					if (!fs->StrBuf_add_c(buf, '"')) {
-						return FALSE;
+		if (rm != NULL) {
+			for (i = 0; i < rm->entry_num; i++) {
+				HashValueEntry *h = rm->entry[i];
+				for (; h != NULL; h = h->next) {
+					Str key = fs->Value_str(h->key);
+					if (xof->html && html_attr_no_value(key)) {
+						if (!fs->StrBuf_add_c(buf, ' ') ||
+							!fs->StrBuf_add(buf, key.p, key.size)) {
+							return FALSE;
+						}
+					} else {
+						if (!fs->StrBuf_add_c(buf, ' ') ||
+							!fs->StrBuf_add(buf, key.p, key.size) ||
+							!fs->StrBuf_add(buf, "=\"", 2)) {
+							return FALSE;
+						}
+						if (!text_convert_html(buf, fs->Value_str(h->val), TRUE, xof)) {
+							return FALSE;
+						}
+						if (!fs->StrBuf_add_c(buf, '"')) {
+							return FALSE;
+						}
 					}
 				}
 			}
@@ -2494,7 +2449,7 @@ static int xml_elem_new(Value *vret, Value *v, RefNode *node)
 	RefArray *ra;
 	int pos = 2;
 	RefStr *rs_name = Value_vp(v[1]);
-	Ref *r = fs->new_ref(cls_elem);
+	Ref *r = fs->ref_new(cls_elem);
 	*vret = vp_Value(r);
 
 	if (!is_valid_elem_name(rs_name->c, rs_name->size)) {
@@ -2510,29 +2465,27 @@ static int xml_elem_new(Value *vret, Value *v, RefNode *node)
 
 	r->v[INDEX_ELEM_ATTR] = vp_Value(fs->refmap_new(0));
 
-	if (fg->stk_top > v + 2) {
+	if (fg->stk_top > v + 2 && fs->Value_type(v[2]) == fs->cls_map) {
 		Value pv = v[2];
-		if (fs->Value_type(pv) == fs->cls_map) {
-			RefMap *map = Value_vp(pv);
-			RefMap *rm_dst = Value_vp(r->v[INDEX_ELEM_ATTR]);
-			int i;
-			for (i = 0; i < map->entry_num; i++) {
-				HashValueEntry *ep;
-				for (ep = map->entry[i]; ep != NULL; ep = ep->next) {
-					HashValueEntry *ve;
-					if (fs->Value_type(ep->key) != fs->cls_str || fs->Value_type(ep->val) != fs->cls_str) {
-						fs->throw_errorf(fs->mod_lang, "TypeError", "Argument #2 must be map of {str:str, str:str ...}");
-						return FALSE;
-					}
-					ve = fs->refmap_add(rm_dst, ep->key, TRUE, FALSE);
-					if (ve == NULL) {
-						return FALSE;
-					}
-					ve->val = fs->Value_cp(ep->val);
+		RefMap *map = Value_vp(pv);
+		RefMap *rm_dst = Value_vp(r->v[INDEX_ELEM_ATTR]);
+		int i;
+		for (i = 0; i < map->entry_num; i++) {
+			HashValueEntry *ep;
+			for (ep = map->entry[i]; ep != NULL; ep = ep->next) {
+				HashValueEntry *ve;
+				if (fs->Value_type(ep->key) != fs->cls_str || fs->Value_type(ep->val) != fs->cls_str) {
+					fs->throw_errorf(fs->mod_lang, "TypeError", "Argument #2 must be map of {str:str, str:str ...}");
+					return FALSE;
 				}
+				ve = fs->refmap_add(rm_dst, ep->key, TRUE, FALSE);
+				if (ve == NULL) {
+					return FALSE;
+				}
+				ve->val = fs->Value_cp(ep->val);
 			}
-			pos = 3;
 		}
+		pos = 3;
 	}
 	for (; v + pos < fg->stk_top; pos++) {
 		RefNode *v_type = fs->Value_type(v[pos]);

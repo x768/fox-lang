@@ -143,7 +143,7 @@ static int font_new(Value *vret, Value *v, RefNode *node)
 	FT_Face face;
 	int font_index = fs->Value_int(v[2], NULL);
 	float font_size = fs->Value_float(v[3]);
-	Ref *r = fs->new_ref(cls_face);
+	Ref *r = fs->ref_new(cls_face);
 	*vret = vp_Value(r);
 
 	if (!ft_initialized) {

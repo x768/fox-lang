@@ -1,0 +1,22 @@
+import util.assert
+import lang => lang
+
+
+def arg_type(i:Number) => null
+
+assert_equal typeof(1), Int
+assert_equal typeof(null), Null
+assert_equal typeof(Int), Class
+assert_equal typeof(typeof), Function
+assert_equal typeof(Int.new), Function
+assert_equal typeof(()=>null), Function
+assert_equal typeof(lang), Module
+
+assert_equal arg_type(1), null
+assert_equal arg_type(1.0), null
+assert_equal arg_type(1d), null
+assert_error () => arg_type("a"), TypeError
+
+assert_true typeof(10) in Number
+assert_true typeof(1.0) in Number
+

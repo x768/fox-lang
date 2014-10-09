@@ -24,7 +24,7 @@ int conv_graphics_to_image(Value *vret, GraphicsHandle img)
     NSBitmapImageRep *imgrep = [NSBitmapImageRep
                                 imageRepWithData:[image TIFFRepresentation]];
 
-	RefImage *fi = fs->new_buf(cls_image, sizeof(RefImage));
+	RefImage *fi = fs->buf_new(cls_image, sizeof(RefImage));
     int width = [imgrep pixelsWide];
     int height = [imgrep pixelsHigh];
     int pitch = [imgrep bytesPerRow];

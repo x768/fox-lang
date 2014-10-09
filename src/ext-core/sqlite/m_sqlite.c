@@ -102,7 +102,7 @@ static int conn_new(Value *vret, Value *v, RefNode *node)
 	int flag = SQLITE_OPEN_READONLY;
 	sqlite3 *conn = NULL;
 	int result = SQLITE_OK;
-	Ref *r = fs->new_ref(cls_sqlite);
+	Ref *r = fs->ref_new(cls_sqlite);
 
 	Str path_s;
 	char *path = fs->file_value_to_path(&path_s, v[1], 0);
@@ -140,7 +140,7 @@ static int conn_new(Value *vret, Value *v, RefNode *node)
 static int conn_memory(Value *vret, Value *v, RefNode *node)
 {
 	sqlite3 *conn = NULL;
-	Ref *r = fs->new_ref(cls_sqlite);
+	Ref *r = fs->ref_new(cls_sqlite);
 	int result = sqlite3_open(":memory:", &conn);
 
 	*vret = vp_Value(r);
@@ -292,7 +292,7 @@ static int conn_query(Value *vret, Value *v, RefNode *node)
 	}
 
 	{
-		RefCursor *rc = fs->new_buf(cls_cursor, sizeof(RefCursor));
+		RefCursor *rc = fs->buf_new(cls_cursor, sizeof(RefCursor));
 		*vret = vp_Value(rc);
 		rc->connect = fs->Value_cp(*v);
 		rc->stmt = stmt;

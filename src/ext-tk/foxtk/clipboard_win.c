@@ -33,7 +33,7 @@ int conv_graphics_to_image(Value *vret, GraphicsHandle img)
 	int y;
 	uint8_t *dst;
 
-	RefImage *fi = fs->new_buf(cls_image, sizeof(RefImage));
+	RefImage *fi = fs->buf_new(cls_image, sizeof(RefImage));
 	*vret = vp_Value(fi);
 
 	GetObject(img, sizeof(bmp), &bmp);

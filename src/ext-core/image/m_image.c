@@ -602,7 +602,7 @@ static int color_get_hsl(Value *vret, Value *v, RefNode *node)
 	double ret[3];
 	int ord = FUNC_INT(node);
 	int val = fs->Value_int(*v, NULL);
-	RefFloat *rd = fs->new_buf(fs->cls_float, sizeof(RefFloat));
+	RefFloat *rd = fs->buf_new(fs->cls_float, sizeof(RefFloat));
 	*vret = vp_Value(rd);
 
 	color_to_hsl(&ret[0], &ret[1], &ret[2], val);
@@ -673,7 +673,7 @@ static int rect_new(Value *vret, Value *v, RefNode *node)
 {
 	int i;
 	RefNode *cls = FUNC_VP(node);
-	RefRect *rc = fs->new_buf(cls, sizeof(RefRect));
+	RefRect *rc = fs->buf_new(cls, sizeof(RefRect));
 	*vret = vp_Value(rc);
 
 	for (i = 0; i < INDEX_RECT_NUM; i++) {
@@ -918,7 +918,7 @@ static int image_new(Value *vret, Value *v, RefNode *node)
 		}
 	}
 
-	image = fs->new_buf(cls_image, sizeof(RefImage));
+	image = fs->buf_new(cls_image, sizeof(RefImage));
 	*vret = vp_Value(image);
 
 	image->width = width;
@@ -977,7 +977,7 @@ static int image_load(Value *vret, Value *v, RefNode *node)
 		}
 	}
 
-	*vret = vp_Value(fs->new_buf(cls_image, sizeof(RefImage)));
+	*vret = vp_Value(fs->buf_new(cls_image, sizeof(RefImage)));
 	if (type == NULL && !detect_image_type(&type, reader)) {
 		fs->Value_dec(reader);
 		return FALSE;
@@ -1201,7 +1201,7 @@ static int image_marshal_read(Value *vret, Value *v, RefNode *node)
 	uint8_t bands;
 	int rd_size = 1;
 	Value r = Value_ref(v[1])->v[INDEX_MARSHALDUMPER_SRC];
-	RefImage *image = fs->new_buf(cls_image, sizeof(RefImage));
+	RefImage *image = fs->buf_new(cls_image, sizeof(RefImage));
 	*vret = vp_Value(image);
 
 	if (!fs->stream_read_data(r, NULL, (char*)&bands, &rd_size, FALSE, TRUE)) {
@@ -1302,7 +1302,7 @@ static int image_marshal_write(Value *vret, Value *v, RefNode *node)
 static int image_dup(Value *vret, Value *v, RefNode *node)
 {
 	RefImage *src = Value_vp(*v);
-	RefImage *dst = fs->new_buf(cls_image, sizeof(RefImage));
+	RefImage *dst = fs->buf_new(cls_image, sizeof(RefImage));
 	*vret = vp_Value(dst);
 
 	if (src->data == NULL) {
@@ -1425,7 +1425,7 @@ static int image_rect(Value *vret, Value *v, RefNode *node)
 {
 	RefImage *image = Value_vp(*v);
 	RefNode *cls = FUNC_VP(node);
-	RefRect *rc = fs->new_buf(cls, sizeof(RefRect));
+	RefRect *rc = fs->buf_new(cls, sizeof(RefRect));
 	*vret = vp_Value(rc);
 
 	rc->i[INDEX_RECT_X] = 0;
@@ -1514,7 +1514,7 @@ static int image_split(Value *vret, Value *v, RefNode *node)
 		RefArray *ra = fs->refarray_new(channels);
 		*vret = vp_Value(ra);
 		for (i = 0; i < channels; i++) {
-			RefImage *img = fs->new_buf(cls_image, sizeof(RefImage));
+			RefImage *img = fs->buf_new(cls_image, sizeof(RefImage));
 			ra->p[i] = vp_Value(img);
 			img->bands = BAND_L;
 			img->width = image->width;
@@ -1558,7 +1558,7 @@ static int image_convert(Value *vret, Value *v, RefNode *node)
 		mat = NULL;
 	}
 
-	dst = fs->new_buf(cls_image, sizeof(RefImage));
+	dst = fs->buf_new(cls_image, sizeof(RefImage));
 	*vret = vp_Value(dst);
 	dst->bands = dst_bands;
 	dst->width = src->width;
@@ -1630,7 +1630,7 @@ static int image_quantize(Value *vret, Value *v, RefNode *node)
 		return FALSE;
 	}
 
-	dst = fs->new_buf(cls_image, sizeof(RefImage));
+	dst = fs->buf_new(cls_image, sizeof(RefImage));
 	*vret = vp_Value(dst);
 	dst->width = src->width;
 	dst->height = src->height;

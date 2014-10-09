@@ -36,7 +36,7 @@ RefSockAddr *new_refsockaddr(struct sockaddr *sa)
 		return NULL;
 	}
 
-	rsa = fs->new_buf(cls_ipaddr, sizeof(RefSockAddr) + len);
+	rsa = fs->buf_new(cls_ipaddr, sizeof(RefSockAddr) + len);
 	rsa->len = len;
 	memcpy(&rsa->addr, sa, len);
 	return rsa;
@@ -198,7 +198,7 @@ static int socket_new(Value *vret, Value *v, RefNode *node)
 	int port = fs->Value_int(v[2], NULL);
 	RefNode *addr_type = fs->Value_type(addr);
 
-	Ref *r = fs->new_ref(cls_socketio);
+	Ref *r = fs->ref_new(cls_socketio);
 	*vret = vp_Value(r);
 
 	if (port < 0 || port > 65535) {
@@ -238,7 +238,7 @@ static int socket_new(Value *vret, Value *v, RefNode *node)
 
 	fs->init_stream_ref(r, STREAM_READ|STREAM_WRITE);
 	{
-		RefFileHandle *fh = fs->new_buf(NULL, sizeof(RefFileHandle));
+		RefFileHandle *fh = fs->buf_new(NULL, sizeof(RefFileHandle));
 		r->v[INDEX_FILEIO_HANDLE] = vp_Value(fh);
 		fh->fd_read = fd;
 		fh->fd_write = fd;
@@ -355,7 +355,7 @@ static int ipaddr_tostr(Value *vret, Value *v, RefNode *node)
 
 static int ifaddr_new(Value *vret, Value *v, RefNode *node)
 {
-	*vret = vp_Value(fs->new_ref(cls_ifaddr));
+	*vret = vp_Value(fs->ref_new(cls_ifaddr));
 	return TRUE;
 }
 static int ifaddr_get(Value *vret, Value *v, RefNode *node)

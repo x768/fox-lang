@@ -1,10 +1,3 @@
-/*
- * mpi2.h
- *
- *  Created on: 2010/03/14
- *      Author: frog
- */
-
 #ifndef MPI2_H_
 #define MPI2_H_
 

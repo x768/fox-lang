@@ -2,6 +2,17 @@
 #define _M_MATH_H_
 
 #include "fox.h"
+#include "mpi2.h"
+
+typedef struct {
+	RefHeader rh;
+	mp_int mp;
+} RefInt;
+
+typedef struct {
+	RefHeader rh;
+	mp_int md[2];
+} RefFrac;
 
 typedef struct {
 	RefHeader rh;

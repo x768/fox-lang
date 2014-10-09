@@ -10,7 +10,7 @@
 
 #include "fox.h"
 #include "m_image.h"
-#include "m_math.h"
+#include "m_number.h"
 
 
 enum {

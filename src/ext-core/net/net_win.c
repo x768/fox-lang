@@ -90,7 +90,7 @@ int getifaddrs_sub(RefArray *ra)
 		Ref *r;
 		
 		v = fs->refarray_push(ra);
-		r = fs->new_ref(cls_ifaddr);
+		r = fs->ref_new(cls_ifaddr);
 		*v = vp_Value(r);
 
 		r->v[INDEX_IFADDR_NAME] = fs->cstr_Value_conv(p->AdapterName, -1, NULL);

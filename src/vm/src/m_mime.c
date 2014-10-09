@@ -172,7 +172,7 @@ static Value header_key_normalize(const char *src, int size)
 {
 	int i;
 	int up = TRUE;
-	RefStr *rs = new_refstr_n(fs->cls_str, size);
+	RefStr *rs = refstr_new_n(fs->cls_str, size);
 	Value v = vp_Value(rs);
 
 	for (i = 0; i < size; i++) {
@@ -381,7 +381,7 @@ int mimereader_next_sub(Value *vret, Value v, Str s_bound, RefCharset *cs)
 
 	RefMap *rm_headers = refmap_new(32);
 	headers = vp_Value(rm_headers);
-	rm_headers->rh.type = cls_mimeheader;
+	rm_headers->rh.type = fv->cls_mimeheader;
 	if (!read_header_from_stream(rm_headers, v, cs)) {
 		Value_dec(headers);
 		return FALSE;
@@ -457,7 +457,7 @@ int mimereader_next_sub(Value *vret, Value v, Str s_bound, RefCharset *cs)
 static int mimereader_new(Value *vret, Value *v, RefNode *node)
 {
 	RefNode *cls_mimereader = FUNC_VP(node);
-	Ref *r = new_ref(cls_mimereader);
+	Ref *r = ref_new(cls_mimereader);
 	Value *src = &r->v[INDEX_MIMEREADER_SRC];
 	RefCharset *cs = fs->cs_utf8;
 
@@ -637,7 +637,7 @@ int mimetype_new_sub(Value *v, RefStr *src)
 {
 	int i;
 	int cnt = 0;
-	RefStr *rs = new_refstr_n(fs->cls_mimetype, src->size);
+	RefStr *rs = refstr_new_n(fs->cls_mimetype, src->size);
 	*v = vp_Value(rs);
 
 	for (i = 0; i < src->size; i++) {
@@ -814,7 +814,7 @@ static int mimetype_new_from_name(Value *vret, Value *v, RefNode *node)
 
 static int open_magic_file(IniTok *tk)
 {
-	char *path = str_printf("%S" SEP_S "data" SEP_S "magic.txt", fs->fox_home);
+	char *path = str_printf("%r" SEP_S "data" SEP_S "magic.txt", fs->fox_home);
 	int ret = IniTok_load(tk, path);
 	free(path);
 	return ret;
@@ -1106,7 +1106,7 @@ static int mimetype_get_base(Value *vret, Value *v, RefNode *node)
 {
 	RefStr *parent = mimetype_get_parent(Value_vp(*v));
 	if (parent->rh.type == fs->cls_mimetype) {
-		*vret = ref_cp_Value(&parent->rh);
+		*vret = Value_cp(vp_Value(parent));
 	} else {
 		*vret = cstr_Value(fs->cls_mimetype, parent->c, parent->size);
 	}
@@ -1119,7 +1119,7 @@ static int mimeheader_new(Value *vret, Value *v, RefNode *node)
 {
 	RefMap *rm = refmap_new(0);
 	*vret = vp_Value(rm);
-	rm->rh.type = cls_mimeheader;
+	rm->rh.type = fv->cls_mimeheader;
 	return TRUE;
 }
 static int mimeheader_read(Value *vret, Value *v, RefNode *node)
@@ -1127,7 +1127,7 @@ static int mimeheader_read(Value *vret, Value *v, RefNode *node)
 	RefCharset *cs = fs->cs_utf8;
 	RefMap *rm = refmap_new(0);
 	*vret = vp_Value(rm);
-	rm->rh.type = cls_mimeheader;
+	rm->rh.type = fv->cls_mimeheader;
 
 	if (fg->stk_top > v + 2) {
 		cs = Value_vp(v[3]);
@@ -1521,14 +1521,14 @@ static int mimeheader_set_content_type(Value *vret, Value *v, RefNode *node)
 static Ref *mimedata_new_ref(Value *v, int flags)
 {
 	RefBytesIO *bio;
-	Ref *r = new_ref(cls_mimedata);
+	Ref *r = ref_new(fv->cls_mimedata);
 
 	RefMap *rm = refmap_new(32);
 	r->v[INDEX_MIMEDATA_HEADER] = vp_Value(rm);
-	rm->rh.type = cls_mimeheader;
+	rm->rh.type = fv->cls_mimeheader;
 	*v = vp_Value(r);
 
-	bio = new_buf(fs->cls_bytesio, sizeof(RefBytesIO));
+	bio = buf_new(fs->cls_bytesio, sizeof(RefBytesIO));
 	r->v[INDEX_MIMEDATA_BUF] = vp_Value(bio);
 	StrBuf_init(&bio->buf, 0);
 	init_stream_ref(r, flags);
@@ -1639,12 +1639,12 @@ static void define_mime_class(RefNode *m)
 	RefNode *cls;
 	RefNode *n;
 
-	cls_mimeheader = define_identifier(m, m, "MimeHeader", NODE_CLASS, 0);
-	cls_mimedata = define_identifier(m, m, "MimeData", NODE_CLASS, 0);
+	fv->cls_mimeheader = define_identifier(m, m, "MimeHeader", NODE_CLASS, 0);
+	fv->cls_mimedata = define_identifier(m, m, "MimeData", NODE_CLASS, 0);
 
 
 	// MimeHeader
-	cls = cls_mimeheader;
+	cls = fv->cls_mimeheader;
 	n = define_identifier_p(m, cls, fs->str_new, NODE_NEW_N, 0);
 	define_native_func_a(n, mimeheader_new, 0, 0, cls, NULL);
 	n = define_identifier(m, cls, "read", NODE_NEW_N, 0);
@@ -1691,7 +1691,7 @@ static void define_mime_class(RefNode *m)
 
 
 	// MimeData
-	cls = cls_mimedata;
+	cls = fv->cls_mimedata;
 	n = define_identifier_p(m, cls, fs->str_new, NODE_NEW_N, 0);
 	define_native_func_a(n, mimedata_new, 0, 0, cls);
 
@@ -1782,7 +1782,7 @@ static void define_mime_class(RefNode *m)
 }
 void init_mime_module_stubs()
 {
-	RefNode *m = new_sys_Module("mime");
+	RefNode *m = Module_new_sys("mime");
 
 	fs->cls_mimetype = define_identifier(m, m, "MimeType", NODE_CLASS, NODEOPT_STRCLASS);
 	fs->mod_mime = m;

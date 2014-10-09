@@ -1,6 +1,24 @@
 #include "fox_vm.h"
 
 
+
+char hex2lchar(int i)
+{
+	if (i < 10) {
+		return i + '0';
+	} else {
+		return i + 'a' - 10;
+	}
+}
+char hex2uchar(int i)
+{
+	if (i < 10) {
+		return i + '0';
+	} else {
+		return i + 'A' - 10;
+	}
+}
+
 int32_t str_hash(const char *p, int size)
 {
 	const char *c;
@@ -16,6 +34,100 @@ int32_t str_hash(const char *p, int size)
 		h = h * 31 + *c;
 	}
 	return h & INT32_MAX;
+}
+
+char *str_dup_p(const char *p, int size, Mem *mem)
+{
+	char *dst;
+
+	if (size < 0) {
+		size = strlen(p);
+	}
+	dst = Mem_get(mem, size + 1);
+	memcpy(dst, p, size);
+	dst[size] = '\0';
+
+	return dst;
+}
+char *str_printf(const char *fmt, ...)
+{
+	StrBuf buf;
+	va_list va;
+
+	StrBuf_init(&buf, 256);
+	va_start(va, fmt);
+	StrBuf_vprintf(&buf, fmt, va);
+	va_end(va);
+
+	StrBuf_add_c(&buf, '\0');
+	return buf.p;
+}
+
+
+/**
+ * 16進数として解釈可能なところまでポインタを進める
+ *
+ * end : 文字列終端(\0終端なら NULL)
+ * n   : 最大文字数 or -1
+ *
+ * 変換できなければ-1
+ * オーバーフローしたら-2
+ */
+int parse_hex(const char **pp, const char *end, int n)
+{
+	const char *p = *pp;
+	int ret = 0;
+	int i = 0;
+
+	if ((end != NULL && p >= end) || !isxdigit(*p)) {
+		return -1;
+	}
+	while ((p == NULL || p < end) && isxdigit(*p)) {
+		if ((ret & 0xF0000000) != 0) {
+			return -2;
+		}
+		ret = ret << 4 | char2hex(*p);
+		p++;
+		if (n >= 0) {
+			if (++i == n) {
+				break;
+			}
+		}
+	}
+
+	*pp = p;
+	return ret;
+}
+
+/**
+ * 整数のみ
+ * エラー:-1
+ */
+int parse_int(const char *src_p, int src_size, int max)
+{
+	int ret = 0;
+	const char *p = src_p;
+	const char *end;
+
+	if (src_size < 0) {
+		src_size = strlen(src_p);
+	}
+
+	end = p + src_size;
+	if (p >= end || !isdigit_fox(*p)) {
+		return -1;
+	}
+
+	while (p < end && isdigit_fox(*p)) {
+		ret = ret * 10 + (*p - '0');
+		if (ret > max) {
+			ret = max;
+			break;
+		}
+		p++;
+	}
+
+	return ret;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////
@@ -371,6 +483,84 @@ void add_backslashes_bin(StrBuf *buf, const char *src_p, int src_size)
 		}
 		}
 	}
+}
+/**
+ * 入力文字列のバックスラッシュシーケンスを解釈
+ * UTF-8文字列として扱う
+ *
+ * dst  : 出力先(少なくともsrcの長さは必要
+ * src  : 入力(dstと同一でも構わない)
+ * size : 入力長
+ * bin  : バイト列
+ *
+ * return : 結果の長さ
+ */
+int escape_backslashes_sub(char *dst, const char *src, int size, int bin)
+{
+	const char *end = src + size;
+	char *dst_top = dst;
+
+	while (src < end) {
+		char ch = *src;
+		if (ch == '\\') {
+			src++;
+			if (src < end) {
+				char ch2 = *src++;
+				switch (ch2) {
+				case '0':
+					*dst++ = '\0';
+					break;
+				case 'b':
+					*dst++ = '\b';
+					break;
+				case 'f':
+					*dst++ = '\f';
+					break;
+				case 'n':
+					*dst++ = '\n';
+					break;
+				case 'r':
+					*dst++ = '\r';
+					break;
+				case 't':
+					*dst++ = '\t';
+					break;
+				case 'x':
+					if (!bin && *src == '{') {
+						int ch3;
+						src++;
+						ch3 = parse_hex(&src, end, -1);
+						if (src < end && *src == '}') {
+							src++;
+							str_add_codepoint(&dst, ch3, NULL);
+						}
+					} else {
+						int ch3 = parse_hex(&src, end, 2);
+						if (bin) {
+							if (ch3 >= 0) {
+								*dst++ = ch3;
+							}
+						} else {
+							if (ch3 >= 0 && ch3 < 0x80) {
+								*dst++ = ch3;
+							}
+						}
+					}
+					break;
+				default:
+					if (!isalnum(ch2)) {
+						*dst++ = ch2;
+					}
+					break;
+				}
+			}
+		} else {
+			src++;
+			*dst++ = ch;
+		}
+	}
+
+	return dst - dst_top;
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////

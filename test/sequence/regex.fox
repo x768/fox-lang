@@ -1,0 +1,25 @@
+import util.assert
+
+
+assert_equal Regex('ab+c', 'i'), /ab+c/i
+assert_equal /ab+c/.source, "ab+c"
+
+if let m = '[2014-08-12]'.match(/(\d+)-(\d+)-(\d+)/) {
+	assert_equal m.source, '[2014-08-12]'
+	assert_equal m[0], '2014-08-12'
+	assert_equal m[1], '2014'
+	assert_equal m[2], '08'
+	assert_equal m[3], '12'
+} else {
+	throw AssertError('Not matched')
+}
+
+if let m = '[2014-08-12]'.match(/(?<year>\d+)-(?<month>\d+)-(?<day>\d+)/) {
+	assert_equal m.all, '2014-08-12'
+	assert_equal m.year, '2014'
+	assert_equal m.month, '08'
+	assert_equal m.day, '12'
+} else {
+	throw AssertError('Not matched')
+}
+

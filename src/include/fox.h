@@ -407,11 +407,10 @@ struct HashValueEntry {
 	Value val;
 };
 
-
+// 外部モジュールに公開(定数)
 struct FoxStatic
 {
-	Str cur_dir;
-	Str fox_home;
+	RefStr *fox_home;
 	int cgi_mode;
 	Hash envs;
 	int max_stack;
@@ -488,9 +487,6 @@ struct FoxStatic
 	RefNode *cls_resource;
 	RefNode *cls_charset;
 
-	char *(*str_dup_p)(const char *p, int size, Mem *mem);
-	char *(*str_printf)(const char *fmt, ...);
-
 	void (*StrBuf_init)(StrBuf *s, int size);
 	void (*StrBuf_init_refstr)(StrBuf *s, int size);
 	Value (*StrBuf_str_Value)(StrBuf *s, RefNode *type);
@@ -510,6 +506,11 @@ struct FoxStatic
 	void *(*Hash_get_p)(const Hash *hash, RefStr *key);
 	HashEntry *(*Hash_get_add_entry)(Hash *hash, Mem *mem, RefStr *key);
 
+	char *(*str_dup_p)(const char *p, int size, Mem *mem);
+	char *(*str_printf)(const char *fmt, ...);
+	void (*add_backslashes_sub)(StrBuf *buf, const char *src_p, int src_size, int mode);
+	int (*parse_hex)(const char **pp, const char *end, int n);
+
 	RefNode *(*Value_type)(Value v);
 	int64_t (*Value_int)(Value v, int *err);
 	double (*Value_float)(Value v);
@@ -519,7 +520,6 @@ struct FoxStatic
 	int64_t (*Value_timestamp)(Value v, RefTimeZone *tz);
 
 	Value (*Value_cp)(Value v);
-	Value (*ref_cp_Value)(RefHeader *rh);
 	Value (*int64_Value)(int64_t i);
 	Value (*float_Value)(double dval);
 	Value (*cstr_Value)(RefNode *klass, const char *p, int size);
@@ -530,9 +530,9 @@ struct FoxStatic
 
 	Value (*printf_Value)(const char *fmt, ...);
 
-	Ref *(*new_ref)(RefNode *klass);
-	void *(*new_buf)(RefNode *klass, int size);
-	RefStr *(*new_refstr_n)(RefNode *klass, int size);
+	Ref *(*ref_new)(RefNode *klass);
+	void *(*buf_new)(RefNode *klass, int size);
+	RefStr *(*refstr_new_n)(RefNode *klass, int size);
 
 	void (*Value_inc)(Value v);
 	void (*Value_dec)(Value v);
@@ -603,6 +603,8 @@ struct FoxStatic
 	int64_t (*get_file_size)(FileHandle fh);
 	char *(*read_from_file)(int *psize, const char *path, Mem *mem);
 };
+
+// 外部モジュールに公開
 struct FoxGlobal
 {
 	Value *stk;
@@ -621,7 +623,7 @@ struct FoxGlobal
 ////////////////////////////////////////////////////////////////////////////////
 
 #define FOX_VERSION_MAJOR    0
-#define FOX_VERSION_MINOR    5
+#define FOX_VERSION_MINOR    6
 #define FOX_VERSION_REVISION 0
 
 
@@ -662,7 +664,7 @@ extern const char *fox_ctype_flags;
 
 #define vp_Value(ptr)        ((uint64_t)(uintptr_t)(ptr))
 #define ptr_Value(ptr)       (((uint64_t)(uintptr_t)(ptr)) | 2ULL)
-#define bool_Value(b)        ((b) ? VALUE_TRUE : VALUE_FALSE);
+#define bool_Value(b)        ((b) ? VALUE_TRUE : VALUE_FALSE)
 #define int32_Value(val)     ((((uint64_t)(val)) << 32) | 5ULL)
 #define uint62_Value(val)    (((val) << 2) | 2ULL)
 #define integral_Value(k, i) (((uint64_t)(i) << 32) | (((uint64_t)(k)->u.c.n_integral) << 2) | 1ULL)

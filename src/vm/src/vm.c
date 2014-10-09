@@ -39,9 +39,6 @@ void put_log(const char *msg, int msg_size)
  */
 void init_so_func(void)
 {
-	fs->str_dup_p = str_dup_p;
-	fs->str_printf = str_printf;
-
 	fs->StrBuf_init = StrBuf_init;
 	fs->StrBuf_init_refstr = StrBuf_init_refstr;
 	fs->StrBuf_str_Value = StrBuf_str_Value;
@@ -62,6 +59,11 @@ void init_so_func(void)
 	fs->Hash_get_p = Hash_get_p;
 	fs->Hash_get_add_entry = Hash_get_add_entry;
 
+	fs->str_dup_p = str_dup_p;
+	fs->str_printf = str_printf;
+	fs->add_backslashes_sub = add_backslashes_sub;
+	fs->parse_hex = parse_hex;
+
 	fs->Value_type = Value_type;
 	fs->Value_int = Value_int;
 	fs->Value_float = Value_float;
@@ -71,7 +73,6 @@ void init_so_func(void)
 	fs->Value_timestamp = Value_timestamp;
 
 	fs->Value_cp = Value_cp;
-	fs->ref_cp_Value = ref_cp_Value;
 	fs->int64_Value = int64_Value;
 	fs->float_Value = float_Value;
 	fs->cstr_Value = cstr_Value;
@@ -80,9 +81,9 @@ void init_so_func(void)
 	fs->frac10_Value = frac10_Value;
 	fs->time_Value = time_Value;
 
-	fs->new_ref = new_ref;
-	fs->new_buf = new_buf;
-	fs->new_refstr_n = new_refstr_n;
+	fs->ref_new = ref_new;
+	fs->buf_new = buf_new;
+	fs->refstr_new_n = refstr_new_n;
 
 	fs->Value_inc = Value_inc;
 	fs->Value_dec = Value_dec;
@@ -183,7 +184,7 @@ void init_fox_vm()
 	fs->max_alloc = 32 * 1024 * 1024;  // 一時的
 	init_first_classes();
 	g_intern_init();
-	fs->fox_home = get_fox_home();
+	fs->fox_home = Value_vp(cstr_Value(fs->cls_file, get_fox_home(), -1));
 
 	fs->symbol_stock[T_EQ] = intern("op_eq", -1);
 	fs->symbol_stock[T_CMP] = intern("op_cmp", -1);
@@ -489,7 +490,7 @@ int fox_link()
 	while (catches != NULL) {
 		NodeAndUnresolved *nu = catches->u.p;
 		if (!is_subclass(nu->node, fs->cls_error)) {
-			throw_errorf(fs->mod_lang, "TypeNameError", "Exceptions must extends from 'Error'");
+			throw_errorf(fs->mod_lang, "TypeNameError", "Error and subclasses required");
 			add_stack_trace(nu->uid->ref_module, NULL, nu->uid->ref_line);
 			return FALSE;
 		}
@@ -584,10 +585,7 @@ void fox_error_dump(StrBuf *sb, FileHandle fh, const RefCharset *cs, int log_sty
 			if (is_absolute_path(Str_new(fv->err_dst, -1))) {
 				err_path = fv->err_dst;
 			} else {
-				char *path = Mem_get(&fg->st_mem, fs->cur_dir.size + strlen(fv->err_dst) + 2);
-				memcpy(path, fs->cur_dir.p, fs->cur_dir.size);
-				strcpy(path + fs->cur_dir.size, fv->err_dst);
-				err_path = path;
+				err_path = str_printf("%r%p", fv->cur_dir, fv->err_dst);
 			}
 			fd = open_fox(err_path, O_CREAT|O_WRONLY|O_APPEND, DEFAULT_PERMISSION);
 		} else {

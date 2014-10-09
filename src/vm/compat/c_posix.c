@@ -2,10 +2,10 @@
 #include "config.h"
 
 
-Str get_fox_home()
+const char *get_fox_home()
 {
 #ifdef FOX_HOME
-	return Str_new(FOX_HOME, -1);
+	return FOX_HOME;
 #elif 0
 	enum {
 		FOX_PATH_MAX = 512,
@@ -21,7 +21,7 @@ Str get_fox_home()
 	size_t cb = FOX_PATH_MAX;
 	sysctl(mib, 4, path, &cb, NULL, 0);
 
-	return Str_new(path, -1);
+	return path;
 #else
 	enum {
 		FOX_PATH_MAX = 512,
@@ -35,7 +35,7 @@ Str get_fox_home()
 	if (readlink("/proc/self/exe", path, FOX_PATH_MAX - 1) != -1) {
 	} else if (readlink("/proc/curproc/file", path, FOX_PATH_MAX - 1) != -1) {
 	} else {
-		return Str_new("./", 2);
+		return "./";
 	}
     len = strlen(path);
     len = make_path_regularize(path, len);
@@ -51,7 +51,7 @@ Str get_fox_home()
 			}
 		}
 	}
-	return Str_new(path, -1);
+	return path;
 #endif
 }
 
@@ -61,5 +61,3 @@ int64_t get_now_time()
 	clock_gettime(CLOCK_REALTIME, &ts);
 	return (int64_t)ts.tv_sec * 1000 + (ts.tv_nsec / 1000000);
 }
-
-

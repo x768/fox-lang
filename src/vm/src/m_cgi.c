@@ -3,7 +3,6 @@
 
 
 static Value v_res;
-static const char *path_info;
 
 static RefNode *mod_cgi;
 static RefNode *cls_cookie;
@@ -27,7 +26,7 @@ void cgi_init_responce()
 	HashValueEntry *ve;
 	RefMap *rm = refmap_new(32);
 	v_res = vp_Value(rm);
-	rm->rh.type = cls_mimeheader;
+	rm->rh.type = fv->cls_mimeheader;
 
 	key = cstr_Value(fs->cls_str, "Content-Type", -1);
 	ve = refmap_add(rm, key, TRUE, FALSE);
@@ -116,13 +115,13 @@ static void write_http_cookie(
 
 void send_headers()
 {
-	if (fs->cgi_mode && !headers_sent) {
+	if (fs->cgi_mode && !fv->headers_sent) {
 		RefMap *rm;
 		int i;
 		StrBuf buf;
 		Value dst = fg->v_cio;
 
-		headers_sent = TRUE;
+		fv->headers_sent = TRUE;
 		StrBuf_init(&buf, 1024);
 		rm = Value_vp(v_res);
 
@@ -185,7 +184,7 @@ void send_headers()
 
 static int check_header_already_send(void)
 {
-	if (headers_sent) {
+	if (fv->headers_sent) {
 		throw_errorf(mod_cgi, "CgiError", "Headers were already sent.");
 		return FALSE;
 	}
@@ -217,7 +216,7 @@ int param_string_init_hash(RefMap *v_map, Value keys)
 				// ve->val = VALUE_NULL
 			} else if (v_type == fs->cls_list) {
 				ve2->val = vp_Value(refarray_new(0));
-			} else if (v_type == cls_mimedata) {
+			} else if (v_type == fv->cls_mimedata) {
 				ve2->val = VALUE_FALSE;
 			} else {
 				goto ERROR_END;
@@ -373,7 +372,7 @@ static int cgi_req_param(Value *vret, Value *v, RefNode *node)
 		int i;
 		RefMap *rm = refmap_new(32);
 		*vret = vp_Value(rm);
-		rm->rh.type = cls_mimeheader;
+		rm->rh.type = fv->cls_mimeheader;
 
 		for (i = 0; i < fs->envs.entry_num; i++) {
 			HashEntry *he = fs->envs.entry[i];
@@ -452,8 +451,8 @@ static int cgi_get_integer(Value *vret, Value *v, RefNode *node)
 }
 static int cgi_get_pathinfo(Value *vret, Value *v, RefNode *node)
 {
-	if (path_info != NULL) {
-		*vret = cstr_Value_conv(path_info, -1, NULL);
+	if (fv->path_info != NULL) {
+		*vret = cstr_Value_conv(fv->path_info, -1, NULL);
 	}
 	return TRUE;
 }
@@ -597,7 +596,7 @@ ERROR_END:
 static int cookie_get_expires(Value *vret, Value *v, RefNode *node)
 {
 	if (cookie_has_expires) {
-		RefInt64 *tm = new_buf(fs->cls_timestamp, sizeof(int64_t));
+		RefInt64 *tm = buf_new(fs->cls_timestamp, sizeof(int64_t));
 		*vret = vp_Value(tm);
 		tm->u.i = cookie_expires;
 	}
@@ -778,50 +777,6 @@ static int cgi_cookie_param(Value *vret, Value *v, RefNode *node)
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////
 
-char *split_script_and_pathinfo(const char *src_p)
-{
-	char *src = str_dup_p(src_p, -1, &fg->st_mem);
-	int src_size = strlen(src_p);
-	char *p;
-	if (exists_file(src) != EXISTS_NONE) {
-		goto FINALLY;
-	}
-
-	p = src + strlen(src) - 1;
-	for (;;) {
-		int type;
-
-		while (p > src && *p != SEP_C) {
-			p--;
-		}
-		if (p <= src) {
-			goto FINALLY;
-		}
-		*p = '\0';
-
-		type = exists_file(src);
-		if (type == EXISTS_FILE) {
-			int len = src_size - (p - src);
-			path_info = str_dup_p(src_p + (p - src), len, &fg->st_mem);
-
-			if (invalid_utf8_pos(path_info, len) >= 0) {
-				StrBuf buf;
-				StrBuf_init(&buf, len);
-				path_info = str_dup_p(buf.p, buf.size, &fg->st_mem);
-				StrBuf_close(&buf);
-			}
-			goto FINALLY;
-		} else if (type == EXISTS_DIR) {
-			goto FINALLY;
-		}
-	}
-
-FINALLY:
-	return src;
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////////////////
-
 static void define_lang_cgi_const(RefNode *m)
 {
 	RefNode *n;
@@ -923,7 +878,7 @@ static void define_lang_cgi_class(RefNode *m)
 }
 void init_cgi_module_1()
 {
-	RefNode *m = new_sys_Module("cgi");
+	RefNode *m = Module_new_sys("cgi");
 
 	mod_cgi = m;
 	define_lang_cgi_const(m);

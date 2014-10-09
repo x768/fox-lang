@@ -1,4 +1,4 @@
-message=%usage: fox [%options...] %source [%arg...]\n%options\n  -e srccode: %immediate\n  -c: %validate\n  -help: %show_help\n  -v: %show_version\n
+message=%usage: fox [%options...] %source [%arg...]\n%options\n  -e srccode: %immediate\n  --help: %show_help\n  -v: %show_version\n  --version: %show_version_more\n
 usage=Usage
 options=Options
 source=source-code-filename
@@ -7,3 +7,4 @@ immediate=Execute "srccode" immediately.
 validate=Validate syntax only.
 show_help=Show help.
 show_version=Show version information.
+show_version_more=Show modules version and settings.

@@ -276,7 +276,7 @@ void Value_push(const char *fmt, ...)
 		}
 		case 'r': { // Ref互換
 			RefHeader* rh = va_arg(va, RefHeader*);
-			*fg->stk_top = ref_cp_Value(rh);
+			*fg->stk_top = Value_cp(vp_Value(rh));
 			break;
 		}
 		case 'v': { // Value
@@ -316,7 +316,7 @@ void Value_pop()
 Value int64_Value(int64_t i)
 {
 	if (i < -INT32_MAX || i > INT32_MAX) {
-		RefInt *mp = new_buf(fs->cls_int, sizeof(RefInt));
+		RefInt *mp = buf_new(fs->cls_int, sizeof(RefInt));
 		Value v = vp_Value(mp);
 		mp_init(&mp->mp);
 		mp2_set_int64(&mp->mp, i);
@@ -327,7 +327,7 @@ Value int64_Value(int64_t i)
 }
 Value float_Value(double dval)
 {
-	RefFloat *rf = new_buf(fs->cls_float, sizeof(RefFloat));
+	RefFloat *rf = buf_new(fs->cls_float, sizeof(RefFloat));
 	Value v = vp_Value(rf);
 	rf->d = dval;
 	return v;
@@ -340,7 +340,7 @@ Value float_Value(double dval)
 Value frac_s_Value(const char *str)
 {
 	const char *end;
-	RefFrac *md = new_buf(fs->cls_frac, sizeof(RefFrac));
+	RefFrac *md = buf_new(fs->cls_frac, sizeof(RefFrac));
 
 	mp_init(&md->md[0]);
 	mp_init(&md->md[1]);
@@ -355,7 +355,7 @@ Value frac_s_Value(const char *str)
  */
 Value frac10_Value(int64_t val, int factor)
 {
-	RefFrac *md = new_buf(fs->cls_frac, sizeof(RefFrac));
+	RefFrac *md = buf_new(fs->cls_frac, sizeof(RefFrac));
 
 	mp_init(&md->md[0]);
 	mp_init(&md->md[1]);
@@ -384,13 +384,6 @@ Value cstr_Value(RefNode *klass, const char *p, int size)
 
 	fv->heap_count++;
 	return vp_Value(r);
-}
-Value ref_cp_Value(RefHeader *rh)
-{
-	if (rh->nref > 0) {
-		rh->nref++;
-	}
-	return (uint64_t)(uintptr_t)rh;
 }
 Value Value_cp(Value v)
 {
@@ -424,7 +417,7 @@ void Value_set(Value *vp, Value v)
 
 ////////////////////////////////////////////////////////////////////////////////////////
 
-Ref *new_ref(RefNode *klass)
+Ref *ref_new(RefNode *klass)
 {
 	int size = sizeof(RefHeader) + sizeof(Value) * klass->u.c.n_memb;
 	Ref *r = malloc(size);
@@ -436,7 +429,7 @@ Ref *new_ref(RefNode *klass)
 	fv->heap_count++;
 	return r;
 }
-Ref *new_ref_n(RefNode *klass, int n)
+Ref *ref_new_n(RefNode *klass, int n)
 {
 	int size = sizeof(RefHeader) + sizeof(Value) * (klass->u.c.n_memb + n);
 	Ref *r = malloc(size);
@@ -453,7 +446,7 @@ Ref *new_ref_n(RefNode *klass, int n)
  * RefHeaderを持つ構造体
  * 可視のメンバでなければ、klass == NULLが許可される
  */
-void *new_buf(RefNode *klass, int size)
+void *buf_new(RefNode *klass, int size)
 {
 	RefHeader *r = malloc(size);
 	memset(r, 0, size);
@@ -465,7 +458,7 @@ void *new_buf(RefNode *klass, int size)
 	return r;
 }
 
-RefStr *new_refstr_n(RefNode *klass, int size)
+RefStr *refstr_new_n(RefNode *klass, int size)
 {
 	RefStr *r = malloc(sizeof(RefStr) + (size + 1));
 	r->rh.nref = 1;
@@ -524,7 +517,7 @@ Value printf_Value(const char *fmt, ...)
  * mod_rootに登録する
  * Unresolvedは無効
  */
-static RefNode *static_new_Module(RefStr *name)
+static RefNode *Module_new_static(RefStr *name)
 {
 	RefNode *m = Mem_get(&fg->st_mem, sizeof(RefNode));
 	memset(m, 0, sizeof(*m));
@@ -544,10 +537,10 @@ static RefNode *static_new_Module(RefStr *name)
 
 	return m;
 }
-RefNode *new_sys_Module(const char *name_p)
+RefNode *Module_new_sys(const char *name_p)
 {
 	RefStr *rs = intern(name_p, -1);
-	RefNode *m = static_new_Module(rs);
+	RefNode *m = Module_new_static(rs);
 	char *ptr = Mem_get(&fg->st_mem, rs->size + 9);
 	sprintf(ptr, "[system]%.*s", rs->size, rs->c);
 	m->u.m.src_path = ptr;
@@ -745,7 +738,7 @@ char *resource_to_path(Str name_s, const char *ext_p)
 		}
 	}
 
-	for (lst = resource_path; lst != NULL; lst = lst->next) {
+	for (lst = fv->resource_path; lst != NULL; lst = lst->next) {
 		char *path = str_printf("%s" SEP_S "%s%s", lst->u.c, name_p, ext_p);
 		if (exists_file(path) == EXISTS_FILE) {
 			free(name_p);

@@ -4,6 +4,7 @@
 #include <time.h>
 #include <fcntl.h>
 #include <sys/stat.h>
+#include <errno.h>
 
 
 int64_t get_file_size(FileHandle fh)
@@ -106,6 +107,15 @@ RefCharset *get_console_charset()
 	return fs->cs_utf8;
 }
 
+char *get_current_directory(void)
+{
+	return getcwd(NULL, 0);
+}
+int set_current_directory(const char *path)
+{
+	return chdir(path) == 0;
+}
+
 ////////////////////////////////////////////////////////////////////////
 
 static void init_env(char **envp)
@@ -130,11 +140,11 @@ static void init_env(char **envp)
 void init_stdio()
 {
 	RefFileHandle *fh;
-	Ref *r = new_ref(cls_fileio);
+	Ref *r = ref_new(fv->cls_fileio);
 	fg->v_cio = vp_Value(r);
 
 	init_stream_ref(r, STREAM_READ|STREAM_WRITE);
-	fh = new_buf(NULL, sizeof(RefFileHandle));
+	fh = buf_new(NULL, sizeof(RefFileHandle));
 	r->v[INDEX_FILEIO_HANDLE] = vp_Value(fh);
 	fh->fd_read = STDIN_FILENO;
 	fh->fd_write = STDOUT_FILENO;

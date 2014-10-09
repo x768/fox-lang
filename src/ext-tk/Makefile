@@ -6,9 +6,11 @@ include ../Makefile.env
 all:
 	cd editor; make DEBUG_MODE=$(DEBUG_MODE) TARGET=$(TARGET)
 	cd foxtk; make DEBUG_MODE=$(DEBUG_MODE) TARGET=$(TARGET)
+	cd sdl2; make DEBUG_MODE=$(DEBUG_MODE) TARGET=$(TARGET)
 
 
 clean:
 	cd editor; make clean TARGET=$(TARGET)
 	cd foxtk; make clean TARGET=$(TARGET)
+	cd sdl2; make clean TARGET=$(TARGET)
 

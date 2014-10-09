@@ -178,16 +178,6 @@ int rename_fox(const char *fname, const char *tname)
 
 	return ret != 0 ? 0 : -1;
 }
-char *getcwd_fox(char *p, int n)
-{
-	wchar_t wbuf[MAX_PATH];
-	char *buf = malloc(MAX_PATH + 1);
-
-	GetCurrentDirectoryW(MAX_PATH, wbuf);
-	WideCharToMultiByte(CP_UTF8, 0, wbuf, -1, buf, MAX_PATH, NULL, NULL);
-
-	return buf;
-}
 
 int64_t get_file_size(FileHandle fh)
 {
@@ -256,15 +246,13 @@ void native_sleep(int ms)
 	Sleep(ms);
 }
 
-Str get_fox_home()
+const char *get_fox_home()
 {
 #ifdef FOX_HOME
-	return Str_new(FOX_HOME, -1);
+	return FOX_HOME;
 #else
 	wchar_t path[MAX_PATH];
-	char *cbuf;
 	wchar_t *p;
-	int maxlen;
 	int n = 2;
 
 	// exeのpathから、'\\'を2つ除去する
@@ -282,12 +270,23 @@ Str get_fox_home()
 		}
 	}
 
-	maxlen = wcslen(path) * 4 + 1;
-	cbuf = Mem_get(&fg->st_mem, maxlen);
-	WideCharToMultiByte(CP_UTF8, 0, path, -1, cbuf, maxlen, NULL, NULL);
-
-	return Str_new(cbuf, -1);
+	return utf16to8(path);
 #endif
+}
+
+char *get_current_directory()
+{
+	wchar_t wbuf[MAX_PATH];
+
+	GetCurrentDirectoryW(MAX_PATH, wbuf);
+	return utf16to8(wbuf);
+}
+int set_current_directory(const char *path)
+{
+	wchar_t *wbuf = cstr_to_utf16(path, -1);
+	BOOL ret = SetCurrentDirectoryW(wbuf);
+	free(wbuf);
+	return ret;
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////

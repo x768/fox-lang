@@ -3,42 +3,26 @@ include ../../Makefile.common
 
 .PHONY: clean
 
-
-OBJS_COMMON = \
-	m_net.o \
-	strutil.o \
-	compat_$(TARGET).o \
-
-
 ifeq ($(TARGET),posix)
-CFLAGS = -I../../include -fPIC
-LFLAGS = $(COMMON_DLFLAGS)
-OBJS = \
-	$(OBJS_COMMON) \
-	net_posix.o \
-
+CFLAGS = -I../../include -fPIC -I../../lib/mariadb/include
+LFLAGS = $(COMMON_DLFLAGS) -L../../lib/mariadb/libmariadb -lmariadbclient
 endif
 ifeq ($(TARGET),win)
-CFLAGS = -I../../include -I/usr/local/include
-LFLAGS = $(COMMON_DLFLAGS) -lws2_32 -liphlpapi
-OBJS = \
-	$(OBJS_COMMON) \
-	net_win.o \
-
+CFLAGS = -I../../include -I/usr/local/include -I../../lib/mariadb/include
+LFLAGS = $(COMMON_DLFLAGS) -L../../lib/mariadb/libmariadb -lmariadbclient -lws2_32 -liphlpapi
 endif
 ifeq ($(TARGET),osx)
-CFLAGS = -I../../include
-LFLAGS = $(COMMON_DLFLAGS)
-OBJS = \
-	$(OBJS_COMMON) \
-	net_posix.o \
-
+CFLAGS = -I../../include -I../../lib/mariadb/include
+LFLAGS = $(COMMON_DLFLAGS) -L../../lib/mariadb/libmariadb -lmariadbclient
 endif
 
-
-DEST = ../../../import/io/net.so
+DEST = ../../../import/db/mysql.so
 VPATH = ../../common
 
+OBJS = \
+	m_mysql.o \
+	strutil.o \
+	compat_$(TARGET).o \
 
 
 all: $(OBJS)

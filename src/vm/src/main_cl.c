@@ -44,7 +44,7 @@ static void show_version(void)
 	stream_write_data(fg->v_cio, pcre_version(), -1);
 
 	stream_write_data(fg->v_cio, "\nfox home: ", -1);
-	stream_write_data(fg->v_cio, fs->fox_home.p, fs->fox_home.size);
+	stream_write_data(fg->v_cio, fs->fox_home->c, fs->fox_home->size);
 
 	stream_write_data(fg->v_cio, "\n", 1);
 }
@@ -214,7 +214,7 @@ static void show_lib_version(void)
 	StrBuf_init(&path, 0);
 	StrBuf_init(&package, 0);
 
-	StrBuf_add(&path, fs->fox_home.p, fs->fox_home.size);
+	StrBuf_add_r(&path, fs->fox_home);
 	StrBuf_add(&path, SEP_S "import" SEP_S, -1);
 	show_lib_version_sub(&mem, &path, &package, "Native library: ");
 
@@ -298,8 +298,8 @@ static void show_configure(void)
 	}
 	stream_write_data(fg->v_cio, ctmp, -1);
 
-	show_configure_path(import_path, "\nFOX_IMPORT: ");
-	show_configure_path(resource_path, "\nFOX_RESOURCE: ");
+	show_configure_path(fv->import_path, "\nFOX_IMPORT: ");
+	show_configure_path(fv->resource_path, "\nFOX_RESOURCE: ");
 
 	stream_write_data(fg->v_cio, "\nFOX_STDIO_CHARSET: ", -1);
 	if (defs[ENVSET_STDIO_CHARSET]) {
@@ -366,17 +366,17 @@ static int parse_args(ArgumentInfo *ai, int argc, const char **argv)
 	for (i = 1; argv[i] != NULL; i++) {
 		const char *p = argv[i];
 		if (p[0] == '-') {
-			if (islower_fox(p[1]) && isalnumu_fox(p[2])) {
-				// -の後に識別子2文字以上
+			if (p[1] == '-') {
+				// --
 				int j;
-				for (j = 1; p[j] != '\0'; j++) {
+				for (j = 2; p[j] != '\0'; j++) {
 					char ch = p[j];
 					if (!isalnumu_fox(ch)) {
 						throw_errorf(fs->mod_lang, "ArgumentError", "Unknown option %q", p);
 						return FALSE;
 					}
 				}
-				srcfile = str_printf("%S" SEP_S "script" SEP_S "%s.fox", fs->fox_home, p + 1);
+				srcfile = str_printf("%r" SEP_S "script" SEP_S "%s.fox", fs->fox_home, p + 2);
 			} else {
 				switch (p[1]) {
 				case 'D': {
@@ -435,7 +435,7 @@ static int parse_args(ArgumentInfo *ai, int argc, const char **argv)
 				srcfile = str_dup_p(src.p, src.size, NULL);
 			} else {
 				// 相対パス
-				srcfile = str_printf("%S" SEP_S "%s", fs->cur_dir, p);
+				srcfile = str_printf("%r" SEP_S "%s", fv->cur_dir, p);
 			}
 			goto FINALLY;
 		}
@@ -483,13 +483,30 @@ int main_fox(int argc, const char **argv)
 	fs->max_alloc = 32 * 1024 * 1024; // 32MB
 	fs->max_stack = 32768;
 	fv->err_dst = "stderr";
-	fs->cur_dir = Str_new(getcwd_fox(NULL, 0), -1);
+	{
+		// 実際のカレントディレクトリを取得
+		// 末尾に/を付ける
+		char *pwd = get_current_directory();
+		int pwd_len = strlen(pwd);
+		RefStr *rs = refstr_new_n(fs->cls_file, pwd_len + 1);
+		memcpy(rs->c, pwd, pwd_len);
+		if (rs->c[pwd_len - 1] != SEP_C) {
+			rs->c[pwd_len] = SEP_C;
+			rs->c[pwd_len + 1] = '\0';
+		} else {
+			rs->size = pwd_len;
+			rs->c[pwd_len] = '\0';
+		}
+		fv->cur_dir = rs;
+		free(pwd);
+	}
 	fs->cs_stdio = get_console_charset();
 
 	if (!parse_args(&ai, argc, argv)) {
 		goto ERROR_END;
 	}
 	fox_init_compile(FALSE);
+	load_htfox();
 
 	if (ai.srcfile != NULL) {
 		mod = get_module_by_file(ai.srcfile);

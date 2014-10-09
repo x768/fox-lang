@@ -6,7 +6,7 @@
 
 void init_stdio()
 {
-	Ref *r = new_ref(cls_nullio);
+	Ref *r = ref_new(fv->cls_nullio);
 	fg->v_cio = vp_Value(r);
 	init_stream_ref(r, STREAM_READ | STREAM_WRITE);
 }
@@ -18,7 +18,7 @@ void show_error_message(const char *msg, int msg_size, int warn)
 }
 static LONG CALLBACK exception_filter(EXCEPTION_POINTERS *e)
 {
-	show_error_message("UnhandledException occured\n", -1, FALSE);
+	show_error_message("UnhandledException occurred\n", -1, FALSE);
 	return EXCEPTION_EXECUTE_HANDLER;
 }
 int main()

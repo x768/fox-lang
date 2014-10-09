@@ -73,17 +73,19 @@ static int conn_check_open(RefMysql *my, RefNode *node)
 
 static int conn_new(Value *vret, Value *v, RefNode *node)
 {
-	RefMysql *my = fs->new_buf(cls_mysql, sizeof(RefMysql));
+	RefMysql *my = fs->buf_new(cls_mysql, sizeof(RefMysql));
 	char *host = Value_cstr(v[1]);
 	char *user = Value_cstr(v[2]);
 	char *pass = Value_cstr(v[3]);
 	char *db   = Value_cstr(v[4]);
 
+	*vret = vp_Value(my);
+
 	if (fg->stk_top > v + 5) {
 		int err;
 		int64_t port = fs->Value_int(v[5], &err);
 		if (err || port < 1 || port > 65535) {
-			fs->throw_errorf(fs->mod_lang, "ValueError", "Illigal port number (0 - 65535)");
+			fs->throw_errorf(fs->mod_lang, "ValueError", "Illigal port number (1 - 65535)");
 			return FALSE;
 		}
 		my->port = port;
@@ -413,7 +415,7 @@ static int conn_query(Value *vret, Value *v, RefNode *node)
 		mysql_stmt_close(stmt);
 		fs->Mem_close(&mem);
 	} else {
-		RefMysqlCursor *cur = fs->new_buf(cls_cursor, sizeof(RefMysqlCursor));
+		RefMysqlCursor *cur = fs->buf_new(cls_cursor, sizeof(RefMysqlCursor));
 		*vret = vp_Value(cur);
 
 		if (!mem_init) {
@@ -525,7 +527,7 @@ static Value mysql_to_fox_value(MYSQL_BIND *b, RefMysqlCursor *cur, int n)
 	case MYSQL_TYPE_DATETIME:
 	case MYSQL_TYPE_TIMESTAMP: {
 		MYSQL_TIME *tm = b->buffer;
-		RefTime *rtm = fs->new_buf(fs->cls_time, sizeof(RefTime));
+		RefTime *rtm = fs->buf_new(fs->cls_time, sizeof(RefTime));
 
 		rtm->cal.year = tm->year;
 		rtm->cal.month = tm->month;

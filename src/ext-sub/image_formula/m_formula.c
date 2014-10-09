@@ -105,7 +105,7 @@ static int mimetex_mimetex(Value *vret, Value *v, RefNode *node)
 		goto ERROR_END;
 	}
 	rs = sp->image;
-	image = fs->new_buf(cls_image, sizeof(RefImage));
+	image = fs->buf_new(cls_image, sizeof(RefImage));
 	*vret = vp_Value(image);
 
 	image->bands = (is_palette ? BAND_P : BAND_L);

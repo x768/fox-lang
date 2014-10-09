@@ -10,12 +10,12 @@ enum {
 
 ////////////////////////////////////////////////////////////////////////////////
 
-static void make_locale_name(char *dst, int size, Str name)
+static void make_locale_name(char *dst, int size, const char *name_p, int name_size)
 {
 	int i;
-	int len = name.size;
+	int len = name_size;
 
-	if (len == 1 && name.p[0] == '!') {
+	if (len == 1 && name_p[0] == '!') {
 		strcpy(dst, "!");
 		return;
 	}
@@ -24,7 +24,7 @@ static void make_locale_name(char *dst, int size, Str name)
 	}
 
 	for (i = 0; i < len; i++) {
-		char c = tolower(name.p[i]);
+		char c = tolower(name_p[i]);
 		if (c == '-' || c == '_') {
 			dst[i] = '-';
 		} else if (isalnum(c)) {
@@ -56,7 +56,8 @@ static RefStr **get_best_locale_cgi(const char *p)
 
 	while (*p != '\0') {
 		const char *top;
-		Str s1;
+		const char *locale_raw_p;
+		int locale_raw_size;
 		double qv = 1.0;
 
 		// ja ; q=1.0,
@@ -67,7 +68,8 @@ static RefStr **get_best_locale_cgi(const char *p)
 		while (*p != '\0' && *p != ',' && *p != ';') {
 			p++;
 		}
-		s1 = Str_new(top, p - top);
+		locale_raw_p = top;
+		locale_raw_size = p - top;
 
 		// タグ名以降を切り出す
 		if (*p == ';') {
@@ -87,7 +89,7 @@ static RefStr **get_best_locale_cgi(const char *p)
 			p++;
 		}
 
-		make_locale_name(cbuf, LOCALE_LEN, s1);
+		make_locale_name(cbuf, LOCALE_LEN, locale_raw_p, locale_raw_size);
 		// localeのエイリアスの解決
 		{
 			RefStr *alias = locale_alias(cbuf, -1);
@@ -155,16 +157,16 @@ RefStr **get_best_locale_list()
 		if (lang != NULL) {
 			int i;
 			char cbuf[LOCALE_LEN];
-			Str s = Str_new(lang, -1);
+			int lang_size = strlen(lang);
 
 			// .以降を除去
-			for (i = 0; i < s.size; i++) {
-				if (s.p[i] == '.') {
+			for (i = 0; i < lang_size; i++) {
+				if (lang[i] == '.') {
 					break;
 				}
 			}
-			s.size = i;
-			make_locale_name(cbuf, LOCALE_LEN, s);
+			lang_size = i;
+			make_locale_name(cbuf, LOCALE_LEN, lang, lang_size);
 			// localeのエイリアスの解決
 			{
 				RefStr *alias = locale_alias(cbuf, -1);
@@ -191,7 +193,7 @@ RefStr **get_best_locale_list()
 
 static int load_locale_file(IniTok *tk, Str name)
 {
-	char *path = str_printf("%S" SEP_S "locale" SEP_S "%S.txt", fs->fox_home, name);
+	char *path = str_printf("%r" SEP_S "locale" SEP_S "%S.txt", fs->fox_home, name);
 	int ret = IniTok_load(tk, path);
 	free(path);
 	return ret;
@@ -260,7 +262,7 @@ static RefLocale *load_locale_sub(RefLocale *loc_src, Str name)
 				if (Str_eq_p(key, "group")) {
 					loc->group = str_dup_p(val.p, val.size, &fg->st_mem);
 				} else if (Str_eq_p(key, "group_n")) {
-					loc->group_n = parse_int(val, 256);
+					loc->group_n = parse_int(val.p, val.size, 256);
 				}
 				break;
 			case 'l':
@@ -317,7 +319,7 @@ static RefLocale *load_locale(Str name)
 	RefLocale *loc = NULL;
 	int i;
 
-	make_locale_name(buf, LOCALE_LEN, name);
+	make_locale_name(buf, LOCALE_LEN, name.p, name.size);
 
 	// デフォルトロケールからコピー
 	loc = load_locale_sub(NULL, Str_new("!", 1));
@@ -390,7 +392,7 @@ static int locale_new(Value *vret, Value *v, RefNode *node)
 			while (*list != NULL) {
 				loc = load_locale(Str_new((*list)->c, (*list)->size));
 				if (loc != fs->loc_neutral) {
-					*vret = ref_cp_Value(&loc->rh);
+					*vret = Value_cp(vp_Value(loc));
 					return TRUE;
 				}
 				list++;
@@ -400,7 +402,7 @@ static int locale_new(Value *vret, Value *v, RefNode *node)
 		name = fs->Str_EMPTY;
 	}
 	loc = load_locale(name);
-	*vret = ref_cp_Value(&loc->rh);
+	*vret = Value_cp(vp_Value(loc));
 
 	return TRUE;
 }
@@ -426,7 +428,7 @@ static int locale_marshal_read(Value *vret, Value *v, RefNode *node)
 	cbuf[rd_size] = '\0';
 
 	loc = load_locale(Str_new(cbuf, -1));
-	*vret = ref_cp_Value(&loc->rh);
+	*vret = Value_cp(vp_Value(loc));
 
 	return TRUE;
 }
@@ -470,8 +472,8 @@ static int locale_str_sub(StrBuf *buf, RefLocale *loc, RefLocale *dsp_loc, int o
 	// Resourceが読み込まれていない場合は読み込む
 	if (dsp_loc->locale_name == VALUE_NULL) {
 		int found = FALSE;
-		char *path_p = str_printf("%S" SEP_S "resource" SEP_S "locale", fs->fox_home);
-		RefResource *res = new_buf(fs->cls_resource, sizeof(RefResource));
+		char *path_p = str_printf("%r" SEP_S "resource" SEP_S "locale", fs->fox_home);
+		RefResource *res = buf_new(fs->cls_resource, sizeof(RefResource));
 		RefStr *loc_name = dsp_loc->name;
 		loc->locale_name = vp_Value(res);
 		load_resource(res, &found, Str_new(path_p, -1), Str_new(loc_name->c, loc_name->size), FALSE);
@@ -514,9 +516,9 @@ static int locale_tostr(Value *vret, Value *v, RefNode *node)
 	if (fmt.size == 0) {
 		*vret = printf_Value("Locale(%r)", loc->tag);
 	} else if (fmt.p[0] == 't') {
-		*vret = ref_cp_Value(&loc->tag->rh);
+		*vret = Value_cp(vp_Value(loc->tag));
 	} else if (fmt.p[0] == 'f') {
-		*vret = ref_cp_Value(&loc->name->rh);
+		*vret = Value_cp(vp_Value(loc->name));
 	} else if (fmt.p[0] == 'N' || fmt.p[0] == 'n') {
 		StrBuf buf;
 		RefLocale *dsp_loc = fs->loc_neutral;
@@ -537,13 +539,13 @@ static int locale_tostr(Value *vret, Value *v, RefNode *node)
 static int locale_tag(Value *vret, Value *v, RefNode *node)
 {
 	RefLocale *loc = Value_vp(*v);
-	*vret = ref_cp_Value(&loc->tag->rh);
+	*vret = Value_cp(vp_Value(loc->tag));
 	return TRUE;
 }
 static int locale_filename(Value *vret, Value *v, RefNode *node)
 {
 	RefLocale *loc = Value_vp(*v);
-	*vret = ref_cp_Value(&loc->name->rh);
+	*vret = Value_cp(vp_Value(loc->name));
 	return TRUE;
 }
 static int locale_get_param(Value *vret, Value *v, RefNode *node)
@@ -710,7 +712,7 @@ int load_resource(RefResource *res, int *pfound, Str path, Str locale, int no_de
 	path_p[path.size] = SEP_C;
 	file_p = path_p + path.size + 1;
 
-	make_locale_name(file_p, 64, locale);
+	make_locale_name(file_p, 64, locale.p, locale.size);
 	{
 		RefStr *alias = locale_alias(file_p, -1);
 		if (alias != NULL) {
@@ -847,7 +849,7 @@ static int resource_new(Value *vret, Value *v, RefNode *node)
 	} else {
 		int found;
 		Str path_s = Str_new(path, -1);
-		RefResource *res = new_buf(fs->cls_resource, sizeof(RefResource));
+		RefResource *res = buf_new(fs->cls_resource, sizeof(RefResource));
 		*vret = vp_Value(res);
 
 		// pathから"/!.txt"を削除
@@ -895,7 +897,7 @@ static int resource_locale(Value *vret, Value *v, RefNode *node)
 	RefLocale *loc = res->locale;
 
 	if (loc != NULL) {
-		*vret = ref_cp_Value(&loc->rh);
+		*vret = Value_cp(vp_Value(loc));
 	}
 	return TRUE;
 }
@@ -1004,7 +1006,7 @@ static void define_locale_class(RefNode *m)
 	define_native_func_a(n, locale_get_json, 0, 0, NULL);
 
 	n = define_identifier(m, cls, "NEUTRAL", NODE_CONST, 0);
-	n->u.k.val = ref_cp_Value(&fs->loc_neutral->rh);
+	n->u.k.val = Value_cp(vp_Value(fs->loc_neutral));
 
 	cls->u.c.n_memb = 2;
 	extends_method(cls, fs->cls_obj);
@@ -1036,7 +1038,7 @@ static void define_locale_class(RefNode *m)
 
 void init_locale_module_1()
 {
-	RefNode *m = new_sys_Module("locale");
+	RefNode *m = Module_new_sys("locale");
 
 	define_locale_class(m);
 	define_locale_func(m);

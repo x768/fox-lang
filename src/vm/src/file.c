@@ -5,27 +5,32 @@
  * in  : /hoge/aaa/bbb.txt
  * out : /hoge/aaa/
  */
-Str base_dir_with_sep(Str path)
+Str base_dir_with_sep(const char *path_p, int path_size)
 {
 	Str ret;
 	const char *p;
 
-	ret.p = path.p;
-	ret.size = path.size;
+	if (path_size < 0) {
+		path_size = strlen(path_p);
+	}
 
-	p = &path.p[ret.size];
+	ret.p = path_p;
+	ret.size = path_size;
 
-	while (p > path.p) {
+	p = &path_p[ret.size];
+
+	while (p > path_p) {
 		if (p[-1] == SEP_C) {
 			break;
 		}
 		p--;
 	}
 
-	if (p > path.p) {
-		ret.size = p - path.p;
+	if (p > path_p) {
+		ret.size = p - path_p;
 	} else {
-		ret = Str_new("." SEP_S, 2);
+		ret.p = "." SEP_S;
+		ret.size = 2;
 	}
 
 	return ret;
@@ -156,7 +161,7 @@ int make_path_regularize(char *path, int size)
  * 正規化済みのファイルパス(.. などを解釈)を返す
  * NULバイトを通す
  */
-char *path_normalize(Str *ret, Str base_dir, const char *path_p, int path_size, Mem *mem)
+char *path_normalize(Str *ret, RefStr *base_dir, const char *path_p, int path_size, Mem *mem)
 {
 	char *ptr;
 	int size, ret_size;
@@ -165,7 +170,7 @@ char *path_normalize(Str *ret, Str base_dir, const char *path_p, int path_size, 
 		path_size = strlen(path_p);
 	}
 
-	if (base_dir.size == 0 || is_absolute_path(Str_new(path_p, path_size))) {
+	if (base_dir->size == 0 || is_absolute_path(Str_new(path_p, path_size))) {
 		ptr = str_dup_p(path_p, path_size, mem);
 		size = path_size;
 #ifdef WIN32
@@ -173,12 +178,12 @@ char *path_normalize(Str *ret, Str base_dir, const char *path_p, int path_size, 
 		//TODO ネットワークドライブがbaseの場合
 #endif
 	} else {
-		ptr = Mem_get(mem, base_dir.size + path_size + 2);
-		memcpy(ptr, base_dir.p, base_dir.size);
-		size = base_dir.size;
+		ptr = Mem_get(mem, base_dir->size + path_size + 2);
+		memcpy(ptr, base_dir->c, base_dir->size);
+		size = base_dir->size;
 
 		// base_dirの最後が/で終わっていない場合、/を補う
-		if (base_dir.p[base_dir.size - 1] != SEP_C) {
+		if (base_dir->c[base_dir->size - 1] != SEP_C) {
 			ptr[size++] = SEP_C;
 		}
 		memcpy(ptr + size, path_p, path_size);

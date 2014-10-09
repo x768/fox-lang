@@ -41,8 +41,8 @@ static int load_windows_tz_file(IniTok *tk)
 	int ret;
 	StrBuf buf;
 
-	StrBuf_init(&buf, fs->fox_home.size + 20);
-	StrBuf_printf(&buf, "%S" SEP_S "data" SEP_S "windows-tz.txt", fs->fox_home);
+	StrBuf_init(&buf, fs->fox_home->size + 20);
+	StrBuf_printf(&buf, "%r" SEP_S "data" SEP_S "windows-tz.txt", fs->fox_home);
 	StrBuf_add_c(&buf, '\0');
 
 	ret = IniTok_load(tk, buf.p);

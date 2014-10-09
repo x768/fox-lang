@@ -105,7 +105,7 @@ static int replacer_new(Value *vret, Value *v, RefNode *node)
 	const RefNode *v1_type;
 
 	if (fg->stk_top <= v + 1) {
-		RefMapReplace *rp = fs->new_buf(cls_replacer, sizeof(RefMapReplace));
+		RefMapReplace *rp = fs->buf_new(cls_replacer, sizeof(RefMapReplace));
 		*vret = vp_Value(rp);
 		fs->Mem_init(&rp->mem, 1024);
 		return TRUE;
@@ -122,7 +122,7 @@ static int replacer_new(Value *vret, Value *v, RefNode *node)
 		if (path_p == NULL) {
 			return FALSE;
 		}
-		rp = fs->new_buf(cls_replacer, sizeof(RefMapReplace));
+		rp = fs->buf_new(cls_replacer, sizeof(RefMapReplace));
 		*vret = vp_Value(rp);
 		data = init_mem_and_read_file(path_p, &rp->mem);
 		free(path_p);
@@ -134,7 +134,7 @@ static int replacer_new(Value *vret, Value *v, RefNode *node)
 		// 引数のMapをそのまま使う
 		int i;
 		RefMap *rm = Value_vp(v[1]);
-		RefMapReplace *rp = fs->new_buf(cls_replacer, sizeof(RefMapReplace));
+		RefMapReplace *rp = fs->buf_new(cls_replacer, sizeof(RefMapReplace));
 		*vret = vp_Value(rp);
 
 		fs->Mem_init(&rp->mem, 1024);

@@ -53,7 +53,7 @@ int value_to_streamio(Value *stream, Value v, int writemode, int argn)
 	RefNode *v_type = Value_type(v);
 	if (v_type == fs->cls_str || v_type == fs->cls_file) {
 		// FileIOを開く
-		RefNode *fileio_new = Hash_get_p(&cls_fileio->u.c.h, fs->str_new);
+		RefNode *fileio_new = Hash_get_p(&fv->cls_fileio->u.c.h, fs->str_new);
 		Value_push("Nv", v);
 		if (writemode) {
 			Value_push("s", "w");
@@ -88,7 +88,7 @@ void init_stream_ref(Ref *r, int mode)
 }
 static RefBytesIO *bytesio_new_streambuf(void)
 {
-	RefBytesIO *mb = new_buf(fs->cls_bytesio, sizeof(RefBytesIO));
+	RefBytesIO *mb = buf_new(fs->cls_bytesio, sizeof(RefBytesIO));
 	StrBuf_init(&mb->buf, BUFFER_SIZE);
 	return mb;
 }
@@ -587,7 +587,7 @@ static int stream_fetch(Value *vret, Value *v, RefNode *node)
 		return FALSE;
 	}
 
-	rs = new_refstr_n(fs->cls_bytes, size);
+	rs = refstr_new_n(fs->cls_bytes, size);
 	*vret = vp_Value(rs);
 	if (!stream_read_data(*v, NULL, rs->c, &size, TRUE, FALSE)) {
 		return FALSE;
@@ -1382,7 +1382,7 @@ static int stream_unpack_float(Value *vret, Value v, int size, int le)
 		memcpy(&d, &u64, sizeof(u64));
 	}
 	if (!isnan(d) && !isinf(d)) {
-		RefFloat *rd = new_buf(fs->cls_float, sizeof(RefFloat));
+		RefFloat *rd = buf_new(fs->cls_float, sizeof(RefFloat));
 		rd->d = d;
 		*vret = vp_Value(rd);
 	}
@@ -1397,7 +1397,7 @@ static int stream_unpack_bin(Value *vret, Value v, int size)
 		throw_error_select(THROW_MAX_ALLOC_OVER__INT, fs->max_alloc);
 		return FALSE;
 	}
-	rs = new_refstr_n(fs->cls_bytes, size);
+	rs = refstr_new_n(fs->cls_bytes, size);
 	*vret = vp_Value(rs);
 	if (!stream_read_data(v, NULL, rs->c, &read_size, FALSE, TRUE)) {
 		return FALSE;
@@ -1579,7 +1579,7 @@ StrBuf *bytesio_get_strbuf(Value v)
 
 RefBytesIO *bytesio_new_sub(const char *src, int size)
 {
-	RefBytesIO *mb = new_buf(fs->cls_bytesio, sizeof(RefBytesIO));
+	RefBytesIO *mb = buf_new(fs->cls_bytesio, sizeof(RefBytesIO));
 	StrBuf_init(&mb->buf, size);
 	StrBuf_add(&mb->buf, src, size);
 	mb->cur = 0;
@@ -1620,7 +1620,7 @@ static int bytesio_new_sized(Value *vret, Value *v, RefNode *node)
 		}
 	}
 
-	mb = new_buf(fs->cls_bytesio, sizeof(RefBytesIO));
+	mb = buf_new(fs->cls_bytesio, sizeof(RefBytesIO));
 	*vret = vp_Value(mb);
 	StrBuf_init(&mb->buf, size);
 	mb->buf.size = size;
@@ -2151,7 +2151,7 @@ int stream_seek(Value v, int64_t offset)
 
 static int nullio_new(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = new_ref(cls_nullio);
+	Ref *r = ref_new(fv->cls_nullio);
 	*vret = vp_Value(r);
 	init_stream_ref(r, STREAM_READ | STREAM_WRITE);
 	return TRUE;
@@ -2163,10 +2163,10 @@ static int textio_new(Value *vret, Value *v, RefNode *node)
 {
 	RefTextIO *tio;
 	RefCharset *cs = Value_vp(v[2]);
-	Ref *r = new_ref(fs->cls_textio);
+	Ref *r = ref_new(fs->cls_textio);
 	*vret = vp_Value(r);
 
-	tio = new_buf(NULL, sizeof(RefTextIO));
+	tio = buf_new(NULL, sizeof(RefTextIO));
 	r->v[INDEX_TEXTIO_TEXTIO] = vp_Value(tio);
 	r->v[INDEX_TEXTIO_STREAM] = Value_cp(v[1]);
 
@@ -2190,7 +2190,7 @@ static int textio_close(Value *vret, Value *v, RefNode *node)
 	RefTextIO *tio = Value_vp(r->v[INDEX_TEXTIO_TEXTIO]);
 
 	if (tio != NULL) {
-		if (tio != (RefTextIO*)ref_textio_utf8) {
+		if (tio != (RefTextIO*)fv->ref_textio_utf8) {
 			IconvIO_close(&tio->in);
 			IconvIO_close(&tio->out);
 			free(tio);
@@ -2334,7 +2334,7 @@ static int textio_print_sub(Value v_textio, StrBuf *sb, Value v, RefLocale *loc)
 		if (!stream_write_sub_s(vb, sb, rs->c, rs->size, tio)) {
 			result = FALSE;
 		}
-	} else if (v_type == cls_strio) {
+	} else if (v_type == fv->cls_strio) {
 		RefBytesIO *mb = Value_bytesio(v);
 		if (!stream_write_sub_s(vb, sb, mb->buf.p, mb->buf.size, tio)) {
 			result = FALSE;
@@ -2522,7 +2522,7 @@ static int textio_printf_sub(Value v, StrBuf *sb, Str fmt_src, int start_arg, Re
 					}
 				} else {
 					// keyを整数に変換して引数のn番目から取り出す
-					int n = parse_int(key, 65536);
+					int n = parse_int(key.p, key.size, 65536);
 					if (n >= 0 && n < vargc) {
 						val = &varg[n];
 					}
@@ -2702,7 +2702,7 @@ int textio_translit(Value *vret, Value *v, RefNode *node)
 static int strio_new(Value *vret, Value *v, RefNode *node)
 {
 	RefStr *src;
-	Ref *r = new_ref(cls_strio);
+	Ref *r = ref_new(fv->cls_strio);
 
 	*vret = vp_Value(r);
 
@@ -2712,7 +2712,7 @@ static int strio_new(Value *vret, Value *v, RefNode *node)
 		src = fs->str_0;
 	}
 	r->v[INDEX_TEXTIO_STREAM] = vp_Value(bytesio_new_sub(src->c, src->size));
-	r->v[INDEX_TEXTIO_TEXTIO] = vp_Value(ref_textio_utf8);
+	r->v[INDEX_TEXTIO_TEXTIO] = vp_Value(fv->ref_textio_utf8);
 
 	return TRUE;
 }
@@ -2755,11 +2755,11 @@ static int strio_data(Value *vret, Value *v, RefNode *node)
 static int strio_dup(Value *vret, Value *v, RefNode *node)
 {
 	RefBytesIO *src = Value_bytesio(*v);
-	Ref *r = new_ref(cls_strio);
+	Ref *r = ref_new(fv->cls_strio);
 
 	*vret = vp_Value(r);
 	r->v[INDEX_TEXTIO_STREAM] = vp_Value(bytesio_new_sub(src->buf.p, src->buf.size));
-	r->v[INDEX_TEXTIO_TEXTIO] = vp_Value(ref_textio_utf8);
+	r->v[INDEX_TEXTIO_TEXTIO] = vp_Value(fv->ref_textio_utf8);
 
 	return TRUE;
 }
@@ -2841,7 +2841,7 @@ static int parse_server(Str *url, Str src)
 	for (i = src.size - 1; i >= 0; i--) {
 		if (src.p[i] == ':') {
 			Str port = Str_new(src.p + i + 1, src.size - i - 1);
-			int n = parse_int(port, 65535);
+			int n = parse_int(port.p, port.size, 65535);
 			if (n < 0) {
 				return FALSE;
 			}
@@ -2994,7 +2994,7 @@ static int uri_get_scheme(Value *vret, Value *v, RefNode *node)
 		}
 	}
 	len = i;
-	rs = new_refstr_n(fs->cls_str, len);
+	rs = refstr_new_n(fs->cls_str, len);
 	*vret = vp_Value(rs);
 	for (i = 0; i < len; i++) {
 		rs->c[i] = tolower(src.p[i]);
@@ -3012,7 +3012,7 @@ static int uri_get_port(Value *vret, Value *v, RefNode *node)
 	if (parse_url(part, src)) {
 		Str port = part[URL_PORT];
 		if (port.size > 0) {
-			int port_i = parse_int(port, 65535);
+			int port_i = parse_int(port.p, port.size, 65535);
 			if (port_i >= 0) {
 				*vret = int32_Value(port_i);
 			} else {
@@ -3082,7 +3082,7 @@ static int uri_tofile(Value *vret, Value *v, RefNode *node)
 #endif
 	StrBuf_init(&buf, end - p);
 	urldecode_sub(&buf, p, end - p);
-	path = path_normalize(&path_s, fs->cur_dir, buf.p, buf.size, NULL);
+	path = path_normalize(&path_s, fv->cur_dir, buf.p, buf.size, NULL);
 
 	if (path_s.size > 0 && path_s.p[path_s.size - 1] == SEP_C) {
 		path_s.size--;
@@ -3104,15 +3104,15 @@ ERROR_END:
 
 static void v_ctextio_init(void)
 {
-	Ref *ref = new_ref(fs->cls_textio);
+	Ref *ref = ref_new(fs->cls_textio);
 
 	fg->v_ctextio = vp_Value(ref);
 	ref->v[INDEX_TEXTIO_STREAM] = Value_cp(fg->v_cio);
 
 	if (fs->cs_stdio == fs->cs_utf8) {
-		ref->v[INDEX_TEXTIO_TEXTIO] = vp_Value(ref_textio_utf8);
+		ref->v[INDEX_TEXTIO_TEXTIO] = vp_Value(fv->ref_textio_utf8);
 	} else {
-		RefTextIO *tio = new_buf(NULL, sizeof(RefTextIO));
+		RefTextIO *tio = buf_new(NULL, sizeof(RefTextIO));
 		ref->v[INDEX_TEXTIO_TEXTIO] = vp_Value(tio);
 		tio->cs = fs->cs_stdio;
 		tio->in.ic = (void*)-1;
@@ -3247,7 +3247,7 @@ static void define_io_class(RefNode *m)
 
 	// NullIO(R,W) なにもしない
 	cls = define_identifier(m, m, "NullIO", NODE_CLASS, 0);
-	cls_nullio = cls;
+	fv->cls_nullio = cls;
 	n = define_identifier_p(m, cls, fs->str_new, NODE_NEW_N, 0);
 	define_native_func_a(n, nullio_new, 0, 0, NULL);
 	n = define_identifier_p(m, cls, fs->str_marshal_read, NODE_NEW_N, 0);
@@ -3355,7 +3355,7 @@ static void define_io_class(RefNode *m)
 
 
 	// StrIO
-	cls = cls_strio;
+	cls = fv->cls_strio;
 	cls->u.c.n_memb = INDEX_TEXTIO_NUM;
 	n = define_identifier_p(m, cls, fs->str_new, NODE_NEW_N, 0);
 	define_native_func_a(n, strio_new, 0, 1, NULL, fs->cls_str);
@@ -3426,7 +3426,7 @@ static void define_io_class(RefNode *m)
 
 void init_io_module_stubs()
 {
-	RefNode *m = new_sys_Module("io");
+	RefNode *m = Module_new_sys("io");
 
 	fs->cls_uri = define_identifier(m, m, "Uri", NODE_CLASS, NODEOPT_STRCLASS);
 
@@ -3434,7 +3434,7 @@ void init_io_module_stubs()
 	fs->cls_bytesio = define_identifier(m, m, "BytesIO", NODE_CLASS, 0);
 	fs->cls_textio = define_identifier(m, m, "TextIO", NODE_CLASS, NODEOPT_ABSTRACT);
 
-	cls_strio = define_identifier(m, m, "StrIO", NODE_CLASS, 0);
+	fv->cls_strio = define_identifier(m, m, "StrIO", NODE_CLASS, 0);
 
 	fs->mod_io = m;
 }
@@ -3451,7 +3451,7 @@ void init_io_module_1()
 	tio->in.ic = (void*)-1;
 	tio->out.ic = (void*)-1;
 	tio->trans = TRUE;
-	ref_textio_utf8 = &tio->rh;
+	fv->ref_textio_utf8 = &tio->rh;
 
 	define_io_class(m);
 	define_io_func(m);

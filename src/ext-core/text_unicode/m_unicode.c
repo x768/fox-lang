@@ -166,7 +166,7 @@ static uint8_t *load_unicode_property(const char *type, int plane)
 {
 	int size;
 	uint8_t *ret;
-	char *path = fs->str_printf("%S" SEP_S "unicode" SEP_S "%s%i", fs->fox_home, type, plane);
+	char *path = fs->str_printf("%r" SEP_S "unicode" SEP_S "%s%i", fs->fox_home, type, plane);
 
 	ret = (uint8_t*)fs->read_from_file(&size, path, &fg->st_mem);
 	free(path);
@@ -180,7 +180,7 @@ static uint8_t *load_unicode_property(const char *type, int plane)
 static uint8_t *load_unicode_data(int *size, const char *name)
 {
 	uint8_t *ret;
-	char *path = fs->str_printf("%S" SEP_S "unicode" SEP_S "%s", fs->fox_home, name);
+	char *path = fs->str_printf("%r" SEP_S "unicode" SEP_S "%s", fs->fox_home, name);
 
 	ret = (uint8_t*)fs->read_from_file(size, path, &fg->st_mem);
 	free(path);
@@ -216,7 +216,7 @@ static void load_composition_data(void)
 {
 	int size;
 	uint8_t *data;
-	char *path = fs->str_printf("%S" SEP_S "unicode" SEP_S "composition", fs->fox_home);
+	char *path = fs->str_printf("%r" SEP_S "unicode" SEP_S "composition", fs->fox_home);
 
 	data = (uint8_t*)fs->read_from_file(&size, path, NULL);
 	free(path);
@@ -225,7 +225,7 @@ static void load_composition_data(void)
 		const uint8_t *end = data + size;
 		uint8_t *p = data;
 
-		while (p + sizeof(uint32_t) * 3 < end) {
+		while (p + sizeof(uint32_t) * 3 <= end) {
 			uint32_t c1, c2, ch;
 
 			c1 = (p[0] << 24) | (p[1] << 16) | (p[2] << 8) | p[3];
@@ -429,7 +429,7 @@ static int breakiter_new(Value *vret, Value *v, RefNode *node)
 	if (type == BREAKS_NONE) {
 		return FALSE;
 	}
-	r = fs->new_ref(b_iter);
+	r = fs->ref_new(b_iter);
 	*vret = vp_Value(r);
 
 	r->v[BREAKITER_SRC] = fs->Value_cp(v[1]);
@@ -692,7 +692,7 @@ static void sort_combi_class_order(uint32_t *src, int size)
 	}
 	// ordを昇順で並べ替え(安定ソート)
 	for (i = 0; i < size - 1; i++) {
-		for (j = i + 1; j < size; j++) {
+		for (j = size - 1; j > i; j--) {
 			if (ord[i] > ord[j]) {
 				uint32_t s;
 				int o;
@@ -741,6 +741,7 @@ static int unicode_composition(uint32_t *buffer, int size)
 	uint32_t *starter = NULL;
 
 	for (i = 0; i < size; i++) {
+		uint32_t cmp;
 		int ch = buffer[i];
 		int cc = ch_get_property(ch_combi_class, "cc", ch);
 
@@ -763,24 +764,25 @@ static int unicode_composition(uint32_t *buffer, int size)
 				}
 			}
 		}
-
-		if (cc == 0) {
-			max_cc = 0;
-			starter = &buffer[dst];
-			buffer[dst++] = ch;
-		} else if (max_cc == cc) {
-			buffer[dst++] = ch;
-		} else if (starter != NULL) {
+		if (starter != NULL && (cmp = get_composition(*starter, ch)) != 0) {
 			// 結合済み文字
-			uint32_t cmp = get_composition(*starter, ch);
-			if (cmp != 0) {
-				*starter = cmp;
+			*starter = cmp;
+			if (cc == 0) {
+				max_cc = 0;
+			} else if (max_cc < cc) {
+				max_cc = cc;
+			}
+		} else {
+			if (cc == 0) {
+				max_cc = 0;
+				starter = &buffer[dst];
+				buffer[dst++] = ch;
+			} else if (max_cc == cc) {
+				buffer[dst++] = ch;
 			} else {
 				buffer[dst++] = ch;
 				max_cc = cc;
 			}
-		} else {
-			buffer[dst++] = ch;
 		}
 	}
 	return dst;
@@ -788,8 +790,8 @@ static int unicode_composition(uint32_t *buffer, int size)
 
 static int unicode_normalize(Value *vret, Value *v, RefNode *node)
 {
-	Str src = fs->Value_str(v[1]);
-	Str mode = fs->Value_str(v[2]);
+	RefStr *src = Value_vp(v[1]);
+	RefStr *mode = Value_vp(v[2]);
 	uint32_t *cbuf;
 	int cbuf_size;
 	StrBuf sb;
@@ -812,25 +814,25 @@ static int unicode_normalize(Value *vret, Value *v, RefNode *node)
 		}
 	}
 
-	srclen = strlen_utf8(src.p, src.size);
+	srclen = strlen_utf8(src->c, src->size);
 	cbuf = malloc(srclen * sizeof(uint32_t));
-	cbuf_size = encode_utf32(cbuf, src.p, src.size);
+	cbuf_size = encode_utf32(cbuf, src->c, src->size);
 	fs->StrBuf_init(&sb, srclen + 1);
 
-	if (Str_eq_p(mode, "D")) {
+	if (str_eq(mode->c, mode->size, "D", 1)) {
 		// 正準分解
 		ch_normalize = ch_normalize_c;
 		norm_name = "nc";
-	} else if (Str_eq_p(mode, "C")) {
+	} else if (str_eq(mode->c, mode->size, "C", 1)) {
 		// 正準分解・正準合成
 		ch_normalize = ch_normalize_c;
 		norm_name = "nc";
 		composition = TRUE;
-	} else if (Str_eq_p(mode, "KD")) {
+	} else if (str_eq(mode->c, mode->size, "KD", 2)) {
 		// 互換分解
 		ch_normalize = ch_normalize_k;
 		norm_name = "nk";
-	} else if (Str_eq_p(mode, "KC")) {
+	} else if (str_eq(mode->c, mode->size, "KC", 2)) {
 		// 互換分解・正準合成
 		ch_normalize = ch_normalize_k;
 		norm_name = "nk";
@@ -857,7 +859,7 @@ static int unicode_normalize(Value *vret, Value *v, RefNode *node)
 	}
 
 	{
-		RefStr *rs = fs->new_refstr_n(fs->cls_str, strlen_utf32(cbuf, cbuf_size));
+		RefStr *rs = fs->refstr_new_n(fs->cls_str, strlen_utf32(cbuf, cbuf_size));
 		*vret = vp_Value(rs);
 		decode_utf32(rs->c, cbuf, cbuf_size);
 		rs->c[rs->size] = '\0';
@@ -932,7 +934,7 @@ const char *module_version(const FoxStatic *a_fs)
 		char *version;
 
 		fs = a_fs;
-		path = fs->str_printf("%S" SEP_S "unicode" SEP_S "version.txt", fs->fox_home);
+		path = fs->str_printf("%r" SEP_S "unicode" SEP_S "version.txt", fs->fox_home);
 		version = fs->read_from_file(NULL, path, NULL);
 
 		buf = malloc(256);

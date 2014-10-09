@@ -930,7 +930,7 @@ void native_timer_new(int millisec, Ref *r)
 	UINT_PTR id = SetTimer(NULL, 0, millisec, timeout_callback);
 	Value *v_tmp = GuiHash_add_p(&timer_entry, (const void*)id);
 
-	*v_tmp = fs->ref_cp_Value(&r->rh);
+	*v_tmp = fs->Value_cp(vp_Value(r));
 
 	r->v[INDEX_TIMER_ID] = int32_Value(id);
 	r->rh.nref++;

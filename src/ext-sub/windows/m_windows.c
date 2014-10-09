@@ -77,7 +77,7 @@ static Value BSTR_Value(BSTR bstr)
 	if (bstr != NULL) {
 		int blen = wcslen((wchar_t*)bstr);
 		int len = WideCharToMultiByte(CP_UTF8, 0, (wchar_t*)bstr, blen, NULL, 0, NULL, NULL);
-		RefStr *rs = fs->new_refstr_n(fs->cls_str, len);
+		RefStr *rs = fs->refstr_new_n(fs->cls_str, len);
 		WideCharToMultiByte(CP_UTF8, 0, (wchar_t*)bstr, blen, rs->c, len, NULL, NULL);
 		rs->c[len] = '\0';
 		return vp_Value(rs);
@@ -89,7 +89,7 @@ static Value wstr_Value(const wchar_t *wstr)
 {
 	int wlen = wcslen(wstr);
 	int len = WideCharToMultiByte(CP_UTF8, 0, wstr, wlen, NULL, 0, NULL, NULL);
-	RefStr *rs = fs->new_refstr_n(fs->cls_str, len);
+	RefStr *rs = fs->refstr_new_n(fs->cls_str, len);
 	WideCharToMultiByte(CP_UTF8, 0, wstr, wlen, rs->c, len, NULL, NULL);
 	rs->c[len] = '\0';
 	return vp_Value(rs);
@@ -197,7 +197,7 @@ static int ole_new(Value *vret, Value *v, RefNode *node)
 	BSTR bname = Str_to_BSTR(name);
 	HRESULT hr = CLSIDFromProgID(bname, &clsid);
 
-	RefOleObject *ole = fs->new_buf(cls_oleobject, sizeof(RefOleObject));
+	RefOleObject *ole = fs->buf_new(cls_oleobject, sizeof(RefOleObject));
 	*vret = vp_Value(ole);
 
 	if (FAILED(hr)) {
@@ -419,7 +419,7 @@ static int variant_to_fox_value(Value *v, VARIANT *va)
 			idisp = va->pdispVal;
 		}
 		if (idisp != NULL) {
-			RefOleObject *ole = fs->new_buf(cls_oleobject, sizeof(RefOleObject));
+			RefOleObject *ole = fs->buf_new(cls_oleobject, sizeof(RefOleObject));
 			*v = vp_Value(ole);
 			ole->valid = TRUE;
 			ole->pdisp = idisp;
@@ -576,7 +576,7 @@ static int ole_get_iterator(Value *vret, Value *v, RefNode *node)
 	}
 	VariantClear(&result);
 
-	ret = fs->new_buf(cls_oleenum, sizeof(RefOleEnumerator));
+	ret = fs->buf_new(cls_oleenum, sizeof(RefOleEnumerator));
 	*vret = vp_Value(ret);
 	ret->valid = TRUE;
 	ret->penum = vp;
@@ -698,7 +698,7 @@ static int regkey_new(Value *vret, Value *v, RefNode *node)
 	wchar_t *path_p;
 	int write_mode = FALSE;
 	int ret = 0;
-	RefRegKey *r = fs->new_buf(cls_regkey, sizeof(RefRegKey));
+	RefRegKey *r = fs->buf_new(cls_regkey, sizeof(RefRegKey));
 	*vret = vp_Value(r);
 
 	if (!regpath_split(&hroot, &path, fs->Value_str(v[1]))) {
@@ -746,7 +746,7 @@ static int regkey_tostr(Value *vret, Value *v, RefNode *node)
 static int regkey_iterator(Value *vret, Value *v, RefNode *node)
 {
 	RefNode *cls_regiter = FUNC_VP(node);
-	Ref *r = fs->new_ref(cls_regiter);
+	Ref *r = fs->ref_new(cls_regiter);
 	*vret = vp_Value(r);
 
 	r->v[INDEX_REGITER_PARENT] = fs->Value_cp(*v);
@@ -930,7 +930,7 @@ static int regiter_next(Value *vret, Value *v, RefNode *node)
 
 			if (wbuf[0] != '\0') {
 				char *cbuf;
-				RefRegKey *r2 = fs->new_buf(cls_regkey, sizeof(RefRegKey));
+				RefRegKey *r2 = fs->buf_new(cls_regkey, sizeof(RefRegKey));
 				*vret = vp_Value(r2);
 
 				r2->hroot = r_p->hroot;
@@ -963,7 +963,7 @@ static int regiter_next(Value *vret, Value *v, RefNode *node)
 
 static int get_timezone(Value *vret, Value *v, RefNode *node)
 {
-	*vret = fs->ref_cp_Value((RefHeader*)default_tz);
+	*vret = fs->Value_cp(vp_Value(default_tz));
 	return TRUE;
 }
 static int set_timezone(Value *vret, Value *v, RefNode *node)

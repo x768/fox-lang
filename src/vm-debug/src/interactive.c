@@ -140,19 +140,20 @@ void fox_intaractive(RefNode *module)
 
 				// コンパイル
 				StrBuf_add_c(&buf, '\0');
-				if (!set_module_eval(module, buf.p, toplevel, block)) {
-					// ...
-				}
-				fox_link();
-				buf.size = 0;
+				if (set_module_eval(module, buf.p, toplevel, block)) {
+					fox_link();
+					buf.size = 0;
 
-				// 実行
-				if (fg->error == VALUE_NULL) {
-					if (!invoke_code(toplevel, 0)) {
+					// 実行
+					if (fg->error == VALUE_NULL) {
+						if (!invoke_code(toplevel, 0)) {
+						}
 					}
+					dispose_opcode(toplevel);
+					toplevel->u.f.u.op = NULL;
+				} else {
+					Mem_close(&fv->cmp_mem);
 				}
-				dispose_opcode(toplevel);
-
 				stream_flush_sub(fg->v_cio);
 			}
 			if (fg->error != VALUE_NULL) {

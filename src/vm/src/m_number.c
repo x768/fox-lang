@@ -83,7 +83,7 @@ static int integer_new(Value *vret, Value *v, RefNode *node)
 			if (real <= (double)INT32_MAX && real >= -(double)(INT32_MAX)) {
 				*vret = int32_Value((int32_t)real);
 			} else {
-				RefInt *m1 = new_buf(fs->cls_int, sizeof(RefInt));
+				RefInt *m1 = buf_new(fs->cls_int, sizeof(RefInt));
 				*vret = vp_Value(m1);
 				mp_init(&m1->mp);
 				mp2_set_double(&m1->mp, real);
@@ -96,7 +96,7 @@ static int integer_new(Value *vret, Value *v, RefNode *node)
 				errno = 0;
 				val = strtol(rs->c, NULL, 10);
 				if (errno != 0 || val <= INT32_MIN || val > INT32_MAX) {
-					RefInt *m1 = new_buf(fs->cls_int, sizeof(RefInt));
+					RefInt *m1 = buf_new(fs->cls_int, sizeof(RefInt));
 					*vret = vp_Value(m1);
 					mp_init(&m1->mp);
 					mp_read_radix(&m1->mp, (unsigned char*)rs->c, 10);
@@ -109,7 +109,7 @@ static int integer_new(Value *vret, Value *v, RefNode *node)
 		} else if (type == fs->cls_frac) {
 			mp_int rem;
 			RefFrac *md = Value_vp(v1);
-			RefInt *m1 = new_buf(fs->cls_int, sizeof(RefInt));
+			RefInt *m1 = buf_new(fs->cls_int, sizeof(RefInt));
 			*vret = vp_Value(m1);
 
 			mp_init(&m1->mp);
@@ -166,7 +166,7 @@ static int integer_parse(Value *vret, Value *v, RefNode *node)
 	errno = 0;
 	ret = strtol(rs->c, NULL, base);
 	if (errno != 0 || ret <= INT32_MIN || ret > INT32_MAX) {
-		RefInt *mp = new_buf(fs->cls_int, sizeof(RefInt));
+		RefInt *mp = buf_new(fs->cls_int, sizeof(RefInt));
 		*vret = vp_Value(mp);
 		mp_init(&mp->mp);
 		mp_read_radix(&mp->mp, (unsigned char*)rs->c, base);
@@ -228,7 +228,7 @@ static int integer_marshal_read(Value *vret, Value *v, RefNode *node)
 		}
 		if (digits == 2 && (data[0] & 0x80) != 0) {
 			int i;
-			RefInt *mp = new_buf(fs->cls_int, sizeof(RefInt));
+			RefInt *mp = buf_new(fs->cls_int, sizeof(RefInt));
 			*vret = vp_Value(mp);
 
 			mp_init_size(&mp->mp, digits);
@@ -247,7 +247,7 @@ static int integer_marshal_read(Value *vret, Value *v, RefNode *node)
 			*vret = int32_Value(ival);
 		}
 	} else {
-		RefInt *mp = new_buf(fs->cls_int, sizeof(RefInt));
+		RefInt *mp = buf_new(fs->cls_int, sizeof(RefInt));
 		*vret = vp_Value(mp);
 		mp_init_size(&mp->mp, digits);
 		if (!read_int16_array(mp->mp.dp, digits, r)) {
@@ -415,7 +415,7 @@ static int integer_addsub(Value *vret, Value *v, RefNode *node)
 	} else {
 		mp_int m0;
 		mp_int m1;
-		RefInt *mp = new_buf(fs->cls_int, sizeof(RefInt));
+		RefInt *mp = buf_new(fs->cls_int, sizeof(RefInt));
 		*vret = vp_Value(mp);
 
 		if (Value_isint(v0)) {
@@ -474,7 +474,7 @@ static int integer_mul(Value *vret, Value *v, RefNode *node)
 	} else {
 		mp_int m0;
 		mp_int m1;
-		RefInt *mp = new_buf(fs->cls_int, sizeof(RefInt));
+		RefInt *mp = buf_new(fs->cls_int, sizeof(RefInt));
 		*vret = vp_Value(mp);
 
 		if (Value_isint(v0)) {
@@ -567,7 +567,7 @@ static int integer_div(Value *vret, Value *v, RefNode *node)
 		sgn2 = mp_cmp_z(&m1);
 
 		// 負の数の除数をpython方式に合わせるため、ごにょごにょする
-		mp = new_buf(fs->cls_int, sizeof(RefInt));
+		mp = buf_new(fs->cls_int, sizeof(RefInt));
 		*vret = vp_Value(mp);
 		if (modulo) {
 			if ((sgn1 < 0 && sgn2 > 0) || (sgn1 > 0 && sgn2 < 0)) {
@@ -604,7 +604,7 @@ static int integer_negative(Value *vret, Value *v, RefNode *node)
 {
 	if (Value_isref(*v)) {
 		RefInt *src = Value_vp(*v);
-		RefInt *mp = new_buf(fs->cls_int, sizeof(RefInt));
+		RefInt *mp = buf_new(fs->cls_int, sizeof(RefInt));
 		*vret = vp_Value(mp);
 
 		mp_init(&mp->mp);
@@ -626,7 +626,7 @@ static int integer_inc(Value *vret, Value *v, RefNode *node)
 		ret += inc;
 
 		if (ret < -INT32_MAX || ret > INT32_MAX) {
-			RefInt *mp = new_buf(fs->cls_int, sizeof(RefInt));
+			RefInt *mp = buf_new(fs->cls_int, sizeof(RefInt));
 			*vret = vp_Value(mp);
 			mp_init(&mp->mp);
 			mp_set_int(&mp->mp, ret);
@@ -635,7 +635,7 @@ static int integer_inc(Value *vret, Value *v, RefNode *node)
 		}
 	} else {
 		RefInt *m1 = Value_vp(*v);
-		RefInt *m = new_buf(fs->cls_int, sizeof(RefInt));
+		RefInt *m = buf_new(fs->cls_int, sizeof(RefInt));
 		*vret = vp_Value(m);
 
 		mp_init(&m->mp);
@@ -672,7 +672,7 @@ static int integer_logical(Value *vret, Value *v, RefNode *node)
 	} else {
 		mp_int m0;
 		mp_int m1;
-		RefInt *mp = new_buf(fs->cls_int, sizeof(RefInt));
+		RefInt *mp = buf_new(fs->cls_int, sizeof(RefInt));
 		*vret = vp_Value(mp);
 
 		if (Value_isint(v0)) {
@@ -745,7 +745,7 @@ static int integer_shift(Value *vret, Value *v, RefNode *node)
 		if (i1 == 0) {
 			*vret = int32_Value(0);
 		} if (shift + get_msb_pos(i1) > 31) {
-			RefInt *mp = new_buf(fs->cls_int, sizeof(RefInt));
+			RefInt *mp = buf_new(fs->cls_int, sizeof(RefInt));
 			*vret = vp_Value(mp);
 			mp_init(&mp->mp);
 			mp_set_int(&mp->mp, i1);
@@ -762,12 +762,12 @@ static int integer_shift(Value *vret, Value *v, RefNode *node)
 			goto ERROR_END;
 		}
 		if (shift > 0) {
-			RefInt *mp2 = new_buf(fs->cls_int, sizeof(RefInt));
+			RefInt *mp2 = buf_new(fs->cls_int, sizeof(RefInt));
 			*vret = vp_Value(mp2);
 			mp_init(&mp2->mp);
 			mpl_lsh(&mp->mp, &mp2->mp, shift);
 		} else if (shift < 0) {
-			RefInt *mp2 = new_buf(fs->cls_int, sizeof(RefInt));
+			RefInt *mp2 = buf_new(fs->cls_int, sizeof(RefInt));
 			*vret = vp_Value(mp2);
 			mp_init(&mp2->mp);
 			mpl_rsh(&mp->mp, &mp2->mp, -shift);
@@ -785,7 +785,7 @@ ERROR_END:
 }
 static int integer_tofloat(Value *vret, Value *v, RefNode *node)
 {
-	RefFloat *rd = new_buf(fs->cls_float, sizeof(RefFloat));
+	RefFloat *rd = buf_new(fs->cls_float, sizeof(RefFloat));
 	*vret = vp_Value(rd);
 
 	if (Value_isint(*v)) {
@@ -803,7 +803,7 @@ static int integer_tofloat(Value *vret, Value *v, RefNode *node)
 }
 static int integer_tofrac(Value *vret, Value *v, RefNode *node)
 {
-	RefFrac *md = new_buf(fs->cls_frac, sizeof(RefFrac));
+	RefFrac *md = buf_new(fs->cls_frac, sizeof(RefFrac));
 	*vret = vp_Value(md);
 	mp_init(&md->md[0]);
 	mp_init(&md->md[1]);
@@ -1129,7 +1129,7 @@ static Value mp2_number_format(mp_int *mp, NumberFormat *nf, const RefLocale *lo
 	mp_toradix(mp, (unsigned char *)ptr, nf->base);
 
 	len = number_format_maxlength(ptr, nf, loc);
-	rs = new_refstr_n(fs->cls_str, len);
+	rs = refstr_new_n(fs->cls_str, len);
 	number_format_str(rs->c, &len, ptr, nf, loc);
 	rs->c[len] = '\0';
 	rs->size = len;
@@ -1286,7 +1286,7 @@ static int integer_tostr_sub(Value *vret, Value v, Str fmt, const RefLocale *loc
 		}
 
 		len = number_format_maxlength(ptr, &nf, loc);
-		rs = new_refstr_n(fs->cls_str, len);
+		rs = refstr_new_n(fs->cls_str, len);
 		*vret = vp_Value(rs);
 		number_format_str(rs->c, &len, ptr, &nf, loc);
 		rs->c[len] = '\0';
@@ -1364,7 +1364,7 @@ static int frac_new(Value *vret, Value *v, RefNode *node)
 			return FALSE;
 		}
 
-		md = new_buf(fs->cls_frac, sizeof(RefFrac));
+		md = buf_new(fs->cls_frac, sizeof(RefFrac));
 		*vret = vp_Value(md);
 
 		mp_init(&md->md[0]);
@@ -1399,7 +1399,7 @@ static int frac_new(Value *vret, Value *v, RefNode *node)
 			return TRUE;
 		}
 
-		md = new_buf(fs->cls_frac, sizeof(RefFrac));
+		md = buf_new(fs->cls_frac, sizeof(RefFrac));
 		*vret = vp_Value(md);
 		mp_init(&md->md[0]);
 		mp_init(&md->md[1]);
@@ -1431,7 +1431,7 @@ static int frac_new(Value *vret, Value *v, RefNode *node)
 		// 未知の型の場合、0とする
 	} else {
 		// ゼロ初期化 (0 / 1)
-		RefFrac *md = new_buf(fs->cls_frac, sizeof(RefFrac));
+		RefFrac *md = buf_new(fs->cls_frac, sizeof(RefFrac));
 		*vret = vp_Value(md);
 		mp_init(&md->md[0]);
 		mp_init(&md->md[1]);
@@ -1443,7 +1443,7 @@ static int frac_new(Value *vret, Value *v, RefNode *node)
 static int frac_parse(Value *vret, Value *v, RefNode *node)
 {
 	Value v1 = v[1];
-	RefFrac *md = new_buf(fs->cls_frac, sizeof(RefFrac));
+	RefFrac *md = buf_new(fs->cls_frac, sizeof(RefFrac));
 
 	RefStr *rs = Value_vp(v1);
 	const char *end;
@@ -1465,7 +1465,7 @@ static int frac_marshal_read(Value *vret, Value *v, RefNode *node)
 	char minus;
 	uint32_t digits;
 	int rd_size = 1;
-	RefFrac *md = new_buf(fs->cls_frac, sizeof(RefFrac));
+	RefFrac *md = buf_new(fs->cls_frac, sizeof(RefFrac));
 	Value r = Value_ref(v[1])->v[INDEX_MARSHALDUMPER_SRC];
 
 	*vret = vp_Value(md);
@@ -1594,7 +1594,7 @@ static int frac_cmp(Value *vret, Value *v, RefNode *node)
 static int frac_negative(Value *vret, Value *v, RefNode *node)
 {
 	RefFrac *src = Value_vp(*v);
-	RefFrac *md = new_buf(fs->cls_frac, sizeof(RefFrac));
+	RefFrac *md = buf_new(fs->cls_frac, sizeof(RefFrac));
 	*vret = vp_Value(md);
 
 	mp_init(&md->md[0]);
@@ -1610,7 +1610,7 @@ static int frac_addsub(Value *vret, Value *v, RefNode *node)
 	int sub = FUNC_INT(node);
 	mp_int tmp;
 
-	RefFrac *md = new_buf(fs->cls_frac, sizeof(RefFrac));
+	RefFrac *md = buf_new(fs->cls_frac, sizeof(RefFrac));
 	RefFrac *md1 = Value_vp(*v);
 	RefFrac *md2 = Value_vp(v[1]);
 
@@ -1639,7 +1639,7 @@ static int frac_addsub(Value *vret, Value *v, RefNode *node)
 }
 static int frac_mul(Value *vret, Value *v, RefNode *node)
 {
-	RefFrac *md = new_buf(fs->cls_frac, sizeof(RefFrac));
+	RefFrac *md = buf_new(fs->cls_frac, sizeof(RefFrac));
 	RefFrac *md1 = Value_vp(*v);
 	RefFrac *md2 = Value_vp(v[1]);
 
@@ -1658,7 +1658,7 @@ static int frac_mul(Value *vret, Value *v, RefNode *node)
 }
 static int frac_div(Value *vret, Value *v, RefNode *node)
 {
-	RefFrac *md = new_buf(fs->cls_frac, sizeof(RefFrac));
+	RefFrac *md = buf_new(fs->cls_frac, sizeof(RefFrac));
 	RefFrac *md1 = Value_vp(*v);
 	RefFrac *md2 = Value_vp(v[1]);
 
@@ -1693,7 +1693,7 @@ static int frac_get_part(Value *vret, Value *v, RefNode *node)
 		int32_t i = mp2_tolong(&md->md[part]);
 		*vret = int32_Value(i);
 	} else {
-		RefInt *mp = new_buf(fs->cls_int, sizeof(RefInt));
+		RefInt *mp = buf_new(fs->cls_int, sizeof(RefInt));
 		*vret = vp_Value(mp);
 		mp_init(&mp->mp);
 		mp_copy(&md->md[part], &mp->mp);
@@ -1705,7 +1705,7 @@ static int frac_get_part(Value *vret, Value *v, RefNode *node)
 static int frac_toint(Value *vret, Value *v, RefNode *node)
 {
 	RefFrac *md = Value_vp(*v);
-	RefInt *mp = new_buf(fs->cls_int, sizeof(RefInt));
+	RefInt *mp = buf_new(fs->cls_int, sizeof(RefInt));
 	mp_int rem;
 
 	*vret = vp_Value(mp);
@@ -1723,7 +1723,7 @@ static int frac_toint(Value *vret, Value *v, RefNode *node)
 static int frac_tofloat(Value *vret, Value *v, RefNode *node)
 {
 	RefFrac *md = Value_vp(*v);
-	RefFloat *rd = new_buf(fs->cls_float, sizeof(RefFloat));
+	RefFloat *rd = buf_new(fs->cls_float, sizeof(RefFloat));
 	double d1 = mp2_todouble(&md->md[0]);
 	double d2 = mp2_todouble(&md->md[1]);
 
@@ -1922,7 +1922,7 @@ static int frac_tostr(Value *vret, Value *v, RefNode *node)
 			mp_clear(&rem2);
 		}
 		{
-			RefStr *rs = new_refstr_n(fs->cls_str, number_format_maxlength(c_buf, &nf, loc));
+			RefStr *rs = refstr_new_n(fs->cls_str, number_format_maxlength(c_buf, &nf, loc));
 			*vret = vp_Value(rs);
 			number_format_str(rs->c, &len, c_buf, &nf, loc);
 			if (ellip) {
@@ -1942,7 +1942,7 @@ static int frac_tostr(Value *vret, Value *v, RefNode *node)
 	case 'r': {
 		// (numerator/denominator)
 		int len;
-		RefStr *rs = new_refstr_n(fs->cls_str, mp_radix_size(&md->md[0], 10) + mp_radix_size(&md->md[1], 10) + 5);
+		RefStr *rs = refstr_new_n(fs->cls_str, mp_radix_size(&md->md[0], 10) + mp_radix_size(&md->md[1], 10) + 5);
 		*vret = vp_Value(rs);
 
 		strcpy(rs->c, "(");
@@ -2003,7 +2003,7 @@ static int float_new(Value *vret, Value *v, RefNode *node)
 		const RefNode *type = Value_type(v1);
 
 		if (type == fs->cls_int) {
-			RefFloat *rd = new_buf(fs->cls_float, sizeof(RefFloat));
+			RefFloat *rd = buf_new(fs->cls_float, sizeof(RefFloat));
 			*vret = vp_Value(rd);
 			if (Value_isint(v1)) {
 				rd->d = (double)Value_integral(v1);
@@ -2015,7 +2015,7 @@ static int float_new(Value *vret, Value *v, RefNode *node)
 				}
 			}
 		} else if (type == fs->cls_str || type == fs->cls_bytes) {
-			RefFloat *rd = new_buf(fs->cls_float, sizeof(RefFloat));
+			RefFloat *rd = buf_new(fs->cls_float, sizeof(RefFloat));
 			RefStr *rs = Value_vp(v1);
 
 			*vret = vp_Value(rd);
@@ -2029,7 +2029,7 @@ static int float_new(Value *vret, Value *v, RefNode *node)
 			v[1] = VALUE_NULL;
 			return TRUE;
 		} else if (type == fs->cls_frac) {
-			RefFloat *rd = new_buf(fs->cls_float, sizeof(RefFloat));
+			RefFloat *rd = buf_new(fs->cls_float, sizeof(RefFloat));
 			RefFrac *md = Value_vp(v[1]);
 			double d1 = mp2_todouble(&md->md[0]);
 			double d2 = mp2_todouble(&md->md[1]);
@@ -2042,7 +2042,7 @@ static int float_new(Value *vret, Value *v, RefNode *node)
 			}
 			return TRUE;
 		} else if (type == fs->cls_bool) {
-			RefFloat *rd = new_buf(fs->cls_float, sizeof(RefFloat));
+			RefFloat *rd = buf_new(fs->cls_float, sizeof(RefFloat));
 			*vret = vp_Value(rd);
 			rd->d = (Value_bool(v1) ? 1.0 : 0.0);
 		}
@@ -2052,7 +2052,7 @@ static int float_new(Value *vret, Value *v, RefNode *node)
 }
 static int float_parse(Value *vret, Value *v, RefNode *node)
 {
-	RefFloat *rd = new_buf(fs->cls_float, sizeof(RefFloat));
+	RefFloat *rd = buf_new(fs->cls_float, sizeof(RefFloat));
 	RefStr *rs = Value_vp(v[1]);
 	char *end;
 
@@ -2081,7 +2081,7 @@ static int float_marshal_read(Value *vret, Value *v, RefNode *node)
 	int rd_size = 8;
 	int i;
 
-	RefFloat *rd = new_buf(fs->cls_float, sizeof(RefFloat));
+	RefFloat *rd = buf_new(fs->cls_float, sizeof(RefFloat));
 	Value r = Value_ref(v[1])->v[INDEX_MARSHALDUMPER_SRC];
 
 	*vret = vp_Value(rd);
@@ -2273,7 +2273,7 @@ static int float_tostr(Value *vret, Value *v, RefNode *node)
 		adjust_float_str(c_tmp, c_buf, ex);
 
 		len = number_format_maxlength(c_tmp, &nf, loc);
-		rs = new_refstr_n(fs->cls_str, len);
+		rs = refstr_new_n(fs->cls_str, len);
 		*vret = vp_Value(rs);
 		number_format_str(rs->c, &len, c_tmp, &nf, loc);
 		rs->c[len] = '\0';
@@ -2285,7 +2285,7 @@ static int float_tostr(Value *vret, Value *v, RefNode *node)
 	case 'e': case 'E': {
 		// フォーマットを調整
 		int len = number_format_maxlength(c_buf, &nf, loc);
-		RefStr *rs = new_refstr_n(fs->cls_str, len + 8);
+		RefStr *rs = refstr_new_n(fs->cls_str, len + 8);
 		*vret = vp_Value(rs);
 		number_format_str(rs->c, &len, c_buf, &nf, loc);
 		sprintf(rs->c + len, "%c%+d", nf.other, ex);
@@ -2354,7 +2354,7 @@ static int float_cmp(Value *vret, Value *v, RefNode *node)
 static int float_negative(Value *vret, Value *v, RefNode *node)
 {
 	RefFloat *d1 = Value_vp(*v);
-	RefFloat *rd = new_buf(fs->cls_float, sizeof(RefFloat));
+	RefFloat *rd = buf_new(fs->cls_float, sizeof(RefFloat));
 
 	*vret = vp_Value(rd);
 	rd->d = -d1->d;
@@ -2363,7 +2363,7 @@ static int float_negative(Value *vret, Value *v, RefNode *node)
 }
 static int float_addsubmul(Value *vret, Value *v, RefNode *node)
 {
-	RefFloat *rd = new_buf(fs->cls_float, sizeof(RefFloat));
+	RefFloat *rd = buf_new(fs->cls_float, sizeof(RefFloat));
 	RefFloat *d1 = Value_vp(*v);
 	RefFloat *d2 = Value_vp(v[1]);
 
@@ -2389,7 +2389,7 @@ static int float_addsubmul(Value *vret, Value *v, RefNode *node)
 }
 static int float_div(Value *vret, Value *v, RefNode *node)
 {
-	RefFloat *rd = new_buf(fs->cls_float, sizeof(RefFloat));
+	RefFloat *rd = buf_new(fs->cls_float, sizeof(RefFloat));
 	RefFloat *d1 = Value_vp(*v);
 	RefFloat *d2 = Value_vp(v[1]);
 
@@ -2414,7 +2414,7 @@ static int float_toint(Value *vret, Value *v, RefNode *node)
 	if (real <= (double)INT32_MAX && real >= -(double)(INT32_MAX)) {
 		*vret = int32_Value((int32_t)real);
 	} else {
-		RefInt *mp = new_buf(fs->cls_int, sizeof(RefInt));
+		RefInt *mp = buf_new(fs->cls_int, sizeof(RefInt));
 		*vret = vp_Value(mp);
 		mp_init(&mp->mp);
 		mp2_set_double(&mp->mp, real);
@@ -2424,7 +2424,7 @@ static int float_toint(Value *vret, Value *v, RefNode *node)
 static int float_tofrac(Value *vret, Value *v, RefNode *node)
 {
 	double real = Value_double(*v);
-	RefFrac *md = new_buf(fs->cls_frac, sizeof(RefFrac));
+	RefFrac *md = buf_new(fs->cls_frac, sizeof(RefFrac));
 
 	*vret = vp_Value(md);
 	mp_init(&md->md[0]);
@@ -2610,7 +2610,7 @@ static int base58decode(Value *vret, Value *v, RefNode *node)
 		init_base58_dtable(base58, "0aA");
 	}
 
-	ri = new_buf(fs->cls_int, sizeof(RefInt));
+	ri = buf_new(fs->cls_int, sizeof(RefInt));
 	mp_init(&ri->mp);
 	for (i = 0; i < rs->size; i++) {
 		uint8_t c = rs->c[i];

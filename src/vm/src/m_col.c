@@ -70,7 +70,7 @@ static int inspect_sub(StrBuf *buf, Value v, Hash *hash, Mem *mem)
 			return FALSE;
 		}
 		he->p = NULL;
-	} else if (type == fs->cls_map || type == cls_mimeheader) {
+	} else if (type == fs->cls_map || type == fv->cls_mimeheader) {
 		RefMap *r = Value_vp(v);
 		HashEntry *he = Hash_get_add_entry(hash, mem, (RefStr*)r);
 		int i, first = TRUE;
@@ -406,11 +406,97 @@ int col_eq(Value *vret, Value *v, RefNode *node)
 	return TRUE;
 }
 
+int list_cmp_sub(int *ret, RefArray *r1, RefArray *r2, Hash *hash1, Hash *hash2, Mem *mem)
+{
+	HashEntry *he1 = Hash_get_add_entry(hash1, mem, (RefStr*)r1);
+	HashEntry *he2 = Hash_get_add_entry(hash2, mem, (RefStr*)r2);
+	int i;
+	int size;
+
+	// 循環参照チェック
+	if (he1->p != NULL || he2->p != NULL) {
+		throw_error_select(THROW_LOOP_REFERENCE);
+		return FALSE;
+	}
+	// 参照先が同じならtrue
+	if (r1 == r2) {
+		return TRUE;
+	}
+	he1->p = (void*)1;
+	he2->p = (void*)1;
+
+	size = (r1->size < r2->size) ? r1->size : r2->size;
+
+	for (i = 0; i < size; i++) {
+		Value v1 = r1->p[i];
+		Value v2 = r2->p[i];
+		RefNode *v1_type = Value_type(v1);
+		RefNode *v2_type = Value_type(v2);
+
+		if (v1_type != v2_type) {
+			throw_errorf(fs->mod_lang, "TypeError",
+				"Compare operator given difference type values (%n and %n)", v1_type, v2_type);
+			return FALSE;
+		}
+		if (v1_type == fs->cls_list) {
+			int ret2;
+			if (!list_cmp_sub(&ret2, Value_vp(v1), Value_vp(v2), hash1, hash2, mem)) {
+				return FALSE;
+			}
+			if (ret2 != 0) {
+				*ret = ret2;
+				return TRUE;
+			}
+		} else {
+			int ret2;
+			*fg->stk_top++ = Value_cp(v1);
+			*fg->stk_top++ = Value_cp(v2);
+			if (!call_member_func(fs->symbol_stock[T_CMP], 1, TRUE)) {
+				return FALSE;
+			}
+			ret2 = Value_int(fg->stk_top[-1], NULL);
+			Value_pop();
+			if (ret2 != 0) {
+				*ret = ret2;
+				return TRUE;
+			}
+		}
+	}
+
+	if (r1->size < r2->size) {
+		*ret = -1;
+	} else if (r1->size > r2->size) {
+		*ret = 1;
+	} else {
+		*ret = 0;
+	}
+	return TRUE;
+}
+int list_cmp(Value *vret, Value *v, RefNode *node)
+{
+	Mem mem;
+	Hash hash1, hash2;
+	int result = TRUE;
+
+	Mem_init(&mem, 1024);
+	Hash_init(&hash1, &mem, 128);
+	Hash_init(&hash2, &mem, 128);
+
+	if (!list_cmp_sub(&result, Value_vp(v[0]), Value_vp(v[1]), &hash1, &hash2, &mem)) {
+		Mem_close(&mem);
+		return FALSE;
+	}
+	Mem_close(&mem);
+	*vret = int32_Value(result);
+
+	return TRUE;
+}
+
 /////////////////////////////////////////////////////////////////////////////////////
 
 RefArray *refarray_new(int size)
 {
-	RefArray *r = new_buf(fs->cls_list, sizeof(RefArray));
+	RefArray *r = buf_new(fs->cls_list, sizeof(RefArray));
 
 	if (size > 0) {
 		int max = align_pow2(size, 32);
@@ -781,7 +867,7 @@ static int array_has_key(Value *vret, Value *v, RefNode *node)
 static int array_iterator(Value *vret, Value *v, RefNode *node)
 {
 	RefArray *ra = Value_vp(*v);
-	Ref *r = new_ref(cls_listiter);
+	Ref *r = ref_new(cls_listiter);
 	int type = FUNC_INT(node);
 
 	ra->lock_count++;
@@ -802,7 +888,7 @@ static int array_keys(Value *vret, Value *v, RefNode *node)
 {
 	RefArray *ra = Value_vp(*v);
 	RefNode *rangeiter = FUNC_VP(node);
-	Ref *r = new_ref(rangeiter);
+	Ref *r = ref_new(rangeiter);
 
 	r->v[INDEX_RANGE_BEGIN] = int32_Value(0);
 	r->v[INDEX_RANGE_END] = int32_Value(ra->size);
@@ -975,7 +1061,7 @@ static int array_join_sub(StrBuf *buf, Value v, int is_str)
 	RefNode *v_type = Value_type(v);
 
 	if (is_str) {
-		if (v_type == cls_strio) {
+		if (v_type == fv->cls_strio) {
 			RefBytesIO *bio = Value_vp(Value_ref(v)->v[INDEX_TEXTIO_STREAM]);
 			if (!StrBuf_add(buf, bio->buf.p, bio->buf.size)) {
 				return FALSE;
@@ -1106,18 +1192,16 @@ static int msort_sub(Value *v, int low, int high, Value fn, Value *tmp)
 	// 要素数が少ない場合は単純なソート
 	if (high - low <= MSORT_MIN) {
 		int i, j;
-		for (i = low + 1; i < high; i++) {
-			for (j = i; j > low; j--) {
-				int comp = value_cmp_invoke(v[j - 1], v[j], fn);
+		for (i = low; i < high - 1; i++) {
+			for (j = high - 1; j > i; j--) {
+				int comp = value_cmp_invoke(v[i], v[j], fn);
 				if (comp == VALUE_CMP_ERROR) {
 					return FALSE;
 				}
 				if (comp == VALUE_CMP_GT) {
-					Value tv = v[j];
-					v[j] = v[j - 1];
-					v[j - 1] = tv;
-				} else {
-					break;
+					Value tv = v[i];
+					v[i] = v[j];
+					v[j] = tv;
 				}
 			}
 		}
@@ -1511,7 +1595,7 @@ static int arrayiter_next(Value *vret, Value *v, RefNode *node)
 	idx++;
 	if (idx < ra->size) {
 		if (type == ITERATOR_BOTH) {
-			Ref *r2 = new_ref(cls_entry);
+			Ref *r2 = ref_new(fv->cls_entry);
 			Value v2 = ra->p[idx];
 
 			r2->v[INDEX_ENTRY_KEY] = int32_Value(idx);
@@ -1585,7 +1669,7 @@ int pairvalue_eq(Value *vret, Value *v, RefNode *node)
 
 int range_new(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = new_ref(fs->cls_range);
+	Ref *r = ref_new(fs->cls_range);
 	Value v1 = v[1];
 	Value v2 = v[2];
 	RefNode *v1_type = Value_type(v1);
@@ -1632,7 +1716,7 @@ int range_marshal_read(Value *vret, Value *v, RefNode *node)
 	char c;
 	int rd_size;
 
-	Ref *r = new_ref(fs->cls_range);
+	Ref *r = ref_new(fs->cls_range);
 	Value d = v[1];
 	Value rd = Value_ref(*v)->v[INDEX_MARSHALDUMPER_SRC];
 
@@ -1785,7 +1869,7 @@ static int range_iter(Value *vret, Value *v, RefNode *node)
 	int i;
 	Ref *r = Value_ref(*v);
 	RefNode *rangeiter = FUNC_VP(node);
-	Ref *r2 = new_ref(rangeiter);
+	Ref *r2 = ref_new(rangeiter);
 	Value *r2v = r2->v;
 
 	*vret = vp_Value(r2);
@@ -1811,7 +1895,7 @@ static int range_get(Value *vret, Value *v, RefNode *node)
 static int rangeiter_inf(Value *vret, Value *v, RefNode *node)
 {
 	RefNode *rangeiter = FUNC_VP(node);
-	Ref *r = new_ref(rangeiter);
+	Ref *r = ref_new(rangeiter);
 	*vret = vp_Value(r);
 
 	r->v[INDEX_RANGE_BEGIN] = Value_cp(v[1]);
@@ -2122,7 +2206,7 @@ static int iterator_skip(Value *vret, Value *v, RefNode *node)
 static int iterator_map_select(Value *vret, Value *v, RefNode *node)
 {
 	RefNode *cls_itersub = FUNC_VP(node);
-	Ref *r = new_ref(cls_itersub);
+	Ref *r = ref_new(cls_itersub);
 
 	r->v[INDEX_ITERFILTER_ITER] = Value_cp(v[0]);
 	r->v[INDEX_ITERFILTER_FUNC] = Value_cp(v[1]);
@@ -2447,7 +2531,7 @@ void define_lang_col_class(RefNode *m)
 	extends_method(cls, fs->cls_iterator);
 
 	// Generator
-	cls = cls_generator;
+	cls = fv->cls_generator;
 	n = define_identifier(m, cls, "next", NODE_FUNC_N, 0);
 	define_native_func_a(n, generator_next, 0, 0, NULL);
 	extends_method(cls, fs->cls_iterator);
@@ -2493,7 +2577,7 @@ void define_lang_col_class(RefNode *m)
 	cls = fs->cls_list;
 	n = define_identifier_p(m, cls, fs->str_new, NODE_NEW_N, 0);
 	define_native_func_a(n, array_new_elems, 0, -1, NULL);
-	func_array_new = n;
+	fv->func_array_new = n;
 	n = define_identifier(m, cls, "sized", NODE_NEW_N, 0);
 	define_native_func_a(n, array_new_sized, 1, -1, NULL, NULL);
 	n = define_identifier_p(m, cls, fs->str_marshal_read, NODE_NEW_N, 0);
@@ -2509,6 +2593,8 @@ void define_lang_col_class(RefNode *m)
 	define_native_func_a(n, col_hash, 0, 0, NULL);
 	n = define_identifier_p(m, cls, fs->symbol_stock[T_EQ], NODE_FUNC_N, 0);
 	define_native_func_a(n, col_eq, 1, 1, NULL, fs->cls_list);
+	n = define_identifier_p(m, cls, fs->symbol_stock[T_CMP], NODE_FUNC_N, 0);
+	define_native_func_a(n, list_cmp, 1, 1, NULL, fs->cls_list);
 	n = define_identifier_p(m, cls, fs->symbol_stock[T_LB], NODE_FUNC_N, 0);
 	define_native_func_a(n, array_index, 1, 1, NULL, fs->cls_int);
 	n = define_identifier_p(m, cls, fs->symbol_stock[T_LET_B], NODE_FUNC_N, 0);
@@ -2581,7 +2667,7 @@ void define_lang_col_class(RefNode *m)
 	cls->u.c.n_memb = INDEX_RANGE_NUM;
 	n = define_identifier_p(m, cls, fs->str_new, NODE_NEW_N, 0);
 	define_native_func_a(n, range_new, 2, 4, cls, NULL, NULL, fs->cls_bool, NULL);
-	func_range_new = n;
+	fv->func_range_new = n;
 	n = define_identifier_p(m, cls, fs->str_marshal_read, NODE_NEW_N, 0);
 	define_native_func_a(n, range_marshal_read, 1, 1, NULL, fs->cls_marshaldumper);
 

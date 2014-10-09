@@ -47,7 +47,6 @@ DIR *opendir_fox(const char *dname);
 struct dirent *readdir_fox(DIR *d);
 void closedir_fox(DIR *d);
 
-char *getcwd_fox(char *p, int n);
 int mkdir_fox(const char *dname, int dummy);
 int remove_fox(const char *fname);
 int rename_fox(const char *fname, const char *tname);
@@ -62,7 +61,6 @@ const char *dlerror_fox(void);
 #define readdir_fox readdir
 #define closedir_fox closedir
 
-#define getcwd_fox getcwd
 #define mkdir_fox mkdir
 #define remove_fox remove
 #define rename_fox rename
@@ -79,7 +77,7 @@ int exists_file(const char *file);
 int is_root_dir(Str path);
 int is_absolute_path(Str path);
 Str get_root_name(Str path);
-Str get_fox_home(void);
+const char *get_fox_home(void);
 void native_sleep(int ms);
 const char *get_default_locale(void);
 void get_local_timezone_name(char *buf, int max);
@@ -88,6 +86,8 @@ void get_random(void *buf, int len);
 
 RefCharset *get_console_charset(void);
 void init_stdio(void);
+char *get_current_directory(void);
+int set_current_directory(const char *path);
 void show_error_message(const char *msg, int msg_size, int warn);
 
 

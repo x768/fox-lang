@@ -59,7 +59,7 @@ static int deflateio_new(Value *vret, Value *v, RefNode *node)
 	int flags = 0;
 	int level = 6; // default
 	Value v1 = v[1];
-	Ref *r = fs->new_ref(FUNC_VP(node));
+	Ref *r = fs->ref_new(FUNC_VP(node));
 	*vret = vp_Value(r);
 
 	// modeの解析
@@ -366,7 +366,7 @@ static int zip_randomreader_new(Value *vret, Value *v, RefNode *node)
 	int file_size;
 
 	Value v1 = v[1];
-	Ref *r = fs->new_ref(cls_zipreader);
+	Ref *r = fs->ref_new(cls_zipreader);
 	*vret = vp_Value(r);
 
 	if (fg->stk_top > v + 2) {
@@ -426,7 +426,7 @@ static int zip_randomreader_size(Value *vret, Value *v, RefNode *node)
 static void zipentry_new_sub(Value *vret, Value v, CentralDir *cd)
 {
 	CentralDir *p = malloc(sizeof(CentralDir));
-	Ref *r = fs->new_ref(cls_zipentry);
+	Ref *r = fs->ref_new(cls_zipentry);
 	*vret = vp_Value(r);
 
 	*p = *cd;
@@ -509,7 +509,7 @@ static int zip_randomreader_index(Value *vret, Value *v, RefNode *node)
 }
 static int zip_randomreader_list(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = fs->new_ref(cls_zipentryiter);
+	Ref *r = fs->ref_new(cls_zipentryiter);
 	*vret = vp_Value(r);
 	r->v[INDEX_ZIPENTRYITER_REF] = fs->Value_cp(*v);
 	r->v[INDEX_ZIPENTRYITER_INDEX] = int32_Value(-1);
@@ -524,7 +524,7 @@ static int zipreader_new(Value *vret, Value *v, RefNode *node)
 	//RefCharset *cs;
 	//RefTimeZone *tz;
 	RefNode *cls_zipreader = FUNC_VP(node);
-	Ref *r = fs->new_ref(cls_zipreader);
+	Ref *r = fs->ref_new(cls_zipreader);
 	*vret = vp_Value(r);
 
 /*
@@ -577,7 +577,7 @@ static int zipwriter_new(Value *vret, Value *v, RefNode *node)
 	Value writer;
 	CentralDirEnd *cdir;
 	RefNode *cls_zipwriter = FUNC_VP(node);
-	Ref *r = fs->new_ref(cls_zipwriter);
+	Ref *r = fs->ref_new(cls_zipwriter);
 	*vret = vp_Value(r);
 
 	if (!fs->value_to_streamio(&writer, v[1], TRUE, 0)) {
@@ -708,7 +708,7 @@ static int zipentry_finish_sub(CentralDir *cd)
 static int zipentry_new(Value *vret, Value *v, RefNode *node)
 {
 	CentralDir *cd = malloc(sizeof(CentralDir));
-	Ref *r = fs->new_ref(cls_zipentry);
+	Ref *r = fs->ref_new(cls_zipentry);
 	*vret = vp_Value(r);
 
 	fs->init_stream_ref(r, STREAM_WRITE);
@@ -1053,7 +1053,7 @@ static int zipentry_mtime(Value *vret, Value *v, RefNode *node)
 	CentralDir *cd = Value_ptr(r->v[INDEX_ZIPENTRY_CDIR]);
 
 	if (cd->time_valid) {
-		RefInt64 *rt = fs->new_buf(fs->cls_timestamp, sizeof(RefInt64));
+		RefInt64 *rt = fs->buf_new(fs->cls_timestamp, sizeof(RefInt64));
 		*vret = vp_Value(rt);
 		rt->u.i = cd->modified;
 	}

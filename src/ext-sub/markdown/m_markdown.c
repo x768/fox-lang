@@ -13,9 +13,9 @@ enum {
 	MD_EMPTY_LINE,    // 空行
 	MD_HEADING,       // opt=1...6 <h1>child</h1>, <h2>child</h2>
 	MD_SENTENSE,      // <p>child</p>
+	MD_HORIZONTAL,    // <hr>
 
 	// インライン要素
-	MD_EMPTY,         // 空文字列
 	MD_TEXT,          // text
 	MD_STRONG,        // opt=1, 2 <em>child</em>, <strong>child</strong>
 	MD_CODE_INLINE,   // <code>#hilight:link text</code>
@@ -26,7 +26,6 @@ enum {
 	MD_LINK_PAREN,    // (hogehoge)  # [...]の後ろに限る
 
 	// 単一要素
-	MD_HORIZONTAL,    // <hr>
 	MD_IMAGE,         // <img src="link" alt="title">
 	MD_TEX_FORMULA,   // optional: $$ {e} ^ {i\pi} + 1 = 0 $$
 	MD_PLUGIN,
@@ -47,15 +46,14 @@ enum {
 	MD_TABLE_CELL,    // <td></td>
 };
 
-
-
 typedef struct MDNode {
 	struct MDNode *child;
 	struct MDNode *next;
+	struct MDNode *parent;
 
 	uint16_t type;
 	uint16_t opt;
-	uint16_t level;
+	uint16_t indent;
 
 	const char *cstr;
 } MDNode;
@@ -72,9 +70,10 @@ typedef struct {
 	Hash link_map;
 	MDNode *root;
 
-	MDNode *cur_node;
 	MDNode *parent_node;
-	MDNode **prev_nodep;
+	MDNode *prev_node;
+	MDNode **nextp;
+	MDNode **root_nextp;
 
 	const char *code_block;
 	int prev_level;
@@ -104,6 +103,10 @@ static RefNode *mod_markdown;
 static RefNode *mod_xml;
 static XMLStatic *xst;
 
+static RefNode *cls_xmlelem;
+static RefNode *cls_xmltext;
+static RefNode *cls_nodelist;
+
 
 // markdown字句解析
 
@@ -112,7 +115,7 @@ static void MDTok_init(MDTok *tk, RefMarkdown *md, const char *src)
 	fs->StrBuf_init(&tk->val, 256);
 	tk->md = md;
 	tk->p = src;
-	tk->type = MD_EMPTY;
+	tk->type = MD_EMPTY_LINE;
 	tk->head = TRUE;
 	tk->prev_link = FALSE;
 }
@@ -213,6 +216,8 @@ static int parse_text(MDTok *tk, const char *term)
 			}
 			break;
 		case '\n':
+			tk->head = TRUE;
+			tk->prev_link = FALSE;
 			return TRUE;
 		default: {
 			const char *t = term;
@@ -231,23 +236,34 @@ static int parse_text(MDTok *tk, const char *term)
 	}
 	return TRUE;
 }
+static void MDTok_skip_space(MDTok *tk)
+{
+	while (*tk->p != '\0') {
+		if ((*tk->p & 0xFF) <= ' ' && *tk->p != '\n') {
+			tk->p++;
+		} else {
+			break;
+		}
+	}
+}
 static void MDTok_next(MDTok *tk)
 {
 	tk->val.size = 0;
 	tk->opt = 0;
 
 	if (!tk->head) {
-		while (*tk->p != '\0') {
-			if ((*tk->p & 0xFF) <= ' ' && *tk->p != '\n') {
-				tk->p++;
-			} else {
-				break;
-			}
-		}
+		const char *top = tk->p;
+		MDTok_skip_space(tk);
 		if (*tk->p == '\n') {
 			tk->p++;
 			tk->head = TRUE;
+		}
+		if (tk->p != top) {
 			tk->prev_link = FALSE;
+			tk->val.p[0] = ' ';
+			tk->val.size = 1;
+			tk->type = MD_TEXT;
+			return;
 		}
 	}
 
@@ -258,8 +274,9 @@ static void MDTok_next(MDTok *tk)
 
 		while (*tk->p != '\0') {
 			if (*tk->p == '\t') {
+				int ts = tk->md->tabstop;
+				tk->indent = tk->indent / ts * ts + 1;
 				tk->p++;
-				tk->indent += tk->md->tabstop;
 			} else if ((*tk->p & 0xFF) <= ' ' && *tk->p != '\n' && *tk->p != '\r') {
 				tk->p++;
 				tk->indent++;
@@ -280,6 +297,7 @@ static void MDTok_next(MDTok *tk)
 				tk->opt++;
 				tk->p++;
 			}
+			MDTok_skip_space(tk);
 			return;
 		case '*': case '-':
 			if (tk->p[1] == ' ') {
@@ -300,6 +318,7 @@ static void MDTok_next(MDTok *tk)
 				}
 				if (n >= 3) {
 					tk->p += i;
+					MDTok_skip_space(tk);
 					tk->type = MD_HORIZONTAL;
 					return;
 				}
@@ -313,6 +332,7 @@ static void MDTok_next(MDTok *tk)
 				tk->opt++;
 				tk->p++;
 			}
+			MDTok_skip_space(tk);
 			return;
 		case '`':
 			if (tk->p[1] == '`' && tk->p[2] == '`') {
@@ -328,8 +348,9 @@ static void MDTok_next(MDTok *tk)
 				while (isdigit_fox(*p)) {
 					p++;
 				}
-				if (p[0] == '.' && p[1] == ' ') {
+				if (p[0] == '.' && isspace_fox(p[1])) {
 					tk->p = p + 2;
+					MDTok_skip_space(tk);
 					tk->type = MD_ORDERD_LIST;
 					return;
 				}
@@ -345,6 +366,7 @@ static void MDTok_next(MDTok *tk)
 
 	tk->indent = 0;
 
+RETRY:
 	switch (*tk->p) {
 	case '\0':
 		tk->type = MD_EOS;
@@ -444,13 +466,224 @@ static void MDTok_next(MDTok *tk)
 	if (tk->val.size > 0) {
 		tk->type = MD_TEXT;
 	} else {
-		tk->type = MD_EMPTY;
+		goto RETRY;
+	}
+}
+
+void dump_mdtree(MDNode *node, int level)
+{
+	static const char *name[] = {
+	"MD_EOS",
+	"MD_FATAL_ERROR",
+	"MD_EMPTY_LINE",
+	"MD_HEADING",
+	"MD_SENTENSE",
+	"MD_HORIZONTAL",
+	"MD_TEXT",
+	"MD_STRONG",
+	"MD_CODE_INLINE",
+	"MD_LINK",
+	"MD_CODE",
+	"MD_LINK_BRAKET",
+	"MD_LINK_PAREN",
+	"MD_IMAGE",
+	"MD_TEX_FORMULA",
+	"MD_PLUGIN",
+	"MD_UNORDERD_LIST",
+	"MD_ORDERD_LIST",
+	"MD_DEFINE_LIST",
+	"MD_LIST_ITEM",
+	"MD_DEFINE_DT",
+	"MD_DEFINE_DD",
+	"MD_BLOCKQUOTE",
+	"MD_TABLE",
+	"MD_TABLE_ROW",
+	"MD_TABLE_HEADER",
+	"MD_TABLE_CELL",
+	};
+	while (node != NULL) {
+		int i;
+		for (i = 0; i < level; i++) {
+			fprintf(stderr, " ");
+		}
+		fprintf(stderr, "%p:%s '%s'\n", node, name[node->type], node->cstr);
+		dump_mdtree(node->child, level + 1);
+		node = node->next;
 	}
 }
 
 ////////////////////////////////////////////////////////////////////////////////////
 
-static int parse_markdown_line(RefMarkdown *r, const char *p)
+static MDNode *MDNode_new(int type, RefMarkdown *r, MDTok *tk)
+{
+	MDNode *n = fs->Mem_get(&r->mem, sizeof(MDNode));
+	memset(n, 0, sizeof(MDNode));
+	n->type = type;
+	n->indent = tk->indent;
+	return n;
+}
+// +-------+---(node)
+// |       |
+// +---+   +----+
+static void add_toplevel(RefMarkdown *r, MDNode *node)
+{
+	r->parent_node = NULL;
+	r->prev_node = node;
+
+	*r->root_nextp = node;
+	r->nextp = &node->next;
+	r->root_nextp = &node->next;
+}
+// +-------+
+// |       |
+// +---+   +----+---(node)
+static void add_sibling(RefMarkdown *r, MDNode *node)
+{
+	r->prev_node = node;
+
+	*r->nextp = node;
+	r->nextp = &node->next;
+
+	node->parent = r->parent_node;
+}
+// +-------+
+// |       |
+// +---+   +----+
+//              |
+//            (node)
+static void add_child(RefMarkdown *r, MDNode *node)
+{
+	if (r->prev_node != NULL) {
+		r->parent_node = r->prev_node;
+		r->parent_node->child = node;
+		r->prev_node = node;
+
+		r->nextp = &node->next;
+
+		node->parent = r->parent_node;
+	}
+}
+static void set_current_node(RefMarkdown *r, MDNode *node)
+{
+	r->nextp = &node->next;
+	r->parent_node = node->parent;
+	r->prev_node = node;
+}
+
+static int parse_markdown_line_block(RefMarkdown *r, MDTok *tk)
+{
+	MDNode *node;
+	MDNode *block_prev = r->prev_node;
+	MDNode *block_parent = r->parent_node;
+	MDNode **block_nextp = r->nextp;
+
+	r->parent_node = r->prev_node;
+	r->nextp = &r->prev_node->child;
+
+	for (;;) {
+		switch (tk->type) {
+		case MD_TEXT:
+			node = MDNode_new(MD_TEXT, r, tk);
+			node->cstr = fs->str_dup_p(tk->val.p, tk->val.size, &r->mem);
+			add_sibling(r, node);
+			MDTok_next(tk);
+			break;
+		case MD_LINK:
+			node = MDNode_new(MD_LINK, r, tk);
+			node->cstr = fs->str_dup_p(tk->val.p, tk->val.size, &r->mem);
+			add_sibling(r, node);
+			MDTok_next(tk);
+			break;
+		case MD_FATAL_ERROR:
+			return FALSE;
+		default:
+			r->prev_node = block_prev;
+			r->parent_node = block_parent;
+			r->nextp = block_nextp;
+			return TRUE;
+		}
+	}
+}
+
+static int parse_markdown_line(RefMarkdown *r, MDTok *tk)
+{
+	MDNode *node;
+
+	switch (tk->type) {
+	case MD_HEADING:
+		node = MDNode_new(MD_HEADING, r, tk);
+		node->opt = tk->opt;
+		add_toplevel(r, node);
+		MDTok_next(tk);
+		parse_markdown_line_block(r, tk);
+		break;
+	case MD_HORIZONTAL:
+		node = MDNode_new(MD_HORIZONTAL, r, tk);
+		add_toplevel(r, node);
+		MDTok_next(tk);
+		break;
+	case MD_UNORDERD_LIST:
+	case MD_ORDERD_LIST: {
+		MDNode *nd2 = r->parent_node;
+
+		if (nd2 != NULL && nd2->type == tk->type) {
+			if (tk->indent == nd2->indent) {
+				// 同じインデントレベル
+				node = MDNode_new(MD_LIST_ITEM, r, tk);
+				add_sibling(r, node);
+			} else if (tk->indent > nd2->indent) {
+				// インデントが深くなる場合
+				node = MDNode_new(tk->type, r, tk);
+				add_sibling(r, node);
+
+				node = MDNode_new(MD_LIST_ITEM, r, tk);
+				add_child(r, node);
+			} else {
+				// インデントが浅くなる場合
+				// 同じレベルの位置まで戻る
+				while (nd2->parent != NULL) {
+					if (nd2->parent->type == tk->type && tk->indent <= nd2->parent->indent) {
+						break;
+					}
+					nd2 = nd2->parent;
+				}
+				if (nd2->parent != NULL) {
+					// 同じレベルのリストの後ろに追加
+					set_current_node(r, nd2);
+					node = MDNode_new(MD_LIST_ITEM, r, tk);
+					add_sibling(r, node);
+				} else {
+					// リスト開始
+					node = MDNode_new(tk->type, r, tk);
+					add_toplevel(r, node);
+
+					node = MDNode_new(MD_LIST_ITEM, r, tk);
+					add_sibling(r, node);
+				}
+			}
+		} else {
+			// リスト開始
+			node = MDNode_new(tk->type, r, tk);
+			add_toplevel(r, node);
+
+			node = MDNode_new(MD_LIST_ITEM, r, tk);
+			add_child(r, node);
+		}
+		MDTok_next(tk);
+		parse_markdown_line_block(r, tk);
+		break;
+	}
+	case MD_FATAL_ERROR:
+		return FALSE;
+	default:
+		MDTok_next(tk);
+		break;
+	}
+	return TRUE;
+}
+
+// 文字列をmarkdown中間形式に変換
+static int parse_markdown(RefMarkdown *r, const char *p)
 {
 	MDTok tk;
 	MDTok_init(&tk, r, p);
@@ -467,17 +700,165 @@ static int parse_markdown_line(RefMarkdown *r, const char *p)
 		fprintf(stderr, "%d : %.*s\n", tk.type, tk.val.size, tk.val.p);
 	}
 #endif
+	MDTok_next(&tk);
+
 	for (;;) {
-		MDTok_next(&tk);
+		if (!parse_markdown_line(r, &tk)) {
+			return FALSE;
+		}
 		if (tk.type == MD_FATAL_ERROR) {
 			return FALSE;
 		}
 		if (tk.type == MD_EOS) {
 			break;
 		}
+		while (tk.type == MD_EMPTY_LINE) {
+			MDTok_next(&tk);
+		}
 	}
 
 	MDTok_close(&tk);
+//	dump_mdtree(r->root, 0);
+	return TRUE;
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////
+
+static int link_markdown(RefMarkdown *r, const char *p)
+{
+	return TRUE;
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////
+
+static Ref *xmlelem_new(const char *name)
+{
+	RefArray *ra;
+	Ref *r = fs->ref_new(cls_xmlelem);
+	r->v[INDEX_ELEM_NAME] = vp_Value(fs->intern(name, -1));
+
+	ra = fs->refarray_new(0);
+	ra->rh.type = cls_nodelist;
+	r->v[INDEX_ELEM_CHILDREN] = vp_Value(ra);
+
+	r->v[INDEX_ELEM_ATTR] = vp_Value(fs->refmap_new(0));
+	
+	return r;
+}
+static void xmlelem_add(Ref *r, Ref *elem)
+{
+	RefArray *ra = Value_vp(r->v[INDEX_ELEM_CHILDREN]);
+	Value *v = fs->refarray_push(ra);
+	*v = fs->Value_cp(vp_Value(elem));
+}
+
+static int xml_convert_line(Ref *r, MDNode *node, StrBuf *buf)
+{
+	int prev_type = MD_EMPTY_LINE;
+
+	buf->size = 0;
+
+	for (; node != NULL; node = node->next) {
+		switch (node->type) {
+		case MD_TEXT:
+			if (prev_type != MD_TEXT) {
+				buf->size = 0;
+			}
+			fs->StrBuf_add(buf, node->cstr, -1);
+			break;
+		case MD_LINK:
+			if (prev_type == MD_TEXT) {
+				xmlelem_add(r, Value_vp(fs->cstr_Value(cls_xmltext, buf->p, buf->size)));
+			}
+			break;
+		case MD_STRONG:
+			if (prev_type == MD_TEXT) {
+				xmlelem_add(r, Value_vp(fs->cstr_Value(cls_xmltext, buf->p, buf->size)));
+			}
+			break;
+		default:
+			if (prev_type == MD_TEXT) {
+				xmlelem_add(r, Value_vp(fs->cstr_Value(cls_xmltext, buf->p, buf->size)));
+			}
+			break;
+		}
+		prev_type = node->type;
+	}
+	if (prev_type == MD_TEXT) {
+		xmlelem_add(r, Value_vp(fs->cstr_Value(cls_xmltext, buf->p, buf->size)));
+	}
+	return TRUE;
+}
+static int xml_convert_listitem(Ref *r, MDNode *node, StrBuf *buf)
+{
+	Ref *prev_li = NULL;
+
+	for (; node != NULL; node = node->next) {
+		switch (node->type) {
+		case MD_LIST_ITEM: {
+			Ref *li = xmlelem_new("li");
+			xmlelem_add(r, li);
+			if (!xml_convert_line(li, node->child, buf)) {
+				return FALSE;
+			}
+			prev_li = li;
+			break;
+		}
+		case MD_UNORDERD_LIST:
+		case MD_ORDERD_LIST:
+			if (prev_li != NULL) {
+				Ref *list = xmlelem_new(node->type == MD_UNORDERD_LIST ? "ul" : "ol");
+				xmlelem_add(prev_li, list);
+				if (!xml_convert_listitem(list, node->child, buf)) {
+					return FALSE;
+				}
+			}
+			break;
+		}
+	}
+	return TRUE;
+}
+static int xml_from_markdown(Value *v, RefMarkdown *r, const char *p)
+{
+	MDNode *node;
+	StrBuf buf;
+	Ref *root = xmlelem_new("div");
+	*v = vp_Value(root);
+
+	fs->StrBuf_init(&buf, 64);
+
+	for (node = r->root; node != NULL; node = node->next) {
+		switch (node->type) {
+		case MD_HEADING: {
+			char tag[4];
+			Ref *heading;
+			tag[0] = 'h';
+			tag[1] = (node->opt <= 6 ? '0' + node->opt : '6');
+			heading = xmlelem_new(tag);
+			xmlelem_add(root, heading);
+			if (!xml_convert_line(heading, node->child, &buf)) {
+				return FALSE;
+			}
+			break;
+		}
+		case MD_HORIZONTAL: {
+			Ref *hr = xmlelem_new("hr");
+			xmlelem_add(root, hr);
+			break;
+		}
+		case MD_UNORDERD_LIST:
+		case MD_ORDERD_LIST: {
+			Ref *list = xmlelem_new(node->type == MD_UNORDERD_LIST ? "ul" : "ol");
+			xmlelem_add(root, list);
+			if (!xml_convert_listitem(list, node->child, &buf)) {
+				return FALSE;
+			}
+			break;
+		}
+		default:
+			break;
+		}
+	}
 	return TRUE;
 }
 
@@ -486,12 +867,14 @@ static int parse_markdown_line(RefMarkdown *r, const char *p)
 static int markdown_new(Value *vret, Value *v, RefNode *node)
 {
 	RefNode *cls_markdown = FUNC_VP(node);
-	RefMarkdown *r = fs->new_buf(cls_markdown, sizeof(RefMarkdown));
+	RefMarkdown *r = fs->buf_new(cls_markdown, sizeof(RefMarkdown));
 	*vret = vp_Value(r);
 
 	fs->Mem_init(&r->mem, 1024);
 	r->tabstop = 4;
-	r->prev_nodep = &r->root;
+	r->parent_node = NULL;
+	r->nextp = &r->root;
+	r->root_nextp = &r->root;
 
 	return TRUE;
 }
@@ -564,7 +947,7 @@ static int markdown_compile(Value *vret, Value *v, RefNode *node)
 {
 	RefMarkdown *r = Value_vp(*v);
 
-	if (!parse_markdown_line(r, Value_cstr(v[1]))) {
+	if (!parse_markdown(r, Value_cstr(v[1]))) {
 		return FALSE;
 	}
 
@@ -572,6 +955,15 @@ static int markdown_compile(Value *vret, Value *v, RefNode *node)
 }
 static int markdown_make_xml(Value *vret, Value *v, RefNode *node)
 {
+	RefMarkdown *r = Value_vp(*v);
+
+	if (!link_markdown(r, Value_cstr(v[1]))) {
+		return FALSE;
+	}
+	if (!xml_from_markdown(vret, r, Value_cstr(v[1]))) {
+		return FALSE;
+	}
+
 	return TRUE;
 }
 
@@ -623,6 +1015,9 @@ void define_module(RefNode *m, const FoxStatic *a_fs, FoxGlobal *a_fg)
 	mod_markdown = m;
 	mod_xml = fs->get_module_by_name("datafmt.xml", -1, TRUE, FALSE);
 	xst = mod_xml->u.m.ext;
+	fs->add_unresolved_ptr(m, mod_xml, "XMLElem", &cls_xmlelem);
+	fs->add_unresolved_ptr(m, mod_xml, "XMLText", &cls_xmltext);
+	fs->add_unresolved_ptr(m, mod_xml, "XMLNodeList", &cls_nodelist);
 
 	define_class(m);
 }

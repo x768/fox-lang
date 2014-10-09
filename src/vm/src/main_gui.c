@@ -29,20 +29,39 @@ void print_foxinfo()
 static int parse_args(ArgumentInfo *ai, int argc, const char **argv)
 {
 	if (argc >= 2) {
-		char *srcfile = NULL;
-		const char *p = argv[1];
-		Str src = Str_new(p, -1);
+		const char *srcfile = NULL;
+		const char *arg_file = argv[1];
+		Str src = Str_new(arg_file, -1);
+		char *pwd;
 
 		if (is_absolute_path(src)) {
-			srcfile = str_dup_p(src.p, src.size, &fg->st_mem);
+			Str curdir_s = base_dir_with_sep(src.p, src.size);
+			char *curdir_p = str_dup_p(curdir_s.p, curdir_s.size, NULL);
+			set_current_directory(curdir_p);
+			free(curdir_p);
+
+			pwd = get_current_directory();
+			srcfile = arg_file;
 		} else {
 			// 相対パス
-			char *cwd = getcwd_fox(NULL, 0);
-			srcfile = Mem_get(&fg->st_mem, strlen(cwd) + src.size + 2);
-			sprintf(srcfile, "%s" SEP_S "%s", cwd, p);
-			free(cwd);
+			pwd = get_current_directory();
+			srcfile = str_printf("%s" SEP_S "%s", pwd, arg_file);
 		}
-		fs->cur_dir = base_dir_with_sep(Str_new(srcfile, -1));
+		{
+			// カレントディレクトリの末尾に/を付ける
+			int pwd_len = strlen(pwd);
+			RefStr *rs = refstr_new_n(fs->cls_file, pwd_len + 1);
+			memcpy(rs->c, pwd, pwd_len);
+			if (rs->c[pwd_len - 1] != SEP_C) {
+				rs->c[pwd_len] = SEP_C;
+				rs->c[pwd_len + 1] = '\0';
+			} else {
+				rs->size = pwd_len;
+				rs->c[pwd_len] = '\0';
+			}
+			fv->cur_dir = rs;
+			free(pwd);
+		}
 
 		ai->srcfile = srcfile;
 		fv->argc = argc - 2;
@@ -82,7 +101,6 @@ int main_fox(int argc, const char **argv)
 	fs->max_alloc = 32 * 1024 * 1024; // 32MB
 	fs->max_stack = 32768;
 	fv->err_dst = "alert";
-	fs->cur_dir = Str_new(getcwd_fox(NULL, 0), -1);
 	fs->cs_stdio = fs->cs_utf8;
 
 	if (!parse_args(&ai, argc, argv)) {

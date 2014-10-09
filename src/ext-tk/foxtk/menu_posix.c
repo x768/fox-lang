@@ -49,7 +49,7 @@ static void signal_menu_activate(GtkMenuItem *menuitem, gpointer user_data)
 void Menu_add_item(MenuHandle menu, Value fn, Str text)
 {
 	GtkWidget *item;
-	Ref *r = fs->new_ref(cls_menuitem);
+	Ref *r = fs->ref_new(cls_menuitem);
 	char *text_p = fs->str_dup_p(text.p, text.size, NULL);
 
 	r->v[INDEX_MENUITEM_FN] = fs->Value_cp(fn);

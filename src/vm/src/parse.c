@@ -757,7 +757,7 @@ static int parse_elem(OpBuf *buf, Block *bk, Tok *tk)
 		break;
 	}
 	case TL_MPINT: {
-		RefInt *mp = new_buf(fs->cls_int, sizeof(RefInt));
+		RefInt *mp = buf_new(fs->cls_int, sizeof(RefInt));
 		Value v = vp_Value(mp);
 		mp->mp = tk->mp_val[0];
 		OpBuf_add_op2(buf, OP_LITERAL, 0, v);
@@ -765,7 +765,7 @@ static int parse_elem(OpBuf *buf, Block *bk, Tok *tk)
 		break;
 	}
 	case TL_FRACTION: {
-		RefFrac *md = new_buf(fs->cls_frac, sizeof(RefFrac));
+		RefFrac *md = buf_new(fs->cls_frac, sizeof(RefFrac));
 		Value v = vp_Value(md);
 		md->md[0] = tk->mp_val[0];
 		md->md[1] = tk->mp_val[1];
@@ -774,7 +774,7 @@ static int parse_elem(OpBuf *buf, Block *bk, Tok *tk)
 		break;
 	}
 	case TL_FLOAT: {
-		RefFloat *rd = new_buf(fs->cls_float, sizeof(RefFloat));
+		RefFloat *rd = buf_new(fs->cls_float, sizeof(RefFloat));
 		Value v = vp_Value(rd);
 		rd->d = tk->real_val;
 		OpBuf_add_op2(buf, OP_LITERAL, 0, v);
@@ -782,7 +782,7 @@ static int parse_elem(OpBuf *buf, Block *bk, Tok *tk)
 		break;
 	}
 	case TL_REGEX: {
-		Ref *r = new_ref(fs->cls_regex);
+		Ref *r = ref_new(fs->cls_regex);
 		Value v = vp_Value(r);
 		r->v[INDEX_REGEX_PTR] = ptr_Value(tk->re_val);
 		r->v[INDEX_REGEX_SRC] = cstr_Value(fs->cls_str, tk->str_val.p, tk->str_val.size);
@@ -820,7 +820,7 @@ static int parse_elem(OpBuf *buf, Block *bk, Tok *tk)
 		tk->ignore_nl = TRUE;
 		tk->wait_colon = FALSE;
 
-		OpBuf_add_op2(buf, OP_FUNC, 0, vp_Value(func_strcat));
+		OpBuf_add_op2(buf, OP_FUNC, 0, vp_Value(fv->func_strcat));
 
 		if (tk->str_val.size > 0) {
 			OpBuf_add_str(buf, tk);
@@ -954,7 +954,7 @@ static int parse_elem(OpBuf *buf, Block *bk, Tok *tk)
 		int ignore_nl = tk->ignore_nl;
 		tk->ignore_nl = TRUE;
 
-		OpBuf_add_op2(buf, OP_FUNC, 0, vp_Value(func_array_new));
+		OpBuf_add_op2(buf, OP_FUNC, 0, vp_Value(fv->func_array_new));
 		Tok_next(tk);
 
 		while (tk->v.type != T_RB) {
@@ -984,7 +984,7 @@ static int parse_elem(OpBuf *buf, Block *bk, Tok *tk)
 		int ignore_nl = tk->ignore_nl;
 		tk->ignore_nl = TRUE;
 
-		OpBuf_add_op2(buf, OP_FUNC, 0, vp_Value(func_map_new));
+		OpBuf_add_op2(buf, OP_FUNC, 0, vp_Value(fv->func_map_new));
 		Tok_next(tk);
 		while (tk->v.type != T_RC) {
 			if ((tk->v.type == TL_VAR || tk->v.type == TL_CLASS || tk->v.type == TL_CONST) && Tok_peek(tk, 0) == T_LET) {
@@ -3019,7 +3019,7 @@ void extends_method(RefNode *klass, RefNode *base)
 	} else if ((klass->opt & NODEOPT_STRCLASS) != 0) {
 		// str互換の場合、hash, op_eqを設定
 		define_default_eq(klass, sequence_eq);
-		define_default_hash(klass, refnode_sequence_hash);
+		define_default_hash(klass, fv->refnode_sequence_hash);
 	}
 }
 static int parse_class_statement(RefNode *module, Tok *tk, int abst)
@@ -3329,7 +3329,7 @@ static int parse_path_env(PtrList **proot, const char *key)
 			}
 
 			if (p > top) {
-				char *abs_path = path_normalize(NULL, fs->cur_dir, top, p - top, NULL);
+				char *abs_path = path_normalize(NULL, fv->cur_dir, top, p - top, NULL);
 				int len = strlen(abs_path);
 				PtrList *pl = PtrList_add(proot, len + 1, &fg->st_mem);
 				strcpy(pl->u.c, abs_path);
@@ -3383,10 +3383,10 @@ static int load_error_dst(void)
 }
 void load_env_settings(int *defs)
 {
-	if (parse_path_env(&import_path, "FOX_IMPORT") && defs != NULL) {
+	if (parse_path_env(&fv->import_path, "FOX_IMPORT") && defs != NULL) {
 		defs[ENVSET_IMPORT] = TRUE;
 	}
-	if (parse_path_env(&resource_path, "FOX_RESOURCE") && defs != NULL) {
+	if (parse_path_env(&fv->resource_path, "FOX_RESOURCE") && defs != NULL) {
 		defs[ENVSET_RESOURCE] = TRUE;
 	}
 	if (load_max_alloc() && defs != NULL) {
@@ -3401,7 +3401,7 @@ void load_env_settings(int *defs)
 }
 static void add_default_path(PtrList **proot, const char *key)
 {
-	char *path = str_printf("%S" SEP_S "%s", fs->fox_home, key);
+	char *path = str_printf("%r" SEP_S "%s", fs->fox_home, key);
 	int len = strlen(path);
 	PtrList *pl = PtrList_add(proot, len + 1, &fg->st_mem);
 	strcpy(pl->u.c, path);
@@ -3542,7 +3542,7 @@ static int parse_source(RefNode *module, Tok *tk, RefNode *top, Block *bk)
 BREAK1:
 	if (module == fv->startup) {
 		load_env_settings(NULL);
-		add_default_path(&resource_path, "res");
+		add_default_path(&fv->resource_path, "res");
 	}
 
 	// import宣言
@@ -3783,7 +3783,7 @@ int load_htfox()
 {
 	Hash hash;
 	Hash_init(&hash, &fv->cmp_mem, 16);
-	return load_htfox_sub(str_printf("%S.htfox", fs->cur_dir), &hash, FALSE);
+	return load_htfox_sub(str_printf("%r.htfox", fv->cur_dir), &hash, FALSE);
 }
 
 /**
@@ -3904,7 +3904,7 @@ static int get_module_by_name_sub(RefNode **mod_p, Str name, const char *name_p,
 {
 	RefNode *mod;
 	int ret;
-	char *path = str_printf("%S" SEP_S "import" SEP_S "%s.%s", fs->fox_home, name_p, ext_p);
+	char *path = str_printf("%r" SEP_S "import" SEP_S "%s.%s", fs->fox_home, name_p, ext_p);
 	ret = module_load_sub(mod_p, name, path, initialize, native);
 	mod = *mod_p;
 
@@ -3944,7 +3944,7 @@ RefNode *get_module_by_name(const char *name_ptr, int name_size, int syslib, int
 
 	if (!syslib) {
 		PtrList *lst;
-		for (lst = import_path; lst != NULL; lst = lst->next) {
+		for (lst = fv->import_path; lst != NULL; lst = lst->next) {
 			int ret;
 			char *path = str_printf("%s" SEP_S "%s.fox", lst->u.c, name_p);
 			ret = module_load_sub(&mod, name, path, initialize, FALSE);

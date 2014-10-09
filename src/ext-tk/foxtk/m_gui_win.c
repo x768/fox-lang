@@ -107,7 +107,7 @@ void *Value_handle(Value v)
 Value handle_Value(void *handle)
 {
 #if _WIN64
-	RefInt64 *rh = fs->new_buf(NULL, sizeof(RefInt64));
+	RefInt64 *rh = fs->buf_new(NULL, sizeof(RefInt64));
 	rh->u.u = (uintptr_t)handle;
 	return vp_Value(rh);
 #else

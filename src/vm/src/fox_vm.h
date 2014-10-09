@@ -2,9 +2,9 @@
 #define _FOX_VM_H_
 
 #include "fox_io.h"
+#include "m_number.h"
 #include "compat.h"
 #include "compat_vm.h"
-#include "mpi2.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdarg.h>
@@ -158,20 +158,32 @@ struct RefLocale {
 	int rtl;
 };
 
-typedef struct {
-	RefHeader rh;
-	mp_int mp;
-} RefInt;
-
-typedef struct {
-	RefHeader rh;
-	mp_int md[2];
-} RefFrac;
-
 typedef struct
 {
 	int argc;
 	const char **argv;
+	RefStr *cur_dir;
+
+	PtrList *import_path;    // FOX_IMPORTを分解したもの
+	PtrList *resource_path;  // FOX_RESOURCEを分解したもの
+	const char *path_info;   // CGI modeのみ
+	int headers_sent;        // CGI modeのみ
+
+	RefNode *cls_fileio;
+	RefNode *cls_strio;
+	RefNode *cls_generator;
+	RefNode *cls_mimeheader;
+	RefNode *cls_mimedata;
+	RefNode *cls_entry;
+	RefNode *cls_nullio;
+
+	RefNode *func_strcat;
+	RefNode *func_array_new;
+	RefNode *func_map_new;
+	RefNode *func_range_new;
+
+	RefHeader *ref_textio_utf8;
+	RefNode *refnode_sequence_hash;
 
 	uint32_t hash_seed;
 	int heap_count;
@@ -205,26 +217,6 @@ extern FoxStatic *fs;
 extern FoxGlobal *fg;
 extern FoxVM *fv;
 
-extern RefNode *cls_fileio;
-extern RefNode *cls_strio;
-extern RefNode *cls_generator;
-extern RefNode *cls_mimeheader;
-extern RefNode *cls_mimedata;
-extern RefNode *cls_entry;
-extern RefNode *cls_nullio;
-
-extern RefNode *func_strcat;
-extern RefNode *func_array_new;
-extern RefNode *func_map_new;
-extern RefNode *func_range_new;
-
-extern RefHeader *ref_textio_utf8;
-extern RefNode *refnode_sequence_hash;
-
-extern int headers_sent;
-extern PtrList *import_path;    // FOX_IMPORTを分解したもの
-extern PtrList *resource_path;  // FOX_RESOURCEを分解したもの
-
 #ifdef DEFINE_GLOBALS
 #undef extern
 #endif
@@ -252,12 +244,6 @@ int align_pow2(int sz, int min);
 int char2hex(char ch);
 int write_p(int fd, const char *str);
 int parse_memory_size(Str s);
-int parse_hex(const char **pp, const char *end, int n);
-char hex2lchar(int i);
-char hex2uchar(int i);
-int parse_int(Str src, int max);
-char *str_dup_p(const char *p, int size, Mem *mem);
-char *str_printf(const char *fmt, ...);
 
 void Mem_init(Mem *mem, int chunk_size);
 void *Mem_get(Mem *mem, int size);
@@ -285,15 +271,21 @@ int make_directory(const char *path);
 int IniTok_load(IniTok *tk, const char *path);
 void IniTok_close(IniTok *tk);
 int IniTok_next(IniTok *tk);
-int escape_backslashes_sub(char *dst, const char *src, int size, int bin);
 
 
 // util_str.c
+int parse_hex(const char **pp, const char *end, int n);
+int parse_int(const char *src_p, int src_size, int max);
 int str_hash(const char *p, int size);
+char *str_dup_p(const char *p, int size, Mem *mem);
+char *str_printf(const char *fmt, ...);
+char hex2lchar(int i);
+char hex2uchar(int i);
 int encode_b64_sub(char *dst, const char *p, int size, int url);
 int decode_b64_sub(char *dst, const char *p, int size, int strict);
 void add_backslashes_sub(StrBuf *buf, const char *src_p, int src_size, int mode);
 void add_backslashes_bin(StrBuf *buf, const char *src_p, int src_size);
+int escape_backslashes_sub(char *dst, const char *src, int size, int bin);
 void urlencode_sub(StrBuf *buf, const char *p, int size, int plus);
 void urldecode_sub(StrBuf *buf, const char *p, int size);
 void encode_hex_sub(char *dst, const char *src, int len, int upper);
@@ -303,10 +295,10 @@ int is_string_only_ascii(const char *p, int size, const char *except);
 
 
 // file.c
-Str base_dir_with_sep(Str path);
+Str base_dir_with_sep(const char *path_p, int path_size);
 Str file_name_from_path(Str path);
 int make_path_regularize(char *path, int size);
-char *path_normalize(Str *ret, Str base_dir, const char *path_p, int path_size, Mem *mem);
+char *path_normalize(Str *ret, RefStr *base_dir, const char *path_p, int path_size, Mem *mem);
 Str get_name_part_from_path(Str path);
 
 
@@ -333,14 +325,13 @@ void Value_push(const char *fmt, ...);
 void Value_pop(void);
 
 Value Value_cp(Value v);
-Value ref_cp_Value(RefHeader *rh);
 void Value_set(Value *vp, Value v);
 
-Ref *new_ref(RefNode *klass);
-Ref *new_ref_n(RefNode *klass, int n);
-void *new_buf(RefNode *klass, int size);
-RefStr *new_refstr_n(RefNode *klass, int size);
-RefNode *new_sys_Module(const char *name_p);
+Ref *ref_new(RefNode *klass);
+Ref *ref_new_n(RefNode *klass, int n);
+void *buf_new(RefNode *klass, int size);
+RefStr *refstr_new_n(RefNode *klass, int size);
+RefNode *Module_new_sys(const char *name_p);
 
 int Value_hash(Value v, int32_t *phash);
 int Value_eq(Value v1, Value v2, int *ret);
@@ -408,7 +399,6 @@ void send_headers(void);
 void cgi_init_responce(void);
 int param_string_init_hash(RefMap *v_map, Value keys);
 int is_content_type_html(void);
-char *split_script_and_pathinfo(const char *src_p);
 void init_cgi_module_1(void);
 
 

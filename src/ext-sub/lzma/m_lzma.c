@@ -61,7 +61,7 @@ static int lzmaio_new(Value *vret, Value *v, RefNode *node)
 	int level = 6;
 	int flags = 0;
 	Value v1 = v[1];
-	Ref *r = fs->new_ref(FUNC_VP(node));
+	Ref *r = fs->ref_new(FUNC_VP(node));
 	*vret = vp_Value(r);
 
 	// modeの解析

@@ -677,10 +677,7 @@ class QRCode
 		this._make_matrix code_words, qrv, frame_data, max_modules_1side, max_codewords, byte_num
 	}
 
-	def op_index(x:Int, y:Int)
-	{
-		return m_mat[y][x]
-	}
+	def op_index(x:Int, y:Int) => m_mat[y][x]
 	def width => m_mat[0].size
 	def height => m_mat.size
 
@@ -689,7 +686,7 @@ class QRCode
 		let s = StrIO()
 		var c = null
 
-		if !fmt.empty && fmt.find(',') {
+		if fmt && fmt.find(',') {
 			c = fmt.split(',')
 		} else {
 			c = [' ', '#']

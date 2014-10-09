@@ -15,7 +15,7 @@ enum {
 
 static int load_charset_file(IniTok *tk, RefStr *name)
 {
-	char *path = str_printf("%S" SEP_S "encoding" SEP_S "%r.txt", fs->fox_home, name);
+	char *path = str_printf("%r" SEP_S "encoding" SEP_S "%r.txt", fs->fox_home, name);
 	int ret = IniTok_load(tk, path);
 	free(path);
 	return ret;
@@ -420,7 +420,7 @@ static int charset_iana(Value *vret, Value *v, RefNode *node)
 
 static int charset_get_stdio(Value *vret, Value *v, RefNode *node)
 {
-	*vret = ref_cp_Value(&fs->cs_stdio->rh);
+	*vret = Value_cp(vp_Value(fs->cs_stdio));
 	return TRUE;
 }
 

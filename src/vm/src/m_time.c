@@ -166,7 +166,7 @@ int64_t Value_timestamp(Value v, RefTimeZone *tz)
  */
 Value time_Value(int64_t i_tm, RefTimeZone *tz)
 {
-	RefTime *dt = new_buf(fs->cls_time, sizeof(RefTime));
+	RefTime *dt = buf_new(fs->cls_time, sizeof(RefTime));
 
 	dt->tz = (tz != NULL ? tz : get_local_tz());
 	dt->tm = i_tm;
@@ -229,7 +229,7 @@ static int int64_marshal_read(Value *vret, Value *v, RefNode *node)
 
 	Value r = Value_ref(v[1])->v[INDEX_MARSHALDUMPER_SRC];
 	RefNode *cls = FUNC_VP(node);
-	RefInt64 *rt = new_buf(cls, sizeof(RefInt64));
+	RefInt64 *rt = buf_new(cls, sizeof(RefInt64));
 	*vret = vp_Value(rt);
 
 	if (!stream_read_data(r, NULL, (char*)data, &rd_size, FALSE, TRUE)) {
@@ -267,7 +267,7 @@ static int timestamp_new(Value *vret, Value *v, RefNode *node)
 	};
 	int i;
 	Calendar cal;
-	RefInt64 *rt = new_buf(fs->cls_timestamp, sizeof(RefInt64));
+	RefInt64 *rt = buf_new(fs->cls_timestamp, sizeof(RefInt64));
 	*vret = vp_Value(rt);
 
 	for (i = 1; v + i < fg->stk_top; i++) {
@@ -286,7 +286,7 @@ static int timestamp_new(Value *vret, Value *v, RefNode *node)
 }
 static int timestamp_now(Value *vret, Value *v, RefNode *node)
 {
-	RefInt64 *rt = new_buf(fs->cls_timestamp, sizeof(RefInt64));
+	RefInt64 *rt = buf_new(fs->cls_timestamp, sizeof(RefInt64));
 	*vret = vp_Value(rt);
 	rt->u.i = get_now_time();
 	return TRUE;
@@ -310,7 +310,7 @@ static int parse_digits_sub(int *ret, const char **pp, const char *end, int widt
 	if (p == top) {
 		return FALSE;
 	}
-	*ret = parse_int(Str_new(top, p - top), 99999999);
+	*ret = parse_int(top, p - top, 99999999);
 
 	*pp = p;
 	return TRUE;
@@ -486,9 +486,9 @@ static int parse_rfc_sub(Calendar *cal, Str src)
 				}
 			} else if (digit_only) {
 				if (s.size >= 3) {
-					cal->year = parse_int(s, 99999999);
+					cal->year = parse_int(s.p, s.size, 99999999);
 				} else {
-					cal->day_of_month = parse_int(s, 99);
+					cal->day_of_month = parse_int(s.p, s.size, 99);
 				}
 			} else if (s.p[0] == '+' || s.p[0] == '-') {
 				int sign = (s.p[0] == '+' ? 1 : -1);
@@ -543,7 +543,7 @@ static int timestamp_parse_iso(Value *vret, Value *v, RefNode *node)
 {
 	Calendar cal;
 	Str src = Value_str(v[1]);
-	RefInt64 *rt = new_buf(fs->cls_timestamp, sizeof(RefInt64));
+	RefInt64 *rt = buf_new(fs->cls_timestamp, sizeof(RefInt64));
 	*vret = vp_Value(rt);
 
 	if (!parse_iso_sub(&cal, src)) {
@@ -558,7 +558,7 @@ static int timestamp_parse_rfc2822(Value *vret, Value *v, RefNode *node)
 {
 	Calendar cal;
 	Str src = Value_str(v[1]);
-	RefInt64 *rt = new_buf(fs->cls_timestamp, sizeof(RefInt64));
+	RefInt64 *rt = buf_new(fs->cls_timestamp, sizeof(RefInt64));
 	*vret = vp_Value(rt);
 
 	if (!parse_rfc_sub(&cal, src)) {
@@ -782,7 +782,7 @@ static int word_parse_time(RefTime *dt, Str src, int parse_type)
 				return FALSE;
 			}
 
-			n = parse_int(Str_new(s.p + 1, s.size - 1), INT_MAX);
+			n = parse_int(s.p + 1, s.size - 1, INT_MAX);
 			if (n < 0) {
 				return FALSE;
 			}
@@ -798,7 +798,7 @@ static int word_parse_time(RefTime *dt, Str src, int parse_type)
 		} else if (parse_type != PARSE_ABS) {
 			if ((parse_type == PARSE_POSITIVE || parse_type == PARSE_NEGATIVE) && isdigit(s.p[0])) {
 				type = PARSETYPE_OFFSET;
-				num = parse_int(s, INT_MAX);
+				num = parse_int(s.p, s.size, INT_MAX);
 				if (parse_type == PARSE_NEGATIVE) {
 					num = -num;
 				}
@@ -846,7 +846,7 @@ static int word_parse_time(RefTime *dt, Str src, int parse_type)
 				type = PARSETYPE_NONE;
 			} else if (isdigit(s.p[0])){
 				type = PARSETYPE_NUM;
-				num = parse_int(s, INT_MAX);
+				num = parse_int(s.p, s.size, INT_MAX);
 			} else {
 				return FALSE;
 			}
@@ -1162,7 +1162,7 @@ static int timestamp_add(Value *vret, Value *v, RefNode *node)
 
 	if (v1_type == cls_timedelta) {
 		int64_t tm2 = VALUE_INT64(v[1]);
-		RefInt64 *rt = new_buf(fs->cls_timestamp, sizeof(RefInt64));
+		RefInt64 *rt = buf_new(fs->cls_timestamp, sizeof(RefInt64));
 		*vret = vp_Value(rt);
 		if (neg) {
 			rt->u.i = tm1 - tm2;
@@ -1183,7 +1183,7 @@ static int timestamp_add(Value *vret, Value *v, RefNode *node)
 			throw_errorf(fs->mod_lang, "ParseError", "Invalid time format");
 			return FALSE;
 		}
-		rt = new_buf(fs->cls_timestamp, sizeof(RefInt64));
+		rt = buf_new(fs->cls_timestamp, sizeof(RefInt64));
 		*vret = vp_Value(rt);
 		adjust_timezone(&dt);
 		rt->u.i = dt.tm;
@@ -1192,7 +1192,7 @@ static int timestamp_add(Value *vret, Value *v, RefNode *node)
 		return FALSE;
 	} else if (v1_type == fs->cls_timestamp) {
 		int64_t tm2 = VALUE_INT64(v[1]);
-		RefInt64 *rt = new_buf(cls_timedelta, sizeof(RefInt64));
+		RefInt64 *rt = buf_new(cls_timedelta, sizeof(RefInt64));
 		*vret = vp_Value(rt);
 		rt->u.i = tm1 - tm2;
 	} else {
@@ -1266,7 +1266,7 @@ static int timedelta_new(Value *vret, Value *v, RefNode *node)
 		0, 0, 0, 0, 0,
 	};
 	int i;
-	RefInt64 *rt = new_buf(cls_timedelta, sizeof(RefInt64));
+	RefInt64 *rt = buf_new(cls_timedelta, sizeof(RefInt64));
 	*vret = vp_Value(rt);
 
 	for (i = 1; v + i < fg->stk_top; i++) {
@@ -1299,7 +1299,7 @@ int timedelta_parse_string(int64_t *ret, Str src)
 static int timedelta_parse(Value *vret, Value *v, RefNode *node)
 {
 	Str fmt = Value_str(v[1]);
-	RefInt64 *rt = new_buf(cls_timedelta, sizeof(RefInt64));
+	RefInt64 *rt = buf_new(cls_timedelta, sizeof(RefInt64));
 	*vret = vp_Value(rt);
 
 	if (!timedelta_parse_string(&rt->u.i, fmt)) {
@@ -1318,7 +1318,7 @@ static int timedelta_empty(Value *vret, Value *v, RefNode *node)
 static int timedelta_negative(Value *vret, Value *v, RefNode *node)
 {
 	RefInt64 *src = Value_vp(*v);
-	RefInt64 *rt = new_buf(cls_timedelta, sizeof(RefInt64));
+	RefInt64 *rt = buf_new(cls_timedelta, sizeof(RefInt64));
 	*vret = vp_Value(rt);
 	rt->u.i = -src->u.i;
 	return TRUE;
@@ -1329,7 +1329,7 @@ static int timedelta_add(Value *vret, Value *v, RefNode *node)
 	int64_t r1 = VALUE_INT64(*v);
 	int64_t r2 = VALUE_INT64(v[1]);
 
-	RefInt64 *rt = new_buf(cls_timedelta, sizeof(RefInt64));
+	RefInt64 *rt = buf_new(cls_timedelta, sizeof(RefInt64));
 	*vret = vp_Value(rt);
 	rt->u.i = r1 + r2 * sign;
 
@@ -1339,7 +1339,7 @@ static int timedelta_mul(Value *vret, Value *v, RefNode *node)
 {
 	int64_t r1 = VALUE_INT64(*v);
 	double d2 = Value_float(v[1]);
-	RefInt64 *rt = new_buf(cls_timedelta, sizeof(RefInt64));
+	RefInt64 *rt = buf_new(cls_timedelta, sizeof(RefInt64));
 	*vret = vp_Value(rt);
 	rt->u.i = (int64_t)((double)r1 * d2);
 
@@ -1359,13 +1359,13 @@ static int timedelta_div(Value *vret, Value *v, RefNode *node)
 			throw_errorf(fs->mod_lang, "ZeroDivisionError", "TimeDelta / 0.0");
 			return FALSE;
 		}
-		rt = new_buf(cls_timedelta, sizeof(RefInt64));
+		rt = buf_new(cls_timedelta, sizeof(RefInt64));
 		*vret = vp_Value(rt);
 		rt->u.i = (int64_t)d;
 	} else if (v1_type == cls_timedelta) {
 		RefFloat *rd;
 		int64_t r2 = VALUE_INT64(v[1]);
-		rd = new_buf(fs->cls_float, sizeof(RefFloat));
+		rd = buf_new(fs->cls_float, sizeof(RefFloat));
 		*vret = vp_Value(rd);
 		rd->d = (double)r1 / (double)r2;
 	} else {
@@ -1403,7 +1403,7 @@ static int timedelta_get_float(Value *vret, Value *v, RefNode *node)
 {
 	int64_t r1 = VALUE_INT64(*v);
 	double ret = (double)r1;
-	RefFloat *rd = new_buf(fs->cls_float, sizeof(RefFloat));
+	RefFloat *rd = buf_new(fs->cls_float, sizeof(RefFloat));
 	*vret = vp_Value(rd);
 
 	switch (FUNC_INT(node)) {
@@ -1591,7 +1591,7 @@ static int timezone_new(Value *vret, Value *v, RefNode *node)
 	if (tz == NULL) {
 		return FALSE;
 	}
-	*vret = ref_cp_Value(&tz->rh);
+	*vret = Value_cp(vp_Value(tz));
 
 	return TRUE;
 }
@@ -1631,7 +1631,7 @@ static int timezone_marshal_read(Value *vret, Value *v, RefNode *node)
 	if (tz == NULL) {
 		return FALSE;
 	}
-	*vret = ref_cp_Value(&tz->rh);
+	*vret = Value_cp(vp_Value(tz));
 
 	return TRUE;
 }
@@ -1661,7 +1661,7 @@ static int timezone_tostr(Value *vret, Value *v, RefNode *node)
 	if (fmt.size == 0) {
 		*vret = printf_Value("TimeZone(%r)", tz->name);
 	} else if (fmt.p[0] == 'N' || fmt.p[0] == 'n') {
-		*vret = ref_cp_Value(&tz->name->rh);
+		*vret = Value_cp(vp_Value(tz));
 	} else {
 		throw_errorf(fs->mod_lang, "FormatError", "Unknown format string %Q", fmt);
 		return FALSE;
@@ -1670,7 +1670,7 @@ static int timezone_tostr(Value *vret, Value *v, RefNode *node)
 }
 static int timezone_local(Value *vret, Value *v, RefNode *node)
 {
-	*vret = ref_cp_Value(&get_local_tz()->rh);
+	*vret = Value_cp(vp_Value(get_local_tz()));
 	return TRUE;
 }
 
@@ -1681,7 +1681,7 @@ static int date_new(Value *vret, Value *v, RefNode *node)
 	Value *va;
 	Calendar cal;
 	int argc = fg->stk_top - v - 1;
-	RefTime *dt = new_buf(fs->cls_time, sizeof(RefTime));
+	RefTime *dt = buf_new(fs->cls_time, sizeof(RefTime));
 	*vret = vp_Value(dt);
 
 	// RefTimeZoneがあれば、処理する
@@ -1773,7 +1773,7 @@ static int date_new(Value *vret, Value *v, RefNode *node)
 }
 static int date_now(Value *vret, Value *v, RefNode *node)
 {
-	RefTime *dt = new_buf(fs->cls_time, sizeof(RefTime));
+	RefTime *dt = buf_new(fs->cls_time, sizeof(RefTime));
 	*vret = vp_Value(dt);
 
 	if (fg->stk_top > v + 1) {
@@ -1821,7 +1821,7 @@ static int date_marshal_read(Value *vret, Value *v, RefNode *node)
 {
 	uint32_t uval;
 	Value r = Value_ref(v[1])->v[INDEX_MARSHALDUMPER_SRC];
-	RefTime *dt = new_buf(fs->cls_time, sizeof(RefTime));
+	RefTime *dt = buf_new(fs->cls_time, sizeof(RefTime));
 	*vret = vp_Value(dt);
 
 	if (!read_int32(&uval, r)) {
@@ -1868,7 +1868,7 @@ static int date_parse(Value *vret, Value *v, RefNode *node)
 {
 	Str src;
 	int64_t i_tm;
-	RefTime *dt = new_buf(fs->cls_time, sizeof(RefTime));
+	RefTime *dt = buf_new(fs->cls_time, sizeof(RefTime));
 	*vret = vp_Value(dt);
 
 	if (fg->stk_top > v + 2) {
@@ -1944,7 +1944,7 @@ static int date_get(Value *vret, Value *v, RefNode *node)
 static int date_timestamp(Value *vret, Value *v, RefNode *node)
 {
 	RefTime *dt = Value_vp(*v);
-	RefInt64 *rt = new_buf(fs->cls_timestamp, sizeof(RefInt64));
+	RefInt64 *rt = buf_new(fs->cls_timestamp, sizeof(RefInt64));
 	*vret = vp_Value(rt);
 	rt->u.i = dt->tm;
 	return TRUE;
@@ -1953,14 +1953,14 @@ static int date_timezone(Value *vret, Value *v, RefNode *node)
 {
 	RefTime *dt = Value_vp(*v);
 	RefTimeZone *tz = dt->tz;
-	*vret = ref_cp_Value(&tz->rh);
+	*vret = Value_cp(vp_Value(tz));
 	return TRUE;
 }
 static int date_zoneabbr(Value *vret, Value *v, RefNode *node)
 {
 	RefTime *dt = Value_vp(*v);
 	RefStr *abbr = dt->off->name;
-	*vret = ref_cp_Value(&abbr->rh);
+	*vret = Value_cp(vp_Value(abbr));
 	return TRUE;
 }
 static int date_is_dst(Value *vret, Value *v, RefNode *node)
@@ -1972,7 +1972,7 @@ static int date_is_dst(Value *vret, Value *v, RefNode *node)
 static int date_offset(Value *vret, Value *v, RefNode *node)
 {
 	RefTime *dt = Value_vp(*v);
-	RefInt64 *rt = new_buf(cls_timedelta, sizeof(RefInt64));
+	RefInt64 *rt = buf_new(cls_timedelta, sizeof(RefInt64));
 	*vret = vp_Value(rt);
 	rt->u.i = dt->off->offset;
 	return TRUE;
@@ -2022,7 +2022,7 @@ static int date_add(Value *vret, Value *v, RefNode *node)
 	int neg = FUNC_INT(node);
 	RefTime *dt1 = Value_vp(v[0]);
 	RefNode *v1_type = Value_type(v[1]);
-	RefTime *dt2 = new_buf(fs->cls_time, sizeof(RefTime));
+	RefTime *dt2 = buf_new(fs->cls_time, sizeof(RefTime));
 	*vret = vp_Value(dt2);
 
 	if (v1_type == fs->cls_str) {
@@ -2191,7 +2191,7 @@ static void define_time_class(RefNode *m)
 	define_native_func_a(n, timezone_marshal_write, 1, 1, NULL, fs->cls_marshaldumper);
 
 	n = define_identifier(m, cls, "UTC", NODE_CONST, 0);
-	n->u.k.val = ref_cp_Value(&fs->tz_utc->rh);
+	n->u.k.val = Value_cp(vp_Value(fs->tz_utc));
 	n = define_identifier(m, cls, "LOCAL", NODE_CONST_U_N, 0);
 	define_native_func_a(n, timezone_local, 0, 0, NULL);
 
@@ -2262,7 +2262,7 @@ static void define_time_class(RefNode *m)
 
 RefNode *init_time_module_stubs()
 {
-	RefNode *m = new_sys_Module("time");
+	RefNode *m = Module_new_sys("time");
 
 	fs->cls_timestamp = define_identifier(m, m, "TimeStamp", NODE_CLASS, 0);
 	fs->cls_time = define_identifier(m, m, "Time", NODE_CLASS, 0);

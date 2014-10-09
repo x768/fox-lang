@@ -41,7 +41,6 @@ static Hash *load_type_function(Mem *mem)
 	return &mods;
 }
 
-/*
 static int read_int8(uint8_t *val, Value r)
 {
 	int size = 1;
@@ -51,7 +50,6 @@ static int read_int8(uint8_t *val, Value r)
 	}
 	return TRUE;
 }
-*/
 static int write_int8(uint32_t val, Value w)
 {
 	uint8_t buf[1];
@@ -94,7 +92,7 @@ static int audio_new(Value *vret, Value *v, RefNode *node)
 	int samples = fs->Value_int(v[1], NULL);
 	int bits = fs->Value_int(v[2], NULL);
 
-	RefAudio *snd = fs->new_buf(cls_audio, sizeof(RefAudio));
+	RefAudio *snd = fs->buf_new(cls_audio, sizeof(RefAudio));
 	*vret = vp_Value(snd);
 
 	if (samples < 1 && samples > 1000000) {
@@ -133,7 +131,7 @@ static int audio_load(Value *vret, Value *v, RefNode *node)
 	if (!fs->value_to_streamio(&reader, v[1], FALSE, 0)) {
 		return FALSE;
 	}
-	snd = fs->new_buf(cls_audio, sizeof(RefAudio));
+	snd = fs->buf_new(cls_audio, sizeof(RefAudio));
 	*vret = vp_Value(snd);
 	if (!audio_load_wav(snd, reader, FUNC_INT(node))) {
 		fs->Value_dec(reader);
@@ -174,7 +172,30 @@ static int audio_save(Value *vret, Value *v, RefNode *node)
 }
 static int audio_marshal_read(Value *vret, Value *v, RefNode *node)
 {
-	//Value r = Value_ref(v[1])->v[INDEX_MARSHALDUMPER_SRC];
+	RefAudio *snd = fs->buf_new(cls_audio, sizeof(RefAudio));
+	Value r = Value_ref(v[1])->v[INDEX_MARSHALDUMPER_SRC];
+	uint8_t i8;
+
+	if (!read_int8(&i8, r)) {
+		return FALSE;
+	}
+	snd->samples = i8;
+
+	if (!read_int8(&i8, r)) {
+		return FALSE;
+	}
+	snd->width = i8;
+
+	if (!read_int8(&i8, r)) {
+		return FALSE;
+	}
+	snd->channels = i8;
+
+	if (!read_int8(&i8, r)) {
+		return FALSE;
+	}
+	snd->length = i8;
+
 	return TRUE;
 }
 static int audio_marshal_write(Value *vret, Value *v, RefNode *node)
@@ -268,7 +289,7 @@ static int audio_size(Value *vret, Value *v, RefNode *node)
 static int audio_length(Value *vret, Value *v, RefNode *node)
 {
 	RefAudio *snd = Value_vp(*v);
-	RefInt64 *delta = fs->new_buf(cls_timedelta, sizeof(RefInt64));
+	RefInt64 *delta = fs->buf_new(cls_timedelta, sizeof(RefInt64));
 	*vret = vp_Value(delta);
 	delta->u.i = (int64_t)snd->length * 1000 / snd->samples;
 	return TRUE;
@@ -450,7 +471,7 @@ static int audio_sub(Value *vret, Value *v, RefNode *node)
 	{
 		int size2 = end - begin;
 		int n = snd->width * snd->channels;
-		RefAudio *snd2 = fs->new_buf(cls_audio, sizeof(RefAudio));
+		RefAudio *snd2 = fs->buf_new(cls_audio, sizeof(RefAudio));
 		*vret = vp_Value(snd2);
 		*snd2 = *snd;
 		snd2->max = 0;
@@ -517,7 +538,7 @@ static int audio_convert(Value *vret, Value *v, RefNode *node)
 		}
 	}
 
-	snd = fs->new_buf(cls_audio, sizeof(RefAudio));
+	snd = fs->buf_new(cls_audio, sizeof(RefAudio));
 	*vret = vp_Value(snd);
 	snd->samples = samples;
 	snd->width = bits / 8;

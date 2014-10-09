@@ -293,10 +293,10 @@ static int function_call(Value *vret, Value *v, RefNode *node)
 
 /////////////////////////////////////////////////////////////////////////////////////
 
-static int ref_new(Value *vret, Value *v, RefNode *node)
+static int lang_ref_new(Value *vret, Value *v, RefNode *node)
 {
 	RefNode *cls_ref = FUNC_VP(node);
-	Ref *r = new_ref(cls_ref);
+	Ref *r = ref_new(cls_ref);
 
 	*vret = vp_Value(r);
 	r->v[0] = v[1];
@@ -304,14 +304,14 @@ static int ref_new(Value *vret, Value *v, RefNode *node)
 
 	return TRUE;
 }
-static int ref_tohash(Value *vret, Value *v, RefNode *node)
+static int lang_ref_tohash(Value *vret, Value *v, RefNode *node)
 {
 	Ref *r1 = Value_ref(*v);
 	int32_t hash = int32_hash(Value_integral(r1->v[0]));
 	*vret = int32_Value(hash);
 	return TRUE;
 }
-static int ref_eq(Value *vret, Value *v, RefNode *node)
+static int lang_ref_eq(Value *vret, Value *v, RefNode *node)
 {
 	Ref *r1 = Value_ref(*v);
 	Ref *r2 = Value_ref(v[1]);
@@ -330,7 +330,7 @@ static int weakref_new(Value *vret, Value *v, RefNode *node)
 			// すでに存在する場合は再利用
 			ref = r;
 		} else {
-			ref = new_ref_n(cls_weakref, INDEX_WEAKREF_NUM);
+			ref = ref_new_n(cls_weakref, INDEX_WEAKREF_NUM);
 			ref->v[0] = v1;
 			ref->v[1] = VALUE_TRUE;
 			ref->rh.nref++;
@@ -338,7 +338,7 @@ static int weakref_new(Value *vret, Value *v, RefNode *node)
 		}
 	} else {
 		// 参照ではない型は、毎回作成する
-		ref = new_ref_n(cls_weakref, INDEX_WEAKREF_NUM);
+		ref = ref_new_n(cls_weakref, INDEX_WEAKREF_NUM);
 		ref->v[0] = v1;
 		ref->v[1] = VALUE_TRUE;
 	}
@@ -475,7 +475,7 @@ static int error_new(Value *vret, Value *v, RefNode *node)
 	Ref *r = Value_ref(*v);
 
 	if (*v == VALUE_NULL || r->rh.n_memb == 0) {
-		r = new_ref(type);
+		r = ref_new(type);
 		*vret = vp_Value(r);
 	}
 
@@ -777,12 +777,12 @@ static void define_lang_class(RefNode *m)
 	// Ref
 	cls = define_identifier(m, m, "Ref", NODE_CLASS, 0);
 	n = define_identifier_p(m, cls, fs->str_new, NODE_NEW_N, 0);
-	define_native_func_a(n, ref_new, 1, 1, cls, NULL);
+	define_native_func_a(n, lang_ref_new, 1, 1, cls, NULL);
 
 	n = define_identifier_p(m, cls, fs->str_hash, NODE_FUNC_N, NODEOPT_PROPERTY);
-	define_native_func_a(n, ref_tohash, 0, 0, NULL);
+	define_native_func_a(n, lang_ref_tohash, 0, 0, NULL);
 	n = define_identifier_p(m, cls, fs->symbol_stock[T_EQ], NODE_FUNC_N, 0);
-	define_native_func_a(n, ref_eq, 1, 1, NULL, cls);
+	define_native_func_a(n, lang_ref_eq, 1, 1, NULL, cls);
 
 	n = define_identifier(m, cls, "value", NODE_FUNC_N, NODEOPT_PROPERTY);
 	define_native_func_a(n, native_get_member, 0, 0, (void*) 0);
@@ -919,7 +919,7 @@ static void define_lang_class(RefNode *m)
 
 void init_lang_module_stubs()
 {
-	RefNode *m = new_sys_Module("lang");
+	RefNode *m = Module_new_sys("lang");
 
 	redefine_identifier(m, m, "Str", NODE_CLASS, NODEOPT_STRCLASS, fs->cls_str);
 	redefine_identifier(m, m, "Class", NODE_CLASS, 0, fs->cls_class);
@@ -945,7 +945,7 @@ void init_lang_module_stubs()
 	cls_weakref = define_identifier(m, m, "WeakRef", NODE_CLASS, 0);
 	fs->cls_iterable = define_identifier(m, m, "Iterable", NODE_CLASS, NODEOPT_ABSTRACT);
 	fs->cls_iterator = define_identifier(m, m, "Iterator", NODE_CLASS, NODEOPT_ABSTRACT);
-	cls_generator = define_identifier(m, m, "Generator", NODE_CLASS, 0);
+	fv->cls_generator = define_identifier(m, m, "Generator", NODE_CLASS, 0);
 	fs->cls_marshaldumper = define_identifier(m, m, "MarshalDumper", NODE_CLASS, 0);
 
 	fs->cls_error = define_identifier(m, m, "Error", NODE_CLASS, NODEOPT_ABSTRACT);

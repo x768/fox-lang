@@ -47,7 +47,7 @@ char *file_value_to_path(Str *ret, Value v, int argn)
 	if (type == fs->cls_str) {
 		int len;
 		RefStr *rs = Value_vp(v);
-		ptr = path_normalize(&path, fs->cur_dir, rs->c, rs->size, NULL);
+		ptr = path_normalize(&path, fv->cur_dir, rs->c, rs->size, NULL);
 
 		// NULを含む場合エラー
 		if (str_has0(path.p, path.size)) {
@@ -86,7 +86,7 @@ static int file_new(Value *vret, Value *v, RefNode *node)
 	char *path;
 	Str path_s;
 
-	path = path_normalize(&path_s, fs->cur_dir, r1->c, r1->size, NULL);
+	path = path_normalize(&path_s, fv->cur_dir, r1->c, r1->size, NULL);
 	if (path_s.size > 0 && path_s.p[path_s.size - 1] == SEP_C) {
 		path_s.size--;
 	}
@@ -125,7 +125,7 @@ static int file_relative(Value *vret, Value *v, RefNode *node)
 		base = Str_new(path_p, -1);
 	} else {
 		// ソースファイルのあるディレクトリを基準にする
-		base = fs->cur_dir;
+		base = Str_new(fv->cur_dir->c, fv->cur_dir->size);
 		if (base.size > 0 && base.p[base.size - 1] == SEP_C) {
 			base.size--;
 		}
@@ -164,14 +164,14 @@ static int file_relative(Value *vret, Value *v, RefNode *node)
 	}
 	if (count == 0) {
 		// "./path"
-		rs_tmp = new_refstr_n(fs->cls_str, relpath.size + 2);
+		rs_tmp = refstr_new_n(fs->cls_str, relpath.size + 2);
 		tmp = vp_Value(rs_tmp);
 		dst = rs_tmp->c;
 		memcpy(dst, "./", 2);
 		dst += 2;
 	} else {
 		// "../../path"
-		rs_tmp = new_refstr_n(fs->cls_str, relpath.size + count * 3);
+		rs_tmp = refstr_new_n(fs->cls_str, relpath.size + count * 3);
 		tmp = vp_Value(rs_tmp);
 		dst = rs_tmp->c;
 		for (i = 0; i < count; i++) {
@@ -290,7 +290,7 @@ static int file_path(Value *vret, Value *v, RefNode *node)
 
 	switch (type) {
 	case FILEPATH_BASEDIR: // basedir:File
-		path = base_dir_with_sep(s);
+		path = base_dir_with_sep(s.p, s.size);
 		if (path.p[0] != '.') {
 			// 末尾の / を除去
 			path.size--;
@@ -381,7 +381,7 @@ static int file_mtime(Value *vret, Value *v, RefNode *node)
 	int64_t mtime;
 
 	if (get_file_mtime(&mtime, path->c)) {
-		RefInt64 *tm = new_buf(fs->cls_timestamp, sizeof(RefInt64));
+		RefInt64 *tm = buf_new(fs->cls_timestamp, sizeof(RefInt64));
 		tm->u.i = mtime;
 		*vret = vp_Value(tm);
 		return TRUE;
@@ -403,7 +403,7 @@ static int file_iter(Value *vret, Value *v, RefNode *node)
 	if (d == NULL) {
 		goto FINALLY;
 	}
-	r = new_ref(cls_diriter);
+	r = ref_new(cls_diriter);
 	*vret = vp_Value(r);
 	r->v[DIRITER_FILE] = Value_cp(*v);
 	r->v[DIRITER_DIR] = ptr_Value(d);
@@ -434,7 +434,7 @@ static int file_marshal_read(Value *vret, Value *v, RefNode *node)
 		return FALSE;
 	}
 
-	rs = new_refstr_n(fs->cls_file, size);
+	rs = refstr_new_n(fs->cls_file, size);
 	*vret = vp_Value(rs);
 	rd_size = size;
 	if (!stream_read_data(r, NULL, rs->c, &rd_size, FALSE, TRUE)) {
@@ -527,7 +527,7 @@ static int fileio_new(Value *vret, Value *v, RefNode *node)
 	RefFileHandle *fh;
 	int mode = O_RDONLY;
 
-	Ref *r = new_ref(cls_fileio);
+	Ref *r = ref_new(fv->cls_fileio);
 	Value v1 = v[1];
 
 	Str path_s;
@@ -561,7 +561,7 @@ static int fileio_new(Value *vret, Value *v, RefNode *node)
 		return FALSE;
 	}
 
-	fh = new_buf(NULL, sizeof(RefFileHandle));
+	fh = buf_new(NULL, sizeof(RefFileHandle));
 	r->v[INDEX_FILEIO_HANDLE] = vp_Value(fh);
 	if (mode == O_RDONLY) {
 		init_stream_ref(r, STREAM_READ);
@@ -698,10 +698,10 @@ static int file_fopen(Value *vret, Value *v, RefNode *node)
 		Value_dec(tmp);
 		return FALSE;
 	}
-	ref = new_ref(fs->cls_textio);
+	ref = ref_new(fs->cls_textio);
 	*vret = vp_Value(ref);
 	ref->v[INDEX_TEXTIO_STREAM] = tmp;
-	ref->v[INDEX_TEXTIO_TEXTIO] = vp_Value(ref_textio_utf8);
+	ref->v[INDEX_TEXTIO_TEXTIO] = vp_Value(fv->ref_textio_utf8);
 
 	return TRUE;
 }
@@ -947,7 +947,7 @@ static int file_readfile(Value *vret, Value *v, RefNode *node)
 	} else {
 		// そのまま読み込む
 		int size = size64;
-		RefStr *buf = new_refstr_n(fs->cls_bytes, size);
+		RefStr *buf = refstr_new_n(fs->cls_bytes, size);
 		*vret = vp_Value(buf);
 		if (!read_file_sub(buf->c, &size, path)) {
 			throw_error_select(THROW_CANNOT_OPEN_FILE__STR, path_s);
@@ -1070,9 +1070,45 @@ static int file_writefile(Value *vret, Value *v, RefNode *node)
 	return TRUE;
 }
 
+static int file_getcwd(Value *vret, Value *v, RefNode *node)
+{
+	char *path = get_current_directory();
+	*vret = cstr_Value(fs->cls_file, path, -1);
+	free(path);
+	return TRUE;
+}
+static int file_chdir(Value *vret, Value *v, RefNode *node)
+{
+	char *path = file_value_to_path(NULL, v[1], 0);
+
+	if (path == NULL) {
+		return FALSE;
+	}
+	if (!set_current_directory(path)) {
+		throw_errorf(fs->mod_file, "DirOpenError", "Change directory failed %q", path);
+		free(path);
+		return FALSE;
+	}
+	free(path);
+
+	path = get_current_directory();
+	Value_dec(vp_Value(fv->cur_dir));
+	fv->cur_dir = Value_vp(cstr_Value(fs->cls_file, path, -1));
+	free(path);
+
+	return TRUE;
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+static void define_file_const(RefNode *m)
+{
+	RefNode *n;
+//	Ref *r;
+
+	n = define_identifier(m, m, "FOX_HOME", NODE_CONST, 0);
+	n->u.k.val = Value_cp(vp_Value(fs->fox_home));
+}
 static void define_file_func(RefNode *m)
 {
 	RefNode *n;
@@ -1102,6 +1138,13 @@ static void define_file_func(RefNode *m)
 
 	n = define_identifier(m, m, "appendfile", NODE_FUNC_N, 0);
 	define_native_func_a(n, file_writefile, 2, 4, (void*) TRUE, NULL, NULL, fs->cls_charset, fs->cls_bool);
+
+	// ディレクトリ系
+	n = define_identifier(m, m, "getcwd", NODE_FUNC_N, 0);
+	define_native_func_a(n, file_getcwd, 0, 0, NULL);
+
+	n = define_identifier(m, m, "chdir", NODE_FUNC_N, 0);
+	define_native_func_a(n, file_chdir, 1, 1, NULL, NULL);
 }
 static void define_file_class(RefNode *m)
 {
@@ -1176,9 +1219,9 @@ static void define_file_class(RefNode *m)
 
 
 	// FileIO
-	cls = cls_fileio;
+	cls = fv->cls_fileio;
 	n = define_identifier_p(m, cls, fs->str_new, NODE_NEW_N, 0);
-	define_native_func_a(n, fileio_new, 1, 2, cls_fileio, NULL, fs->cls_str);
+	define_native_func_a(n, fileio_new, 1, 2, fv->cls_fileio, NULL, fs->cls_str);
 
 	n = define_identifier(m, cls, "_close", NODE_FUNC_N, 0);
 	define_native_func_a(n, fileio_close, 0, 0, NULL);
@@ -1208,11 +1251,11 @@ static void define_file_class(RefNode *m)
 
 void init_file_module_stubs()
 {
-	RefNode *m = new_sys_Module("io.file");
+	RefNode *m = Module_new_sys("io.file");
 
 	redefine_identifier(m, m, "File", NODE_CLASS, NODEOPT_STRCLASS, fs->cls_file);
 
-	cls_fileio = define_identifier(m, m, "FileIO", NODE_CLASS, 0);
+	fv->cls_fileio = define_identifier(m, m, "FileIO", NODE_CLASS, 0);
 	cls_diriter = define_identifier(m, m, "DirIterator", NODE_CLASS, 0);
 
 	fs->mod_file = m;
@@ -1223,6 +1266,7 @@ void init_file_module_1()
 
 	define_file_class(m);
 	define_file_func(m);
+	define_file_const(m);
 
 	m->u.m.loaded = TRUE;
 }

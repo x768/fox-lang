@@ -8,7 +8,7 @@ int conv_graphics_to_image(Value *vret, GraphicsHandle img)
 {
 	int width, height;
 	int pitch, has_alpha = FALSE;  // pitch:1行あたりのバイト数
-	RefImage *fi = fs->new_buf(cls_image, sizeof(RefImage));
+	RefImage *fi = fs->buf_new(cls_image, sizeof(RefImage));
 	*vret = vp_Value(fi);
 
 	has_alpha = gdk_pixbuf_get_has_alpha(img);

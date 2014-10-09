@@ -16,7 +16,7 @@ static int editor_pane_new(Value *vret, Value *v, RefNode *node)
 	Ref *r = Value_ref(v[1]);
 	WndHandle parent = ftk->Value_handle(r->v[INDEX_WIDGET_HANDLE]);
 
-	*vret = vp_Value(fs->new_ref(cls_editor));
+	*vret = vp_Value(fs->ref_new(cls_editor));
 	create_editor_pane_window(vret, parent);
 	r->v[INDEX_EDITWND_DATA] = ptr_Value(newEditWnd());
 

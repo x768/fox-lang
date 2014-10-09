@@ -12,6 +12,42 @@ static const char *tlend = "</td></tr>\n<tr><th>";
 static const char *tend = "</td></tr>\n</tbody>\n</table>\n";
 
 
+static void split_script_and_pathinfo(const char **srcfile, const char **path_info, const char *src_p)
+{
+	char *src = str_dup_p(src_p, -1, &fg->st_mem);
+	int src_size = strlen(src_p);
+	char *p;
+	if (exists_file(src) != EXISTS_NONE) {
+		goto FINALLY;
+	}
+
+	p = src + strlen(src) - 1;
+	for (;;) {
+		int type;
+
+		while (p > src && *p != SEP_C) {
+			p--;
+		}
+		if (p <= src) {
+			*path_info = "";
+			goto FINALLY;
+		}
+		*p = '\0';
+
+		type = exists_file(src);
+		if (type == EXISTS_FILE) {
+			int len = src_size - (p - src);
+			*path_info = str_dup_p(src_p + (p - src), len, &fg->st_mem);
+			goto FINALLY;
+		} else if (type == EXISTS_DIR) {
+			*path_info = "";
+			goto FINALLY;
+		}
+	}
+FINALLY:
+	*srcfile = src;
+}
+
 static void write_html_encode(const char *p, int size)
 {
 	StrBuf sb;
@@ -51,7 +87,7 @@ static void show_version(void)
 
 	stream_write_data(fg->v_cio, tlend, -1);
 	stream_write_data(fg->v_cio, "fox home</th><td>", -1);
-	write_html_encode(fs->fox_home.p, fs->fox_home.size);
+	write_html_encode(fs->fox_home->c, fs->fox_home->size);
 
 	stream_write_data(fg->v_cio, tend, -1);
 }
@@ -227,7 +263,7 @@ static void show_lib_version(void)
 	StrBuf_init(&path, 0);
 	StrBuf_init(&package, 0);
 
-	StrBuf_add(&path, fs->fox_home.p, fs->fox_home.size);
+	StrBuf_add_r(&path, fs->fox_home);
 	StrBuf_add(&path, SEP_S "import" SEP_S, -1);
 	show_lib_version_sub(&mem, &path, &package, "Native library: ");
 
@@ -348,8 +384,8 @@ static void show_configure(void)
 	stream_write_data(fg->v_cio, ctmp, -1);
 	stream_write_data(fg->v_cio, tlend, -1);
 
-	show_configure_path(import_path, "FOX_IMPORT</th><td>");
-	show_configure_path(resource_path, "FOX_RESOURCE</th><td>");
+	show_configure_path(fv->import_path, "FOX_IMPORT</th><td>");
+	show_configure_path(fv->resource_path, "FOX_RESOURCE</th><td>");
 
 	stream_write_data(fg->v_cio, "FOX_STDIO_CHARSET</th><td>", -1);
 	if (defs[ENVSET_STDIO_CHARSET]) {
@@ -459,7 +495,7 @@ void print_foxinfo()
 		"</head>\n<body>\n";
 	const char *footer = "</body>\n</html>\n";
 
-	headers_sent = TRUE;
+	fv->headers_sent = TRUE;
 
 	stream_write_data(fg->v_cio, header, -1);
 	show_version();
@@ -533,7 +569,6 @@ static void print_404()
 	write_p(STDOUT_FILENO, msg);
 }
 
-void put_log(const char *msg, int msg_size);
 /**
  * argv[1]にスクリプト名
  */
@@ -556,8 +591,35 @@ int main_fox(int argc, const char **argv)
 	fox_init_compile(FALSE);
 
 	if (argv[1] != NULL) {
-		srcfile = split_script_and_pathinfo(argv[1]);
-		fs->cur_dir = base_dir_with_sep(Str_new(srcfile, -1));
+		Str curdir;
+
+		split_script_and_pathinfo(&srcfile, &fv->path_info, argv[1]);
+		curdir = base_dir_with_sep(srcfile, -1);
+		char *p_curdir = str_dup_p(curdir.p, curdir.size, NULL);
+
+		// ソースファイルのディレクトリに移動
+		if (set_current_directory(p_curdir)) {
+			// ディレクトリに移動できる場合は、実際のカレントディレクトリを取得
+			// 末尾に/を付ける
+			char *pwd = get_current_directory();
+			int pwd_len = strlen(pwd);
+			RefStr *rs = refstr_new_n(fs->cls_file, pwd_len + 1);
+			memcpy(rs->c, pwd, pwd_len);
+			if (rs->c[pwd_len - 1] != SEP_C) {
+				rs->c[pwd_len] = SEP_C;
+				rs->c[pwd_len + 1] = '\0';
+			} else {
+				rs->size = pwd_len;
+				rs->c[pwd_len] = '\0';
+			}
+			fv->cur_dir = rs;
+			free(pwd);
+		} else {
+			// ディレクトリに移動できない場合は、ソースのパスからディレクトリを取得
+			fv->cur_dir = Value_vp(cstr_Value(fs->cls_file, curdir.p, curdir.size));
+		}
+		free(p_curdir);
+
 		load_htfox();
 		mod = get_module_by_file(srcfile);
 		if (mod != NULL) {

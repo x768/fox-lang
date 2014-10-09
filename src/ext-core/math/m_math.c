@@ -1,8 +1,5 @@
 #include "fox.h"
-#include "m_math.h"
-#include "mpi.h"
-#include "mpi2.h"
-#include "mplogic.h"
+#include "m_number.h"
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
@@ -20,16 +17,6 @@ enum {
 	ROUND_HALF_UP,
 	ROUND_HALF_EVEN,
 };
-
-typedef struct {
-	RefHeader rh;
-	mp_int mp;
-} RefInt;
-
-typedef struct {
-	RefHeader rh;
-	mp_int md[2];
-} RefFrac;
 
 
 static const FoxStatic *fs;
@@ -278,7 +265,7 @@ static int math_rand_bin(Value *vret, Value *v, RefNode *node)
 	}
 	n = (size + 3) / 4;
 
-	rs = fs->new_refstr_n(fs->cls_bytes, n * 4);
+	rs = fs->refstr_new_n(fs->cls_bytes, n * 4);
 	*vret = vp_Value(rs);
 	for (i = 0; i < n; i++) {
 		uint32_t r = gen_int32();
@@ -318,7 +305,7 @@ static int math_rand_int(Value *vret, Value *v, RefNode *node)
 			mp_add_d(&mp, r >> 16, &mp);
 		}
 		mp_init(&q);
-		rem = fs->new_buf(fs->cls_int, sizeof(RefInt));
+		rem = fs->buf_new(fs->cls_int, sizeof(RefInt));
 		*vret = vp_Value(rem);
 		mp_init(&rem->mp);
 		mp_div(&mp, mpval, &q, &rem->mp);
@@ -453,7 +440,7 @@ static int vector_new(Value *vret, Value *v, RefNode *node)
 			size = ra->size;
 		}
 	}
-	vec = fs->new_buf(cls_vector, sizeof(RefVector) + sizeof(double) * size);
+	vec = fs->buf_new(cls_vector, sizeof(RefVector) + sizeof(double) * size);
 	*vret = vp_Value(vec);
 	vec->size = size;
 
@@ -472,7 +459,7 @@ static int vector_dup(Value *vret, Value *v, RefNode *node)
 {
 	RefVector *src = Value_vp(*v);
 	int size = sizeof(RefVector) + sizeof(double) * src->size;
-	RefVector *dst = fs->new_buf(cls_vector, size);
+	RefVector *dst = fs->buf_new(cls_vector, size);
 	*vret = vp_Value(dst);
 	memcpy(dst->d, src->d, size);
 
@@ -520,7 +507,7 @@ static int vector_to_matrix(Value *vret, Value *v, RefNode *node)
 {
 	int i;
 	RefVector *vec = Value_vp(*v);
-	RefMatrix *mat = fs->new_buf(cls_matrix, sizeof(RefMatrix) + sizeof(double) * vec->size);
+	RefMatrix *mat = fs->buf_new(cls_matrix, sizeof(RefMatrix) + sizeof(double) * vec->size);
 	*vret = vp_Value(mat);
 
 	if (FUNC_INT(node)) {
@@ -644,7 +631,7 @@ static int vector_addsub(Value *vret, Value *v, RefNode *node)
 		return FALSE;
 	}
 	size = v1->size;
-	vec = fs->new_buf(cls_vector, sizeof(RefVector) + sizeof(double) * size);
+	vec = fs->buf_new(cls_vector, sizeof(RefVector) + sizeof(double) * size);
 	*vret = vp_Value(vec);
 	vec->size = size;
 
@@ -668,7 +655,7 @@ static int vector_muldiv(Value *vret, Value *v, RefNode *node)
 		d = 1.0 / d;
 	}
 
-	vec = fs->new_buf(cls_vector, sizeof(RefVector) + sizeof(double) * v1->size);
+	vec = fs->buf_new(cls_vector, sizeof(RefVector) + sizeof(double) * v1->size);
 	*vret = vp_Value(vec);
 	vec->size = v1->size;
 
@@ -714,7 +701,7 @@ static int matrix_new(Value *vret, Value *v, RefNode *node)
 			}
 		}
 	}
-	mat = fs->new_buf(cls_matrix, sizeof(RefMatrix) + sizeof(double) * size * cols);
+	mat = fs->buf_new(cls_matrix, sizeof(RefMatrix) + sizeof(double) * size * cols);
 	*vret = vp_Value(mat);
 	mat->rows = size;
 	mat->cols = cols;
@@ -750,7 +737,7 @@ static int matrix_i(Value *vret, Value *v, RefNode *node)
 		return FALSE;
 	}
 
-	mat = fs->new_buf(cls_matrix, sizeof(RefMatrix) + sizeof(double) * size * size);
+	mat = fs->buf_new(cls_matrix, sizeof(RefMatrix) + sizeof(double) * size * size);
 	*vret = vp_Value(mat);
 	mat->rows = size;
 	mat->cols = size;
@@ -784,7 +771,7 @@ static int matrix_zero(Value *vret, Value *v, RefNode *node)
 		return FALSE;
 	}
 
-	mat = fs->new_buf(cls_matrix, sizeof(RefMatrix) + sizeof(double) * size1 * size2);
+	mat = fs->buf_new(cls_matrix, sizeof(RefMatrix) + sizeof(double) * size1 * size2);
 	*vret = vp_Value(mat);
 	mat->cols = size1;
 	mat->rows = size2;
@@ -805,7 +792,7 @@ static int matrix_dup(Value *vret, Value *v, RefNode *node)
 {
 	RefMatrix *src = Value_vp(*v);
 	int size = sizeof(RefMatrix) + sizeof(double) * src->cols * src->rows;
-	RefMatrix *dst = fs->new_buf(cls_matrix, size);
+	RefMatrix *dst = fs->buf_new(cls_matrix, size);
 	*vret = vp_Value(dst);
 	memcpy(dst->d, src->d, size);
 
@@ -838,7 +825,7 @@ static int matrix_to_vector(Value *vret, Value *v, RefNode *node)
 			fs->throw_error_select(THROW_INVALID_INDEX__VAL_INT, &v[1], mat->cols);
 			return FALSE;
 		}
-		vec = fs->new_buf(cls_vector, sizeof(RefVector) + sizeof(double) * mat->rows);
+		vec = fs->buf_new(cls_vector, sizeof(RefVector) + sizeof(double) * mat->rows);
 		*vret = vp_Value(vec);
 		vec->size = mat->rows;
 		for (i = 0; i < mat->rows; i++) {
@@ -852,7 +839,7 @@ static int matrix_to_vector(Value *vret, Value *v, RefNode *node)
 			fs->throw_error_select(THROW_INVALID_INDEX__VAL_INT, &v[1], mat->rows);
 			return FALSE;
 		}
-		vec = fs->new_buf(cls_vector, sizeof(RefVector) + sizeof(double) * mat->cols);
+		vec = fs->buf_new(cls_vector, sizeof(RefVector) + sizeof(double) * mat->cols);
 		*vret = vp_Value(vec);
 		vec->size = mat->cols;
 		for (i = 0; i < mat->cols; i++) {
@@ -887,7 +874,7 @@ static int matrix_transpose(Value *vret, Value *v, RefNode *node)
 	int rows = mat->rows;
 	int cols = mat->cols;
 
-	mat2 = fs->new_buf(cls_matrix, sizeof(RefMatrix) + sizeof(double) * rows * cols);
+	mat2 = fs->buf_new(cls_matrix, sizeof(RefMatrix) + sizeof(double) * rows * cols);
 	*vret = vp_Value(mat2);
 	mat2->rows = cols;
 	mat2->cols = rows;
@@ -937,7 +924,7 @@ static int matrix_addsub(Value *vret, Value *v, RefNode *node)
 		return FALSE;
 	}
 	size = m1->rows * m1->cols;
-	mat = fs->new_buf(cls_matrix, sizeof(RefMatrix) + sizeof(double) * size);
+	mat = fs->buf_new(cls_matrix, sizeof(RefMatrix) + sizeof(double) * size);
 	*vret = vp_Value(mat);
 	mat->rows = m1->rows;
 	mat->cols = m1->cols;
@@ -970,7 +957,7 @@ static int matrix_multiple(Value *vret, Value *v, RefNode *node)
 			fs->throw_errorf(fs->mod_lang, "ValueError", "RefMatrix size mismatch");
 			return FALSE;
 		}
-		mat = fs->new_buf(cls_matrix, sizeof(RefMatrix) + sizeof(double) * rows1 * cols2);
+		mat = fs->buf_new(cls_matrix, sizeof(RefMatrix) + sizeof(double) * rows1 * cols2);
 		*vret = vp_Value(mat);
 		mat->rows = rows1;
 		mat->cols = cols2;
@@ -988,7 +975,7 @@ static int matrix_multiple(Value *vret, Value *v, RefNode *node)
 		int i;
 		double d2 = fs->Value_float(v[1]);
 		int size = cols1 * rows1;
-		RefMatrix *mat = fs->new_buf(cls_matrix, sizeof(RefMatrix) + sizeof(double) * size);
+		RefMatrix *mat = fs->buf_new(cls_matrix, sizeof(RefMatrix) + sizeof(double) * size);
 		*vret = vp_Value(mat);
 
 		mat->cols = cols1;
@@ -1187,7 +1174,7 @@ static int math_cross(Value *vret, Value *v, RefNode *node)
 		fs->throw_errorf(fs->mod_lang, "ValueError", "RefVector size must be 3");
 		return FALSE;
 	}
-	vr = fs->new_buf(cls_vector, sizeof(RefVector) + sizeof(double) * 3);
+	vr = fs->buf_new(cls_vector, sizeof(RefVector) + sizeof(double) * 3);
 	*vret = vp_Value(vr);
 	vr->size = 3;
 
@@ -1205,7 +1192,7 @@ static int math_outer(Value *vret, Value *v, RefNode *node)
 	int rows = v1->size;
 	int cols = v2->size;
 
-	RefMatrix *mat = fs->new_buf(cls_matrix, sizeof(RefMatrix) + sizeof(double) * v1->size * v2->size);
+	RefMatrix *mat = fs->buf_new(cls_matrix, sizeof(RefMatrix) + sizeof(double) * v1->size * v2->size);
 	*vret = vp_Value(mat);
 
 	mat->rows = rows;
@@ -1236,7 +1223,7 @@ static int math_abs(Value *vret, Value *v, RefNode *node)
 		if (Value_isref(v1)) {
 			RefInt *mp = Value_vp(v1);
 			if (mp->mp.sign == MP_NEG) {
-				RefInt *mp2 = fs->new_buf(fs->cls_int, sizeof(RefInt));
+				RefInt *mp2 = fs->buf_new(fs->cls_int, sizeof(RefInt));
 				*vret = vp_Value(mp2);
 				mp_init(&mp2->mp);
 				mp_abs(&mp->mp, &mp2->mp);
@@ -1264,7 +1251,7 @@ static int math_abs(Value *vret, Value *v, RefNode *node)
 		RefFrac *md = Value_vp(v1);
 
 		if (md->md[0].sign == MP_NEG) {
-			RefFrac *md2 = fs->new_buf(fs->cls_frac, sizeof(RefFrac));
+			RefFrac *md2 = fs->buf_new(fs->cls_frac, sizeof(RefFrac));
 			*vret = vp_Value(md2);
 			mp_init(&md2->md[0]);
 			mp_init(&md2->md[1]);
@@ -1317,7 +1304,7 @@ static int math_gcd(Value *vret, Value *v, RefNode *node)
 			goto ERROR_END;
 		}
 
-		gcd = fs->new_buf(fs->cls_int, sizeof(RefInt));
+		gcd = fs->buf_new(fs->cls_int, sizeof(RefInt));
 		*vret = vp_Value(gcd);
 		mp_init(&gcd->mp);
 		mp_gcd(&m, &n, &gcd->mp);
@@ -1373,7 +1360,7 @@ static int math_round(Value *vret, Value *v, RefNode *node)
 		}
 	}
 
-	mp = fs->new_buf(fs->cls_frac, sizeof(RefFrac));
+	mp = fs->buf_new(fs->cls_frac, sizeof(RefFrac));
 	*vret = vp_Value(mp);
 	mp_init(&mp->md[0]);
 	mp_init(&mp->md[1]);

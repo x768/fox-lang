@@ -66,14 +66,14 @@ static int process_new(Value *vret, Value *v, RefNode *node)
 		flags = STREAM_READ;
 	}
 
-	r = fs->new_ref(create_pipe ? cls_pipeio : cls_process);
+	r = fs->ref_new(create_pipe ? cls_pipeio : cls_process);
 	*vret = vp_Value(r);
 	if (create_pipe) {
 		fs->init_stream_ref(r, flags);
 	}
 
 	argv = value_to_argv(path, v[2]);
-	ph = fs->new_buf(NULL, sizeof(RefProcessHandle));
+	ph = fs->buf_new(NULL, sizeof(RefProcessHandle));
 	r->v[INDEX_P_HANDLE] = vp_Value(ph);
 
 	if (!process_new_sub(ph, create_pipe, path, argv, flags)) {

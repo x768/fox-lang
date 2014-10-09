@@ -1,10 +1,3 @@
-/*
- * m_crypt.c
- *
- *  Created on: 2012/09/17
- *      Author: frog
- */
-
 #define DEFINE_GLOBALS
 #include "fox_io.h"
 #include <stdio.h>
@@ -89,7 +82,7 @@ static int ssl_ctx_new(Value *vret, Value *v, RefNode *node)
 	const SSL_METHOD *method = NULL;
 	RefNode *cls_ssl_ctx = FUNC_VP(node);
 	Str mode = fs->Value_str(v[1]);
-	RefSSLContext *ctx = fs->new_buf(cls_ssl_ctx, sizeof(RefSSLContext));
+	RefSSLContext *ctx = fs->buf_new(cls_ssl_ctx, sizeof(RefSSLContext));
 	*vret = vp_Value(ctx);
 
 	init_openssl();
@@ -216,7 +209,7 @@ static int sslsocket_certificate(Value *vret, Value *v, RefNode *node)
 {
 	Ref *r = Value_ref(*v);
 	SSL *ssl = Value_ptr(r->v[INDEX_SSL_SSL]);
-	RefCertificate *cr = fs->new_buf(cls_cert, sizeof(RefCertificate));
+	RefCertificate *cr = fs->buf_new(cls_cert, sizeof(RefCertificate));
 	*vret = vp_Value(cr);
 	cr->cert = SSL_get_peer_certificate(ssl);
 
@@ -291,7 +284,7 @@ static void ASN1_TIME_to_calendar(Calendar *cal, ASN1_TIME* tm)
 static Value ASN1_TIME_to_val(ASN1_TIME *tm)
 {
 	if (tm != NULL) {
-		RefInt64 *rt = fs->new_buf(fs->cls_timestamp, sizeof(RefInt64));
+		RefInt64 *rt = fs->buf_new(fs->cls_timestamp, sizeof(RefInt64));
 		Calendar cal;
 		memset(&cal, 0, sizeof(cal));
 		ASN1_TIME_to_calendar(&cal, tm);
@@ -377,21 +370,21 @@ static int ssl_get_hash(Value *vret, Value *v, RefNode *node)
 
 	switch (type) {
 	case HASH_MD5: {
-		RefStr *rs = fs->new_refstr_n(fs->cls_bytes, MD5_DIGEST_LENGTH);
+		RefStr *rs = fs->refstr_new_n(fs->cls_bytes, MD5_DIGEST_LENGTH);
 		*vret = vp_Value(rs);
 		MD5((unsigned char *)src.p, src.size, (unsigned char *)rs->c);
 		rs->c[rs->size] = '\0';
 		break;
 	}
 	case HASH_SHA1: {
-		RefStr *rs = fs->new_refstr_n(fs->cls_bytes, SHA_DIGEST_LENGTH);
+		RefStr *rs = fs->refstr_new_n(fs->cls_bytes, SHA_DIGEST_LENGTH);
 		*vret = vp_Value(rs);
 		SHA1((unsigned char *)src.p, src.size, (unsigned char *)rs->c);
 		rs->c[rs->size] = '\0';
 		break;
 	}
 	case HASH_SHA256: {
-		RefStr *rs = fs->new_refstr_n(fs->cls_bytes, SHA256_DIGEST_LENGTH);
+		RefStr *rs = fs->refstr_new_n(fs->cls_bytes, SHA256_DIGEST_LENGTH);
 		*vret = vp_Value(rs);
 		SHA256((unsigned char *)src.p, src.size, (unsigned char *)rs->c);
 		rs->c[rs->size] = '\0';

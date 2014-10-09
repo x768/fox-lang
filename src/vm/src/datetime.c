@@ -56,11 +56,11 @@ static int convert_timezone_name(char *dst, const char *s_p, int s_size)
  */
 static char *load_tztext(RefStr *name)
 {
-	char *path = str_printf("%S" SEP_S "tzdata" SEP_S "%r.txt", fs->fox_home, name);
+	char *path = str_printf("%r" SEP_S "tzdata" SEP_S "%r.txt", fs->fox_home, name);
 	char *buf;
 #ifdef WIN32
 	int i;
-	for (i = fs->fox_home.size + 8; path[i] != '\0'; i++) {
+	for (i = fs->fox_home->size + 8; path[i] != '\0'; i++) {
 		if (path[i] == '/') {
 			path[i] = '\\';
 		}

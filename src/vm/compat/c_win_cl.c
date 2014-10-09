@@ -12,7 +12,7 @@ static void write_errmsg(const char *str)
 }
 static LONG CALLBACK exception_filter(EXCEPTION_POINTERS *e)
 {
-	write_errmsg("UnhandledException occured\n");
+	write_errmsg("UnhandledException occurred\n");
 	return EXCEPTION_EXECUTE_HANDLER;
 }
 

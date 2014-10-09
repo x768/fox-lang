@@ -5,14 +5,13 @@ void throw_stopiter()
 	if (fg->error != VALUE_NULL) {
 		Value_dec(fg->error);
 	}
-	fg->error = vp_Value(new_ref(fs->cls_stopiter));
+	fg->error = vp_Value(ref_new(fs->cls_stopiter));
 }
 
 void throw_error_vprintf(RefNode *err_m, const char *err_name, const char *fmt, va_list va)
 {
 	RefNode *err = Hash_get_p(&err_m->u.m.h, intern(err_name, -1));
 	Ref *r;
-	StrBuf msg;
 
 	if (err == NULL) {
 		const RefStr *m = err_m->name;
@@ -22,13 +21,16 @@ void throw_error_vprintf(RefNode *err_m, const char *err_name, const char *fmt, 
 	if (fg->error != VALUE_NULL) {
 		Value_dec(fg->error);
 	}
-	r = new_ref(err);
+	r = ref_new(err);
 	fg->error = vp_Value(r);
 
-	StrBuf_init(&msg, 0);
-	StrBuf_vprintf(&msg, fmt, va);
-	r->v[1] = cstr_Value(fs->cls_str, msg.p, msg.size);
-	StrBuf_close(&msg);
+	if (fmt != NULL) {
+		StrBuf msg;
+		StrBuf_init(&msg, 0);
+		StrBuf_vprintf(&msg, fmt, va);
+		r->v[1] = cstr_Value(fs->cls_str, msg.p, msg.size);
+		StrBuf_close(&msg);
+	}
 }
 void fatal_errorf(RefNode *fn, const char *fmt, ...)
 {

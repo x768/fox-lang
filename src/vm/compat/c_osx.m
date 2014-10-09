@@ -28,10 +28,10 @@ int64_t get_now_time()
     }
 }
 
-Str get_fox_home()
+const char *get_fox_home()
 {
 #ifdef FOX_HOME
-	return Str_new(FOX_HOME, -1);
+	return FOX_HOME;
 #else
 	enum {
 		FOX_PATH_MAX = 512,
@@ -48,7 +48,7 @@ Str get_fox_home()
     
 	memset(path, 0, size);
     if (_NSGetExecutablePath(path, &size) != 0) {
-		return Str_new("./", 2);
+		return "./";
     }
     len = strlen(path);
     len = make_path_regularize(path, len);
@@ -64,7 +64,7 @@ Str get_fox_home()
             }
 		}
 	}
-	return Str_new(path, -1);
+	return path;
 #endif
 }
 

@@ -167,10 +167,10 @@ Value event_object_new(Ref *sender_r)
 {
 	Value sender;
 	Value evt;
-	RefGuiHash *h = fs->new_buf(cls_event, sizeof(RefGuiHash));
+	RefGuiHash *h = fs->buf_new(cls_event, sizeof(RefGuiHash));
 	GuiHash_init(h);
 
-	sender = fs->ref_cp_Value(&sender_r->rh);
+	sender = fs->Value_cp(vp_Value(sender_r));
 	evt = vp_Value(h);
 	event_object_add(evt, "sender", sender);
 	return evt;
@@ -430,7 +430,7 @@ static int form_new_sub(Value *vret, Value *v, WndHandle parent, int *size)
 	RefNode *type = fs->Value_type(*v);
 	// 継承可能なクラス
 	if (type == fs->cls_fn) {
-		*vret = vp_Value(fs->new_ref(cls_form));
+		*vret = vp_Value(fs->ref_new(cls_form));
 	} else {
 		*vret = fs->Value_cp(*v);
 	}
@@ -678,7 +678,7 @@ static int image_pane_new(Value *vret, Value *v, RefNode *node)
 	RefNode *cls_image_pane = FUNC_VP(node);
 	WndHandle parent = Value_widget_handle(v[1]);
 
-	*vret = vp_Value(fs->new_ref(cls_image_pane));
+	*vret = vp_Value(fs->ref_new(cls_image_pane));
 	create_image_pane_window(vret, parent);
 	return TRUE;
 }
@@ -701,7 +701,7 @@ static int image_pane_set_image(Value *vret, Value *v, RefNode *node)
 static int timer_new(Value *vret, Value *v, RefNode *node)
 {
 	int millisec = fs->Value_int(v[1], NULL);
-	Ref *r = fs->new_ref(cls_timer);
+	Ref *r = fs->ref_new(cls_timer);
 	*vret = vp_Value(r);
 
 	if (millisec <= 0) {
@@ -745,7 +745,7 @@ static int timer_close(Value *vret, Value *v, RefNode *node)
 static int filemonitor_new(Value *vret, Value *v, RefNode *node)
 {
 	Str path_s;
-	Ref *r = fs->new_ref(cls_filemonitor);
+	Ref *r = fs->ref_new(cls_filemonitor);
 	char *path = fs->file_value_to_path(&path_s, v[1], 0);
 
 	*vret = vp_Value(r);
@@ -800,7 +800,7 @@ static int menu_new(Value *vret, Value *v, RefNode *node)
 	int i;
 	int argc = fg->stk_top - v;
 	MenuHandle menu = Menu_new();
-	Ref *r = fs->new_ref(cls_menu);
+	Ref *r = fs->ref_new(cls_menu);
 	*vret = vp_Value(r);
 
 	for (i = 1; i < argc; ) {

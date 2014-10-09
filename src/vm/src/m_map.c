@@ -226,7 +226,7 @@ int refmap_del(Value *val, RefMap *rm, Value key)
 
 RefMap *refmap_new(int size)
 {
-	RefMap *rm = new_buf(fs->cls_map, sizeof(RefMap));
+	RefMap *rm = buf_new(fs->cls_map, sizeof(RefMap));
 	int max = align_pow2(size == 0 ? 32 : size, 32);
 	HashValueEntry **entry = malloc(sizeof(HashValueEntry*) * max);
 
@@ -578,7 +578,7 @@ int map_iterator(Value *vret, Value *v, RefNode *node)
 {
 	RefMap *rm = Value_vp(*v);
 	int type = FUNC_INT(node);
-	Ref *r = new_ref(cls_mapiter);
+	Ref *r = ref_new(cls_mapiter);
 
 	rm->lock_count++;
 	r->v[INDEX_MAPITER_VAL] = Value_cp(*v);
@@ -598,7 +598,7 @@ int map_dup(Value *vret, Value *v, RefNode *node)
 	RefNode *type = FUNC_VP(node);
 	int i;
 	int max = src->entry_num;
-	RefMap *dst = new_buf(type, sizeof(RefMap));
+	RefMap *dst = buf_new(type, sizeof(RefMap));
 
 	*vret = vp_Value(dst);
 	dst->count = src->count;
@@ -652,7 +652,7 @@ static int mapiter_next(Value *vret, Value *v, RefNode *node)
 			*vret = Value_cp(ep->val);
 			break;
 		default: {
-			Ref *r2 = new_ref(cls_entry);
+			Ref *r2 = ref_new(fv->cls_entry);
 			*vret = vp_Value(r2);
 			r2->v[INDEX_ENTRY_KEY] = Value_cp(ep->key);
 			r2->v[INDEX_ENTRY_VAL] = Value_cp(ep->val);
@@ -678,7 +678,7 @@ static int mapiter_dispose(Value *vret, Value *v, RefNode *node)
 
 static int mapentry_new(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = new_ref(cls_entry);
+	Ref *r = ref_new(fv->cls_entry);
 	*vret = vp_Value(r);
 	r->v[INDEX_ENTRY_KEY] = Value_cp(v[1]);
 	r->v[INDEX_ENTRY_VAL] = Value_cp(v[2]);
@@ -918,14 +918,14 @@ void define_lang_map_class(RefNode *m)
 	RefStr *size = intern("size", -1);
 
 	cls_mapiter = define_identifier(m, m, "MapIter", NODE_CLASS, 0);
-	cls_entry = define_identifier(m, m, "Entry", NODE_CLASS, 0);
+	fv->cls_entry = define_identifier(m, m, "Entry", NODE_CLASS, 0);
 
 
 	// Map
 	cls = fs->cls_map;
 	n = define_identifier_p(m, cls, fs->str_new, NODE_NEW_N, 0);
 	define_native_func_a(n, map_new_elems, 0, -1, NULL);
-	func_map_new = n;
+	fv->func_map_new = n;
 	n = define_identifier_p(m, cls, fs->str_marshal_read, NODE_NEW_N, 0);
 	define_native_func_a(n, map_marshal_read, 1, 1, (void*) TRUE, fs->cls_marshaldumper);
 
@@ -971,7 +971,7 @@ void define_lang_map_class(RefNode *m)
 	n = define_identifier(m, cls, "has_value", NODE_FUNC_N, 0);
 	define_native_func_a(n, map_index_of, 1, 1, (void*) FALSE, NULL);
 	n = define_identifier(m, cls, "add", NODE_FUNC_N, 0);
-	define_native_func_a(n, map_add_entry, 1, 1, NULL, cls_entry);
+	define_native_func_a(n, map_add_entry, 1, 1, NULL, fv->cls_entry);
 	n = define_identifier(m, cls, "delete", NODE_FUNC_N, 0);
 	define_native_func_a(n, map_delete, 1, 1, NULL, NULL);
 	n = define_identifier(m, cls, "clear", NODE_FUNC_N, 0);
@@ -989,7 +989,7 @@ void define_lang_map_class(RefNode *m)
 
 
 	// Entry
-	cls = cls_entry;
+	cls = fv->cls_entry;
 	n = define_identifier_p(m, cls, fs->str_new, NODE_NEW_N, 0);
 	define_native_func_a(n, mapentry_new, 2, 2, NULL, NULL, NULL);
 
@@ -998,9 +998,9 @@ void define_lang_map_class(RefNode *m)
 	n = define_identifier_p(m, cls, fs->str_hash, NODE_FUNC_N, NODEOPT_PROPERTY);
 	define_native_func_a(n, pairvalue_hash, 0, 0, NULL);
 	n = define_identifier_p(m, cls, fs->symbol_stock[T_EQ], NODE_FUNC_N, 0);
-	define_native_func_a(n, pairvalue_eq, 1, 1, NULL, cls_entry);
+	define_native_func_a(n, pairvalue_eq, 1, 1, NULL, fv->cls_entry);
 	n = define_identifier_p(m, cls, fs->symbol_stock[T_CMP], NODE_FUNC_N, 0);
-	define_native_func_a(n, mapentry_cmp, 1, 1, NULL, cls_entry);
+	define_native_func_a(n, mapentry_cmp, 1, 1, NULL, fv->cls_entry);
 	n = define_identifier(m, cls, "key", NODE_FUNC_N, NODEOPT_PROPERTY);
 	define_native_func_a(n, native_get_member, 0, 0, (void*) INDEX_ENTRY_KEY);
 	n = define_identifier(m, cls, "value", NODE_FUNC_N, NODEOPT_PROPERTY);

@@ -34,7 +34,7 @@ typedef struct {
 
 typedef struct {
 	RefHeader rh;
-	const bson_oid_t *oid;
+	bson_oid_t oid;
 } RefBsonOID;
 
 static const FoxStatic *fs;
@@ -110,7 +110,7 @@ static void throw_iteration_already_started(void)
 
 static int mongo_new(Value *vret, Value *v, RefNode *node)
 {
-	RefMongoDB *mon = fs->new_buf(cls_mongo, sizeof(RefMongoDB));
+	RefMongoDB *mon = fs->buf_new(cls_mongo, sizeof(RefMongoDB));
 	const char *conn_str;
 
 	*vret = vp_Value(mon);
@@ -161,7 +161,7 @@ static int mongo_tostr(Value *vret, Value *v, RefNode *node)
 }
 static int mongo_select_db(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = fs->new_ref(cls_mongodb);
+	Ref *r = fs->ref_new(cls_mongodb);
 
 	*vret = vp_Value(r);
 	if (!is_valid_mongo_name(Value_vp(v[1]), FALSE)) {
@@ -186,7 +186,7 @@ static int mongodb_select_col(Value *vret, Value *v, RefNode *node)
 		return FALSE;
 	}
 
-	r_dst = fs->new_ref(cls_mongocollection);
+	r_dst = fs->ref_new(cls_mongocollection);
 	r_dst->v[INDEX_MONGODB_DB] = fs->Value_cp(r_src->v[INDEX_MONGODB_DB]);
 	*vret = vp_Value(r_dst);
 
@@ -295,169 +295,337 @@ static int mongo_get_count(int64_t *result, Value v, const bson_t *query)
 	return TRUE;
 }
 
-static int bson_iter_to_value(Value *v, bson_iter_t *iter, bson_type_t type)
+static void append_fox_value(void *data, const char *key, Value val)
 {
-	*v = VALUE_NULL;
+	RefHeader *rh = (RefHeader*)data;
 
-	switch (type) {
-	case BSON_TYPE_NULL:
-		*v = VALUE_NULL;
-		break;
-	case BSON_TYPE_BOOL:
-		*v = bool_Value(bson_iter_bool(iter));
-		break;
-	case BSON_TYPE_INT32: {
-		int32_t i = bson_iter_int32(iter);
-		*v = int32_Value(i);
-		break;
+	if (rh->type == fs->cls_map) {
+		Value vkey = fs->cstr_Value_conv(key, -1, NULL);
+		HashValueEntry *ve = fs->refmap_add((RefMap*)rh, vkey, TRUE, FALSE);
+		ve->val = val;
+		fs->Value_dec(vkey);
+	} else if (rh->type == fs->cls_list) {
+		Value *v = fs->refarray_push((RefArray*)rh);
+		*v = val;
 	}
-	case BSON_TYPE_INT64: {
-		int64_t i = bson_iter_int64(iter);
-		*v = fs->int64_Value(i);
-		break;
-	}
-	case BSON_TYPE_DOUBLE: {
-		double dbl = bson_iter_double(iter);
-		if (isnan(dbl)) {
-			// TODO
-		} else if (isinf(dbl)) {
-			// TODO
-		} else {
-			*v = fs->float_Value(dbl);
-		}
-		break;
-	}
-	case BSON_TYPE_UTF8:
-	case BSON_TYPE_SYMBOL: {
-		uint32_t len;
-		const char *p = bson_iter_utf8(iter, &len);
-		*v = fs->cstr_Value_conv(p, len, NULL);
-		break;
-	}
-	case BSON_TYPE_BINARY: {
-		Str s;
-		s.p = bson_iterator_bin_data(iter);
-		s.size = bson_iterator_bin_len(iter);
-		fs->Value_new_str(v, fs->cls_bytes, s);
-		break;
-	}
-	case BSON_TYPE_OID: {
-		RefBsonOID *rid = fs->new_buf(cls_bsonoid, sizeof(RefBsonOID));
-		rid->oid = bson_iter_oid(iter);
-		break;
-	}
-	case BSON_TYPE_DATE_TIME: {
-		RefInt64 *rt = fs->new_buf(fs->cls_timestamp, sizeof(RefInt64));
-		*v = vp_Value(rt);
-		rt->u.i = bson_iter_date_time(iter);
-		break;
-	}
-	case BSON_TYPE_TIMESTAMP: {
-		int64_t tm = bson_iterator_time_t(iter);
-		tm *= 1000LL;
-		fs->Value_setint(v, fs->cls_timestamp, tm);
-		break;
-	}
-	case BSON_OBJECT: {
-		bson_iter_t iter2;
-		RefMap *rm = fs->refmap_new(0);
-
-		*v = vp_Value(rm);
-		bson_iterator_from_buffer(&iter2, bson_iterator_value(iter));
-
-		for (;;) {
-			Value key, val;
-
-			bson_type type2 = bson_iterator_next(&iter2);
-			if (type2 == BSON_EOO) {
-				break;
-			}
-			fs->Value_new_str(&key, fs->cls_str, fs->Str_new_p(bson_iterator_key(&iter2)));
-			if (!bson_iter_to_value(&val, &iter2, type2, e)) {
-				return FALSE;
-			}
-			if (fs->map_add_elem(e, v, &key, &val, TRUE, FALSE) == NULL) {
-				return FALSE;
-			}
-		}
-
-		break;
-	}
-	case BSON_TYPE_ARRAY: {
-		RefArray *ra = fs->refarray_new(0);
-		*v = vp_Value(ra);
-		bson_iter_t iter2;
-		bson_iterator_from_buffer(&iter2, bson_iterator_value(iter));
-
-		for (;;) {
-			Value *pv;
-
-			bson_type type2 = bson_iterator_next(&iter2);
-			if (type2 == BSON_EOO) {
-				break;
-			}
-			pv = fs->array_push_value(ra);
-			if (!bson_iter_to_value(pv, &iter2, type2, e)) {
-				return FALSE;
-			}
-		}
-		break;
-	}
-	case BSON_TYPE_REGEX: {
-		const char *pattern = bson_iterator_regex(iter);
-		const char *opt = bson_iterator_regex_opts(iter);
-		int opts = 0;
-		Ref *r = fs->Value_new_ref(v, cls_bsonregex);
-
-		while (*opt != '\0') {
-			switch (*opt) {
-			case 'i':
-				opts |= PCRE_CASELESS;
-				break;
-			case 'm':
-				opts |= PCRE_MULTILINE;
-				break;
-			default:
-				break;
-			}
-			opt++;
-		}
-		fs->Value_new_str(&r->v[INDEX_REGEX_SRC], fs->cls_str, fs->Str_new_p(pattern));
-		fs->Value_setint(&r->v[INDEX_REGEX_OPT], fs->cls_int, opts);
-		break;
-	}
-	default:
-		break;
-	}
-	return TRUE;
 }
-static int bson_to_map_value(Value *v, bson *bs)
+static bool bson_value_visit_utf8(
+	const bson_iter_t *iter, const char *key,
+	size_t v_utf8_len, const char *v_utf8,
+	void *data)
 {
-	bson_iterator iter;
+	append_fox_value(data, key, fs->cstr_Value_conv(v_utf8, v_utf8_len, NULL));
+	return false;
+}
+static bool bson_value_visit_int32(
+	const bson_iter_t *iter, const char *key,
+	int32_t v_int32,
+	void *data)
+{
+	append_fox_value(data, key, int32_Value(v_int32));
+	return false;
+}
+static bool bson_value_visit_int64(
+	const bson_iter_t *iter, const char *key,
+	int64_t v_int64,
+	void *data)
+{
+	append_fox_value(data, key, fs->int64_Value(v_int64));
+	return false;
+}
+static bool bson_value_visit_double(
+	const bson_iter_t *iter, const char *key,
+	double v_double,
+	void *data)
+{
+	append_fox_value(data, key, fs->float_Value(v_double));
+	return false;
+}
+static bool bson_value_visit_undefined(
+	const bson_iter_t *iter, const char *key,
+	void *data)
+{
+	RefMap *rm = fs->refmap_new(0);
+	Value val = vp_Value(rm);
 
-	bson_iterator_init(&iter, bs);
-	fs->map_init_sized(v, 0);
+	Value vkey = fs->cstr_Value(fs->cls_str, "$undefined", -1);
+	HashValueEntry *ve = fs->refmap_add(rm, vkey, TRUE, FALSE);
+	fs->Value_dec(vkey);
+	ve->val = VALUE_TRUE;
 
-	for (;;) {
-		bson_type type = bson_iterator_next(&iter);
-		Value key;
-		Value val;
+	append_fox_value(data, key, val);
+	return false;
+}
+static bool bson_value_visit_null(
+	const bson_iter_t *iter, const char *key,
+	void *data)
+{
+	append_fox_value(data, key, VALUE_NULL);
+	return false;
+}
+static bool bson_value_visit_oid(
+	const bson_iter_t *iter, const char *key,
+	const bson_oid_t *oid,
+	void *data)
+{
+	RefBsonOID *rid = fs->buf_new(cls_bsonoid, sizeof(RefBsonOID));
+	Value val = vp_Value(rid);
+	rid->oid = *oid;
+	append_fox_value(data, key, val);
+	return false;
+}
+static bool bson_value_visit_binary(
+	const bson_iter_t *iter, const char *key,
+	bson_subtype_t v_subtype, size_t v_binary_len, const uint8_t *v_binary,
+	void *data)
+{
+	Value val = fs->cstr_Value(fs->cls_bytes, (const char*)v_binary, v_binary_len);
+	append_fox_value(data, key, val);
+	return false;
+}
+static bool bson_value_visit_bool(
+	const bson_iter_t *iter, const char *key,
+	bool v_bool,
+	void *data)
+{
+	append_fox_value(data, key, bool_Value(v_bool));
+	return false;
+}
+static bool bson_value_visit_date_time(
+	const bson_iter_t *iter, const char *key,
+	int64_t msec_since_epoch,
+	void *data)
+{
+	RefInt64 *rt = fs->buf_new(fs->cls_timestamp, sizeof(RefInt64));
+	rt->u.i = msec_since_epoch;
+	append_fox_value(data, key, vp_Value(rt));
+	return false;
+}
+static bool bson_value_visit_regex(
+	const bson_iter_t *iter, const char *key,
+	const char *v_regex,
+	const char *v_options,
+	void *data)
+{
+	Ref *r = fs->ref_new(cls_bsonregex);
+	const char *opt = v_options;
+	int opts = 0;
 
-		if (type == BSON_EOO) {
+	while (*opt != '\0') {
+		switch (*opt) {
+		case 'i':
+			opts |= PCRE_CASELESS;
+			break;
+		case 'm':
+			opts |= PCRE_MULTILINE;
+			break;
+		default:
 			break;
 		}
-		fs->Value_new_str(&key, fs->cls_str, fs->Str_new_p(bson_iterator_key(&iter)));
-		if (!bson_iter_to_value(&val, &iter, type, e)) {
-			return FALSE;
-		}
-		if (fs->map_add_elem(e, v, &key, &val, TRUE, FALSE) == NULL) {
-			return FALSE;
-		}
+		opt++;
 	}
+	r->v[INDEX_REGEX_SRC] = fs->cstr_Value_conv(v_regex, -1, NULL);
+	r->v[INDEX_REGEX_OPT] = int32_Value(opts);
+
+	append_fox_value(data, key, vp_Value(r));
+	return false;
+}
+static bool bson_value_visit_timestamp(
+	const bson_iter_t *iter, const char *key,
+	uint32_t v_timestamp,
+	uint32_t v_increment,
+	void *data)
+{
+	return false;
+}
+static bool bson_value_visit_symbol(
+	const bson_iter_t *iter, const char *key,
+	size_t v_symbol_len, const char *v_symbol,
+	void *data)
+{
+	append_fox_value(data, key, fs->cstr_Value_conv(v_symbol, v_symbol_len, NULL));
+	return false;
+}
+
+static bool bson_value_visit_document(const bson_iter_t *iter, const char *key, const bson_t *v_document, void *data);
+static bool bson_value_visit_array(const bson_iter_t *iter, const char *key, const bson_t *v_document, void *data);
+
+static const bson_visitor_t bson_value_visitors = {
+	NULL, // bson_value_visit_before,
+	NULL, // bson_value_visit_after,
+	NULL, // bson_value_visit_corrupt,
+	bson_value_visit_double,
+	bson_value_visit_utf8,
+	bson_value_visit_document,
+	bson_value_visit_array,
+	bson_value_visit_binary,
+	bson_value_visit_undefined,
+	bson_value_visit_oid,
+	bson_value_visit_bool,
+	bson_value_visit_date_time,
+	bson_value_visit_null,
+	bson_value_visit_regex,
+	NULL, //bson_value_visit_dbpointer,
+	NULL, //bson_value_visit_code,
+	bson_value_visit_symbol,
+	NULL, //bson_value_visit_codewscope,
+	bson_value_visit_int32,
+	bson_value_visit_timestamp,
+	bson_value_visit_int64,
+	NULL, //bson_value_visit_maxkey,
+	NULL, //bson_value_visit_minkey,
+};
+
+static bool bson_value_visit_document(
+	const bson_iter_t *iter, const char *key,
+	const bson_t *v_document,
+	void *data)
+{
+	bson_iter_t child;
+
+	if (bson_iter_init (&child, v_document)) {
+		Value val = vp_Value(fs->refmap_new(0));
+		bson_iter_visit_all(&child, &bson_value_visitors, &val);
+		append_fox_value(data, key, val);
+		fs->Value_dec(val);
+	}
+	return false;
+}
+static bool bson_value_visit_array(
+	const bson_iter_t *iter, const char *key,
+	const bson_t *v_document,
+	void *data)
+{
+	bson_iter_t child;
+
+	if (bson_iter_init (&child, v_document)) {
+		Value val = vp_Value(fs->refarray_new(0));
+		bson_iter_visit_all(&child, &bson_value_visitors, &val);
+		append_fox_value(data, key, val);
+		fs->Value_dec(val);
+	}
+	return false;
+}
+
+// BSONをfoxの値に変換
+static int bson_Value(Value *v, const bson_t *bson)
+{
+	bson_iter_t iter;
+	*v = vp_Value(fs->refmap_new(0));
+
+	if (bson_empty0(bson)) {
+		return TRUE;
+	}
+	if (!bson_iter_init(&iter, bson)) {
+		return TRUE;
+	}
+	bson_iter_visit_all(&iter, &bson_value_visitors, v);
 
 	return TRUE;
 }
 
+///////////////////////////////////////////////////////////////////////////////////////
+
+static int Value_bson_sub(bson_t *bson, const char *key, int key_size, Value v)
+{
+	const RefNode *v_type = fs->Value_type(v);
+
+	if (v_type == fs->cls_int) {
+		int err;
+		int64_t val = fs->Value_int(v, &err);
+		if (err) {
+			return FALSE;
+		}
+		if (!bson_append_int64(bson, key, key_size, val)) {
+			return FALSE;
+		}
+	} else if (v_type == fs->cls_float) {
+		double d = Value_float2(v);
+		if (!bson_append_double(bson, key, key_size, d)) {
+			return FALSE;
+		}
+	} else if (v_type == fs->cls_str) {
+		RefStr *rs = Value_vp(v);
+		if (!bson_append_utf8(bson, key, key_size, rs->c, rs->size)) {
+			return FALSE;
+		}
+	} else if (v_type == fs->cls_bytes) {
+		RefStr *rs = Value_vp(v);
+		if (!bson_append_binary(bson, key, key_size, BSON_SUBTYPE_BINARY, (const uint8_t*)rs->c, rs->size)) {
+			return FALSE;
+		}
+	} else if (v_type == fs->cls_bool) {
+		if (!bson_append_bool(bson, key, key_size, Value_bool(v))) {
+			return FALSE;
+		}
+	} else if (v_type == fs->cls_null) {
+		if (!bson_append_null(bson, key, key_size)) {
+			return FALSE;
+		}
+	} else if (v_type == fs->cls_map) {
+		int i;
+		RefMap *rm = Value_vp(v);
+		for (i = 0; i < rm->entry_num; i++) {
+			HashValueEntry *h = rm->entry[i];
+			for (; h != NULL; h = h->next) {
+				RefNode *key_type = fs->Value_type(h->key);
+				RefStr *rs_key;
+				if (key_type != fs->cls_str) {
+					fs->throw_errorf(fs->mod_lang, "TypeError", "Argument must be map of {str:*, str:* ...}");
+					return FALSE;
+				}
+				rs_key = Value_vp(h->key);
+				if (!Value_bson_sub(child, rs_key->c, rs_key->size, h->val)) {
+					return FALSE;
+				}
+			}
+		}
+	} else if (v_type == fs->cls_list) {
+		int i;
+		RefArray *ra = Value_vp(v);
+		char ckey[16];
+
+		for (i = 0; i < ra->size; i++) {
+			sprintf(ckey, "%d", i);
+			if (!Value_bson_sub(child, ckey, strlen(ckey), ra->p[i])) {
+				return FALSE;
+			}
+		}
+	} else {
+		fs->throw_errorf(fs->mod_lang, "TypeError", "%n cannot convert to BSON", v_type);
+		return FALSE;
+	}
+
+	return TRUE;
+}
+static int Value_bson(bson_t **pbson, RefMap *rm)
+{
+	int i;
+	bson_t *bson = bson_new();
+
+	for (i = 0; i < rm->entry_num; i++) {
+		HashValueEntry *h = rm->entry[i];
+		for (; h != NULL; h = h->next) {
+			RefNode *key_type = fs->Value_type(h->key);
+			RefStr *rs_key;
+			if (key_type != fs->cls_str) {
+				fs->throw_errorf(fs->mod_lang, "TypeError", "Argument must be map of {str:*, str:* ...}");
+				return FALSE;
+			}
+			rs_key = Value_vp(h->key);
+			if (!Value_bson_sub(child, rs_key->c, rs_key->size, h->val)) {
+				if (fg->error == VALUE_NULL) {
+					fs->throw_errorf(mod_mongo, "MongoError", "Failed to convert BSON");
+				}
+				return FALSE;
+			}
+		}
+	}
+
+	*pbson = bson;
+	return TRUE;
+}
+/*
 static int map_to_bson(bson *bs, Value *v);
 static int array_to_bson(bson *bs, Value *v);
 
@@ -564,11 +732,14 @@ static int map_to_bson(bson *bs, Value *v)
 	}
 	return TRUE;
 }
+*/
+
 static int mongocol_find(Value *vret, Value *v, RefNode *node)
 {
 	mongo *mon;
 	char *path;
-	MongoCursor *cur = fs->Value_new_ptr(vret, cls_mongocursor, sizeof(MongoCursor), NULL);
+	RefMongoCursor *cur = fs->Value_new_ptr(cls_mongocursor, sizeof(RefMongoCursor));
+	*vret = vp_Value(cur);
 
 	if (!get_mongo_conn(&mon, &path, v, node)) {
 		return FALSE;
@@ -579,7 +750,7 @@ static int mongocol_find(Value *vret, Value *v, RefNode *node)
 	bson_init(&cur->query);
 	bson_append_start_object(&cur->query, "$query");
 	if (fg->stk_top > v + 1) {
-		if (!map_to_bson(&cur->query, &v[1], e)) {
+		if (!map_to_bson(&cur->query, &v[1])) {
 			bson_destroy(&cur->query);
 			goto ERROR_END;
 		}
@@ -595,8 +766,7 @@ static int mongocol_find(Value *vret, Value *v, RefNode *node)
 		mongo_cursor_set_fields(&cur->cur, &cur->field);
 		cur->field_init = TRUE;
 	}
-	cur->connect = *v;
-	VALUE_INC(*v);
+	cur->connect = fs->Value_cp(*v);
 	cur->valid = TRUE;
 
 	return TRUE;
@@ -649,10 +819,10 @@ static int mongocol_count(Value *vret, Value *v, RefNode *node)
 {
 	int64_t count;
 
-	if (!mongo_get_count(&count, v, NULL)) {
+	if (!mongo_get_count(&count, *v, NULL)) {
 		return FALSE;
 	}
-	fs->Value_setint(vret, fs->cls_int, count);
+	*vret = int32_Value(count);
 
 	return TRUE;
 }
@@ -766,9 +936,7 @@ static int mongocur_sort(Value *vret, Value *v, RefNode *node)
 		goto ERROR_END;
 	}
 	bson_append_finish_object(&cur->query);
-
-	*vret = *v;
-	VALUE_INC(*v);
+	*vret = fs->Value_cp(*v);
 
 	return TRUE;
 
@@ -778,32 +946,28 @@ ERROR_END:
 static int mongocur_limit(Value *vret, Value *v, RefNode *node)
 {
 	RefMongoCursor *cur = Value_vp(*v);
-	int64_t lim = fs->Value_int(&v[1], NULL);
+	int64_t lim = fs->Value_int(v[1], NULL);
 
 	if (cur->started) {
 		throw_iteration_already_started();
 		return FALSE;
 	}
 	mongo_cursor_set_limit(&cur->cur, lim);
-
-	*vret = *v;
-	VALUE_INC(*v);
+	*vret = fs->Value_cp(*v);
 
 	return TRUE;
 }
 static int mongocur_skip(Value *vret, Value *v, RefNode *node)
 {
 	RefMongoCursor *cur = Value_vp(*v);
-	int64_t n = fs->Value_int(&v[1], NULL);
+	int64_t n = fs->Value_int(v[1], NULL);
 
 	if (cur->started) {
 		throw_iteration_already_started();
 		return FALSE;
 	}
 	mongo_cursor_set_skip(&cur->cur, n);
-
-	*vret = *v;
-	VALUE_INC(*v);
+	*vret = fs->Value_cp(*v);
 
 	return TRUE;
 }
@@ -831,7 +995,7 @@ static int mongocur_count(Value *vret, Value *v, RefNode *node)
 			}
 		}
 	}
-	fs->Value_setint(vret, fs->cls_int, count);
+	*vret = int32_Value(count);
 
 	return TRUE;
 }
@@ -882,16 +1046,16 @@ static int mongocur_close(Value *vret, Value *v, RefNode *node)
 static int bsonoid_tostr(Value *vret, Value *v, RefNode *node)
 {
 	bson_oid_t *oid = Value_vp(*v);
-	char *cbuf = fs->Value_new_str_n(vret, fs->cls_str, 24 + 10);
+	RefStr *rs = fs->refstr_new_n(fs->cls_str, 24 + 10);
 	int i;
 
-	strcpy(cbuf, "ObjectId(");
+	strcpy(rs->c, "ObjectId(");
 	for (i = 0; i < 12; i++) {
 		int c = oid->bytes[i] & 0xFF;
-		cbuf[i * 2 +  9] = int_to_hex(c >> 4);
-		cbuf[i * 2 + 10] = int_to_hex(c & 0xF);
+		rs->c[i * 2 +  9] = int_to_hex(c >> 4);
+		rs->c[i * 2 + 10] = int_to_hex(c & 0xF);
 	}
-	cbuf[24 + 9] = ')';
+	rs->c[24 + 9] = ')';
 
 	return TRUE;
 }
@@ -930,7 +1094,7 @@ static int bsonoid_hash(Value *vret, Value *v, RefNode *node)
 
 static int bsonregex_new(Value *vret, Value *v, RefNode *node)
 {
-	Ref *r = fs->new_ref(cls_bsonregex);
+	Ref *r = fs->ref_new(cls_bsonregex);
 	const RefNode *v1_type = fs->Value_type(v[1]);
 	Value *src;
 	int opts = 0;
@@ -1100,7 +1264,7 @@ static void define_class(RefNode *m)
 	fs->define_native_func_a(n, bsonoid_hash, 0, 0, NULL);
 
 	n = fs->define_identifier_p(m, cls, fs->symbol_stock[T_EQ], NODE_FUNC_N, 0);
-	fs->define_native_func_a(n, bsonoid_eq, 1, 1, NULL, cls_mongooid);
+	fs->define_native_func_a(n, bsonoid_eq, 1, 1, NULL, cls_bsonoid);
 	fs->extends_method(cls, fs->cls_obj);
 
 
@@ -1128,7 +1292,7 @@ void define_module(RefNode *m, const FoxStatic *a_fs, FoxGlobal *a_fg)
 	mod_mongo = m;
 
 	define_class(m);
-	mongo_init_sockets();
+	mongoc_init();
 }
 
 const char *module_version(const FoxStatic *a_fs)
