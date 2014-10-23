@@ -12,82 +12,82 @@
 
 
 enum {
-	MAX_EXPR_STACK = 1024,
-	MAX_CALLFUNC_NUM = 1024,
-	MAX_STACKTRACE_NUM = 64,
-	PREFETCH_MAX = 4, // 高々4の先読みで解析できる
+    MAX_EXPR_STACK = 1024,
+    MAX_CALLFUNC_NUM = 1024,
+    MAX_STACKTRACE_NUM = 64,
+    PREFETCH_MAX = 4, // 高々4の先読みで解析できる
 
-	MAX_UNRSLV_NUM = 256,
+    MAX_UNRSLV_NUM = 256,
 
-	CURLY_MASK   = 0xF00,
-	CURLY_NORMAL = 0x100,
-	CURLY_STRING = 0x200,
-	CURLY_IDENT  = 0x400,
+    CURLY_MASK   = 0xF00,
+    CURLY_NORMAL = 0x100,
+    CURLY_STRING = 0x200,
+    CURLY_IDENT  = 0x400,
 };
 enum {
-	ENVSET_IMPORT,
-	ENVSET_RESOURCE,
-	ENVSET_STDIO_CHARSET,
-	ENVSET_TZ,
-	ENVSET_LANG,
-	ENVSET_ERROR,
-	ENVSET_MAX_ALLOC,
-	ENVSET_MAX_STACK,
-	ENVSET_NUM,
+    ENVSET_IMPORT,
+    ENVSET_RESOURCE,
+    ENVSET_STDIO_CHARSET,
+    ENVSET_TZ,
+    ENVSET_LANG,
+    ENVSET_ERROR,
+    ENVSET_MAX_ALLOC,
+    ENVSET_MAX_STACK,
+    ENVSET_NUM,
 };
 enum {
-	ITERATOR_KEY,
-	ITERATOR_VAL,
-	ITERATOR_BOTH,
+    ITERATOR_KEY,
+    ITERATOR_VAL,
+    ITERATOR_BOTH,
 };
 
 // class Generator
 enum {
-	INDEX_GENERATOR_PC,
-	INDEX_GENERATOR_NSTACK,
-	INDEX_GENERATOR_FUNC,
-	INDEX_GENERATOR_LOCAL,
+    INDEX_GENERATOR_PC,
+    INDEX_GENERATOR_NSTACK,
+    INDEX_GENERATOR_FUNC,
+    INDEX_GENERATOR_LOCAL,
 };
 // class MimeData
 enum {
-	INDEX_MIMEDATA_HEADER = INDEX_STREAM_NUM,
-	INDEX_MIMEDATA_BUF,
-	INDEX_MIMEDATA_NUM,
+    INDEX_MIMEDATA_HEADER = INDEX_STREAM_NUM,
+    INDEX_MIMEDATA_BUF,
+    INDEX_MIMEDATA_NUM,
 };
 
 // class TextIO
 enum {
-	INDEX_TEXTIO_STREAM,
-	INDEX_TEXTIO_TEXTIO,
-	INDEX_TEXTIO_NEWLINE,
-	INDEX_TEXTIO_NUM,
+    INDEX_TEXTIO_STREAM,
+    INDEX_TEXTIO_TEXTIO,
+    INDEX_TEXTIO_NEWLINE,
+    INDEX_TEXTIO_NUM,
 };
 
 // class Entry
 enum {
-	INDEX_ENTRY_KEY,
-	INDEX_ENTRY_VAL,
-	INDEX_ENTRY_NUM,
+    INDEX_ENTRY_KEY,
+    INDEX_ENTRY_VAL,
+    INDEX_ENTRY_NUM,
 };
 
 enum {
-	ICONV_OK,
-	ICONV_OUTBUF,
-	ICONV_INVALID,
+    ICONV_OK,
+    ICONV_OUTBUF,
+    ICONV_INVALID,
 };
 enum {
-	INITYPE_NONE,
-	INITYPE_ERROR,
-	INITYPE_EOF,
-	INITYPE_STRING,
-	INITYPE_FILE,
+    INITYPE_NONE,
+    INITYPE_ERROR,
+    INITYPE_EOF,
+    INITYPE_STRING,
+    INITYPE_FILE,
 };
 enum {
-	LOCALE_LANGUAGE,
-	LOCALE_SCRIPT,
-	LOCALE_TERRITORY,
-	LOCALE_VALIANT,
-	LOCALE_NUM,
+    LOCALE_LANGUAGE,
+    LOCALE_SCRIPT,
+    LOCALE_TERRITORY,
+    LOCALE_VALIANT,
+    LOCALE_NUM,
 };
 
 /////////////////////////////////////////////////////////////////////////////////////
@@ -96,112 +96,112 @@ typedef void (*FoxModuleDefine)(RefNode *m, const FoxStatic *fs, FoxGlobal *fg);
 typedef const char *(*FoxModuleVersion)(const FoxStatic *fs);
 
 typedef struct {
-	char *buf;
-	char *p;
-	char *end;
+    char *buf;
+    char *p;
+    char *end;
 
-	int type;
-	Str key;
-	Str val;
+    int type;
+    Str key;
+    Str val;
 } IniTok;
 
 struct PtrList {
-	struct PtrList *next;
-	union {
-		void *p;
-		char c[1];
-	} u;
+    struct PtrList *next;
+    union {
+        void *p;
+        char c[1];
+    } u;
 };
 
 struct RefCharset {
-	RefHeader rh;
+    RefHeader rh;
 
-	RefStr *name;    // 文字コード名
-	RefStr *iana;    // IANA登録名
-	RefStr *ic_name; // iconvで使う名前
-	int utf8;              // UTF-8ならTRUE
-	int ascii;             // G1がUS-ASCIIと互換性があればTRUE
+    RefStr *name;    // 文字コード名
+    RefStr *iana;    // IANA登録名
+    RefStr *ic_name; // iconvで使う名前
+    int utf8;              // UTF-8ならTRUE
+    int ascii;             // G1がUS-ASCIIと互換性があればTRUE
 };
 
 typedef struct {
-	RefHeader rh;
+    RefHeader rh;
 
-	Mem mem;
-	RefLocale *locale;
-	Hash h;
+    Mem mem;
+    RefLocale *locale;
+    Hash h;
 } RefResource;
 
 typedef struct {
-	int type;
-	Str val;  // RESTYPE_FILEの場合はファイルパスが入る
+    int type;
+    Str val;  // RESTYPE_FILEの場合はファイルパスが入る
 } ResEntry;
 
 struct RefLocale {
-	RefHeader rh;
-	Value locale_name;  // Resource
+    RefHeader rh;
+    Value locale_name;  // Resource
 
-	RefStr *tag;   // ja_JP
-	RefStr *name;  // ja-jp
-	RefStr *param[LOCALE_NUM];
+    RefStr *tag;   // ja_JP
+    RefStr *name;  // ja-jp
+    RefStr *param[LOCALE_NUM];
 
-	const char *month[13];
-	const char *month_w[13];
-	const char *week[7];
-	const char *week_w[7];
-	const char *am_pm[2];
-	const char *date[4];
-	const char *time[4];
+    const char *month[13];
+    const char *month_w[13];
+    const char *week[7];
+    const char *week_w[7];
+    const char *am_pm[2];
+    const char *date[4];
+    const char *time[4];
 
-	int group_n;
-	const char *group;
-	const char *decimal;
-	int rtl;
+    int group_n;
+    const char *group;
+    const char *decimal;
+    int rtl;
 };
 
 typedef struct
 {
-	int argc;
-	const char **argv;
-	RefStr *cur_dir;
+    int argc;
+    const char **argv;
+    RefStr *cur_dir;
 
-	PtrList *import_path;    // FOX_IMPORTを分解したもの
-	PtrList *resource_path;  // FOX_RESOURCEを分解したもの
-	const char *path_info;   // CGI modeのみ
-	int headers_sent;        // CGI modeのみ
+    PtrList *import_path;    // FOX_IMPORTを分解したもの
+    PtrList *resource_path;  // FOX_RESOURCEを分解したもの
+    const char *path_info;   // CGI modeのみ
+    int headers_sent;        // CGI modeのみ
 
-	RefNode *cls_fileio;
-	RefNode *cls_strio;
-	RefNode *cls_generator;
-	RefNode *cls_mimeheader;
-	RefNode *cls_mimedata;
-	RefNode *cls_entry;
-	RefNode *cls_nullio;
+    RefNode *cls_fileio;
+    RefNode *cls_strio;
+    RefNode *cls_generator;
+    RefNode *cls_mimeheader;
+    RefNode *cls_mimedata;
+    RefNode *cls_entry;
+    RefNode *cls_nullio;
 
-	RefNode *func_strcat;
-	RefNode *func_array_new;
-	RefNode *func_map_new;
-	RefNode *func_range_new;
+    RefNode *func_strcat;
+    RefNode *func_array_new;
+    RefNode *func_map_new;
+    RefNode *func_range_new;
 
-	RefHeader *ref_textio_utf8;
-	RefNode *refnode_sequence_hash;
+    RefHeader *ref_textio_utf8;
+    RefNode *refnode_sequence_hash;
 
-	uint32_t hash_seed;
-	int heap_count;
-	int n_callfunc;
+    uint32_t hash_seed;
+    int heap_count;
+    int n_callfunc;
 
-	RefNode **integral;  // 整数型互換クラス
-	int integral_num;
-	int integral_max;
+    RefNode **integral;  // 整数型互換クラス
+    int integral_num;
+    int integral_max;
 
-	RefNode *startup;
-	const char *err_dst;
+    RefNode *startup;
+    const char *err_dst;
 
-	UnresolvedMemb *unresolved_memb;  // Class.memb参照解決(コンパイル時に使われる)
-	UnresolvedMemb *unresolved_memb_root;
-	int unresolved_memb_n;
+    UnresolvedMemb *unresolved_memb;  // Class.memb参照解決(コンパイル時に使われる)
+    UnresolvedMemb *unresolved_memb_root;
+    int unresolved_memb_n;
 
-	Mem cmp_mem;     // コンパイル時のみ
-	int cmp_dynamic;
+    Mem cmp_mem;     // コンパイル時のみ
+    int cmp_dynamic;
 } FoxVM;
 
 /////////////////////////////////////////////////////////////////////////////////////
@@ -304,7 +304,7 @@ Str get_name_part_from_path(Str path);
 
 // value.c
 RefNode *Value_type(Value v);
-int64_t Value_int(Value v, int *err);
+int64_t Value_int64(Value v, int *err);
 double Value_float(Value v);
 Str Value_str(Value v);
 char *Value_frac_s(Value v, int max_frac);
@@ -421,6 +421,7 @@ void define_charset_class(RefNode *m);
 // m_col.c
 RefArray *refarray_new(int size);
 Value *refarray_push(RefArray *r);
+int refarray_set_size(RefArray *ra, int size);
 void refarray_push_str(RefArray *arr, const char *p, int size, RefNode *type);
 int pairvalue_hash(Value *vret, Value *v, RefNode *node);
 int pairvalue_eq(Value *vret, Value *v, RefNode *node);

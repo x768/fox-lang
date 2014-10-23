@@ -5,15 +5,15 @@ include ../../Makefile.common
 
 ifeq ($(TARGET),posix)
 CFLAGS = -I../../include -fPIC -I../../lib/mongo-c-driver/src/mongoc -I../../lib/mongo-c-driver/libbson/src/bson
-LFLAGS = $(COMMON_DLFLAGS) ../../lib/mongo-c-driver/libbson.a
+LFLAGS = $(COMMON_DLFLAGS) ../../lib/mongo-c-driver/.libs/libmongoc-priv.a ../../lib/mongo-c-driver/libbson/.libs/libbson.a -lssl
 endif
 ifeq ($(TARGET),win)
-CFLAGS = -I../../include -I/usr/local/include -I../../lib/mongo-c-driver/src/mongoc -I../../lib/mongo-c-driver/libbson/src/bson
-LFLAGS = $(COMMON_DLFLAGS) ../../lib/mongo-c-driver/libbson.a
+CFLAGS = -I../../include -I/usr/local/include -I../../lib/mongo-c-driver/src/mongoc -I../../lib/mongo-c-driver/src/libbson/src/bson
+LFLAGS = $(COMMON_DLFLAGS) ../../lib/mongo-c-driver/.libs/libmongoc-priv.a ../../lib/mongo-c-driver/src/libbson/.libs/libbson.a -L../../lib/openssl -lssl -lcrypto -lws2_32
 endif
 ifeq ($(TARGET),osx)
-CFLAGS = -I../../include -I../../lib/mongo-c-driver/src/mongoc -I../../lib/mongo-c-driver/libbson/src/bson
-LFLAGS = $(COMMON_DLFLAGS) ../../lib/mongo-c-driver/libbson.a
+CFLAGS = -I../../include -I../../lib/mongo-c-driver/src/mongoc -I../../lib/mongo-c-driver/src/libbson/src/bson -I../../lib/libpcre
+LFLAGS = $(COMMON_DLFLAGS) ../../lib/mongo-c-driver/.libs/libmongoc-priv.a ../../lib/mongo-c-driver/src/libbson/.libs/libbson.a -lssl -lcrypto
 endif
 
 DEST = ../../../import/db/mongo.so

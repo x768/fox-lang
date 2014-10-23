@@ -1,3 +1,0 @@
-iana=UTF-32
-iconv=UTF-32LE
-ascii_compat=false

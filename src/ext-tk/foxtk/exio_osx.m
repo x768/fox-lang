@@ -15,9 +15,9 @@
 
 int uri_to_file_sub(Value *dst, Value src)
 {
-	return TRUE;
+    return TRUE;
 }
 int exio_trash_sub(Value vdst)
 {
-	return TRUE;
+    return TRUE;
 }

@@ -24,7 +24,7 @@ int conv_graphics_to_image(Value *vret, GraphicsHandle img)
     NSBitmapImageRep *imgrep = [NSBitmapImageRep
                                 imageRepWithData:[image TIFFRepresentation]];
 
-	RefImage *fi = fs->buf_new(cls_image, sizeof(RefImage));
+    RefImage *fi = fs->buf_new(cls_image, sizeof(RefImage));
     int width = [imgrep pixelsWide];
     int height = [imgrep pixelsHigh];
     int pitch = [imgrep bytesPerRow];
@@ -34,16 +34,16 @@ int conv_graphics_to_image(Value *vret, GraphicsHandle img)
 
     *vret = vp_Value(fi);
     if ([imgrep bitsPerSample] != 8) {
-		fs->throw_errorf(mod_gui, "GuiError", "Format not supported");
-		return FALSE;
+        fs->throw_errorf(mod_gui, "GuiError", "Format not supported");
+        return FALSE;
     }
     
     fi->width = width;
     fi->height = height;
-	if (width > MAX_IMAGE_SIZE || height > MAX_IMAGE_SIZE) {
-		fs->throw_errorf(mod_gui, "GuiError", "Graphics size too large (max:%d)", MAX_IMAGE_SIZE);
-		return FALSE;
-	}
+    if (width > MAX_IMAGE_SIZE || height > MAX_IMAGE_SIZE) {
+        fs->throw_errorf(mod_gui, "GuiError", "Graphics size too large (max:%d)", MAX_IMAGE_SIZE);
+        return FALSE;
+    }
     if (samples_per_pixel == 4) {
         fi->bands = BAND_RGBA;
         fi->pitch = width * 4;
@@ -51,8 +51,8 @@ int conv_graphics_to_image(Value *vret, GraphicsHandle img)
         fi->bands = BAND_RGB;
         fi->pitch = width * 3;
     } else {
-		fs->throw_errorf(mod_gui, "GuiError", "Graphics size too large (max:%d)", MAX_IMAGE_SIZE);
-		return FALSE;
+        fs->throw_errorf(mod_gui, "GuiError", "Graphics size too large (max:%d)", MAX_IMAGE_SIZE);
+        return FALSE;
     }
     fi->data = malloc(fi->pitch * height);
 
@@ -74,16 +74,16 @@ GraphicsHandle conv_image_to_graphics(RefImage *img)
     int y;
 
     if (img->bands == BAND_RGB) {
-		samples_per_pixel = 3;
+        samples_per_pixel = 3;
         pitch = img->width * 3;
-	} else if (img->bands == BAND_RGBA) {
-		samples_per_pixel = 4;
+    } else if (img->bands == BAND_RGBA) {
+        samples_per_pixel = 4;
         pitch = img->width * 4;
         has_alpha = TRUE;
-	} else {
-		fs->throw_errorf(mod_image, "ImageError", "Not supported type");
-		return NULL;
-	}
+    } else {
+        fs->throw_errorf(mod_image, "ImageError", "Not supported type");
+        return NULL;
+    }
 
     data = malloc(img->height * sizeof(uint8_t*));
     for (y = 0; y < img->height; y++) {
@@ -105,7 +105,7 @@ GraphicsHandle conv_image_to_graphics(RefImage *img)
     free(data);
 
     if (nsrep == nil) {
-		fs->throw_errorf(mod_image, "ImageError", "Cannot initialize NSBitmapImageRep");
+        fs->throw_errorf(mod_image, "ImageError", "Cannot initialize NSBitmapImageRep");
         return NULL;
     }
     
@@ -116,7 +116,7 @@ int clipboard_clear()
 {
     NSPasteboard *pasteboard = [NSPasteboard generalPasteboard];
     [pasteboard clearContents];
-	return TRUE;
+    return TRUE;
 }
 
 int clipboard_is_available(const RefNode *klass)
@@ -124,11 +124,11 @@ int clipboard_is_available(const RefNode *klass)
     NSPasteboard *pasteboard = [NSPasteboard generalPasteboard];
     NSArray *types = nil;
 
-	if (klass == fs->cls_str) {
+    if (klass == fs->cls_str) {
         types = [NSArray arrayWithObject: NSPasteboardTypeString];
-	} else if (klass == fs->cls_file) {
+    } else if (klass == fs->cls_file) {
         types = [NSArray arrayWithObject: NSURLPboardType];
-	} else if (klass == cls_image) {
+    } else if (klass == cls_image) {
         types = [NSArray arrayWithObject: NSPasteboardTypeTIFF];
     }
 

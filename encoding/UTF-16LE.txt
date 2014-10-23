@@ -1,3 +1,0 @@
-iana=UTF-16
-iconv=UTF-16LE
-ascii_compat=false

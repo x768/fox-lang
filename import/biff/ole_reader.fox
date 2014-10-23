@@ -29,197 +29,198 @@ def _min(a, b) => a < b ? a : b
 
 class OLEReadError : Error
 {
-	new(s) {
-		super(s)
-	}
+    new(s) {
+        super(s)
+    }
 }
 class OLEReadProperty
 {
-	var m_name
-	var m_type
-	var m_start_block
-	var m_size
+    var m_name
+    var m_type
+    var m_start_block
+    var m_size
 
-	new(name:Str, type:Int, start_block:Int, size:Int)
-	{
-		m_name = name
-		m_type = type
-		m_start_block = start_block
-		m_size = size
-	}
-	def name => m_name
-	def type => m_type
-	def start_block => m_start_block
-	def size => m_size
+    new(name:Str, type:Int, start_block:Int, size:Int)
+    {
+        m_name = name
+        m_type = type
+        m_start_block = start_block
+        m_size = size
+    }
+    def name => m_name
+    def type => m_type
+    def start_block => m_start_block
+    def size => m_size
 }
 
 class OLERead
 {
-	var m_data
+    var m_data
 
-	var m_num_big_block_depot_blocks
-	var m_big_block_depot_blocks
-	var m_sbd_start_block
-	var m_root_start_block
-	var m_extension_block
-	var m_num_extension_blocks
-	var m_big_block_chain
-	var m_small_block_chain
+    var m_num_big_block_depot_blocks
+    var m_big_block_depot_blocks
+    var m_sbd_start_block
+    var m_root_start_block
+    var m_extension_block
+    var m_num_extension_blocks
+    var m_big_block_chain
+    var m_small_block_chain
 
-	var m_entry
-	var m_props
-	var m_wrkbook
-	var m_rootentry
+    var m_entry
+    var m_props
+    var m_wrkbook
+    var m_rootentry
 
-	new(src:StreamIO)
-	{
-		m_data = src
-
-
-		if m_data.read(8) != _IDENTIFIER_OLE {
-			throw OLEReadError("Not a biff file")
-		}
-		m_data.pos = _NUM_BIG_BLOCK_DEPOT_BLOCKS_POS
-		m_num_big_block_depot_blocks = m_data.peek("+i")
-		m_data.pos = _SMALL_BLOCK_DEPOT_BLOCK_POS
-		m_sbd_start_block = m_data.peek("+i")
-		m_data.pos = _ROOT_START_BLOCK_POS
-		m_root_start_block = m_data.peek("+i")
-		m_data.pos = _EXTENSION_BLOCK_POS
-		m_extension_block = m_data.peek("+i")
-		m_data.pos = _NUM_EXTENSION_BLOCK_POS
-		m_num_extension_blocks = m_data.peek("+i")
+    new(src:StreamIO)
+    {
+        m_data = src
 
 
-		var bbd_blocks = m_num_big_block_depot_blocks
-		if m_num_extension_blocks != 0 {
-			bbd_blocks = (_BIG_BLOCK_SIZE - _BIG_BLOCK_DEPOT_BLOCKS_POS) / 4
-		}
+        if m_data.read(8) != _IDENTIFIER_OLE {
+            throw OLEReadError("Not a biff file")
+        }
+        m_data.pos = _NUM_BIG_BLOCK_DEPOT_BLOCKS_POS
+        m_num_big_block_depot_blocks = m_data.peek("+i")
+        m_data.pos = _SMALL_BLOCK_DEPOT_BLOCK_POS
+        m_sbd_start_block = m_data.peek("+i")
+        m_data.pos = _ROOT_START_BLOCK_POS
+        m_root_start_block = m_data.peek("+i")
+        m_data.pos = _EXTENSION_BLOCK_POS
+        m_extension_block = m_data.peek("+i")
+        m_data.pos = _NUM_EXTENSION_BLOCK_POS
+        m_num_extension_blocks = m_data.peek("+i")
 
-		m_big_block_depot_blocks = []
-		m_data.pos = _BIG_BLOCK_DEPOT_BLOCKS_POS
-		for i in 0..bbd_blocks {
-			m_big_block_depot_blocks.push m_data.peek("+i")
-		}
 
-		for j in 0..m_num_extension_blocks {
-			m_data.pos = (m_extension_block + 1) * _BIG_BLOCK_SIZE
-			let blocks_to_read = _min(m_num_big_block_depot_blocks - bbd_blocks, _BIG_BLOCK_SIZE / 4 - 1)
+        var bbd_blocks = m_num_big_block_depot_blocks
+        if m_num_extension_blocks != 0 {
+            bbd_blocks = (_BIG_BLOCK_SIZE - _BIG_BLOCK_DEPOT_BLOCKS_POS) / 4
+        }
 
-			for i in 0..blocks_to_read {
-				m_big_block_depot_blocks.push m_data.peek("+i")
-			}
-			bbd_blocks += blocks_to_read
-			if bbd_blocks < m_num_big_block_depot_blocks {
-				m_extension_block = m_data.peek("+i")
-			}
-		}
+        m_big_block_depot_blocks = []
+        m_data.pos = _BIG_BLOCK_DEPOT_BLOCKS_POS
+        for i in 0..bbd_blocks {
+            m_big_block_depot_blocks.push m_data.peek("+i")
+        }
 
-		// readBigBlockDepot
-		m_big_block_chain = []
-		for n in m_big_block_depot_blocks {
-			m_data.pos = (n + 1) * _BIG_BLOCK_SIZE
-			for j in 0..(_BIG_BLOCK_SIZE / 4) {
-				m_big_block_chain.push m_data.peek("+i")
-			}
-		}
+        for j in 0..m_num_extension_blocks {
+            m_data.pos = (m_extension_block + 1) * _BIG_BLOCK_SIZE
+            let blocks_to_read = _min(m_num_big_block_depot_blocks - bbd_blocks, _BIG_BLOCK_SIZE / 4 - 1)
 
-		// readSmallBlockDepot();
-		var sbd_block = m_sbd_start_block
-		m_small_block_chain = []
+            for i in 0..blocks_to_read {
+                m_big_block_depot_blocks.push m_data.peek("+i")
+            }
+            bbd_blocks += blocks_to_read
+            if bbd_blocks < m_num_big_block_depot_blocks {
+                m_extension_block = m_data.peek("+i")
+            }
+        }
 
-		while sbd_block != -2 {
-			m_data.pos = (sbd_block + 1) * _BIG_BLOCK_SIZE
-			for j in 0..(_BIG_BLOCK_SIZE / 4) {
-				m_small_block_chain.push m_data.peek("+i")
-			}
-			sbd_block = m_big_block_chain[sbd_block]
-		}
+        // readBigBlockDepot
+        m_big_block_chain = []
+        for n in m_big_block_depot_blocks {
+            m_data.pos = (n + 1) * _BIG_BLOCK_SIZE
+            for j in 0..(_BIG_BLOCK_SIZE / 4) {
+                m_big_block_chain.push m_data.peek("+i")
+            }
+        }
 
-		m_entry = this._read_data(m_root_start_block)
-		this._read_property_sets(m_entry)
-	}
+        // readSmallBlockDepot();
+        var sbd_block = m_sbd_start_block
+        m_small_block_chain = []
 
-	def _read_property_sets(entry:BytesIO)
-	{
-		var offset = 0
-		m_props = []
+        while sbd_block != -2 {
+            m_data.pos = (sbd_block + 1) * _BIG_BLOCK_SIZE
+            for j in 0..(_BIG_BLOCK_SIZE / 4) {
+                m_small_block_chain.push m_data.peek("+i")
+            }
+            sbd_block = m_big_block_chain[sbd_block]
+        }
 
-		while offset < entry.size {
-			entry.pos = offset + _SIZE_OF_NAME_POS
-			let name_size = entry.peek("s")
-			entry.pos = offset + _TYPE_POS
-			let type = entry.peek("c")
-			entry.pos = offset + _START_BLOCK_POS
-			let start_block = entry.peek("+i")
-			entry.pos = offset + _SIZE_POS
-			let size = entry.peek("+i")
+        m_entry = this._read_data(m_root_start_block)
+        this._read_property_sets(m_entry)
+    }
 
-			entry.pos = offset
-			let name = Str(entry.read(name_size), "UTF-16LE").replace("\0", "")
+    def _read_property_sets(entry:BytesIO)
+    {
+        let utf16 = Charset("UTF-16LE")
+        var offset = 0
+        m_props = []
 
-			let prop = OLEReadProperty(name, type, start_block, size)
-			m_props.push prop
+        while offset < entry.size {
+            entry.pos = offset + _SIZE_OF_NAME_POS
+            let name_size = entry.peek("s")
+            entry.pos = offset + _TYPE_POS
+            let type = entry.peek("c")
+            entry.pos = offset + _START_BLOCK_POS
+            let start_block = entry.peek("+i")
+            entry.pos = offset + _SIZE_POS
+            let size = entry.peek("+i")
 
-			if name == "Root Entry" {
-				m_rootentry = prop
-			}
-			offset += _PROPERTY_STORAGE_BLOCK_SIZE
-		}
+            entry.pos = offset
+            let name = Str(entry.read(name_size), utf16).replace("\0", "")
 
-	}
+            let prop = OLEReadProperty(name, type, start_block, size)
+            m_props.push prop
 
-	def _read_data(bl:Int)
-	{
-		var block = bl
-		let data = BytesIO()
-		while block != -2  {
-			m_data.pos = (block + 1) * _BIG_BLOCK_SIZE
-			data.write m_data.read(_BIG_BLOCK_SIZE)
-			block = m_big_block_chain[block]
-		}
-		return data
-	}
+            if name == "Root Entry" {
+                m_rootentry = prop
+            }
+            offset += _PROPERTY_STORAGE_BLOCK_SIZE
+        }
 
-	def get(pattern:Regex)
-	{
-		var book = null
-		for b in m_props {
-			if b.name.find(pattern) {
-				book = b
-				break
-			}
-		}
+    }
 
-		if !book {
-			return null
-		} elif book.size < _SMALL_BLOCK_THRESHOLD {
-			let data = BytesIO()
-			let root_data = this._read_data(m_rootentry.start_block)
-			var block = book.start_block
-			while block != -2 {
-				root_data.pos = block * _SMALL_BLOCK_SIZE
-				data.write root_data.read(_SMALL_BLOCK_SIZE)
-				block = m_small_block_chain[block]
-			}
-			return data
-		} else {
-			let data = BytesIO()
-			var num_blocks = book.size / _BIG_BLOCK_SIZE
-			if book.size % _BIG_BLOCK_SIZE != 0 {
-				num_blocks++
-			}
+    def _read_data(bl:Int)
+    {
+        var block = bl
+        let data = BytesIO()
+        while block != -2  {
+            m_data.pos = (block + 1) * _BIG_BLOCK_SIZE
+            data.write m_data.read(_BIG_BLOCK_SIZE)
+            block = m_big_block_chain[block]
+        }
+        return data
+    }
 
-			if num_blocks == 0 {
-				return data
-			}
-			var block = book.start_block
-			while block != -2 {
-				m_data.pos = (block + 1) * _BIG_BLOCK_SIZE
-				data.write m_data.read(_BIG_BLOCK_SIZE)
-				block = m_big_block_chain[block]
-			}
-			return data
-		}
-	}
+    def get(pattern:Regex)
+    {
+        var book = null
+        for b in m_props {
+            if b.name.find(pattern) {
+                book = b
+                break
+            }
+        }
+
+        if !book {
+            return null
+        } elif book.size < _SMALL_BLOCK_THRESHOLD {
+            let data = BytesIO()
+            let root_data = this._read_data(m_rootentry.start_block)
+            var block = book.start_block
+            while block != -2 {
+                root_data.pos = block * _SMALL_BLOCK_SIZE
+                data.write root_data.read(_SMALL_BLOCK_SIZE)
+                block = m_small_block_chain[block]
+            }
+            return data
+        } else {
+            let data = BytesIO()
+            var num_blocks = book.size / _BIG_BLOCK_SIZE
+            if book.size % _BIG_BLOCK_SIZE != 0 {
+                num_blocks++
+            }
+
+            if num_blocks == 0 {
+                return data
+            }
+            var block = book.start_block
+            while block != -2 {
+                m_data.pos = (block + 1) * _BIG_BLOCK_SIZE
+                data.write m_data.read(_BIG_BLOCK_SIZE)
+                block = m_big_block_chain[block]
+            }
+            return data
+        }
+    }
 }

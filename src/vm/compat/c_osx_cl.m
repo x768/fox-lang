@@ -5,7 +5,7 @@
 
 int main(int argc, char **argv, char **envp)
 {
-	init_fox_vm();
-	init_env(envp);
-	return main_fox(argc, (const char**)argv) ? 0 : 1;
+    init_fox_vm();
+    init_env(envp);
+    return main_fox(argc, (const char**)argv) ? 0 : 1;
 }

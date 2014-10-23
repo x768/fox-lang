@@ -1,0 +1,12 @@
+EUC-JIS-2004:iana=EUC-JP
+ISO-2022-JP-1:iana=ISO-2022-JP
+ISO-2022-JP-2:iana=ISO-2022-JP
+ISO-2022-JP-2004:iana=ISO-2022-JP
+Shift_JISX0213:iana=Shift_JIS
+UTF-16:iconv=UTF-16BE	ascii_compat=false
+UTF-16BE:iana=UTF-16	ascii_compat=false
+UTF-16LE:iana=UTF-16	ascii_compat=false
+UTF-32:iconv=UTF-32BE	ascii_compat=false
+UTF-32BE:iana=UTF-32	ascii_compat=false
+UTF-32LE:iana=UTF-32	ascii_compat=false
+Windows-31J:iana=Shift_JIS	iconv=CP932

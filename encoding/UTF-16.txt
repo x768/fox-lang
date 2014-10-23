@@ -1,2 +1,0 @@
-iconv=UTF-16
-ascii_compat=false

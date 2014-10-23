@@ -6,18 +6,18 @@
 
 
 typedef struct {
-	RefHeader rh;
-	SDL_Window *w;
+    RefHeader rh;
+    SDL_Window *w;
 } RefSDLWindow;
 
 typedef struct {
-	RefHeader rh;
-	SDL_Surface *sf;
+    RefHeader rh;
+    SDL_Surface *sf;
 } RefSDLSurface;
 
 typedef struct {
-	RefHeader rh;
-	SDL_Event e;
+    RefHeader rh;
+    SDL_Event e;
 } RefSDLEvent;
 
 

@@ -11,56 +11,56 @@ typedef void *GraphicsHandle;
  * WidgetやTimerなど
  */
 enum {
-	INDEX_WBASE_HANDLER,
+    INDEX_WBASE_HANDLER,
 #ifdef WIN32
-	INDEX_WBASE_CALLBACK,
+    INDEX_WBASE_CALLBACK,
 #endif
-	INDEX_WBASE_NUM,
+    INDEX_WBASE_NUM,
 };
 /**
  * Widget系
  */
 enum {
-	INDEX_WIDGET_HANDLE = INDEX_WBASE_NUM,  // Windowsの場合はRefHWndの参照
-	INDEX_WIDGET_PARENT,
-	INDEX_WIDGET_GENERAL_USE,
-	INDEX_WIDGET_NUM,
+    INDEX_WIDGET_HANDLE = INDEX_WBASE_NUM,  // Windowsの場合はRefHWndの参照
+    INDEX_WIDGET_PARENT,
+    INDEX_WIDGET_GENERAL_USE,
+    INDEX_WIDGET_NUM,
 };
 
 enum {
-	GUI_ENTRY_NUM = 64,
+    GUI_ENTRY_NUM = 64,
 };
 
 typedef struct GuiEntry {
-	struct GuiEntry *next;
-	const void *key;
-	Value val;
+    struct GuiEntry *next;
+    const void *key;
+    Value val;
 } GuiEntry;
 
 typedef struct {
-	RefHeader rh;
+    RefHeader rh;
 
-	GuiEntry *entry[GUI_ENTRY_NUM];
+    GuiEntry *entry[GUI_ENTRY_NUM];
 } RefGuiHash;
 
 typedef struct {
-	void (*GuiHash_init)(RefGuiHash *h);
-	Value *(*GuiHash_get_p)(RefGuiHash *h, const void *key);
-	Value *(*GuiHash_add_p)(RefGuiHash *h, const void *key);
-	void (*GuiHash_del_p)(RefGuiHash *h, const void *key);
-	void (*GuiHash_close)(RefGuiHash *h);
+    void (*GuiHash_init)(RefGuiHash *h);
+    Value *(*GuiHash_get_p)(RefGuiHash *h, const void *key);
+    Value *(*GuiHash_add_p)(RefGuiHash *h, const void *key);
+    void (*GuiHash_del_p)(RefGuiHash *h, const void *key);
+    void (*GuiHash_close)(RefGuiHash *h);
 
-	void *(*Value_handle)(Value v);
-	Value (*handle_Value)(void *handle);
-	Value *(*get_event_handler)(Ref *r, RefStr *name);
-	int (*invoke_event_handler)(int *result, Value eh, Value evt);
-	void (*widget_event_handler_sub)(Value *vret, Ref *r, RefStr *name);
-	int (*widget_handler_destroy)(Ref *r);
+    void *(*Value_handle)(Value v);
+    Value (*handle_Value)(void *handle);
+    Value *(*get_event_handler)(Ref *r, RefStr *name);
+    int (*invoke_event_handler)(int *result, Value eh, Value evt);
+    void (*widget_event_handler_sub)(Value *vret, Ref *r, RefStr *name);
+    int (*widget_handler_destroy)(Ref *r);
 
-	Value (*event_object_new)(Ref *sender_r);
-	void (*event_object_add)(Value evt, const char *name, Value val);
+    Value (*event_object_new)(Ref *sender_r);
+    void (*event_object_add)(Value evt, const char *name, Value val);
 
-	void (*connect_widget_events)(WndHandle window);
+    void (*connect_widget_events)(WndHandle window);
 } FoxtkStatic;
 
 

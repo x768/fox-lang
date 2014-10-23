@@ -4,9 +4,9 @@
 #include "compat.h"
 
 enum {
-	EXISTS_NONE = 0,
-	EXISTS_FILE = 1,
-	EXISTS_DIR = 2,
+    EXISTS_NONE = 0,
+    EXISTS_FILE = 1,
+    EXISTS_DIR = 2,
 };
 
 
@@ -14,7 +14,7 @@ enum {
 
 #define DT_REG 1
 #define DT_DIR 4
-#define RTLD_LAZY	0x00001
+#define RTLD_LAZY   0x00001
 
 
 #ifdef STDIN_FILENO
@@ -33,14 +33,14 @@ extern FileHandle STDERR_FILENO;
 
 
 struct dirent {
-	unsigned int d_type;
-	char d_name[1024];
+    unsigned int d_type;
+    char d_name[1024];
 };
 typedef struct {
-	void *hDir;
-	int first;
-	struct dirent ent;
-	char wfd[0];
+    void *hDir;
+    int first;
+    struct dirent ent;
+    char wfd[0];
 } DIR;
 
 DIR *opendir_fox(const char *dname);

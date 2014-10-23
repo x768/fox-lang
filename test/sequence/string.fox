@@ -6,6 +6,7 @@ assert_equal ["abc", "def", "ghi"].join(""), "abcdefghi"
 assert_equal "abc,def,ghi".split(","), ["abc", "def", "ghi"]
 
 assert_equal "abcdefg".size, 7
+assert_equal "\x61\x62\x63", "abc"
 assert_equal "abcあいうえお\x{29E3D}".size, 9
 
 assert_equal "\t\x5A\x{29E3D}", "	Z𩸽"

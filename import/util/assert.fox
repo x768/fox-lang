@@ -1,44 +1,44 @@
 class AssertError : Error
 {
-	new(msg:Str){
-		super(msg)
-	}
+    new(msg:Str){
+        super(msg)
+    }
 }
 
 def assert_true(b)
 {
-	if !b {
-		throw AssertError("Assertion fault")
-	}
+    if !b {
+        throw AssertError("Assertion fault")
+    }
 }
 def assert_false(b)
 {
-	if b {
-		throw AssertError("Assertion fault")
-	}
+    if b {
+        throw AssertError("Assertion fault")
+    }
 }
 def assert_equal(a, b)
 {
-	let t1 = typeof(a)
-	let t2 = typeof(b)
-	if t1 != t2 {
-		throw AssertError("$t1 value expected but $t2")
-	}
-	if a != b {
-		throw AssertError("$b expected but $a")
-	}
+    let t1 = typeof(a)
+    let t2 = typeof(b)
+    if t1 != t2 {
+        throw AssertError("$t1 value expected but $t2")
+    }
+    if a != b {
+        throw AssertError("$b expected but $a")
+    }
 }
 def assert_error(f:Function, ex:Class)
 {
-	try {
-		f()
-	} catch e:Error {
-		let t = typeof(e)
-		if t in ex {
-			return
-		}
-		throw AssertError("$ex error expected but $t thrown")
-	}
-	throw AssertError("$ex error expected but no error thrown")
+    try {
+        f()
+    } catch e:Error {
+        let t = typeof(e)
+        if t in ex {
+            return
+        }
+        throw AssertError("$ex error expected but $t thrown")
+    }
+    throw AssertError("$ex error expected but no error thrown")
 }
 

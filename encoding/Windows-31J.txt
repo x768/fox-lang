@@ -1,2 +1,0 @@
-iana=Shift_JIS
-iconv=CP932

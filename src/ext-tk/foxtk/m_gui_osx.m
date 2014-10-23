@@ -13,16 +13,16 @@ void gui_dispose()
 
 char *get_toolkit_version()
 {
-	char *p = malloc(64);
-	sprintf(p, "Cocoa");
-	return p;
+    char *p = malloc(64);
+    sprintf(p, "Cocoa");
+    return p;
 }
 
 void *Value_handle(Value v)
 {
-	return Value_ptr(v);
+    return Value_ptr(v);
 }
 Value handle_Value(void *handle)
 {
-	return ptr_Value(handle);
+    return ptr_Value(handle);
 }

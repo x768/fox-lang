@@ -2,54 +2,54 @@ import windows
 
 class AdoDB
 {
-	var m_ado
+    var m_ado
 
-	new(name:Str, param:Map = null) {
-		let ado = OLEObject("ADODB.Connection")
+    new(name:Str, param:Map = null) {
+        let ado = OLEObject("ADODB.Connection")
 
-		let s = StrIO("Data Source=")
-		s.print name
-		if param {
-			for p in param {
-				s.print ";", p.key, "=", p.value
-			}
-		}
+        let s = StrIO("Data Source=")
+        s.print name
+        if param {
+            for p in param {
+                s.print ";", p.key, "=", p.value
+            }
+        }
 
-		ado.Open s.data
-		m_ado = ado
-	}
-	def _dispose() {
-		if m_ado {
-			m_ado.Close()
-			m_ado = null
-		}
-	}
+        ado.Open s.data
+        m_ado = ado
+    }
+    def _dispose() {
+        if m_ado {
+            m_ado.Close()
+            m_ado = null
+        }
+    }
 
-	def exec(sql:Str) {
-		m_ado.Execute(sql)
-	}
+    def exec(sql:Str) {
+        m_ado.Execute(sql)
+    }
 
-	def *query(sql:Str) {
-		let result = m_ado.Execute(sql)
-		while !result.EOF {
-			var a = []
-			for v in result.Fields {
-				a.push v.Value
-			}
-			result.MoveNext()
-			yield a
-		}
-	}
+    def *query(sql:Str) {
+        let result = m_ado.Execute(sql)
+        while !result.EOF {
+            var a = []
+            for v in result.Fields {
+                a.push v.Value
+            }
+            result.MoveNext()
+            yield a
+        }
+    }
 
-	def *query_map(sql:Str) {
-		let result = m_ado.Execute(sql)
-		while !result.EOF {
-			let a = {}
-			for v in result.Fields {
-				a[v.Name] = v.Value
-			}
-			result.MoveNext()
-			yield a
-		}
-	}
+    def *query_map(sql:Str) {
+        let result = m_ado.Execute(sql)
+        while !result.EOF {
+            let a = {}
+            for v in result.Fields {
+                a[v.Name] = v.Value
+            }
+            result.MoveNext()
+            yield a
+        }
+    }
 }

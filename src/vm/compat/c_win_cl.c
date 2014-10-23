@@ -8,24 +8,24 @@
 
 static void write_errmsg(const char *str)
 {
-	write_fox(STDERR_FILENO, str, strlen(str));
+    write_fox(STDERR_FILENO, str, strlen(str));
 }
 static LONG CALLBACK exception_filter(EXCEPTION_POINTERS *e)
 {
-	write_errmsg("UnhandledException occurred\n");
-	return EXCEPTION_EXECUTE_HANDLER;
+    write_errmsg("UnhandledException occurred\n");
+    return EXCEPTION_EXECUTE_HANDLER;
 }
 
 int main()
 {
-	int argc;
-	const char **argv;
+    int argc;
+    const char **argv;
 
-	SetUnhandledExceptionFilter(exception_filter);
+    SetUnhandledExceptionFilter(exception_filter);
 
-	init_fox_vm();
-	init_env();
-	argv = get_cmd_args(&argc);
-	return main_fox(argc, argv);
+    init_fox_vm();
+    init_env();
+    argv = get_cmd_args(&argc);
+    return main_fox(argc, argv);
 }
 

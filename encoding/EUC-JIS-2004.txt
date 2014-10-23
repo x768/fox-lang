@@ -1,1 +1,0 @@
-iana=EUC-JP

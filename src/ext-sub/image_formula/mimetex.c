@@ -7786,7 +7786,7 @@ convert \left( to \(  and  \right) to \),  etc.
                 }
             }
         }
-	}
+    }
     /* -------------------------------------------------------------------------
        run thru table, converting all {a+b\atop c+d} to \atop{a+b}{c+d}
        -------------------------------------------------------------------------- */
@@ -15622,7 +15622,7 @@ static raster *aaweights(int width, int height)
 {
     raster *weights = NULL;
     int irow = 0;
-	int icol = 0;
+    int icol = 0;
     int weight = 0;             /*running weight, as per Notes above */
 
     if ((weights = new_raster(width, height, 8)) == NULL) {
@@ -15631,8 +15631,8 @@ static raster *aaweights(int width, int height)
 /* -------------------------------------------------------------------------
 Fill weight matrix, as per Notes above
 -------------------------------------------------------------------------- */
-	for (irow = 0; irow < height; irow++) {
-		/* outer loop over rows */
+    for (irow = 0; irow < height; irow++) {
+        /* outer loop over rows */
         for (icol = 0; icol < width; icol++) {  /* inner loop over cols */
             int jrow = height - irow - 1,       /* backwards irow, height-1,...,0 */
                 jcol = width - icol - 1;        /* backwards icol,  width-1,...,0 */
@@ -15641,7 +15641,7 @@ Fill weight matrix, as per Notes above
                 weight = 1;     /* force equal weights */
             setpixel(weights, irow, icol, min2(255, weight));   /*store weight in matrix */
         }
-	}
+    }
   end_of_job:
     return weights;
 }
@@ -15758,7 +15758,7 @@ Initialization
         aaimgval = black8;
     } else {                        /* center point not black */
         aaimgval = ((totwts / 2 - 1) + scalefactor * aaimgval) / totwts;
-	}
+    }
     return aaimgval;
 }
 

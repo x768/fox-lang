@@ -31,40 +31,40 @@ int64_t get_now_time()
 const char *get_fox_home()
 {
 #ifdef FOX_HOME
-	return FOX_HOME;
+    return FOX_HOME;
 #else
-	enum {
-		FOX_PATH_MAX = 512,
-	};
-	char *path = Mem_get(&fg->st_mem, FOX_PATH_MAX);
-	char *p;
+    enum {
+        FOX_PATH_MAX = 512,
+    };
+    char *path = Mem_get(&fg->st_mem, FOX_PATH_MAX);
+    char *p;
 #ifdef FOX_WINDOW
-	int n = 5;
+    int n = 5;
 #else
-	int n = 2;
+    int n = 2;
 #endif
     int len;
     uint32_t size = FOX_PATH_MAX;
     
-	memset(path, 0, size);
+    memset(path, 0, size);
     if (_NSGetExecutablePath(path, &size) != 0) {
-		return "./";
+        return "./";
     }
     len = strlen(path);
     len = make_path_regularize(path, len);
     
-	p = path + len;
-	while (p > path) {
-		p--;
-		if (*p == '/') {
-			*p = '\0';
-			n--;
-			if (n <= 0) {
-				break;
+    p = path + len;
+    while (p > path) {
+        p--;
+        if (*p == '/') {
+            *p = '\0';
+            n--;
+            if (n <= 0) {
+                break;
             }
-		}
-	}
-	return path;
+        }
+    }
+    return path;
 #endif
 }
 

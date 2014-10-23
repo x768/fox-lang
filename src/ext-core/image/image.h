@@ -14,9 +14,9 @@
 
 
 enum {
-	QUANT_MODE_RGB,
-	QUANT_MODE_RGBA,
-	QUANT_MODE_KEY,
+    QUANT_MODE_RGB,
+    QUANT_MODE_RGBA,
+    QUANT_MODE_KEY,
 };
 
 #ifdef DEFINE_GLOBALS
@@ -43,6 +43,9 @@ int image_convert_palette(uint32_t *palette, RefMatrix *mat);
 int image_convert_to_fullcolor(RefImage *dst, int dst_ch, RefImage *src, RefMatrix *mat);
 void copy_image_sub(RefImage *dst, const RefImage *src, int dx, int dy, int32_t *src_rect, int alpha);
 void copy_image_resized_sub(RefImage *dst, const RefImage *src, int32_t *dst_rect, int32_t *src_rect, int alpha, int resampled);
+
+void CopyParam_init(CopyParam *cp, RefImage *dst, const RefImage *src, int alpha, int resampled);
+void copy_image_line(uint8_t *pd, RefImage *dst, const uint8_t *ps, const RefImage *src, int w, const CopyParam *cp, int alpha);
 
 // quantize.c
 void quantize(RefImage *dst, const RefImage *src, int mode, int dither);

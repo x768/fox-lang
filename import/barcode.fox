@@ -1,8 +1,8 @@
 abstract class BarcodeError : Error
 {
-	new(s)
-	{
-		super(s)
-	}
+    new(s)
+    {
+        super(s)
+    }
 }
 

@@ -7,8 +7,8 @@
 
 
 enum {
-	SCALE_MAX = 32767,
-	SCALE_MIN = -32767,
+    SCALE_MAX = 32767,
+    SCALE_MIN = -32767,
 };
 
 

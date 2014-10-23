@@ -7,54 +7,54 @@
 
 // class StreamIO
 enum {
-	INDEX_READ_CUR,
-	INDEX_READ_MAX,
-	INDEX_READ_MEMIO,
-	INDEX_READ_OFFSET,  // キャッシュ先頭のファイル先頭からのオフセット (int62)
+    INDEX_READ_CUR,
+    INDEX_READ_MAX,
+    INDEX_READ_MEMIO,
+    INDEX_READ_OFFSET,  // キャッシュ先頭のファイル先頭からのオフセット (int62)
 
-	INDEX_WRITE_MAX,
-	INDEX_WRITE_MEMIO,
-	INDEX_WRITE_BUFFERING,
+    INDEX_WRITE_MAX,
+    INDEX_WRITE_MEMIO,
+    INDEX_WRITE_BUFFERING,
 
-	INDEX_STREAM_NUM,
+    INDEX_STREAM_NUM,
 };
 // class FileIO
 enum {
-	INDEX_FILEIO_HANDLE = INDEX_STREAM_NUM,
-	INDEX_FILEIO_NUM,
+    INDEX_FILEIO_HANDLE = INDEX_STREAM_NUM,
+    INDEX_FILEIO_NUM,
 };
 
 enum {
-	STREAM_READ = 1,
-	STREAM_WRITE = 2,
+    STREAM_READ = 1,
+    STREAM_WRITE = 2,
 };
 
 ////////////////////////////////////////////////////////////////////////////////
 
 typedef struct {
-	RefHeader rh;
+    RefHeader rh;
 
-	FileHandle fd_read;
-	FileHandle fd_write;
+    FileHandle fd_read;
+    FileHandle fd_write;
 } RefFileHandle;
 
 struct IconvIO {
-	RefCharset *cs_from;
-	RefCharset *cs_to;
-	const char *trans;
-	void *ic;
-	const char *inbuf;
-	size_t inbytesleft;
-	char *outbuf;
-	size_t outbytesleft;
+    RefCharset *cs_from;
+    RefCharset *cs_to;
+    const char *trans;
+    void *ic;
+    const char *inbuf;
+    size_t inbytesleft;
+    char *outbuf;
+    size_t outbytesleft;
 };
 
 typedef struct {
-	RefHeader rh;
+    RefHeader rh;
 
-	Value dummy[INDEX_STREAM_NUM];
-	int cur;
-	StrBuf buf;
+    Value dummy[INDEX_STREAM_NUM];
+    int cur;
+    StrBuf buf;
 } RefBytesIO;
 
 #endif /* _FOX_IO_H_ */

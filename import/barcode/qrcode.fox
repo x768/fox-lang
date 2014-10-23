@@ -3,78 +3,78 @@ import image
 
 
 def _ALNUM_TABLE = {
-	b'0': 0, b'1': 1, b'2': 2, b'3': 3, b'4': 4,
-	b'5': 5, b'6': 6, b'7': 7, b'8': 8, b'9': 9,
-	b'A':10, b'B':11, b'C':12, b'D':13, b'E':14,
-	b'F':15, b'G':16, b'H':17, b'I':18, b'J':19,
-	b'K':20, b'L':21, b'M':22, b'N':23, b'O':24,
-	b'P':25, b'Q':26, b'R':27, b'S':28, b'T':29,
-	b'U':30, b'V':31, b'W':32, b'X':33, b'Y':34,
-	b'Z':35, b' ':36, b'$':37, b'%':38, b'*':39,
-	b'+':40, b'-':41, b'.':42, b'/':43, b':':44,
+    b'0': 0, b'1': 1, b'2': 2, b'3': 3, b'4': 4,
+    b'5': 5, b'6': 6, b'7': 7, b'8': 8, b'9': 9,
+    b'A':10, b'B':11, b'C':12, b'D':13, b'E':14,
+    b'F':15, b'G':16, b'H':17, b'I':18, b'J':19,
+    b'K':20, b'L':21, b'M':22, b'N':23, b'O':24,
+    b'P':25, b'Q':26, b'R':27, b'S':28, b'T':29,
+    b'U':30, b'V':31, b'W':32, b'X':33, b'Y':34,
+    b'Z':35, b' ':36, b'$':37, b'%':38, b'*':39,
+    b'+':40, b'-':41, b'.':42, b'/':43, b':':44,
 }
 
 def _CW_NUM_PLUS_8BIT = b"\0\0\0\0\0\0\0\0\0\0\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b"
 def _CW_NUM_PLUS_ALNUM = b"\0\0\0\0\0\0\0\0\0\0\x02\x02\x02\x02\x02\x02\x02\x02\x02\x02\x02\x02\x02\x02\x02\x02\x02\x04\x04\x04\x04\x04\x04\x04\x04\x04\x04\x04\x04\x04\x04"
 
 def _MAX_DAT_BITS = [
-	    0,
-	  128,  224,  352,  512,  688,  864,  992, 1232, 1456, 1728,
-	 2032, 2320, 2672, 2920, 3320, 3624, 4056, 4504, 5016, 5352,
-	 5712, 6256, 6880, 7312, 8000, 8496, 9024, 9544,10136,10984,
-	11640,12328,13048,13800,14496,15312,15936,16816,17728,18672,
+        0,
+      128,  224,  352,  512,  688,  864,  992, 1232, 1456, 1728,
+     2032, 2320, 2672, 2920, 3320, 3624, 4056, 4504, 5016, 5352,
+     5712, 6256, 6880, 7312, 8000, 8496, 9024, 9544,10136,10984,
+    11640,12328,13048,13800,14496,15312,15936,16816,17728,18672,
 
-	  152,  272,  440,  640,  864, 1088, 1248, 1552, 1856, 2192,
-	 2592, 2960, 3424, 3688, 4184, 4712, 5176, 5768, 6360, 6888,
-	 7456, 8048, 8752, 9392,10208,10960,11744,12248,13048,13880,
-	14744,15640,16568,17528,18448,19472,20528,21616,22496,23648,
+      152,  272,  440,  640,  864, 1088, 1248, 1552, 1856, 2192,
+     2592, 2960, 3424, 3688, 4184, 4712, 5176, 5768, 6360, 6888,
+     7456, 8048, 8752, 9392,10208,10960,11744,12248,13048,13880,
+    14744,15640,16568,17528,18448,19472,20528,21616,22496,23648,
 
-	   72,  128,  208,  288,  368,  480,  528,  688,  800,  976,
-	 1120, 1264, 1440, 1576, 1784, 2024, 2264, 2504, 2728, 3080,
-	 3248, 3536, 3712, 4112, 4304, 4768, 5024, 5288, 5608, 5960,
-	 6344, 6760, 7208, 7688, 7888, 8432, 8768, 9136, 9776,10208,
+       72,  128,  208,  288,  368,  480,  528,  688,  800,  976,
+     1120, 1264, 1440, 1576, 1784, 2024, 2264, 2504, 2728, 3080,
+     3248, 3536, 3712, 4112, 4304, 4768, 5024, 5288, 5608, 5960,
+     6344, 6760, 7208, 7688, 7888, 8432, 8768, 9136, 9776,10208,
 
-	  104,  176,  272,  384,  496,  608,  704,  880, 1056, 1232,
-	 1440, 1648, 1952, 2088, 2360, 2600, 2936, 3176, 3560, 3880,
-	 4096, 4544, 4912, 5312, 5744, 6032, 6464, 6968, 7288, 7880,
-	 8264, 8920, 9368, 9848,10288,10832,11408,12016,12656,13328,
+      104,  176,  272,  384,  496,  608,  704,  880, 1056, 1232,
+     1440, 1648, 1952, 2088, 2360, 2600, 2936, 3176, 3560, 3880,
+     4096, 4544, 4912, 5312, 5744, 6032, 6464, 6968, 7288, 7880,
+     8264, 8920, 9368, 9848,10288,10832,11408,12016,12656,13328,
 ]
 def _MAX_CODE_WORDS = [
-	   0,
-	  26,   44,   70,  100,  134,  172,  196,  242,  292,  346,
-	 404,  466,  532,  581,  655,  733,  815,  901,  991, 1085,
-	1156, 1258, 1364, 1474, 1588, 1706, 1828, 1921, 2051, 2185,
-	2323, 2465, 2611, 2761, 2876, 3034, 3196, 3362, 3532, 3706,
+       0,
+      26,   44,   70,  100,  134,  172,  196,  242,  292,  346,
+     404,  466,  532,  581,  655,  733,  815,  901,  991, 1085,
+    1156, 1258, 1364, 1474, 1588, 1706, 1828, 1921, 2051, 2185,
+    2323, 2465, 2611, 2761, 2876, 3034, 3196, 3362, 3532, 3706,
 ]
 def _REMAIN_BITS = b"\0\0\x07\x07\x07\x07\x07\0\0\0\0\0\0\0\x03\x03\x03\x03\x03\x03\x03\x04\x04\x04\x04\x04\x04\x04\x03\x03\x03\x03\x03\x03\x03\0\0\0\0\0\0"
 
 def _FORMAT_INFO = [
-	0b101010000010010, 0b101000100100101, 0b101111001111100, 0b101101101001011,
-	0b100010111111001, 0b100000011001110, 0b100111110010111, 0b100101010100000,
-	0b111011111000100, 0b111001011110011, 0b111110110101010, 0b111100010011101,
-	0b110011000101111, 0b110001100011000, 0b110110001000001, 0b110100101110110,
-	0b001011010001001, 0b001001110111110, 0b001110011100111, 0b001100111010000,
-	0b000011101100010, 0b000001001010101, 0b000110100001100, 0b000100000111011,
-	0b011010101011111, 0b011000001101000, 0b011111100110001, 0b011101000000110,
-	0b010010010110100, 0b010000110000011, 0b010111011011010, 0b010101111101101,
+    0b101010000010010, 0b101000100100101, 0b101111001111100, 0b101101101001011,
+    0b100010111111001, 0b100000011001110, 0b100111110010111, 0b100101010100000,
+    0b111011111000100, 0b111001011110011, 0b111110110101010, 0b111100010011101,
+    0b110011000101111, 0b110001100011000, 0b110110001000001, 0b110100101110110,
+    0b001011010001001, 0b001001110111110, 0b001110011100111, 0b001100111010000,
+    0b000011101100010, 0b000001001010101, 0b000110100001100, 0b000100000111011,
+    0b011010101011111, 0b011000001101000, 0b011111100110001, 0b011101000000110,
+    0b010010010110100, 0b010000110000011, 0b010111011011010, 0b010101111101101,
 ]
 
 /*
 def dump_s(b:BytesIO)
 {
-	for i in 0..b.size {
-		if i > 0 {
-			print " "
-		}
-		print b[i]
-	}
-	print "\r\n"
+    for i in 0..b.size {
+        if i > 0 {
+            print " "
+        }
+        print b[i]
+    }
+    print "\r\n"
 }
 def dump_mat(mat:List)
 {
-	for row in mat {
-		print row.join(" "), "\r\n"
-	}
+    for row in mat {
+        print row.join(" "), "\r\n"
+    }
 }
 */
 
@@ -82,636 +82,636 @@ def _abs(i) => i < 0 ? -i : i
 
 def _bytesio_xor_bytes(str:BytesIO, b:Bytes)
 {
-	for i in 0..(str.size - 1) {
-		var c = str[i + 1]
-		if i < b.size {
-			c ^= b[i]
-		}
-		str[i] = c
-	}
-	str.size--
-	if b.size > str.size {
-		str.write b.sub(str.size)
-	}
+    for i in 0..(str.size - 1) {
+        var c = str[i + 1]
+        if i < b.size {
+            c ^= b[i]
+        }
+        str[i] = c
+    }
+    str.size--
+    if b.size > str.size {
+        str.write b.sub(str.size)
+    }
 }
 def _bytesio_not(s:BytesIO)
 {
-	for i in 0 .. s.size {
-		s[i] ^= 0xFF
-	}
+    for i in 0 .. s.size {
+        s[i] ^= 0xFF
+    }
 }
 
 def _bytesio_or_char(s:BytesIO, c:Int)
 {
-	for i in 0..s.size {
-		s[i] |= c
-	}
+    for i in 0..s.size {
+        s[i] |= c
+    }
 }
 def _bytesio_and_char(s:BytesIO, c:Int)
 {
-	for i in 0..s.size {
-		s[i] &= c
-	}
+    for i in 0..s.size {
+        s[i] &= c
+    }
 }
 def _b_bio_and_bio_b(b1:Bytes, bi1:BytesIO, bi2:BytesIO, b2:Bytes)
 {
-	var s1 = BytesIO()
-	var s2 = BytesIO()
+    var s1 = BytesIO()
+    var s2 = BytesIO()
 
-	s1.write b1
-	s1.write_s bi1
-	s2.write_s bi2
-	s2.write b2
+    s1.write b1
+    s1.write_s bi1
+    s2.write_s bi2
+    s2.write b2
 
-	bi1.pos = 0
-	bi2.pos = 0
+    bi1.pos = 0
+    bi2.pos = 0
 
-	if s1.size > s2.size {
-		let tmp = s1
-		s1 = s2
-		s2 = tmp
-	}
-	for i in 0..s1.size {
-		s1[i] &= s2[i]
-	}
-	if s2.size > s1.size {
-		s1.write b"\0" * s2.size - s2.size
-	}
-	return s1
+    if s1.size > s2.size {
+        let tmp = s1
+        s1 = s2
+        s2 = tmp
+    }
+    for i in 0..s1.size {
+        s1[i] &= s2[i]
+    }
+    if s2.size > s1.size {
+        s1.write b"\0" * s2.size - s2.size
+    }
+    return s1
 }
 def _b_bio_or_bio_b(b1:Bytes, bi1:BytesIO, bi2:BytesIO, b2:Bytes)
 {
-	var s1 = BytesIO()
-	var s2 = BytesIO()
+    var s1 = BytesIO()
+    var s2 = BytesIO()
 
-	s1.write b1
-	s1.write_s bi1
-	s2.write_s bi2
-	s2.write b2
+    s1.write b1
+    s1.write_s bi1
+    s2.write_s bi2
+    s2.write b2
 
-	bi1.pos = 0
-	bi2.pos = 0
+    bi1.pos = 0
+    bi2.pos = 0
 
-	if s1.size < s2.size {
-		let tmp = s1
-		s1 = s2
-		s2 = tmp
-	}
-	for i in 0..s2.size {
-		s1[i] |= s2[i]
-	}
-	return s1
+    if s1.size < s2.size {
+        let tmp = s1
+        s1 = s2
+        s2 = tmp
+    }
+    for i in 0..s2.size {
+        s1[i] |= s2[i]
+    }
+    return s1
 }
 
 def _ecc_to_code(ecc:Str)
 {
-	switch ecc.toupper() {
-	case "M"
-		return 0
-	case "L"
-		return 1
-	case "H"
-		return 2
-	case "Q"
-		return 3
-	default
-		throw ValueError("Unknown ecc mode '$ecc'")
-	}
+    switch ecc.toupper() {
+    case "M"
+        return 0
+    case "L"
+        return 1
+    case "H"
+        return 2
+    case "Q"
+        return 3
+    default
+        throw ValueError("Unknown ecc mode '$ecc'")
+    }
 }
 def _detect_mode_from_data_string(s:Bytes, mode_s:Str)
 {
-	let mode = mode_s.tolower()
-	switch mode {
-	case "auto"
-		if s.find(/\D/) {
-			if s.find(/[^0-9A-Z \$\*\%\+\-\.\/\:]/) {
-				return "8bit"
-			} else {
-				return "alnum"
-			}
-		} else {
-			return "digit"
-		}
-	default
-		return mode
-	}
+    let mode = mode_s.tolower()
+    switch mode {
+    case "auto"
+        if s.find(/\D/) {
+            if s.find(/[^0-9A-Z \$\*\%\+\-\.\/\:]/) {
+                return "8bit"
+            } else {
+                return "alnum"
+            }
+        } else {
+            return "digit"
+        }
+    default
+        return mode
+    }
 }
 
 def _read_rsc(ecc_words:Int)
 {
-	let cal_tbl = []
-	let f = FileIO(resource_file("barcode.qrcode.rsc${ecc_words}", "dat"))
+    let cal_tbl = []
+    let f = FileIO(resource_file("barcode.qrcode.rsc${ecc_words}", "dat"))
 
-	for i in 0..256 {
-		let b = f.read(ecc_words)
-		if b.size > 0 {
-			cal_tbl.push b
-		}
-		if b.size < ecc_words {
-			break
-		}
-	}
+    for i in 0..256 {
+        let b = f.read(ecc_words)
+        if b.size > 0 {
+            cal_tbl.push b
+        }
+        if b.size < ecc_words {
+            break
+        }
+    }
 
-	return cal_tbl
+    return cal_tbl
 }
 def _read_frame(version:Int)
 {
-	let frame = []
-	let f = FileIO(resource_file("barcode.qrcode.qrvfr${version}", "dat"))
+    let frame = []
+    let f = FileIO(resource_file("barcode.qrcode.qrvfr${version}", "dat"))
 
-	while let line = f.gets() {
-		frame.push line
-	}
+    while let line = f.gets() {
+        frame.push line
+    }
 
-	return frame
+    return frame
 }
 def _convert_bytes(dat_val:List, dat_bit:List, max_words:Int)
 {
-	let words = BytesIO()
-	var rest = 8
-	var c = 0
+    let words = BytesIO()
+    var rest = 8
+    var c = 0
 
-	for i in dat_val.keys {
-		var buff = dat_val[i]
-		var buff_bit = dat_bit[i]
+    for i in dat_val.keys {
+        var buff = dat_val[i]
+        var buff_bit = dat_bit[i]
 
-		while buff_bit > 0 {
-			if rest >= buff_bit {
-				c = (c << buff_bit) | buff
-				rest -= buff_bit
-				buff_bit = 0
-			} elif rest > 0 {
-				let sh = buff_bit - rest
-				c = (c << rest) | (buff >> sh)
-				buff &= ((1 << sh) - 1)
-				buff_bit -= rest
-				rest = 0
-			} else {
-				words.push c
-				c = 0
-				rest = 8
-			}
-		}
-	}
-	if rest != 8 {
-		c = c << rest
-		words.push c
-	} elif words.size < max_words {
-		words.push 0
-	}
-	{
-		var f = true
-		while words.size < max_words {
-			words.push(f ? 0xEC : 0x11)
-			f = !f
-		}
-	}
+        while buff_bit > 0 {
+            if rest >= buff_bit {
+                c = (c << buff_bit) | buff
+                rest -= buff_bit
+                buff_bit = 0
+            } elif rest > 0 {
+                let sh = buff_bit - rest
+                c = (c << rest) | (buff >> sh)
+                buff &= ((1 << sh) - 1)
+                buff_bit -= rest
+                rest = 0
+            } else {
+                words.push c
+                c = 0
+                rest = 8
+            }
+        }
+    }
+    if rest != 8 {
+        c = c << rest
+        words.push c
+    } elif words.size < max_words {
+        words.push 0
+    }
+    {
+        var f = true
+        while words.size < max_words {
+            words.push(f ? 0xEC : 0x11)
+            f = !f
+        }
+    }
 
-	return words
+    return words
 }
 
 class QRCodeError : BarcodeError
 {
-	new(s)
-	{
-		super(s)
-	}
+    new(s)
+    {
+        super(s)
+    }
 }
 class _StrlenAcc
 {
-	var m_count
+    var m_count
 
-	new() {
-		m_count = 0
-	}
-	def fn_1(m) {
-		m_count += m[0].size - 1
-		return b""
-	}
-	def fn_2(m) {
-		m_count += m[0].size - 2
-		return b""
-	}
-	def count => m_count
+    new() {
+        m_count = 0
+    }
+    def fn_1(m) {
+        m_count += m[0].size - 1
+        return b""
+    }
+    def fn_2(m) {
+        m_count += m[0].size - 2
+        return b""
+    }
+    def count => m_count
 }
 
 class _QRVFile
 {
-	var m_mat_x
-	var m_mat_y
-	var m_masks
-	var m_fmt_inf_x2
-	var m_fmt_inf_y2
-	var m_ecc_code_word
-	var m_rs_block_order
+    var m_mat_x
+    var m_mat_y
+    var m_masks
+    var m_fmt_inf_x2
+    var m_fmt_inf_y2
+    var m_ecc_code_word
+    var m_rs_block_order
 
-	def mat_x => m_mat_x
-	def mat_y => m_mat_y
-	def masks => m_masks
-	def fmt_inf_x1 => b"\0\x01\x02\x03\x04\x05\x07\b\b\b\b\b\b\b\b"
-	def fmt_inf_y1 => b"\b\b\b\b\b\b\b\b\x07\x05\x04\x03\x02\x01\0"
-	def fmt_inf_x2 => m_fmt_inf_x2
-	def fmt_inf_y2 => m_fmt_inf_y2
-	def ecc_words => m_ecc_code_word
-	def rs_block_order => m_rs_block_order
+    def mat_x => m_mat_x
+    def mat_y => m_mat_y
+    def masks => m_masks
+    def fmt_inf_x1 => b"\0\x01\x02\x03\x04\x05\x07\b\b\b\b\b\b\b\b"
+    def fmt_inf_y1 => b"\b\b\b\b\b\b\b\b\x07\x05\x04\x03\x02\x01\0"
+    def fmt_inf_x2 => m_fmt_inf_x2
+    def fmt_inf_y2 => m_fmt_inf_y2
+    def ecc_words => m_ecc_code_word
+    def rs_block_order => m_rs_block_order
 
-	new(byte_num:Int, version:Int, ecc:Int) {
-		let f = FileIO(resource_file("barcode.qrcode.qrv${version}_${ecc}", "dat"))
+    new(byte_num:Int, version:Int, ecc:Int) {
+        let f = FileIO(resource_file("barcode.qrcode.qrv${version}_${ecc}", "dat"))
 
-		m_mat_x = f.read(byte_num)
-		m_mat_y = f.read(byte_num)
-		m_masks = f.read(byte_num)
-		m_fmt_inf_x2 = f.read(15)
-		m_fmt_inf_y2 = f.read(15)
-		m_ecc_code_word = f.peek("c")
-		m_rs_block_order = f.read(128)
-	}
+        m_mat_x = f.read(byte_num)
+        m_mat_y = f.read(byte_num)
+        m_masks = f.read(byte_num)
+        m_fmt_inf_x2 = f.read(15)
+        m_fmt_inf_y2 = f.read(15)
+        m_ecc_code_word = f.peek("c")
+        m_rs_block_order = f.read(128)
+    }
 }
 
 class QRCode
 {
-	var m_ecc
-	var m_mode
-	var m_version
-	var m_source
-	var m_codeword_num_counter_value
-	var m_mat
+    var m_ecc
+    var m_mode
+    var m_version
+    var m_source
+    var m_codeword_num_counter_value
+    var m_mat
 
-	def ecc => "MLHQ".sub(m_ecc, 1)
-	def mode => m_mode
-	def version => m_version
-	def source => m_source
+    def ecc => "MLHQ".sub(m_ecc, 1)
+    def mode => m_mode
+    def version => m_version
+    def source => m_source
 
-	def _from_8bit(dat_val:List, dat_bit:List, text:Bytes)
-	{
-		let dat_len = text.size
+    def _from_8bit(dat_val:List, dat_bit:List, text:Bytes)
+    {
+        let dat_len = text.size
 
-		dat_bit.push 4
-		dat_val.push 4   // 8bit byte mode
-		m_codeword_num_counter_value = dat_val.size
+        dat_bit.push 4
+        dat_val.push 4   // 8bit byte mode
+        m_codeword_num_counter_value = dat_val.size
 
-		dat_bit.push 8   // version 1-9
-		dat_val.push dat_len
+        dat_bit.push 8   // version 1-9
+        dat_val.push dat_len
 
-		for i in 0..dat_len {
-			dat_val.push text[i]
-			dat_bit.push 8
-		}
-	}
-	def _from_alnum(dat_val:List, dat_bit:List, text:Bytes)
-	{
-		let dat_len = text.size
-		let c = 0
+        for i in 0..dat_len {
+            dat_val.push text[i]
+            dat_bit.push 8
+        }
+    }
+    def _from_alnum(dat_val:List, dat_bit:List, text:Bytes)
+    {
+        let dat_len = text.size
+        let c = 0
 
-		dat_bit.push 4
-		dat_val.push 2   // alpha numeric mode
-		m_codeword_num_counter_value = dat_val.size
+        dat_bit.push 4
+        dat_val.push 2   // alpha numeric mode
+        m_codeword_num_counter_value = dat_val.size
 
-		dat_bit.push 9   // version 1-9
-		dat_val.push dat_len
+        dat_bit.push 9   // version 1-9
+        dat_val.push dat_len
 
-		for i in 0..dat_len {
-			let h = _ALNUM_TABLE[text.sub(i, i + 1)]
-			if !h {
-				throw ValueError('Not alphanumeric characters found')
-			}
-			if i % 2 == 0 {
-				dat_val.push h
-				dat_bit.push 6
-			} else {
-				dat_val[-1] = dat_val[-1]  * 45 + h
-				dat_bit[-1] = 11
-			}
-		}
-	}
-	def _from_digit(dat_val:List, dat_bit:List, text:Bytes)
-	{
-		let dat_len = text.size
+        for i in 0..dat_len {
+            let h = _ALNUM_TABLE[text.sub(i, i + 1)]
+            if !h {
+                throw ValueError('Not alphanumeric characters found')
+            }
+            if i % 2 == 0 {
+                dat_val.push h
+                dat_bit.push 6
+            } else {
+                dat_val[-1] = dat_val[-1]  * 45 + h
+                dat_bit[-1] = 11
+            }
+        }
+    }
+    def _from_digit(dat_val:List, dat_bit:List, text:Bytes)
+    {
+        let dat_len = text.size
 
-		dat_bit.push 4
-		dat_val.push 1   // numeric mode
-		m_codeword_num_counter_value = dat_val.size
+        dat_bit.push 4
+        dat_val.push 1   // numeric mode
+        m_codeword_num_counter_value = dat_val.size
 
-		dat_bit.push 10  // version 1-9
-		dat_val.push dat_len
+        dat_bit.push 10  // version 1-9
+        dat_val.push dat_len
 
-		for i in 0..dat_len {
-			let h = text[i] - 0x30
-			if h < 0 || h >= 10 {
-				throw ValueError('Not numeric characters found')
-			}
-			switch i % 3 {
-			case 0
-				dat_val.push h
-				dat_bit.push 4
-			case 1
-				dat_val[-1] = dat_val[-1] * 10 + h
-				dat_bit[-1] = 7
-			case 2
-				dat_val[-1] = dat_val[-1] * 10 + h
-				dat_bit[-1] = 10
-			}
-		}
-	}
+        for i in 0..dat_len {
+            let h = text[i] - 0x30
+            if h < 0 || h >= 10 {
+                throw ValueError('Not numeric characters found')
+            }
+            switch i % 3 {
+            case 0
+                dat_val.push h
+                dat_bit.push 4
+            case 1
+                dat_val[-1] = dat_val[-1] * 10 + h
+                dat_bit[-1] = 7
+            case 2
+                dat_val[-1] = dat_val[-1] * 10 + h
+                dat_bit[-1] = 10
+            }
+        }
+    }
 
-	def _rs_ecc_prepare(code_words:BytesIO, qrv:_QRVFile, max_data_codewords:Int, rs_cal_tbl:List)
-	{
-		let rs_tmp = []
-		let block_order = qrv.rs_block_order
-		let ecc_words = qrv.ecc_words
+    def _rs_ecc_prepare(code_words:BytesIO, qrv:_QRVFile, max_data_codewords:Int, rs_cal_tbl:List)
+    {
+        let rs_tmp = []
+        let block_order = qrv.rs_block_order
+        let ecc_words = qrv.ecc_words
 
-		// Divide RS-Blocks
-		{
-			var tmp = BytesIO()
-			var j = 0
-			for i in 0..max_data_codewords {
-				tmp.push code_words[i]
-				j++
-				if j >= block_order[rs_tmp.size] - ecc_words {
-					j = 0
-					rs_tmp.push tmp
-					tmp = BytesIO()
-				}
-			}
-			if tmp.size > 0 {
-				rs_tmp.push tmp
-			}
-		}
-		// RS-ECC main
-		for bk in 0..block_order.size {
-			let cwords = block_order[bk]
-			let tmp = rs_tmp[bk]
-			tmp.write b"\0" * ecc_words
+        // Divide RS-Blocks
+        {
+            var tmp = BytesIO()
+            var j = 0
+            for i in 0..max_data_codewords {
+                tmp.push code_words[i]
+                j++
+                if j >= block_order[rs_tmp.size] - ecc_words {
+                    j = 0
+                    rs_tmp.push tmp
+                    tmp = BytesIO()
+                }
+            }
+            if tmp.size > 0 {
+                rs_tmp.push tmp
+            }
+        }
+        // RS-ECC main
+        for bk in 0..block_order.size {
+            let cwords = block_order[bk]
+            let tmp = rs_tmp[bk]
+            tmp.write b"\0" * ecc_words
 
-			for j in 0..(cwords - ecc_words) {
-				let f = tmp[0]
-				_bytesio_xor_bytes tmp, f != 0 ? rs_cal_tbl[f] : b""
-			}
-			code_words.write_s tmp
-		}
-	}
-	def _make_matrix(code_words:BytesIO, qrv:_QRVFile, frame_data:List, max_modules_1side:Int, max_codewords:Int, byte_num:Int)
-	{
-		// flash matrix
-		let mat = []
-		let mask = qrv.masks
+            for j in 0..(cwords - ecc_words) {
+                let f = tmp[0]
+                _bytesio_xor_bytes tmp, f != 0 ? rs_cal_tbl[f] : b""
+            }
+            code_words.write_s tmp
+        }
+    }
+    def _make_matrix(code_words:BytesIO, qrv:_QRVFile, frame_data:List, max_modules_1side:Int, max_codewords:Int, byte_num:Int)
+    {
+        // flash matrix
+        let mat = []
+        let mask = qrv.masks
 
-		{
-			let line = []
-			for i in 0..max_modules_1side {
-				line.push 0
-			}
-			mat.push line
-			for i in 1..max_modules_1side {
-				mat.push line.dup()
-			}
-		}
+        {
+            let line = []
+            for i in 0..max_modules_1side {
+                line.push 0
+            }
+            mat.push line
+            for i in 1..max_modules_1side {
+                mat.push line.dup()
+            }
+        }
 
-		// attach data
-		{
-			let mat_x = qrv.mat_x
-			let mat_y = qrv.mat_y
-			for i in 0..max_codewords {
-				var val = code_words[i]
-				var j = 7
-				while j >= 0 {
-					let n = (i << 3) +  j
-					mat[mat_x[n]][mat_y[n]] = (255*(val & 1)) ^ mask[n]
-					val >>= 1
-					j--
-				}
-			}
-			var remain = _REMAIN_BITS[m_version]
-			while remain > 0 {
-				let n = remain + (max_codewords << 3) - 1
-				mat[mat_x[n]][mat_y[n]] = mask[n]
-				remain--
-			}
-		}
+        // attach data
+        {
+            let mat_x = qrv.mat_x
+            let mat_y = qrv.mat_y
+            for i in 0..max_codewords {
+                var val = code_words[i]
+                var j = 7
+                while j >= 0 {
+                    let n = (i << 3) +  j
+                    mat[mat_x[n]][mat_y[n]] = (255*(val & 1)) ^ mask[n]
+                    val >>= 1
+                    j--
+                }
+            }
+            var remain = _REMAIN_BITS[m_version]
+            while remain > 0 {
+                let n = remain + (max_codewords << 3) - 1
+                mat[mat_x[n]][mat_y[n]] = mask[n]
+                remain--
+            }
+        }
 
-		// mask select
-		var min_demerit_score = 0
-		var hor_master = BytesIO()
-		var ver_master = BytesIO()
-		for k in 0..max_modules_1side {
-			for l in 0..max_modules_1side {
-				hor_master.push mat[l][k]
-				ver_master.push mat[k][l]
-			}
-		}
-		hor_master = hor_master.data
-		ver_master = ver_master.data
+        // mask select
+        var min_demerit_score = 0
+        var hor_master = BytesIO()
+        var ver_master = BytesIO()
+        for k in 0..max_modules_1side {
+            for l in 0..max_modules_1side {
+                hor_master.push mat[l][k]
+                ver_master.push mat[k][l]
+            }
+        }
+        hor_master = hor_master.data
+        ver_master = ver_master.data
 
-		let padding_aa = b"\xAA" * max_modules_1side
-		let all_matrix = max_modules_1side * max_modules_1side
-		var mask_number = null
+        let padding_aa = b"\xAA" * max_modules_1side
+        let all_matrix = max_modules_1side * max_modules_1side
+        var mask_number = null
 
-		for i in 0..8 {
-			let ptn_temp = []
-			let bit = 1 << i
-			let bit_r = bit ^ 0xff
+        for i in 0..8 {
+            let ptn_temp = []
+            let bit = 1 << i
+            let bit_r = bit ^ 0xff
 
-			let hor = BytesIO(hor_master)
-			let ver = BytesIO(ver_master)
-			_bytesio_and_char(hor, bit)
-			_bytesio_and_char(ver, bit)
+            let hor = BytesIO(hor_master)
+            let ver = BytesIO(ver_master)
+            _bytesio_and_char(hor, bit)
+            _bytesio_and_char(ver, bit)
 
-			let ver_and = _b_bio_and_bio_b(padding_aa, ver, ver, padding_aa)
-			let ver_or  = _b_bio_or_bio_b(padding_aa, ver, ver, padding_aa)
+            let ver_and = _b_bio_and_bio_b(padding_aa, ver, ver, padding_aa)
+            let ver_or  = _b_bio_or_bio_b(padding_aa, ver, ver, padding_aa)
 
-			_bytesio_not(hor)
-			_bytesio_not(ver)
-			_bytesio_not(ver_and)
-			_bytesio_not(ver_or)
+            _bytesio_not(hor)
+            _bytesio_not(ver)
+            _bytesio_not(ver_and)
+            _bytesio_not(ver_or)
 
-			ver_and.splice all_matrix, 0, 170
-			ver_or.splice all_matrix, 0, 170
+            ver_and.splice all_matrix, 0, 170
+            ver_or.splice all_matrix, 0, 170
 
-			var k = max_modules_1side - 1
-			while k >= 0 {
-				hor.splice k * max_modules_1side, 0, 170
-				ver.splice k * max_modules_1side, 0, 170
-				ver_and.splice k * max_modules_1side, 0, 170
-				ver_or.splice k * max_modules_1side, 0, 170
-				k--
-			}
-			hor.push 170
-			hor.write_s ver
-			ver.pos = 0
+            var k = max_modules_1side - 1
+            while k >= 0 {
+                hor.splice k * max_modules_1side, 0, 170
+                ver.splice k * max_modules_1side, 0, 170
+                ver_and.splice k * max_modules_1side, 0, 170
+                ver_or.splice k * max_modules_1side, 0, 170
+                k--
+            }
+            hor.push 170
+            hor.write_s ver
+            ver.pos = 0
 
-			//                                                  +     |                                        +
-			let n1_search  = Bytes.chr(255, 255, 255, 255, 255, 0x2B, 0x7C, bit_r, bit_r, bit_r, bit_r, bit_r, 0x2B)
-			let n2_search1 = Bytes.chr(bit_r, bit_r, 0x2B)
-			let n2_search2 = Bytes.chr(255, 255, 0x2B)
-			let n3_search  = Bytes.chr(bit_r, 255, bit_r, bit_r, bit_r, 255, bit_r)
-			let n4_search  = Bytes.chr(bit_r)
+            //                                                  +     |                                        +
+            let n1_search  = Bytes.chr(255, 255, 255, 255, 255, 0x2B, 0x7C, bit_r, bit_r, bit_r, bit_r, bit_r, 0x2B)
+            let n2_search1 = Bytes.chr(bit_r, bit_r, 0x2B)
+            let n2_search2 = Bytes.chr(255, 255, 0x2B)
+            let n3_search  = Bytes.chr(bit_r, 255, bit_r, bit_r, bit_r, 255, bit_r)
+            let n4_search  = Bytes.chr(bit_r)
 
-			let demerit_n1 = _StrlenAcc()
-			let demerit_n2 = _StrlenAcc()
-			let demerit_n3 = hor.data.count(n3_search) * 40
-			let demerit_n4 = _abs((ver.data.count(n4_search) * 100 / byte_num - 50) / 5) * 10
+            let demerit_n1 = _StrlenAcc()
+            let demerit_n2 = _StrlenAcc()
+            let demerit_n3 = hor.data.count(n3_search) * 40
+            let demerit_n4 = _abs((ver.data.count(n4_search) * 100 / byte_num - 50) / 5) * 10
 
-			ver_and.data.replace(Regex(n2_search1), demerit_n2.fn_1)
-			ver_or.data.replace(Regex(n2_search2), demerit_n2.fn_1)
+            ver_and.data.replace(Regex(n2_search1), demerit_n2.fn_1)
+            ver_or.data.replace(Regex(n2_search2), demerit_n2.fn_1)
 
-			hor.data.replace(Regex(n1_search), demerit_n1.fn_2)
+            hor.data.replace(Regex(n1_search), demerit_n1.fn_2)
 
-			let demerit_score = demerit_n1.count + demerit_n2.count * 3 + demerit_n3 + demerit_n4
+            let demerit_score = demerit_n1.count + demerit_n2.count * 3 + demerit_n3 + demerit_n4
 //print demerit_n1.count, ",", demerit_n2.count * 3, ",", demerit_n3, ",", demerit_n4, "\r\n"
 
-			if demerit_score <= min_demerit_score || i==0 {
-				mask_number = i
-				min_demerit_score = demerit_score
-			}
-		}
-		let mask_content = 1 << mask_number
+            if demerit_score <= min_demerit_score || i==0 {
+                mask_number = i
+                min_demerit_score = demerit_score
+            }
+        }
+        let mask_content = 1 << mask_number
 
-		// format information
-		let format_information_value = (m_ecc << 3) | mask_number
-		let fmt_inf_x1 = qrv.fmt_inf_x1
-		let fmt_inf_y1 = qrv.fmt_inf_y1
-		let fmt_inf_x2 = qrv.fmt_inf_x2
-		let fmt_inf_y2 = qrv.fmt_inf_y2
-		for i in 0..15 {
-			let content = (_FORMAT_INFO[format_information_value] & (1 << (14 - i))) != 0 ? 255 : 0
-			mat[fmt_inf_x1[i]][fmt_inf_y1[i]] = content
-			mat[fmt_inf_x2[i]][fmt_inf_y2[i]] = content
-		}
+        // format information
+        let format_information_value = (m_ecc << 3) | mask_number
+        let fmt_inf_x1 = qrv.fmt_inf_x1
+        let fmt_inf_y1 = qrv.fmt_inf_y1
+        let fmt_inf_x2 = qrv.fmt_inf_x2
+        let fmt_inf_y2 = qrv.fmt_inf_y2
+        for i in 0..15 {
+            let content = (_FORMAT_INFO[format_information_value] & (1 << (14 - i))) != 0 ? 255 : 0
+            mat[fmt_inf_x1[i]][fmt_inf_y1[i]] = content
+            mat[fmt_inf_x2[i]][fmt_inf_y2[i]] = content
+        }
 
-		m_mat = List.sized(max_modules_1side, max_modules_1side)
-		for i in 0..max_modules_1side {
-			for j in 0..max_modules_1side {
-				m_mat[i][j] = frame_data[i][j] == 0x31 || (mat[j][i] & mask_content) != 0
-			}
-		}
-	}
+        m_mat = List.sized(max_modules_1side, max_modules_1side)
+        for i in 0..max_modules_1side {
+            for j in 0..max_modules_1side {
+                m_mat[i][j] = frame_data[i][j] == 0x31 || (mat[j][i] & mask_content) != 0
+            }
+        }
+    }
 
-	new(source:Sequence, mode:Str, ecc_s:Str)
-	{
-		m_ecc = _ecc_to_code(ecc_s)
-		m_mode = "auto"
-		m_version = 0
-		m_source = source
+    new(source:Sequence, mode:Str, ecc_s:Str)
+    {
+        m_ecc = _ecc_to_code(ecc_s)
+        m_mode = "auto"
+        m_version = 0
+        m_source = source
 
-		var data_string = source
-		if typeof(source) == Str {
-			data_string = data_string.to_bytes("US-ASCII")
-		}
-		if data_string.size == 0 {
-			throw ValueError("data_string.size is 0")
-		}
-		let data_val = []
-		let data_bit = []
+        var data_string = source
+        if typeof(source) == Str {
+            data_string = data_string.to_bytes("US-ASCII")
+        }
+        if data_string.size == 0 {
+            throw ValueError("data_string.size is 0")
+        }
+        let data_val = []
+        let data_bit = []
 
-		var codeword_num_plus = null
+        var codeword_num_plus = null
 
-		m_mode = _detect_mode_from_data_string(data_string, m_mode)
-		switch m_mode {
-		case "8bit"
-			this._from_8bit(data_val, data_bit, data_string)
-			codeword_num_plus = _CW_NUM_PLUS_8BIT
-		case "alnum"
-			this._from_alnum(data_val, data_bit, data_string)
-			codeword_num_plus = _CW_NUM_PLUS_ALNUM
-		case "digit"
-			this._from_digit(data_val, data_bit, data_string)
-			codeword_num_plus = _CW_NUM_PLUS_ALNUM
-		}
+        m_mode = _detect_mode_from_data_string(data_string, m_mode)
+        switch m_mode {
+        case "8bit"
+            this._from_8bit(data_val, data_bit, data_string)
+            codeword_num_plus = _CW_NUM_PLUS_8BIT
+        case "alnum"
+            this._from_alnum(data_val, data_bit, data_string)
+            codeword_num_plus = _CW_NUM_PLUS_ALNUM
+        case "digit"
+            this._from_digit(data_val, data_bit, data_string)
+            codeword_num_plus = _CW_NUM_PLUS_ALNUM
+        }
 
-		var total_data_bits = 0
-		for i in data_bit {
-			total_data_bits += i
-		}
+        var total_data_bits = 0
+        for i in data_bit {
+            total_data_bits += i
+        }
 
-		var max_data_bits = 0
-		var version = m_version
-		if version == 0 {
-			var i = 1 + 40 * m_ecc
-			let j = i + 39
-			version = 1
-			while i <= j {
-				if _MAX_DAT_BITS[i] >= total_data_bits + codeword_num_plus[version] {
-					max_data_bits = _MAX_DAT_BITS[i]
-					break
-				}
-				version++
-				i++
-			}
-			m_version = version
-		} else {
-			max_data_bits = _MAX_DAT_BITS[m_version + 40 * m_ecc]
-		}
+        var max_data_bits = 0
+        var version = m_version
+        if version == 0 {
+            var i = 1 + 40 * m_ecc
+            let j = i + 39
+            version = 1
+            while i <= j {
+                if _MAX_DAT_BITS[i] >= total_data_bits + codeword_num_plus[version] {
+                    max_data_bits = _MAX_DAT_BITS[i]
+                    break
+                }
+                version++
+                i++
+            }
+            m_version = version
+        } else {
+            max_data_bits = _MAX_DAT_BITS[m_version + 40 * m_ecc]
+        }
 
-		total_data_bits += codeword_num_plus[m_version]
-		data_bit[m_codeword_num_counter_value] += codeword_num_plus[m_version]
+        total_data_bits += codeword_num_plus[m_version]
+        data_bit[m_codeword_num_counter_value] += codeword_num_plus[m_version]
 
-		let max_codewords = _MAX_CODE_WORDS[m_version]
-		let max_modules_1side = 17 + (m_version << 2)
+        let max_codewords = _MAX_CODE_WORDS[m_version]
+        let max_modules_1side = 17 + (m_version << 2)
 
-		// read version ECC data file
-		let byte_num = _REMAIN_BITS[m_version] + (max_codewords << 3)
-		let max_data_codewords = (max_data_bits >> 3)
-		let qrv = _QRVFile(byte_num, m_version, m_ecc)
+        // read version ECC data file
+        let byte_num = _REMAIN_BITS[m_version] + (max_codewords << 3)
+        let max_data_codewords = (max_data_bits >> 3)
+        let qrv = _QRVFile(byte_num, m_version, m_ecc)
 
-		let rs_cal_table = _read_rsc(qrv.ecc_words)
-		let frame_data = _read_frame(m_version)
+        let rs_cal_table = _read_rsc(qrv.ecc_words)
+        let frame_data = _read_frame(m_version)
 
-		// set terminator
-		if total_data_bits <= max_data_bits - 4 {
-			data_val.push 0
-			data_bit.push 4
-		} elif total_data_bits < max_data_bits {
-			data_val.push 0
-			data_bit.push max_data_bits - total_data_bits
-		} elif total_data_bits > max_data_bits {
-			throw QRCodeError("Datasize overflow")
-		}
+        // set terminator
+        if total_data_bits <= max_data_bits - 4 {
+            data_val.push 0
+            data_bit.push 4
+        } elif total_data_bits < max_data_bits {
+            data_val.push 0
+            data_bit.push max_data_bits - total_data_bits
+        } elif total_data_bits > max_data_bits {
+            throw QRCodeError("Datasize overflow")
+        }
 
-		let code_words = _convert_bytes(data_val, data_bit, max_data_codewords)
-		this._rs_ecc_prepare(code_words, qrv, max_data_codewords, rs_cal_table)
-		// padding
-		if code_words.size < max_codewords {
-			code_words.write b"\0" * (max_codewords - code_words.size)
-		}
+        let code_words = _convert_bytes(data_val, data_bit, max_data_codewords)
+        this._rs_ecc_prepare(code_words, qrv, max_data_codewords, rs_cal_table)
+        // padding
+        if code_words.size < max_codewords {
+            code_words.write b"\0" * (max_codewords - code_words.size)
+        }
 
-		this._make_matrix code_words, qrv, frame_data, max_modules_1side, max_codewords, byte_num
-	}
+        this._make_matrix code_words, qrv, frame_data, max_modules_1side, max_codewords, byte_num
+    }
 
-	def op_index(x:Int, y:Int) => m_mat[y][x]
-	def width => m_mat[0].size
-	def height => m_mat.size
+    def op_index(x:Int, y:Int) => m_mat[y][x]
+    def width => m_mat[0].size
+    def height => m_mat.size
 
-	def to_str(fmt:Str = null, lc:Locale = null)
-	{
-		let s = StrIO()
-		var c = null
+    def to_str(fmt:Str = null, lc:Locale = null)
+    {
+        let s = StrIO()
+        var c = null
 
-		if fmt && fmt.find(',') {
-			c = fmt.split(',')
-		} else {
-			c = [' ', '#']
-		}
-		for row in m_mat {
-			for m in row {
-				s.print c[m ? 1 : 0]
-			}
-			s.print "\n"
-		}
-		return s.data
-	}
-	def to_image(black:Color = null, white:Color = null, mode:Str = null)
-	{
-		let size = m_mat.size
-		let img = Image(size, size, mode || "rgb")
-		let bk = black || Color.BLACK
-		let wh = white || Color.WHITE
+        if fmt && fmt.find(',') {
+            c = fmt.split(',')
+        } else {
+            c = [' ', '#']
+        }
+        for row in m_mat {
+            for m in row {
+                s.print c[m ? 1 : 0]
+            }
+            s.print "\n"
+        }
+        return s.data
+    }
+    def to_image(black:Color = null, white:Color = null, mode:Str = null)
+    {
+        let size = m_mat.size
+        let img = Image(size, size, mode || "rgb")
+        let bk = black || Color.BLACK
+        let wh = white || Color.WHITE
 
-		for y in 0..size {
-			let row = m_mat[y]
-			for x in 0..size {
-				img[x, y] = row[x] ? bk : wh
-			}
-		}
-		return img
-	}
+        for y in 0..size {
+            let row = m_mat[y]
+            for x in 0..size {
+                img[x, y] = row[x] ? bk : wh
+            }
+        }
+        return img
+    }
 }

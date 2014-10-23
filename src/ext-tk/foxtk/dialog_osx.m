@@ -77,30 +77,30 @@ int confirm_dialog(RefStr *msg, RefStr *title, WndHandle parent)
  */
 static void split_filter_name(Str *filter, Str src)
 {
-	int i;
+    int i;
     
-	for (i = src.size - 1; i >= 0; i--) {
-		if (src.p[i] == ':') {
-			filter->p = src.p + i + 1;
-			filter->size = src.size - i - 1;
-			return;
-		}
-	}
-	*filter = src;
+    for (i = src.size - 1; i >= 0; i--) {
+        if (src.p[i] == ':') {
+            filter->p = src.p + i + 1;
+            filter->size = src.size - i - 1;
+            return;
+        }
+    }
+    *filter = src;
 }
 
 static void nsarray_add_filter(NSMutableArray *arr, int *other, Str filter)
 {
-	const char *p = filter.p;
-	const char *end = filter.p + filter.size;
+    const char *p = filter.p;
+    const char *end = filter.p + filter.size;
     
-	while (p < end) {
-		const char *top = p;
-		while (p < end && *p != ';') {
-			p++;
-		}
-		if (p > top) {
-			Str s = Str_new(top, p - top);
+    while (p < end) {
+        const char *top = p;
+        while (p < end && *p != ';') {
+            p++;
+        }
+        if (p > top) {
+            Str s = Str_new(top, p - top);
             if (s.size > 2 && s.p[0] == '*' && s.p[1] == '.') {
                 if (s.size == 3 && s.p[2] == '*') {
                     *other = TRUE;
@@ -112,19 +112,19 @@ static void nsarray_add_filter(NSMutableArray *arr, int *other, Str filter)
             } else if (s.size == 1 && s.p[0] == '*') {
                 *other = TRUE;
             }
-		}
-		if (p < end) {
-			// ;
-			p++;
-		}
-	}
+        }
+        if (p < end) {
+            // ;
+            p++;
+        }
+    }
 }
 static NSMutableArray *make_filter_string(int *other, RefArray *r)
 {
     NSMutableArray *arr = [[NSMutableArray alloc] init];
-	int i;
+    int i;
     
-	for (i = 0; i < r->size; i++) {
+    for (i = 0; i < r->size; i++) {
         Str filter;
         split_filter_name(&filter, fs->Value_str(r->p[i]));
         nsarray_add_filter(arr, other, filter);
@@ -140,7 +140,7 @@ static Value NSURL_to_file_Value(NSURL *url)
 int file_open_dialog(Value *vret, Str title, RefArray *filter, WndHandle parent, int type)
 {
     NSString *ntitle = cstr_to_nsstring(title.p, title.size);
-	
+    
     if (type == FILEOPEN_SAVE) {
         NSSavePanel *panel = [NSSavePanel savePanel];
         if (filter != NULL) {
@@ -182,7 +182,7 @@ int file_open_dialog(Value *vret, Str title, RefArray *filter, WndHandle parent,
                 RefArray *aret = fs->refarray_new(0);
                 *vret = vp_Value(aret);
                 for (i = 0; i < n; i++) {
-					Value *vf = fs->refarray_push(aret);
+                    Value *vf = fs->refarray_push(aret);
                     *vf = NSURL_to_file_Value([ns_arr objectAtIndex:i]);
                 }
             } else {

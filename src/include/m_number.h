@@ -5,27 +5,27 @@
 #include "mpi2.h"
 
 typedef struct {
-	RefHeader rh;
-	mp_int mp;
+    RefHeader rh;
+    mp_int mp;
 } RefInt;
 
 typedef struct {
-	RefHeader rh;
-	mp_int md[2];
+    RefHeader rh;
+    mp_int md[2];
 } RefFrac;
 
 typedef struct {
-	RefHeader rh;
+    RefHeader rh;
 
-	int size;
-	double d[0];
+    int size;
+    double d[0];
 } RefVector;
 
 typedef struct {
-	RefHeader rh;
+    RefHeader rh;
 
-	int rows, cols;
-	double d[0];
+    int rows, cols;
+    double d[0];
 } RefMatrix;
 
 

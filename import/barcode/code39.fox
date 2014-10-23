@@ -5,215 +5,215 @@ import image
 def _TERM = b'NwNnWnWnN'
 
 def _CODE39BAR = {
-	b'0':b'NnNwWnWnN',
-	b'1':b'WnNwNnNnW',
-	b'2':b'NnWwNnNnW',
-	b'3':b'WnWwNnNnN',
-	b'4':b'NnNwWnNnW',
-	b'5':b'WnNwWnNnN',
-	b'6':b'NnWwWnNnN',
-	b'7':b'NnNwNnWnW',
-	b'8':b'WnNwNnWnN',
-	b'9':b'NnWwNnWnN',
-	b'A':b'WnNnNwNnW',
-	b'B':b'NnWnNwNnW',
-	b'C':b'WnWnNwNnN',
-	b'D':b'NnNnWwNnW',
-	b'E':b'WnNnWwNnN',
-	b'F':b'NnWnWwNnN',
-	b'G':b'NnNnNwWnW',
-	b'H':b'WnNnNwWnN',
-	b'I':b'NnWnNwWnN',
-	b'J':b'NnNnWwWnN',
-	b'K':b'WnNnNnNwW',
-	b'L':b'NnWnNnNwW',
-	b'M':b'WnWnNnNwN',
-	b'N':b'NnNnWnNwW',
-	b'O':b'WnNnWnNwN',
-	b'P':b'NnWnWnNwN',
-	b'Q':b'NnNnNnWwW',
-	b'R':b'WnNnNnWwN',
-	b'S':b'NnWnNnWwN',
-	b'T':b'NnNnWnWwN',
-	b'U':b'WwNnNnNnW',
-	b'V':b'NwWnNnNnW',
-	b'W':b'WwWnNnNnN',
-	b'X':b'NwNnWnNnW',
-	b'Y':b'WwNnWnNnN',
-	b'Z':b'NwWnWnNnN',
-	b'-':b'NwNnNnWnW',
-	b'.':b'WwNnNnWnN',
-	b' ':b'NwWnNnWnN',
-	b'$':b'NwNwNwNnN',
-	b'/':b'NwNwNnNwN',
-	b'+':b'NwNnNwNwN',
-	b'%':b'NnNwNwNwN',
+    b'0':b'NnNwWnWnN',
+    b'1':b'WnNwNnNnW',
+    b'2':b'NnWwNnNnW',
+    b'3':b'WnWwNnNnN',
+    b'4':b'NnNwWnNnW',
+    b'5':b'WnNwWnNnN',
+    b'6':b'NnWwWnNnN',
+    b'7':b'NnNwNnWnW',
+    b'8':b'WnNwNnWnN',
+    b'9':b'NnWwNnWnN',
+    b'A':b'WnNnNwNnW',
+    b'B':b'NnWnNwNnW',
+    b'C':b'WnWnNwNnN',
+    b'D':b'NnNnWwNnW',
+    b'E':b'WnNnWwNnN',
+    b'F':b'NnWnWwNnN',
+    b'G':b'NnNnNwWnW',
+    b'H':b'WnNnNwWnN',
+    b'I':b'NnWnNwWnN',
+    b'J':b'NnNnWwWnN',
+    b'K':b'WnNnNnNwW',
+    b'L':b'NnWnNnNwW',
+    b'M':b'WnWnNnNwN',
+    b'N':b'NnNnWnNwW',
+    b'O':b'WnNnWnNwN',
+    b'P':b'NnWnWnNwN',
+    b'Q':b'NnNnNnWwW',
+    b'R':b'WnNnNnWwN',
+    b'S':b'NnWnNnWwN',
+    b'T':b'NnNnWnWwN',
+    b'U':b'WwNnNnNnW',
+    b'V':b'NwWnNnNnW',
+    b'W':b'WwWnNnNnN',
+    b'X':b'NwNnWnNnW',
+    b'Y':b'WwNnWnNnN',
+    b'Z':b'NwWnWnNnN',
+    b'-':b'NwNnNnWnW',
+    b'.':b'WwNnNnWnN',
+    b' ':b'NwWnNnWnN',
+    b'$':b'NwNwNwNnN',
+    b'/':b'NwNwNnNwN',
+    b'+':b'NwNnNwNwN',
+    b'%':b'NnNwNwNwN',
 }
 def _CODE39CKSUM = {
-	b'0':0,
-	b'1':1,
-	b'2':2,
-	b'3':3,
-	b'4':4,
-	b'5':5,
-	b'6':6,
-	b'7':7,
-	b'8':8,
-	b'9':9,
-	b'A':10,
-	b'B':11,
-	b'C':12,
-	b'D':13,
-	b'E':14,
-	b'F':15,
-	b'G':16,
-	b'H':17,
-	b'I':18,
-	b'J':19,
-	b'K':20,
-	b'L':21,
-	b'M':22,
-	b'N':23,
-	b'O':24,
-	b'P':25,
-	b'Q':26,
-	b'R':27,
-	b'S':28,
-	b'T':29,
-	b'U':30,
-	b'V':31,
-	b'W':32,
-	b'X':33,
-	b'Y':34,
-	b'Z':35,
-	b'-':36,
-	b'.':37,
-	b' ':38,
-	b'$':39,
-	b'/':40,
-	b'+':41,
-	b'%':42,
+    b'0':0,
+    b'1':1,
+    b'2':2,
+    b'3':3,
+    b'4':4,
+    b'5':5,
+    b'6':6,
+    b'7':7,
+    b'8':8,
+    b'9':9,
+    b'A':10,
+    b'B':11,
+    b'C':12,
+    b'D':13,
+    b'E':14,
+    b'F':15,
+    b'G':16,
+    b'H':17,
+    b'I':18,
+    b'J':19,
+    b'K':20,
+    b'L':21,
+    b'M':22,
+    b'N':23,
+    b'O':24,
+    b'P':25,
+    b'Q':26,
+    b'R':27,
+    b'S':28,
+    b'T':29,
+    b'U':30,
+    b'V':31,
+    b'W':32,
+    b'X':33,
+    b'Y':34,
+    b'Z':35,
+    b'-':36,
+    b'.':37,
+    b' ':38,
+    b'$':39,
+    b'/':40,
+    b'+':41,
+    b'%':42,
 }
 def _TRANS_BW = {
-	b'W':b'B',
-	b'N':b'b',
-	b'w':b'W',
-	b'n':b'w',
+    b'W':b'B',
+    b'N':b'b',
+    b'w':b'W',
+    b'n':b'w',
 }
 
 class Code39Error : BarcodeError
 {
-	new(s)
-	{
-		super(s)
-	}
+    new(s)
+    {
+        super(s)
+    }
 }
 
 class Code39
 {
-	var m_src
-	var m_data
+    var m_src
+    var m_data
 
-	new(src:Sequence, cksum:Bool = null) {
-		m_src = src
-		var src_b = src
-		if typeof(src) == Str {
-			src_b = src.to_bytes(Charset.UTF8)
-		}
-		m_data = BytesIO()
+    new(src:Sequence, cksum:Bool = null) {
+        m_src = src
+        var src_b = src
+        if typeof(src) == Str {
+            src_b = src.to_bytes(Charset.UTF8)
+        }
+        m_data = BytesIO()
 
-		m_data.write _TERM
-		m_data.write b"n"
-		for i in 0..src_b.size {
-			let c = _CODE39BAR[src_b.sub(i, i + 1)]
-			if !c {
-				throw ValueError("Invalid characters found")
-			}
-			m_data.write c
-			m_data.write b"n"
-		}
-		if cksum {
-			var c = 0
-			for i in 0..src_b.size {
-				c += _CODE39CKSUM[src_b.sub(i, i + 1)]
-			}
-			c = c % 43
-			m_data.write _CODE39BAR[b'0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ-. $/+%'.sub(c, c + 1)]
-			m_data.write b"n"
-		} 
-		m_data.write _TERM
-	}
-	def source => m_src
-	def op_index(i:Int) => m_data[i]
-	def width {
-		var w = 0
-		for i in 0..m_data.size {
-			switch m_data.sub(i, i + 1) {
-			case b'W', 'w'
-				w += 2
-			case b'N', 'n'
-				w += 1
-			}
-		}
-		return w
-	}
-	def to_list()
-	{
-		let a = []
-		for i in 0..m_data.size {
-			switch m_data.sub(i, i + 1) {
-			case b'W'
-				a.push true, true
-			case b'N'
-				a.push true
-			case b'w'
-				a.push false, false
-			case b'n'
-				a.push false
-			}
-		}
-		return a
-	}
-	def to_str(fmt:Str = null, lc:Locale = null)
-	{
-		if fmt.empty || fmt == 'WN' || fmt == 'NW' {
-			return Str(m_data.data, Charset.UTF8)
-		} elif fmt == 'BW' || fmt == 'WB' {
-			let s = m_data.data.replace(/./, m => _TRANS_BW[m[0]])
-			return Str(s, Charset.UTF8)
-		} elif fmt.find(',') {
-			let s = StrIO()
-			let a = fmt.split(',')
-			let white = a[0]
-			let black = a[1]
+        m_data.write _TERM
+        m_data.write b"n"
+        for i in 0..src_b.size {
+            let c = _CODE39BAR[src_b.sub(i, i + 1)]
+            if !c {
+                throw ValueError("Invalid characters found")
+            }
+            m_data.write c
+            m_data.write b"n"
+        }
+        if cksum {
+            var c = 0
+            for i in 0..src_b.size {
+                c += _CODE39CKSUM[src_b.sub(i, i + 1)]
+            }
+            c = c % 43
+            m_data.write _CODE39BAR[b'0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ-. $/+%'.sub(c, c + 1)]
+            m_data.write b"n"
+        } 
+        m_data.write _TERM
+    }
+    def source => m_src
+    def op_index(i:Int) => m_data[i]
+    def width {
+        var w = 0
+        for i in 0..m_data.size {
+            switch m_data.sub(i, i + 1) {
+            case b'W', 'w'
+                w += 2
+            case b'N', 'n'
+                w += 1
+            }
+        }
+        return w
+    }
+    def to_list()
+    {
+        let a = []
+        for i in 0..m_data.size {
+            switch m_data.sub(i, i + 1) {
+            case b'W'
+                a.push true, true
+            case b'N'
+                a.push true
+            case b'w'
+                a.push false, false
+            case b'n'
+                a.push false
+            }
+        }
+        return a
+    }
+    def to_str(fmt:Str = null, lc:Locale = null)
+    {
+        if fmt.empty || fmt == 'WN' || fmt == 'NW' {
+            return Str(m_data.data, Charset.UTF8)
+        } elif fmt == 'BW' || fmt == 'WB' {
+            let s = m_data.data.replace(/./, m => _TRANS_BW[m[0]])
+            return Str(s, Charset.UTF8)
+        } elif fmt.find(',') {
+            let s = StrIO()
+            let a = fmt.split(',')
+            let white = a[0]
+            let black = a[1]
 
-			for i in 0..m_data.size {
-				switch m_data.sub(i, i + 1) {
-				case b'W'
-					s.print black, black
-				case b'N'
-					s.print black
-				case b'w'
-					s.print white, white
-				case b'n'
-					s.print white
-				}
-			}
-			return s.data
-		} else {
-			throw FormatError('Unknown format string')
-		}
-	}
-	def to_image(black:Color = null, white:Color = null, mode:Str = null)
-	{
-		let a = this.to_list()
-		let img = Image(a.size, 1, mode || "rgb")
-		let bk = black || Color.BLACK
-		let wh = white || Color.WHITE
+            for i in 0..m_data.size {
+                switch m_data.sub(i, i + 1) {
+                case b'W'
+                    s.print black, black
+                case b'N'
+                    s.print black
+                case b'w'
+                    s.print white, white
+                case b'n'
+                    s.print white
+                }
+            }
+            return s.data
+        } else {
+            throw FormatError('Unknown format string')
+        }
+    }
+    def to_image(black:Color = null, white:Color = null, mode:Str = null)
+    {
+        let a = this.to_list()
+        let img = Image(a.size, 1, mode || "rgb")
+        let bk = black || Color.BLACK
+        let wh = white || Color.WHITE
 
-		for i in 0..a.size {
-			img[i, 0] = a[i] ? bk : wh
-		}
-		return img
-	}
+        for i in 0..a.size {
+            img[i, 0] = a[i] ? bk : wh
+        }
+        return img
+    }
 }

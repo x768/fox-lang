@@ -21,7 +21,7 @@ void get_local_timezone_name(char *buf, int max)
             buf[max - 1] = '\0';
         }
     } else {
-		strcpy(buf, "Etc/UTC");
+        strcpy(buf, "Etc/UTC");
     }
 }
 
@@ -30,9 +30,9 @@ void get_local_timezone_name(char *buf, int max)
  */
 const char *get_default_locale(void)
 {
-	static const char *def_locale = NULL;
+    static const char *def_locale = NULL;
     
-	if (def_locale == NULL) {
+    if (def_locale == NULL) {
         NSLocale *loc = [NSLocale currentLocale];
         NSString *name = [loc localeIdentifier];
         const char *cstr = [name UTF8String];
@@ -40,6 +40,6 @@ const char *get_default_locale(void)
         char *p = malloc(strlen(cstr) + 1);
         strcpy(p, cstr);
         def_locale = p;
-	}
-	return def_locale;
+    }
+    return def_locale;
 }

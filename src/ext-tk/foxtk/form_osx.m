@@ -59,12 +59,12 @@ void window_set_visible(WndHandle window, int show)
 }
 int window_set_icon(WndHandle window, Ref *r, RefImage *icon)
 {
-	return TRUE;
+    return TRUE;
 }
 int window_message_loop(int *loop)
 {
-	*loop = TRUE;
-	return TRUE;
+    *loop = TRUE;
+    return TRUE;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////
@@ -74,7 +74,7 @@ void create_image_pane_window(Value *v, WndHandle parent)
 }
 int image_pane_set_image_sub(WndHandle window, RefImage *img)
 {
-	return TRUE;
+    return TRUE;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////
@@ -91,7 +91,7 @@ void native_timer_remove(Ref *r)
 
 int native_filemonitor_new(Ref *r, const char *path)
 {
-	return TRUE;
+    return TRUE;
 }
 void native_filemonitor_remove(Ref *r)
 {

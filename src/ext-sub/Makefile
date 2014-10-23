@@ -9,7 +9,7 @@ all:
 	cd json; make DEBUG_MODE=$(DEBUG_MODE) TARGET=$(TARGET)
 	cd lzma; make DEBUG_MODE=$(DEBUG_MODE) TARGET=$(TARGET)
 	cd markdown; make DEBUG_MODE=$(DEBUG_MODE) TARGET=$(TARGET)
-#	cd mongo; make DEBUG_MODE=$(DEBUG_MODE) TARGET=$(TARGET)
+	cd mongo; make DEBUG_MODE=$(DEBUG_MODE) TARGET=$(TARGET)
 	cd mysql; make DEBUG_MODE=$(DEBUG_MODE) TARGET=$(TARGET)
 	cd rawimage; make DEBUG_MODE=$(DEBUG_MODE) TARGET=$(TARGET)
 	cd readline; make DEBUG_MODE=$(DEBUG_MODE) TARGET=$(TARGET)

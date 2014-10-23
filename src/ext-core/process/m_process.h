@@ -4,26 +4,26 @@
 #include "fox_io.h"
 
 enum {
-	INDEX_P_HANDLE = INDEX_STREAM_NUM,
-	INDEX_P_NUM,
+    INDEX_P_HANDLE = INDEX_STREAM_NUM,
+    INDEX_P_NUM,
 };
 
 typedef struct {
-	RefHeader rh;
+    RefHeader rh;
 
-	int valid;
-	int exit_status;
-	FileHandle fd_in;
-	FileHandle fd_out;
+    int valid;
+    int exit_status;
+    FileHandle fd_in;
+    FileHandle fd_out;
 
 #ifdef WIN32
-	FileHandle fd_err;
-	FileHandle p_cin;
-	FileHandle p_cout;
-	FileHandle p_cerr;
-	void *process_info;  // PROCESS_INFORMATION
+    FileHandle fd_err;
+    FileHandle p_cin;
+    FileHandle p_cout;
+    FileHandle p_cerr;
+    void *process_info;  // PROCESS_INFORMATION
 #else
-	int pid;
+    int pid;
 #endif
 } RefProcessHandle;
 

@@ -6,6 +6,7 @@ assert_equal b"abc,def,ghi".split(b","), [b"abc", b"def", b"ghi"]
 
 assert_equal b"abcdefg".size, 7
 assert_equal b"abcあいうえお\x00\x00".size, 20
+assert_equal b"\x61\x62\x63", b"abc"
 
 assert_equal b'C:\WINDOWS\SYSTEM32', b"C:\\WINDOWS\\SYSTEM32"
 assert_equal %B(abc\n), b"abc\n"
