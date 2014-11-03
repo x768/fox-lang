@@ -1,5 +1,0 @@
-=Africa/Conakry
-8000000000000000 -3292 0 LMT
-fffffe55d4cedf60 0 0 GMT
-fffffef89d20b400 -3600 0 WAT
-ffffffb683d82280 0 0 GMT

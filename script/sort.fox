@@ -1,0 +1,12 @@
+let data = []
+
+while let line = STDIO.gets() {
+    data.push line.replace(/\n$/, b"")
+}
+
+data.sort_self()
+
+for line in data {
+    STDIO.write line
+    STDIO.write b"\n"
+}

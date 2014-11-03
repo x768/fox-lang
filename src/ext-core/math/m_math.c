@@ -525,6 +525,18 @@ static int vector_to_matrix(Value *vret, Value *v, RefNode *node)
 
     return TRUE;
 }
+static int vector_to_list(Value *vret, Value *v, RefNode *node)
+{
+    int i;
+    RefVector *vec = Value_vp(*v);
+    RefArray *ra = fs->refarray_new(vec->size);
+    *vret = vp_Value(ra);
+
+    for (i = 0; i < vec->size; i++) {
+        ra->p[i] = fs->float_Value(vec->d[i]);
+    }
+    return TRUE;
+}
 static int vector_tostr(Value *vret, Value *v, RefNode *node)
 {
     StrBuf sb;
@@ -848,6 +860,24 @@ static int matrix_to_vector(Value *vret, Value *v, RefNode *node)
     }
     return TRUE;
 }
+static int matrix_to_list(Value *vret, Value *v, RefNode *node)
+{
+    RefMatrix *mat = Value_vp(*v);
+    RefArray *ra = fs->refarray_new(mat->rows);
+    int i, j;
+
+    *vret = vp_Value(ra);
+    for (i = 0; i < mat->rows; i++) {
+        RefArray *ra2 = fs->refarray_new(mat->cols);
+        const double *src = &mat->d[i * mat->cols];
+        ra->p[i] = vp_Value(ra2);
+
+        for (j = 0; j < mat->cols; j++) {
+            ra2->p[j] = fs->float_Value(src[j]);
+        }
+    }
+    return TRUE;
+}
 static int matrix_empty(Value *vret, Value *v, RefNode *node)
 {
     RefMatrix *mat = Value_vp(*v);
@@ -896,8 +926,8 @@ static int matrix_eq(Value *vret, Value *v, RefNode *node)
     int i, size;
 
     if (rows != m2->rows || cols != m2->cols) {
-        fs->throw_errorf(fs->mod_lang, "ValueError", "Matrix size mismatch");
-        return FALSE;
+        *vret = VALUE_FALSE;
+        return TRUE;
     }
     size = rows * cols;
 
@@ -1134,7 +1164,7 @@ static int matrix_hash(Value *vret, Value *v, RefNode *node)
     int i, size;
     RefMatrix *mat = Value_vp(*v);
     uint32_t *i32 = (uint32_t*)mat->d;
-    long hash = 0;
+    uint32_t hash = 0;
 
     size = mat->rows * mat->cols * 2;   // sizeof(double) / sizeof(uint32_t)
 
@@ -1577,6 +1607,8 @@ static void define_class(RefNode *m)
     fs->define_native_func_a(n, vector_to_matrix, 0, 0, (void*)FALSE);
     n = fs->define_identifier(m, cls, "to_col_matrix", NODE_FUNC_N, 0);
     fs->define_native_func_a(n, vector_to_matrix, 0, 0, (void*)TRUE);
+    n = fs->define_identifier(m, cls, "to_list", NODE_FUNC_N, 0);
+    fs->define_native_func_a(n, vector_to_list, 0, 0, NULL);
 
     n = fs->define_identifier_p(m, cls, fs->symbol_stock[T_LB], NODE_FUNC_N, 0);
     fs->define_native_func_a(n, vector_index, 1, 1, NULL, fs->cls_int);
@@ -1622,6 +1654,8 @@ static void define_class(RefNode *m)
     fs->define_native_func_a(n, matrix_to_vector, 1, 1, (void*)FALSE, fs->cls_int);
     n = fs->define_identifier(m, cls, "get_col_vector", NODE_FUNC_N, 0);
     fs->define_native_func_a(n, matrix_to_vector, 1, 1, (void*)TRUE, fs->cls_int);
+    n = fs->define_identifier(m, cls, "to_list", NODE_FUNC_N, 0);
+    fs->define_native_func_a(n, matrix_to_list, 0, 0, NULL);
 
     n = fs->define_identifier_p(m, cls, fs->symbol_stock[T_LB], NODE_FUNC_N, 0);
     fs->define_native_func_a(n, matrix_index, 2, 2, NULL, fs->cls_int, fs->cls_int);

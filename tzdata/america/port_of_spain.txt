@@ -1,3 +1,0 @@
-=America/Port_of_Spain
-8000000000000000 -14764 0 LMT
-fffffe570fa1d7e0 -14400 0 AST

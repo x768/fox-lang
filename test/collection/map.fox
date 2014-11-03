@@ -28,3 +28,5 @@ assert_equal map, {bar = 2}
 map.clear()
 assert_equal map, {}
 
+assert_error () => map['foo'], IndexError
+

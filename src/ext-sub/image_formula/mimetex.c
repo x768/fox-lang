@@ -408,6 +408,7 @@
 #include <ctype.h>
 #include <math.h>
 
+
 /* ---
  * check for supersampling or low-pass anti-aliasing
  * ------------------------------------------------- */
@@ -436,7 +437,6 @@
 #endif
 
 
-#define GLOBAL(type,variable,value) static type variable = value
 
 /* -------------------------------------------------------------------------
 adjustable default values
@@ -445,12 +445,12 @@ adjustable default values
  * anti-aliasing parameters
  * ------------------------ */
 #ifndef CENTERWT
-                                                        /*#define CENTERWT 32 *//* anti-aliasing centerwt default */
-                                                        /*#define CENTERWT 10 *//* anti-aliasing centerwt default */
+/*#define CENTERWT 32 *//* anti-aliasing centerwt default */
+/*#define CENTERWT 10 *//* anti-aliasing centerwt default */
 #define CENTERWT 8              /* anti-aliasing centerwt default */
 #endif
 #ifndef ADJACENTWT
-                                                         /*#define ADJACENTWT 3 *//* anti-aliasing adjacentwt default */
+/*#define ADJACENTWT 3 *//* anti-aliasing adjacentwt default */
 #define ADJACENTWT 2            /* anti-aliasing adjacentwt default */
 #endif
 #ifndef CORNERWT
@@ -562,48 +562,48 @@ static int scriptlevel = 0;     /* inc/decremented in rastlimits() */
 static int isstring = 0;        /*pixmap is ascii string, not raster */
 static int isligature = 0;      /* true if ligature found */
 static const char *subexprptr = NULL;   /* ptr within expression to subexpr */
-                                                                  /*SHARED(int,imageformat,1); *//* image is 1=bitmap, 2=.gf-like */
-GLOBAL(int, isdisplaystyle, 1); /* displaystyle mode (forced if 2) */
-GLOBAL(int, ispreambledollars, 0);      /* displaystyle mode set by $$...$$ */
-GLOBAL(int, fontnum, 0);        /* cal=1,scr=2,rm=3,it=4,bb=5,bf=6 */
-GLOBAL(int, fontsize, NORMALSIZE);      /* current size */
-GLOBAL(int, magstep, 1);        /* magstep (1=no change) */
-GLOBAL(int, displaysize, DISPLAYSIZE);  /* use \displaystyle when fontsize>= */
-GLOBAL(int, shrinkfactor, 3);   /* shrinkfactors[fontsize] */
-GLOBAL(int, rastlift, 0);       /* rastraise() lift parameter */
-GLOBAL(int, rastlift1, 0);      /* rastraise() lift for base exprssn */
-GLOBAL(double, unitlength, 1.0);        /* #pixels per unit (may be <1.0) */
-GLOBAL(int, iunitlength, 1);    /* #pixels per unit as int for store */
-                                                                            /*GLOBAL(int,textwidth,TEXTWIDTH); *//* #pixels across line */
-//GLOBAL(int, adfrequency, ADFREQUENCY);    /* advertisement frequency */
-GLOBAL(int, isnocatspace, 0);   /* >0 to not add space in rastcat() */
-GLOBAL(int, smashmargin, SMASHMARGIN);  /* minimum "smash" margin */
-GLOBAL(int, mathsmashmargin, SMASHMARGIN);      /* needed for \text{if $n-m$ even} */
-GLOBAL(int, issmashdelta, 1);   /* true if smashmargin is a delta */
-GLOBAL(int, isexplicitsmash, 0);        /* true if \smash explicitly given */
-GLOBAL(int, smashcheck, SMASHCHECK);    /* check if terms safe to smash */
-//GLOBAL(int, isnomath, 0);     /* true to inhibit math mode */
-GLOBAL(int, isscripted, 0);     /* is (lefthand) term text-scripted */
-GLOBAL(int, isdelimscript, 0);  /* is \right delim text-scripted */
-GLOBAL(int, issmashokay, 0);    /*is leading char okay for smashing */
+/*SHARED(int,imageformat,1); *//* image is 1=bitmap, 2=.gf-like */
+static int isdisplaystyle = 1;  /* displaystyle mode (forced if 2) */
+static int ispreambledollars = 0;       /* displaystyle mode set by $$...$$ */
+static int fontnum = 0;         /* cal=1,scr=2,rm=3,it=4,bb=5,bf=6 */
+static int fontsize = NORMALSIZE;       /* current size */
+static int magstep = 1;         /* magstep (1=no change) */
+static int displaysize = DISPLAYSIZE;   /* use \displaystyle when fontsize>= */
+static int shrinkfactor = 3;    /* shrinkfactors[fontsize] */
+static int rastlift = 0;        /* rastraise() lift parameter */
+static int rastlift1 = 0;       /* rastraise() lift for base exprssn */
+static double unitlength = 1.0; /* #pixels per unit (may be <1.0) */
+static int iunitlength = 1;     /* #pixels per unit as int for store */
+/*static int,textwidth = TEXTWIDTH; *//* #pixels across line */
+//static int, adfrequency, ADFREQUENCY;    /* advertisement frequency */
+static int isnocatspace = 0;   /* >0 to not add space in rastcat() */
+static int smashmargin = SMASHMARGIN;  /* minimum "smash" margin */
+static int mathsmashmargin = SMASHMARGIN;      /* needed for \text{if $n-m$ even} */
+static int issmashdelta = 1;   /* true if smashmargin is a delta */
+static int isexplicitsmash = 0;        /* true if \smash explicitly given */
+static int smashcheck = SMASHCHECK;    /* check if terms safe to smash */
+//static int, isnomath = 0;     /* true to inhibit math mode */
+static int isscripted = 0;     /* is (lefthand) term text-scripted */
+static int isdelimscript = 0;  /* is \right delim text-scripted */
+static int issmashokay = 0;    /*is leading char okay for smashing */
 #define BLANKSIGNAL (-991234)   /*rastsmash signal right-hand blank */
-GLOBAL(int, blanksignal, BLANKSIGNAL);  /*rastsmash signal right-hand blank */
-GLOBAL(int, blanksymspace, 0);  /* extra (or too much) space wanted */
-GLOBAL(int, aaalgorithm, AAALGORITHM);  /* for lp, 1=aalowpass, 2 =aapnm */
-GLOBAL(int, maxfollow, MAXFOLLOW);      /* aafollowline() maxturn parameter */
-GLOBAL(int, fgalias, 1);
-GLOBAL(int, fgonly, 0);
-GLOBAL(int, bgalias, 0);
-GLOBAL(int, bgonly, 0);         /* aapnm() params */
-GLOBAL(int, issupersampling, ISSUPERSAMPLING);  /*1=supersampling 0=lowpass */
-GLOBAL(int, isss, ISSUPERSAMPLING);     /* supersampling flag for main() */
-GLOBAL(int, *workingparam, NULL);       /* working parameter */
-GLOBAL(subraster, *workingbox, NULL);   /*working subraster box */
-GLOBAL(int, isreplaceleft, 0);  /* true to replace leftexpression */
-GLOBAL(subraster, *leftexpression, NULL);       /*rasterized so far */
-GLOBAL(mathchardef, *leftsymdef, NULL); /* mathchardef for preceding symbol */
-GLOBAL(int, fraccenterline, NOVALUE);   /* baseline for punct. after \frac */
-                                                                                   /*GLOBAL(int,currentcharclass,NOVALUE); *//*primarily to check for PUNCTION */
+static int blanksignal = BLANKSIGNAL;  /*rastsmash signal right-hand blank */
+static int blanksymspace = 0;  /* extra (or too much) space wanted */
+static int aaalgorithm = AAALGORITHM;  /* for lp, 1=aalowpass, 2 =aapnm */
+static int maxfollow = MAXFOLLOW;      /* aafollowline() maxturn parameter */
+static int fgalias = 1;
+static int fgonly = 0;
+static int bgalias = 0;
+static int bgonly = 0;         /* aapnm() params */
+static int issupersampling = ISSUPERSAMPLING;  /*1=supersampling 0=lowpass */
+static int isss = ISSUPERSAMPLING;     /* supersampling flag for main() */
+static int *workingparam = NULL;       /* working parameter */
+static subraster *workingbox = NULL;   /*working subraster box */
+static int isreplaceleft = 0;  /* true to replace leftexpression */
+static subraster *leftexpression = NULL;       /*rasterized so far */
+static mathchardef *leftsymdef = NULL; /* mathchardef for preceding symbol */
+static int fraccenterline = NOVALUE;   /* baseline for punct. after \frac */
+/*static int,currentcharclass = NOVALUE; *//*primarily to check for PUNCTION */
 
 /* -------------------------------------------------------------------------
 store for evalterm() [n.b., these are stripped-down funcs from nutshell]

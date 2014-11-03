@@ -1,3 +1,0 @@
-=America/St_Kitts
-8000000000000000 -15052 0 LMT
-fffffe570fa63ce0 -14400 0 AST

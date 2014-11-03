@@ -1,5 +1,0 @@
-=Antarctica/DumontDUrville
-8000000000000000 0 0 zzz
-ffffff57002ee400 36000 0 PMT
-ffffff7bfc987700 0 0 zzz
-ffffff9f4269c400 36000 0 DDUT

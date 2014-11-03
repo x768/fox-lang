@@ -1,3 +1,0 @@
-=Pacific/Guadalcanal
-8000000000000000 38388 0 LMT
-fffffe5b55615ae0 39600 0 SBT

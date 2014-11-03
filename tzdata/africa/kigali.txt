@@ -1,3 +1,0 @@
-=Africa/Kigali
-8000000000000000 7216 0 LMT
-ffffff01dd9fe880 7200 0 CAT

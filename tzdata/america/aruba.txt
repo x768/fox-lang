@@ -1,4 +1,0 @@
-=America/Aruba
-8000000000000000 -16824 0 LMT
-fffffe56ade872c0 -16200 0 ANT
-ffffffdb455af940 -14400 0 AST

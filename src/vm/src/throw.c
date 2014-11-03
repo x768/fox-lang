@@ -34,13 +34,15 @@ void throw_error_vprintf(RefNode *err_m, const char *err_name, const char *fmt, 
 }
 void fatal_errorf(RefNode *fn, const char *fmt, ...)
 {
-    va_list va;
-    va_start(va, fmt);
-    throw_error_vprintf(fs->mod_lang, "FatalError", fmt, va);
-    va_end(va);
+    if (fs->mod_lang != NULL && fs->mod_lang->u.m.loaded) {
+        va_list va;
+        va_start(va, fmt);
+        throw_error_vprintf(fs->mod_lang, "FatalError", fmt, va);
+        va_end(va);
 
-    if (fn != NULL) {
-        add_stack_trace(NULL, fn, -1);
+        if (fn != NULL) {
+            add_stack_trace(NULL, fn, -1);
+        }
     }
     print_last_error();
     fox_close();

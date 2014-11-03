@@ -565,85 +565,10 @@ char *read_from_file(int *psize, const char *path, Mem *mem)
     close_fox(fd);
 
     if (psize != NULL) {
-        *psize = size;
+        *psize = rd;
     }
 
     return p;
-}
-int read_all_from_file(StrBuf *buf, int fd, int limit)
-{
-    char *cbuf = (char*)malloc(BUFFER_SIZE);
-    int rd;
-
-    while ((rd = read_fox(fd, cbuf, BUFFER_SIZE)) > 0) {
-        if (buf->size + rd > limit) {
-            free(cbuf);
-            return FALSE;
-        }
-        StrBuf_add(buf, cbuf, rd);
-    }
-    free(cbuf);
-
-    return TRUE;
-}
-int write_to_file(const char *path, const char *write_p, int write_size, int append)
-{
-    int fd = open_fox(path, (append ? O_CREAT|O_WRONLY|O_APPEND : O_CREAT|O_WRONLY|O_TRUNC), DEFAULT_PERMISSION);
-    int ret;
-
-    if (fd == -1) {
-        return FALSE;
-    }
-    ret = (write_fox(fd, write_p, write_size) == write_size);
-    close_fox(fd);
-
-    return ret;
-}
-
-int make_directory(const char *path)
-{
-    int result = TRUE;
-    char *cp = str_dup_p(path, -1, NULL);
-    char *cp_end = &cp[strlen(cp)];
-    char *path_ptr = cp_end - 1;
-    int type;
-
-    // 既に存在している
-    type = exists_file(cp);
-    if (type != EXISTS_NONE) {
-        free(cp);
-        return type == EXISTS_DIR;
-    }
-
-    // ディレクトリが存在する階層を探す
-    while (path_ptr > cp) {
-        if (*path_ptr == SEP_C) {
-            *path_ptr = '\0';
-            type = exists_file(cp);
-            if (type == EXISTS_DIR) {
-                break;
-            } else if (type == EXISTS_FILE) {
-                free(cp);
-                return FALSE;
-            }
-        }
-        path_ptr--;
-    }
-
-    // ディレクトリを作成する
-    while (path_ptr < cp_end) {
-        if (*path_ptr == '\0') {
-            *path_ptr = SEP_C;
-            if (mkdir_fox(cp, DEFAULT_PERMISSION_DIR) != 0) {
-                result = FALSE;
-                break;
-            }
-        }
-        path_ptr++;
-    }
-
-    free(cp);
-    return result;
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////

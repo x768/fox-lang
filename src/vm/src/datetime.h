@@ -14,17 +14,17 @@ enum {
 };
 
 struct TimeOffset {
-    int64_t tm;   // millisec
-    int offset;   // millisec
+    int64_t begin;    // sec
+    int offset;       // sec
     int is_dst;
-    RefStr *name;   // ex. JST
+    const char *abbr; // ex. JST
 };
 
 struct RefTimeZone {
     RefHeader rh;
 
-    RefStr *name;   // ex. Asia/Tokyo
-    int num;
+    const char *name;   // ex. Asia/Tokyo
+    int count;
     TimeOffset off[0];
 };
 

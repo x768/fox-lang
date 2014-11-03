@@ -1,3 +1,0 @@
-=Africa/Brazzaville
-8000000000000000 3668 0 LMT
-fffffe55d464abe0 3600 0 WAT

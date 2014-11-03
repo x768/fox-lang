@@ -15,48 +15,6 @@ enum {
 
 static Hash charset_entries;
 
-/*
-static int load_charset_file(IniTok *tk, RefStr *name)
-{
-    char *path = str_printf("%r" SEP_S "encoding" SEP_S "%r.txt", fs->fox_home, name);
-    int ret = IniTok_load(tk, path);
-    free(path);
-    return ret;
-}
-static RefCharset *load_charset(RefStr *name_r)
-{
-    RefCharset *cs = Mem_get(&fg->st_mem, sizeof(RefCharset));
-    IniTok tk;
-
-    cs->rh.type = fs->cls_charset;
-    cs->rh.nref = -1;
-    cs->rh.n_memb = 0;
-    cs->rh.weak_ref = NULL;
-
-    cs->utf8 = FALSE;
-    cs->ascii = TRUE;
-    cs->name = name_r;
-    cs->iana = name_r;
-    cs->ic_name = name_r;
-
-    if (load_charset_file(&tk, name_r)) {
-        while (IniTok_next(&tk)) {
-            if (tk.type == INITYPE_STRING) {
-                if (Str_eq_p(tk.key, "iana")) {
-                    cs->iana = intern(tk.val.p, tk.val.size);
-                } else if (Str_eq_p(tk.key, "iconv")) {
-                    cs->ic_name = intern(tk.val.p, tk.val.size);
-                } else if (Str_eq_p(tk.key, "ascii_compat")) {
-                    cs->ascii = Str_eq_p(tk.key, "true");
-                }
-            }
-        }
-        IniTok_close(&tk);
-    }
-
-    return cs;
-}
-*/
 static void load_charset_alias_file(const char *filename)
 {
     char *path = path_normalize(NULL, fs->fox_home, filename, -1, NULL);
@@ -348,26 +306,6 @@ int convert_bin_to_str(Value *dst, const Str *src_str, int arg)
     *dst = StrBuf_str_Value(&sbuf, fs->cls_str);
     return TRUE;
 }
-int get_charset_from_args(RefCharset **cs, int *alt_b, int arg)
-{
-    Value *v = fg->stk_base;
-
-    if (fg->stk_top > v + arg + 1) {
-        *cs = Value_vp(v[arg + 1]);
-        if (*cs == NULL) {
-            return FALSE;
-        }
-        if (fg->stk_top > v + arg + 2) {
-            *alt_b = Value_bool(v[arg + 2]);
-        } else {
-            *alt_b = FALSE;
-        }
-    } else {
-        *cs = NULL;
-        *alt_b = FALSE;
-    }
-    return TRUE;
-}
 
 static int charset_new(Value *vret, Value *v, RefNode *node)
 {
@@ -398,7 +336,7 @@ static int charset_marshal_read(Value *vret, Value *v, RefNode *node)
     int rd_size;
     char cbuf[64];
 
-    if (!read_int32(&size, r)) {
+    if (!stream_read_uint32(&size, r)) {
         goto ERROR_END;
     }
     if (size > 63) {
@@ -429,7 +367,7 @@ static int charset_marshal_write(Value *vret, Value *v, RefNode *node)
     RefStr *name = cs->name;
     Value w = Value_ref(v[1])->v[INDEX_MARSHALDUMPER_SRC];
 
-    if (!write_int32(name->size, w)) {
+    if (!stream_write_uint32(name->size, w)) {
         return FALSE;
     }
     if (!stream_write_data(w, name->c, name->size)) {

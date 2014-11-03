@@ -12,6 +12,35 @@
 
 
 enum {
+    TT_ABSTRACT = T_INDEX_NUM,
+    TT_BREAK,
+    TT_CASE,
+    TT_CATCH,
+    TT_CLASS,
+    TT_CONTINUE,
+    TT_DEF,
+    TT_DEFAULT,
+    TT_ELSE,
+    TT_ELIF,
+    TT_FALSE,
+    TT_FOR,
+    TT_IF,
+    TT_IMPORT,
+    TT_IN,
+    TT_LET,
+    TT_NULL,
+    TT_RETURN,
+    TT_SUPER,
+    TT_SWITCH,
+    TT_THIS,
+    TT_THROW,
+    TT_TRUE,
+    TT_TRY,
+    TT_VAR,
+    TT_WHILE,
+    TT_YIELD,
+};
+enum {
     MAX_EXPR_STACK = 1024,
     MAX_CALLFUNC_NUM = 1024,
     MAX_STACKTRACE_NUM = 64,
@@ -111,16 +140,6 @@ struct PtrList {
         void *p;
         char c[1];
     } u;
-};
-
-struct RefCharset {
-    RefHeader rh;
-
-    RefStr *name;    // 文字コード名
-    RefStr *iana;    // IANA登録名
-    RefStr *ic_name; // iconvで使う名前
-    int utf8;              // UTF-8ならTRUE
-    int ascii;             // G1がUS-ASCIIと互換性があればTRUE
 };
 
 typedef struct {
@@ -264,9 +283,7 @@ int StrBuf_printf(StrBuf *s, const char *fmt, ...);
 int StrBuf_add_v(StrBuf *s, Value v);
 
 char *read_from_file(int *psize, const char *path, Mem *mem);
-int read_all_from_file(StrBuf *buf, int fd, int limit);
-int write_to_file(const char *path, const char *write_p, int write_size, int append);
-int make_directory(const char *path);
+int FileHandle_read_all_to_strbuf(StrBuf *buf, int fd, int limit);
 
 int IniTok_load(IniTok *tk, const char *path);
 void IniTok_close(IniTok *tk);
@@ -462,7 +479,13 @@ int stream_gets_sub(StrBuf *sb, Value v, int sep);
 
 void init_stream_ref(Ref *r, int mode);
 int stream_read_data(Value v, StrBuf *sb, char *p, int *psize, int keep, int read_all);
+int stream_read_uint8(uint8_t *val, Value r);
+int stream_read_uint16(uint16_t *val, Value r);
+int stream_read_uint32(uint32_t *val, Value r);
 int stream_write_data(Value v, const char *p, int size);
+int stream_write_uint8(uint8_t val, Value w);
+int stream_write_uint16(uint16_t val, Value w);
+int stream_write_uint32(uint32_t val, Value w);
 int stream_flush_sub(Value v);
 RefBytesIO *bytesio_new_sub(const char *src, int size);
 int stream_gets_limit(Value v, char *p, int *psize);
@@ -499,8 +522,6 @@ void init_locale_module_1(void);
 
 
 // m_marshal.c
-int read_int32(uint32_t *val, Value r);
-int write_int32(uint32_t val, Value w);
 void define_marshal_module(RefNode *m);
 
 

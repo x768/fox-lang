@@ -401,20 +401,18 @@ static void show_configure(void)
     stream_write_data(fg->v_cio, "FOX_TZ</th><td>", -1);
     if (default_timezone) {
         if (tz != NULL) {
-            RefStr *rs = tz->name;
             if (tz_error) {
                 stream_write_data(fg->v_cio, "<span class=\"err\">", -1);
             } else {
                 stream_write_data(fg->v_cio, "<span class=\"def\">", -1);
             }
-            stream_write_data(fg->v_cio, rs->c, rs->size);
+            stream_write_data(fg->v_cio, tz->name, -1);
             stream_write_data(fg->v_cio, "</span>", -1);
         } else {
             stream_write_data(fg->v_cio, "<span class=\"def\">(Etc/UTC)</span>", -1);
         }
     } else {
-        RefStr *rs = tz->name;
-        stream_write_data(fg->v_cio, rs->c, rs->size);
+        stream_write_data(fg->v_cio, tz->name, -1);
     }
 
     show_configure_env("FOX_COOKIE_DOMAIN", TRUE);

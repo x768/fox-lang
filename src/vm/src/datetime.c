@@ -5,11 +5,34 @@
 
 // 扱える時間
 // -99999999-01-01 ～ 99999999-01-01
-
+// BCE1 == year:0
 
 #define DIV(a, b) ((a) / (b) - ((a) % (b) < 0))
-#define LEAPS_THRU_END_OF(y) (DIV (y, 4) - DIV (y, 100) + DIV (y, 400))
+#define LEAPS_THRU_END_OF(y) (DIV((y), 4) - DIV((y), 100) + DIV((y), 400))
 #define IS_LEAP(year) ((year) % 4 == 0 && ((year) % 100 != 0 || (year) % 400 == 0))
+
+typedef struct {
+    RefTimeZone *tz;
+    int index;
+} TZDataAlias;
+
+typedef struct {
+    union {
+        const char *name;
+        int index;
+    } u1;
+    union {
+        TZDataAlias *alias;
+        int index;
+    } u2;
+} TZData;
+
+static TZData *tzdata;
+static int32_t tzdata_size;
+static TZDataAlias *tzdata_alias;
+static char *tzdata_abbr;
+static char *tzdata_line;  // raw data (big endian)
+static char *tzdata_data;  // raw data (big endian)
 
 static const uint16_t mon_yday[2][13] =
 {
@@ -19,19 +42,148 @@ static const uint16_t mon_yday[2][13] =
     { 0, 31, 60, 91, 121, 152, 182, 213, 244, 274, 305, 335, 366 }
 };
 
+static uint32_t fread_uint32(FileHandle fh)
+{
+    char buf[4];
+    if (read_fox(fh, buf, 4) == 4) {
+        return ptr_read_uint32(buf);
+    } else {
+        return 0;
+    }
+}
+static char *fread_buffer(FileHandle fh, int size, Mem *mem)
+{
+    char *p = Mem_get(mem, size);
+    if (read_fox(fh, p, size) != size) {
+        fatal_errorf(NULL, "Failed to load file");
+    }
+    return p;
+}
+static uint64_t ptr_read_uint64(const char *pc)
+{
+    const uint8_t *p = (const uint8_t*)pc;
+    return ((uint64_t)p[0] << 56) | ((uint64_t)p[1] << 48) | ((uint64_t)p[2] << 40) | ((uint64_t)p[3] << 32)
+         | ((uint64_t)p[4] << 24) | ((uint64_t)p[5] << 16) | ((uint64_t)p[6] <<  8) | ((uint64_t)p[7]);
+}
+
+static void load_tzdata(void)
+{
+    char *path = str_printf("%r" SEP_S "data" SEP_S "tzdata.dat", fs->fox_home);
+    FileHandle fh = open_fox(path, O_RDONLY, DEFAULT_PERMISSION);
+    int32_t size;
+    char *tzdata_names;
+    int i;
+
+    if (fh == -1) {
+        fatal_errorf(NULL, "Cannot load file %q", path);
+    }
+    free(path);
+
+
+    tzdata_size = fread_uint32(fh);
+    if (tzdata_size <= 0 || tzdata_size > fs->max_alloc / sizeof(TZData)) {
+        goto ERROR_END;
+    }
+    tzdata = Mem_get(&fg->st_mem, tzdata_size * sizeof(TZData));
+    for (i = 0; i < tzdata_size; i++) {
+        TZData *p = &tzdata[i];
+        p->u1.index = fread_uint32(fh);
+        p->u2.index = fread_uint32(fh);
+    }
+
+    size = fread_uint32(fh);
+    if (size <= 0 || size > fs->max_alloc) {
+        goto ERROR_END;
+    }
+    tzdata_names = fread_buffer(fh, size, &fg->st_mem);
+
+    size = fread_uint32(fh);
+    if (size <= 0 || size > fs->max_alloc / sizeof(TZDataAlias)) {
+        goto ERROR_END;
+    }
+    tzdata_alias = Mem_get(&fg->st_mem, size * sizeof(TZDataAlias));
+    for (i = 0; i < size; i++) {
+        TZDataAlias *p = &tzdata_alias[i];
+        p->tz = NULL;
+        p->index = fread_uint32(fh);
+    }
+
+    size = fread_uint32(fh);
+    if (size <= 0 || size > fs->max_alloc) {
+        goto ERROR_END;
+    }
+    tzdata_abbr = fread_buffer(fh, size, &fg->st_mem);
+
+    size = fread_uint32(fh);
+    if (size <= 0 || size > fs->max_alloc) {
+        goto ERROR_END;
+    }
+    tzdata_line = fread_buffer(fh, size * 4, &fg->st_mem);
+
+    size = fread_uint32(fh);
+    if (size <= 0 || size > fs->max_alloc) {
+        goto ERROR_END;
+    }
+    tzdata_data = fread_buffer(fh, size, &fg->st_mem);
+
+    for (i = 0; i < tzdata_size; i++) {
+        TZData *p = &tzdata[i];
+        p->u1.name = tzdata_names + p->u1.index;
+        p->u2.alias = tzdata_alias + p->u2.index;
+    }
+    close_fox(fh);
+    return;
+
+ERROR_END:
+    fatal_errorf(NULL, "Failed to load tzdata");
+}
+/**
+ * nameは、全て小文字。別名でも構わない
+ * 見つからなければNULL
+ */
+static TZDataAlias *TZDataAlias_find(const char *name)
+{
+    int low, high;
+
+    if (tzdata == NULL) {
+        load_tzdata();
+    }
+    low = 0;
+    high = tzdata_size;
+
+    while (low <= high) {
+        int mid = (low + high) / 2;
+        int cmp = strcmp(name, tzdata[mid].u1.name);
+        if (cmp == 0) {
+            return tzdata[mid].u2.alias;
+        } else if (cmp < 0) {
+            high = mid - 1;
+        } else {
+            low = mid + 1;
+        }
+    }
+    
+    return NULL;
+}
+
 /**
  * alnum
  * alnum/alnum
  * alnum/alnum/alnum
  * ...
  */
-static int convert_timezone_name(char *dst, const char *s_p, int s_size)
+static int validate_and_tolower_tzname(char *dst, const char *s_p, int s_size)
 {
     const char *p = s_p;
-    const char *end = p + s_size;
-    const char *pend = dst + MAX_TZ_LEN - 1;
+    const char *end;
+    const char *dst_end = dst + MAX_TZ_LEN - 1;
 
-    while (dst < pend) {
+    if (s_size < 0) {
+        s_size = strlen(s_p);
+    }
+    end = p + s_size;
+
+    while (dst < dst_end) {
         if (p >= end || !(isalnum(*p) || *p == '_')) {
             return FALSE;
         }
@@ -51,64 +203,12 @@ static int convert_timezone_name(char *dst, const char *s_p, int s_size)
     *dst = '\0';
     return TRUE;
 }
+
 /**
- * ファイルが見つからない場合はNULLを返す
+ * count: TimeZoneの要素数
+ * name:  TimeZone#name
  */
-static char *load_tztext(RefStr *name)
-{
-    char *path = str_printf("%r" SEP_S "tzdata" SEP_S "%r.txt", fs->fox_home, name);
-    char *buf;
-#ifdef WIN32
-    int i;
-    for (i = fs->fox_home->size + 8; path[i] != '\0'; i++) {
-        if (path[i] == '/') {
-            path[i] = '\\';
-        }
-    }
-#endif
-    buf = read_from_file(NULL, path, NULL);
-    free(path);
-
-    return buf;
-}
-static int count_line(const char *buf)
-{
-    int n = 0;
-    while (*buf != '\0') {
-        if (*buf == '\n') {
-            n++;
-        }
-        buf++;
-    }
-    return n;
-}
-
-static int64_t parse_hex64(const char *src)
-{
-    uint64_t ret = 0;
-
-    while (*src != '\0') {
-        ret = (ret << 4) | char2hex(*src);
-        src++;
-    }
-    return ret;
-}
-int parse_decimal(const char *src)
-{
-    int ret = 0;
-    int sign = 1;
-
-    if (*src == '-') {
-        sign = -1;
-        src++;
-    }
-    while (*src != '\0') {
-        ret = ret * 10 + (*src - '0');
-        src++;
-    }
-    return ret * sign;
-}
-static RefTimeZone *RefTimeZone_new(int count, const char *p, int size)
+static RefTimeZone *RefTimeZone_new(int count, const char *name)
 {
     RefTimeZone *ptz = Mem_get(&fg->st_mem, sizeof(RefTimeZone) + sizeof(TimeOffset) * count);
 
@@ -116,129 +216,66 @@ static RefTimeZone *RefTimeZone_new(int count, const char *p, int size)
     ptz->rh.nref = -1;
     ptz->rh.n_memb = 0;
     ptz->rh.weak_ref = NULL;
-    ptz->name = intern(p, size);
+    ptz->name = name;
+    ptz->count = count;
 
     return ptz;
 }
 
-static int parse_tztext_line(TimeOffset *off, Str line)
-{
-    const char *tmp[4];
-    Str_split(line, tmp, 4, ' ');
-
-    off->tm = parse_hex64(tmp[0]);
-    off->offset = parse_decimal(tmp[1]) * 1000;
-    off->is_dst = (tmp[2][0] == '1');
-    off->name = intern(tmp[3], -1);
-
-    return TRUE;
-
-}
-static RefTimeZone *parse_tztext(const char *buf, RefStr **name, int *alias)
-{
-    Str line;
-    RefTimeZone *tz = NULL;
-    int pos = 0;
-
-    while (*buf != '\0') {
-        line.p = buf;
-        while (*buf != '\0' && *buf != '\n') {
-            buf++;
-        }
-        line.size = buf - line.p;
-        if (*buf == '\n') {
-            buf++;
-        }
-
-        if (line.size == 0) {
-            continue;
-        }
-        if (line.p[0] == '>') {
-            *alias = TRUE;
-            *name = intern(line.p + 1, line.size - 1);
-            return NULL;
-        } else if (line.p[0] == '=') {
-            if (tz == NULL) {
-                int n = count_line(buf);
-                tz = RefTimeZone_new(n, line.p + 1, line.size - 1);
-            }
-        } else {
-            if (tz != NULL) {
-                TimeOffset *off = &tz->off[pos];
-                if (parse_tztext_line(off, line)) {
-                    pos++;
-                }
-            }
-        }
-    }
-    *alias = FALSE;
-    tz->num = pos;
-
-    return tz;
-}
 RefTimeZone *load_timezone(const char *name_p, int name_size)
 {
-    static Hash timezones;
-    RefTimeZone *ptz;
-    char *buf;
     char name2[MAX_TZ_LEN];
-    RefStr *name_r;
-    RefStr *alias_key = NULL;
-    int i;
+    TZDataAlias *alias;
 
-    if (name_size < 0) {
-        name_size = strlen(name_p);
-    }
-    if (!convert_timezone_name(name2, name_p, name_size)) {
+    load_tzdata();
+
+    if (!validate_and_tolower_tzname(name2, name_p, name_size)) {
         return NULL;
     }
-    name_r = intern(name2, -1);
-    if (timezones.entry == NULL) {
-        Hash_init(&timezones, &fg->st_mem, 32);
+    alias = TZDataAlias_find(name2);
+    if (alias == NULL) {
+        return NULL;
     }
 
-    for (i = 0; i < 3; i++) {
-        int alias = FALSE;
+    if (alias->tz == NULL) {
+        RefTimeZone *tz;
+        const char *tzname = tzdata_data + alias->index;
+        const char *data = tzname + strlen(tzname) + 1;
+        int n = 0;
+        int i;
 
-        ptz = Hash_get_p(&timezones, name_r);
-        if (ptz != NULL) {
-            if (alias_key != NULL) {
-                // alias解決前の名前
-                Hash_add_p(&timezones, &fg->st_mem, alias_key, ptz);
-            }
-            return ptz;
+        while (ptr_read_uint64(data + n * 8) != 0xFFFFffffFFFFffffUL) {
+            n++;
         }
-        if (strcmp(name_r->c, "etc/utc") == 0) {
-            ptz = RefTimeZone_new(1, "Etc/UTC", 7);
-            ptz->num = 1;
-            ptz->off[0].tm = 0x8000000000000000LL;
-            ptz->off[0].offset = 0;
-            ptz->off[0].is_dst = 0;
-            ptz->off[0].name = intern("UTC", 3);
-        } else {
-            buf = load_tztext(name_r);
-            if (buf == NULL) {
-                return NULL;
+        tz = RefTimeZone_new(n, tzname);
+
+        for (i = 0; i < n; i++) {
+            TimeOffset *off = &tz->off[i];
+            uint64_t line = ptr_read_uint64(data + i * 8);
+            uint32_t line_data = ptr_read_uint32(tzdata_line + (line >> 48));
+            int64_t time_begin = line & 0xffffFFFFffffUL;
+
+            if (time_begin == 0x800000000000) {
+                off->begin = INT64_MIN;
+            } else if ((time_begin & 0x800000000000) != 0) {
+                off->begin = time_begin | 0xFFFF000000000000ULL;
+                off->begin *= 1000;
+            } else {
+                off->begin = time_begin * 1000;
             }
-            ptz = parse_tztext(buf, &name_r, &alias);
-            free(buf);
+
+            off->offset = line_data & 0x3FFFF;
+            if ((off->offset & 0x20000) != 0) {
+                off->offset -= 0x20000;
+            }
+            off->offset *= 1000;
+            off->is_dst = line_data >> 31;
+            off->abbr = tzdata_abbr + ((line_data >> 18) & 0x1FFF);
         }
 
-        if (ptz != NULL) {
-            // alias解決後の名前
-            Hash_add_p(&timezones, &fg->st_mem, name_r, ptz);
-            if (alias_key != NULL) {
-                // alias解決前の名前
-                Hash_add_p(&timezones, &fg->st_mem, alias_key, ptz);
-            }
-            return ptz;
-        } else if (alias) {
-            alias_key = name_r;
-        } else {
-            return NULL;
-        }
+        alias->tz = tz;
     }
-    return NULL;
+    return alias->tz;
 }
 
 RefTimeZone *get_machine_localtime(void)
@@ -259,9 +296,9 @@ TimeOffset *TimeZone_offset_utc(RefTimeZone *tz, int64_t tm)
 {
     int i;
 
-    for (i = tz->num - 1; i >= 0; i--) {
+    for (i = tz->count - 1; i > 0; i--) {
         TimeOffset *off = &tz->off[i];
-        if (tm >= off->tm) {
+        if (tm >= off->begin) {
             return off;
         }
     }
@@ -275,9 +312,9 @@ TimeOffset *TimeZone_offset_local(RefTimeZone *tz, int64_t tm)
 {
     int i;
 
-    for (i = tz->num - 1; i >= 0; i--) {
+    for (i = tz->count - 1; i > 0; i--) {
         TimeOffset *off = &tz->off[i];
-        if (tm >= off->tm + off->offset) {
+        if (tm >= off->begin + off->offset) {
             return off;
         }
     }

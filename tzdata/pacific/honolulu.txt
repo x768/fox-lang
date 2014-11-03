@@ -1,8 +1,0 @@
-=Pacific/Honolulu
-8000000000000000 -37886 0 LMT
-fffffde08cb86630 -37800 0 HST
-fffffef28c8ed140 -34200 1 HDT
-fffffef2faa2bfc0 -37800 0 HST
-ffffff3310195540 -34200 1 HDT
-ffffff4dcc0602c0 -37800 0 HST
-ffffff5a308a5140 -36000 0 HST

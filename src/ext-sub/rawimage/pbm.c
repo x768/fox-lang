@@ -97,12 +97,12 @@ static int ReadBuffer_readint(ReadBuffer *rb, int *pvalue)
                 int ch = rb->buf[i] & 0xFF;
                 switch (phase) {
                 case PARSE_SPACE:
-                    if (isdigit(ch)) {
+                    if (isdigit_fox(ch)) {
                         phase = PARSE_DIGIT;
                         value = ch - '0';
                     } else if (ch == '#') {
                         phase = PARSE_COMMENT;
-                    } else if (!isspace(ch)) {
+                    } else if (!isspace_fox(ch)) {
                         ReadBuffer_format_error(rb);
                         return FALSE;
                     }
@@ -113,7 +113,7 @@ static int ReadBuffer_readint(ReadBuffer *rb, int *pvalue)
                     }
                     break;
                 case PARSE_DIGIT:
-                    if (isdigit(ch)) {
+                    if (isdigit_fox(ch)) {
                         value = value * 10 + (ch - '0');
                     } else {
                         *pvalue = value;

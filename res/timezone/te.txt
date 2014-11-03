@@ -1,8 +1,0 @@
-locale=te
-Australia/Brisbane:బ్రిస్బేన్
-Asia/Jakarta:జకర్తా
-Europe/Moscow:మాస్కో
-America/Denver:డెన్వర్
-America/Chicago:చికాగో
-America/Detroit:డెట్రాయిట్
-America/New_York:న్యూయార్క్

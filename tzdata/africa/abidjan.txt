@@ -1,3 +1,0 @@
-=Africa/Abidjan
-8000000000000000 -968 0 LMT
-fffffe55d4ab6940 0 0 GMT

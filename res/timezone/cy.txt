@@ -1,6 +1,0 @@
-locale=cy
-Antarctica/South_Pole:Pegwn y De
-America/St_Johns:St. John’s
-Europe/London:Llundain
-America/Mexico_City:Dinas Mecsico
-America/New_York:Efrog Newydd

@@ -1,3 +1,0 @@
-=Pacific/Gambier
-8000000000000000 -32388 0 LMT
-fffffe5b59994fa0 -32400 0 GAMT

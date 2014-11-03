@@ -1,4 +1,0 @@
-=Africa/Addis_Ababa
-8000000000000000 9288 0 LMT
-fffffd2142a476c0 9320 0 ADMT
-ffffff08af4ba1c0 10800 0 EAT

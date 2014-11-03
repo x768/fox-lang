@@ -293,7 +293,7 @@ static int map_marshal_read(Value *vret, Value *v, RefNode *node)
     uint32_t size;
     int i;
 
-    if (!read_int32(&size, r)) {
+    if (!stream_read_uint32(&size, r)) {
         return FALSE;
     }
     if (size > 0xffffff) {
@@ -358,7 +358,7 @@ static int map_marshal_write(Value *vret, Value *v, RefNode *node)
     int i;
 
     rm->lock_count++;
-    if (!write_int32(rm->count, w)) {
+    if (!stream_write_uint32(rm->count, w)) {
         goto ERROR_END;
     }
     for (i = 0; i < rm->entry_num; i++) {
@@ -431,6 +431,9 @@ int map_index(Value *vret, Value *v, RefNode *node)
     if (ep != NULL) {
         // 一致
         *vret = Value_cp(ep->val);
+    } else {
+        throw_errorf(fs->mod_lang, "IndexError", "No keys exists %v", key);
+        return FALSE;
     }
 
     return TRUE;

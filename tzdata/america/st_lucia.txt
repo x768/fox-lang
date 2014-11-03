@@ -1,4 +1,0 @@
-=America/St_Lucia
-8000000000000000 -14640 0 LMT
-fffffdb437a8cf80 -14640 0 CMT
-fffffe55d57c0780 -14400 0 AST

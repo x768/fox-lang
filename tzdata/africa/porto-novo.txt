@@ -1,4 +1,0 @@
-=Africa/Porto-Novo
-8000000000000000 628 0 LMT
-fffffe55d4930ee0 0 0 GMT
-fffffef89d20b400 3600 0 WAT

@@ -296,6 +296,33 @@ int stream_read_data(Value v, StrBuf *sb, char *p, int *psize, int keep, int rea
 
     return TRUE;
 }
+int stream_read_uint8(uint8_t *val, Value r)
+{
+    int size = 2;
+    return stream_read_data(r, NULL, (char*)val, &size, FALSE, TRUE);
+}
+int stream_read_uint16(uint16_t *val, Value r)
+{
+    int size = 2;
+    uint8_t buf[2];
+
+    if (!stream_read_data(r, NULL, (char*)buf, &size, FALSE, TRUE)) {
+        return FALSE;
+    }
+    *val = (buf[0] << 8) | buf[1];
+    return TRUE;
+}
+int stream_read_uint32(uint32_t *val, Value r)
+{
+    int size = 4;
+    uint8_t buf[4];
+
+    if (!stream_read_data(r, NULL, (char*)buf, &size, FALSE, TRUE)) {
+        return FALSE;
+    }
+    *val = (buf[0] << 24) | (buf[1] << 16) | (buf[2] << 8) | buf[3];
+    return TRUE;
+}
 /**
  * 改行か、limitバイトまで読み込む
  */
@@ -667,6 +694,34 @@ int stream_write_data(Value v, const char *s_p, int s_size)
 
     return TRUE;
 }
+int stream_write_uint8(uint8_t val, Value w)
+{
+    return stream_write_data(w, (char*)&val, 1);
+}
+int stream_write_uint16(uint16_t val, Value w)
+{
+    uint8_t buf[2];
+    buf[0] = (val >> 8) & 0xFF;
+    buf[1] = val & 0xFF;
+
+    if (!stream_write_data(w, (char*)buf, 2)) {
+        return FALSE;
+    }
+    return TRUE;
+}
+int stream_write_uint32(uint32_t val, Value w)
+{
+    uint8_t buf[4];
+    buf[0] = (val >> 24) & 0xFF;
+    buf[1] = (val >> 16) & 0xFF;
+    buf[2] = (val >> 8) & 0xFF;
+    buf[3] = val & 0xFF;
+
+    if (!stream_write_data(w, (char*)buf, 4)) {
+        return FALSE;
+    }
+    return TRUE;
+}
 /**
  * 文字コードを変換しながらStreamに出力する
  * v : stream (optional,sb==NULLの場合必須)
@@ -1008,13 +1063,23 @@ static int stream_pack_int(Value *vret, StrBuf *sb, Value v, int size, int le)
         }
 
         for (i = 0; i < size; i++) {
-            uint16_t val = mp.dp[i];
-            if (le) {
-                buf[i * 2 + 0] = val & 0xFF;
-                buf[i * 2 + 1] = val >> 8;
+            int n = i / 2;
+            uint8_t val;
+
+            if (n < mp.used) {
+                int d = i % 2;
+                if (d == 0) {
+                    val = mp.dp[n] & 0xFF;
+                } else {
+                    val = mp.dp[n] >> 8;
+                }
             } else {
-                buf[(size - i - 1) * 2 + 0] = val & 0xFF;
-                buf[(size - i - 1) * 2 + 1] = val >> 8;
+                val = 0;
+            }
+            if (le) {
+                buf[i] = val;
+            } else {
+                buf[size - i - 1] = val;
             }
         }
         mp_clear(&mp);

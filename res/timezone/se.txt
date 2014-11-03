@@ -1,3 +1,0 @@
-locale=se
-America/Sao_Paulo:São Paulo
-America/Merida:Mérida

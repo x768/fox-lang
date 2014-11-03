@@ -1,5 +1,0 @@
-=Africa/Nouakchott
-8000000000000000 -3828 0 LMT
-fffffe55d4d70d20 0 0 GMT
-fffffef89d20b400 -3600 0 WAT
-ffffffbd31977280 0 0 GMT

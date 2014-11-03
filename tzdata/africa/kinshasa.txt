@@ -1,3 +1,0 @@
-=Africa/Kinshasa
-8000000000000000 3672 0 LMT
-fffffdeded767040 3600 0 WAT

@@ -357,7 +357,7 @@ static int sequence_marshal_read(Value *vret, Value *v, RefNode *node)
     int rd_size;
     RefStr *rs;
 
-    if (!read_int32(&size, r)) {
+    if (!stream_read_uint32(&size, r)) {
         return FALSE;
     }
     if (size > 0xffffff) {
@@ -390,7 +390,7 @@ static int sequence_marshal_write(Value *vret, Value *v, RefNode *node)
     Value w = Value_ref(v[1])->v[INDEX_MARSHALDUMPER_SRC];
     RefStr *rs = Value_vp(*v);
 
-    if (!write_int32(rs->size, w)) {
+    if (!stream_write_uint32(rs->size, w)) {
         return FALSE;
     }
     if (!stream_write_data(w, rs->c, rs->size)) {
@@ -1627,7 +1627,7 @@ static int regex_marshal_read(Value *vret, Value *v, RefNode *node)
     if (!stream_read_data(rd, NULL, &is_str, &rd_size, FALSE, TRUE)) {
         return FALSE;
     }
-    if (!read_int32(&size, rd)) {
+    if (!stream_read_uint32(&size, rd)) {
         return FALSE;
     }
     if (size > 0xffffff) {
@@ -1645,7 +1645,7 @@ static int regex_marshal_read(Value *vret, Value *v, RefNode *node)
         return FALSE;
     }
     rs->c[size] = '\0';
-    if (!read_int32(&options, rd)) {
+    if (!stream_read_uint32(&options, rd)) {
         return FALSE;
     }
     re = pcre_compile(rs->c, options, &errptr, &erroffset, NULL);
@@ -1678,13 +1678,13 @@ static int regex_marshal_write(Value *vret, Value *v, RefNode *node)
     if (!stream_write_data(w, &is_str, 1)) {
         return FALSE;
     }
-    if (!write_int32(src_s->size, w)) {
+    if (!stream_write_uint32(src_s->size, w)) {
         return FALSE;
     }
     if (!stream_write_data(w, src_s->c, src_s->size)) {
         return FALSE;
     }
-    if (!write_int32(opt, w)) {
+    if (!stream_write_uint32(opt, w)) {
         return FALSE;
     }
     return TRUE;

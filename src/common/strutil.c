@@ -99,7 +99,6 @@ int Str_eq_p(Str s, const char *p)
     return s.size == len && memcmp(s.p, p, len) == 0;
 }
 
-
 ////////////////////////////////////////////////////////////////////////////
 
 int refstr_eq(RefStr *r1, RefStr *r2)
@@ -115,3 +114,28 @@ int refstr_cmp(RefStr *r1, RefStr *r2)
     }
     return cmp;
 }
+
+////////////////////////////////////////////////////////////////////////////
+
+uint16_t ptr_read_uint16(const char *p)
+{
+    return ((uint8_t)p[0] << 8) | ((uint8_t)p[1]);
+}
+uint32_t ptr_read_uint32(const char *p)
+{
+    return ((uint8_t)p[0] << 24) | ((uint8_t)p[1] << 16) | ((uint8_t)p[2] << 8) | ((uint8_t)p[3]);
+}
+
+void ptr_write_uint16(char *p, uint32_t val)
+{
+    p[0] = val >> 8;
+    p[1] = val & 0xFF;
+}
+void ptr_write_uint32(char *p, uint32_t val)
+{
+    p[0] = (val >> 24) & 0xFF;
+    p[1] = (val >> 16) & 0xFF;
+    p[2] = (val >> 8) & 0xFF;
+    p[3] = val & 0xFF;
+}
+

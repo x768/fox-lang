@@ -1,3 +1,0 @@
-=America/Guadeloupe
-8000000000000000 -14768 0 LMT
-fffffe51ab799780 -14400 0 AST

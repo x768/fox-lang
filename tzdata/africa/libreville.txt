@@ -1,3 +1,0 @@
-=Africa/Libreville
-8000000000000000 2268 0 LMT
-fffffe55d47a08a0 3600 0 WAT

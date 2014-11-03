@@ -21,6 +21,7 @@ VPATH = ../../common
 
 OBJS = \
 	m_xml.o \
+	xml_parse.o \
 	xml_select.o \
 	strutil.o \
 	compat_$(TARGET).o \

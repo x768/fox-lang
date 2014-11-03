@@ -130,7 +130,7 @@ RefTimeZone *Value_to_tz(Value v, int argn)
         } else {
             tz = load_timezone(name->c, name->size);
             if (tz == NULL) {
-                throw_errorf(fs->mod_lang, "ValueError", "RefTimeZone %Q not found", name);
+                throw_errorf(fs->mod_lang, "ValueError", "RefTimeZone %q not found", name->c);
                 return NULL;
             }
         }
@@ -1111,7 +1111,7 @@ static void parse_time_format(StrBuf *buf, const char *fmt_p, int fmt_size, cons
             break;
         }
         case 'Z':  // タイムゾーン
-            StrBuf_add_r(buf, off->name);
+            StrBuf_add(buf, off->abbr, -1);
             i++;
             break;
         case '\'': // '任意の文字列'
@@ -1602,7 +1602,7 @@ static RefTimeZone *timezone_marshal_read_sub(Value r)
     int rd_size;
     char cbuf[64];
 
-    if (!read_int32(&size, r)) {
+    if (!stream_read_uint32(&size, r)) {
         return NULL;
     }
     if (size > 63) {
@@ -1639,12 +1639,13 @@ static int timezone_marshal_write(Value *vret, Value *v, RefNode *node)
 {
     Value w = Value_ref(v[1])->v[INDEX_MARSHALDUMPER_SRC];
     RefTimeZone *tz = Value_vp(*v);
-    RefStr *name = tz->name;
+    const char *name = tz->name;
+    int name_size = strlen(name);
 
-    if (!write_int32(name->size, w)) {
+    if (!stream_write_uint32(name_size, w)) {
         return FALSE;
     }
-    if (!stream_write_data(w, name->c, name->size)) {
+    if (!stream_write_data(w, name, name_size)) {
         return FALSE;
     }
 
@@ -1659,7 +1660,7 @@ static int timezone_tostr(Value *vret, Value *v, RefNode *node)
         fmt = Value_str(v[1]);
     }
     if (fmt.size == 0) {
-        *vret = printf_Value("TimeZone(%r)", tz->name);
+        *vret = printf_Value("TimeZone(%s)", tz->name);
     } else if (fmt.p[0] == 'N' || fmt.p[0] == 'n') {
         *vret = Value_cp(vp_Value(tz));
     } else {
@@ -1785,7 +1786,7 @@ static int date_now(Value *vret, Value *v, RefNode *node)
         dt->tz = get_local_tz();
     }
     dt->tm = get_now_time();
-    dt->off = TimeZone_offset_local(dt->tz, dt->tm);
+    dt->off = TimeZone_offset_utc(dt->tz, dt->tm);
     Time_to_Calendar(&dt->cal, dt->tm + dt->off->offset);
 
     return TRUE;
@@ -1793,28 +1794,6 @@ static int date_now(Value *vret, Value *v, RefNode *node)
 // TODO
 static int date_parse_format(Value *vret, Value *v, RefNode *node)
 {
-    /*
-    Value *v = e->stk_base;
-    Date *dt = Value_new_ptr(v, cls_date, sizeof(Date), NULL);
-    Calendar *cal = &dt->cal;
-
-    Str src = Value_str(v[1]);
-    Str fmt = Value_str(v[2]);
-    int i;
-
-    if (fg->stk_top > v + 3) {
-        if (!Value_to_tz(&dt->tz, &v[3], vm, 2)) {
-            add_trace(NULL, node, 0);
-            return FALSE;
-        }
-    } else {
-        dt->tz = get_local_tz();
-    }
-
-    for (i = 0; i < fmt.size; i++) {
-    }
-    */
-
     return TRUE;
 }
 static int date_marshal_read(Value *vret, Value *v, RefNode *node)
@@ -1824,11 +1803,11 @@ static int date_marshal_read(Value *vret, Value *v, RefNode *node)
     RefTime *dt = buf_new(fs->cls_time, sizeof(RefTime));
     *vret = vp_Value(dt);
 
-    if (!read_int32(&uval, r)) {
+    if (!stream_read_uint32(&uval, r)) {
         return FALSE;
     }
     dt->tm = ((uint64_t)uval) << 32;
-    if (!read_int32(&uval, r)) {
+    if (!stream_read_uint32(&uval, r)) {
         return FALSE;
     }
     dt->tm |= uval;
@@ -1837,7 +1816,7 @@ static int date_marshal_read(Value *vret, Value *v, RefNode *node)
         return FALSE;
     }
 
-    dt->off = TimeZone_offset_local(dt->tz, dt->tm);
+    dt->off = TimeZone_offset_utc(dt->tz, dt->tm);
     Time_to_Calendar(&dt->cal, dt->tm + dt->off->offset);
 
     return TRUE;
@@ -1846,19 +1825,20 @@ static int date_marshal_write(Value *vret, Value *v, RefNode *node)
 {
     Value w = Value_ref(v[1])->v[INDEX_MARSHALDUMPER_SRC];
     RefTime *dt = Value_vp(*v);
-    RefStr *name = dt->tz->name;
+    const char *name = dt->tz->name;
+    int name_size = strlen(name);
 
-    if (!write_int32((uint32_t)(dt->tm >> 32), w)) {
+    if (!stream_write_uint32((uint32_t)(dt->tm >> 32), w)) {
         return FALSE;
     }
-    if (!write_int32((uint32_t)(dt->tm & 0xFFFFffff), w)) {
+    if (!stream_write_uint32((uint32_t)(dt->tm & 0xFFFFffff), w)) {
         return FALSE;
     }
 
-    if (!write_int32(name->size, w)) {
+    if (!stream_write_uint32(name_size, w)) {
         return FALSE;
     }
-    if (!stream_write_data(w, name->c, name->size)) {
+    if (!stream_write_data(w, name, name_size)) {
         return FALSE;
     }
     return TRUE;
@@ -1959,8 +1939,7 @@ static int date_timezone(Value *vret, Value *v, RefNode *node)
 static int date_zoneabbr(Value *vret, Value *v, RefNode *node)
 {
     RefTime *dt = Value_vp(*v);
-    RefStr *abbr = dt->off->name;
-    *vret = Value_cp(vp_Value(abbr));
+    *vret = cstr_Value(fs->cls_str, dt->off->abbr, -1);
     return TRUE;
 }
 static int date_is_dst(Value *vret, Value *v, RefNode *node)

@@ -1,15 +1,15 @@
 import text.unicode
 import text.util
 
-def _HALF2FULL = Replacer('text.util.half2full')
-def _FULL2HALF = Replacer('text.util.full2half')
-def _ZEN2HAN   = Replacer('text.kana.zen2han')
-def _HAN2ZEN   = Replacer('text.kana.han2zen')
-def _HIRAGANA  = Replacer('text.kana.hiragana')
-def _KATAKANA  = Replacer('text.kana.katakana')
-def _R_KUNREI  = Replacer('text.kana.roman_kunrei')
-def _R_HEBON   = Replacer('text.kana.roman_hebon')
-def _YOMI      = Replacer('text.han.kanji_kana')
+def _HALF2FULL = Replacer('text.util.half_full')
+def _FULL2HALF = Replacer('text.util.full_half')
+def _ZEN2HAN   = Replacer('text.ja.zen_han')
+def _HAN2ZEN   = Replacer('text.ja.han_zen')
+def _HIRAGANA  = Replacer('text.ja.kana_hira')
+def _KATAKANA  = Replacer('text.ja.hira_kana')
+def _R_KUNREI  = Replacer('text.ja.kana_latn_kunrei')
+def _R_HEBON   = Replacer('text.ja.kana_latn_hebon')
+def _YOMI      = Replacer('text.ja.hani_kana')
 
 def convert_kana(src:Str, mode:Str)
 {

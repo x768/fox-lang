@@ -1,3 +1,0 @@
-=Antarctica/Rothera
-8000000000000000 0 0 zzz
-00000032d07fc800 -10800 0 ROTT

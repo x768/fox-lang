@@ -1,3 +1,0 @@
-=America/Grenada
-8000000000000000 -14820 0 LMT
-fffffe5221eca6a0 -14400 0 AST

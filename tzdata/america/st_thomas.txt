@@ -1,3 +1,0 @@
-=America/St_Thomas
-8000000000000000 -15584 0 LMT
-fffffe5221f84f00 -14400 0 AST

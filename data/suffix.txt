@@ -76,7 +76,7 @@ message/rfc822:eml
 text/css:css
 text/csv:csv
 text/html:htm	html
-text/markdown:md	markdown
+text/x-markdown:md	markdown
 text/plain:txt	text	ini
 video/mp4:mp4
 video/mpeg:mpeg	mpg	mpe

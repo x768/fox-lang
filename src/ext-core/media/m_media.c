@@ -41,27 +41,6 @@ static Hash *load_type_function(Mem *mem)
     return &mods;
 }
 
-static int read_int8(uint8_t *val, Value r)
-{
-    int size = 1;
-
-    if (!fs->stream_read_data(r, NULL, (char*)val, &size, FALSE, TRUE)) {
-        return FALSE;
-    }
-    return TRUE;
-}
-static int write_int8(uint32_t val, Value w)
-{
-    uint8_t buf[1];
-
-    buf[0] = val;
-
-    if (!fs->stream_write_data(w, (char*)buf, 1)) {
-        return FALSE;
-    }
-    return TRUE;
-}
-
 ////////////////////////////////////////////////////////////////////////////
 
 int Audio_set_size(RefAudio *snd, int size)
@@ -176,22 +155,22 @@ static int audio_marshal_read(Value *vret, Value *v, RefNode *node)
     Value r = Value_ref(v[1])->v[INDEX_MARSHALDUMPER_SRC];
     uint8_t i8;
 
-    if (!read_int8(&i8, r)) {
+    if (!fs->stream_read_uint8(&i8, r)) {
         return FALSE;
     }
     snd->samples = i8;
 
-    if (!read_int8(&i8, r)) {
+    if (!fs->stream_read_uint8(&i8, r)) {
         return FALSE;
     }
     snd->width = i8;
 
-    if (!read_int8(&i8, r)) {
+    if (!fs->stream_read_uint8(&i8, r)) {
         return FALSE;
     }
     snd->channels = i8;
 
-    if (!read_int8(&i8, r)) {
+    if (!fs->stream_read_uint8(&i8, r)) {
         return FALSE;
     }
     snd->length = i8;
@@ -203,16 +182,16 @@ static int audio_marshal_write(Value *vret, Value *v, RefNode *node)
     RefAudio *snd = Value_vp(*v);
     Value w = Value_ref(v[1])->v[INDEX_MARSHALDUMPER_SRC];
 
-    if (!write_int8(snd->samples, w)) {
+    if (!fs->stream_write_uint8(snd->samples, w)) {
         return FALSE;
     }
-    if (!write_int8(snd->width, w)) {
+    if (!fs->stream_write_uint8(snd->width, w)) {
         return FALSE;
     }
-    if (!write_int8(snd->channels, w)) {
+    if (!fs->stream_write_uint8(snd->channels, w)) {
         return FALSE;
     }
-    if (!write_int8(snd->length, w)) {
+    if (!fs->stream_write_uint8(snd->length, w)) {
         return FALSE;
     }
 

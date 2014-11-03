@@ -60,27 +60,26 @@ typedef struct tagBITMAPINFOHEADER {
 } BITMAPINFOHEADER;
 */
 
-
-static uint16_t read_int16(const uint8_t *p)
+static uint16_t ptr_read_uint16_le(const char *p)
 {
-    return p[0] | p[1] << 8;
+    return ((uint8_t)p[0]) | ((uint8_t)p[1] << 8);
 }
-static uint32_t read_int32(const uint8_t *p)
+static uint32_t ptr_read_uint32_le(const char *p)
 {
-    return p[0] | p[1] << 8 | p[2] << 16 | p[3] << 24;
+    return ((uint8_t)p[0]) | ((uint8_t)p[1] << 8) | ((uint8_t)p[2] << 16) | ((uint8_t)p[3] << 24);
 }
 
-static void write_int16(uint8_t *p, uint32_t val)
+static void ptr_write_uint16_le(char *p, uint16_t val)
 {
     p[0] = val & 0xFF;
     p[1] = val >> 8;
 }
-static void write_int32(uint8_t *p, uint32_t val)
+static void ptr_write_uint32_le(char *p, uint32_t val)
 {
     p[0] = val & 0xFF;
-    p[1] = (val & 0xFF00) >> 8;
-    p[2] = (val & 0xFF0000) >> 16;
-    p[3] = (val & 0xFF000000) >> 24;
+    p[1] = (val >> 8) & 0xFF;
+    p[2] = (val >> 16) & 0xFF;
+    p[3] = (val >> 24) & 0xFF;
 }
 
 static int get_shift_n(uint32_t mask)
@@ -189,9 +188,11 @@ static void bmp_swap_rgba(uint8_t *dst, const uint8_t *src, int width)
     }
 }
 
+//////////////////////////////////////////////////////////////////////////////////////////////
+
 int load_image_bmp_sub(RefImage *image, Value r, int info_only)
 {
-    uint8_t *buf = malloc(RGBQUAD_SIZE * PALETTE_NUM);
+    char *buf = malloc(RGBQUAD_SIZE * PALETTE_NUM);
     uint32_t off_bits;
     uint32_t bi_size;
     uint32_t bi_compression;
@@ -204,7 +205,7 @@ int load_image_bmp_sub(RefImage *image, Value r, int info_only)
     int read_total = 0;
     int read_size = BMPHEADER_TOTAL_SIZE;
 
-    if (!fs->stream_read_data(r, NULL, (char*)buf, &read_size, FALSE, TRUE)) {
+    if (!fs->stream_read_data(r, NULL, buf, &read_size, FALSE, TRUE)) {
         free(buf);
         return FALSE;
     }
@@ -213,10 +214,10 @@ int load_image_bmp_sub(RefImage *image, Value r, int info_only)
     if (buf[0] != 'B' || buf[1] != 'M') {
         goto ERROR_INVALID_FORMAT;
     }
-    off_bits = read_int32(buf + 10);
-    bi_size = read_int32(buf + 14);
-    width = read_int32(buf + 18);
-    height = read_int32(buf + 22);
+    off_bits = ptr_read_uint32_le(buf + 10);
+    bi_size = ptr_read_uint32_le(buf + 14);
+    width = ptr_read_uint32_le(buf + 18);
+    height = ptr_read_uint32_le(buf + 22);
 
     if (height < 0) {
         height = -height;
@@ -234,9 +235,9 @@ int load_image_bmp_sub(RefImage *image, Value r, int info_only)
     image->width = width;
     image->height = height;
 
-    bi_compression = read_int32(buf + 30);
-    bit_count = read_int16(buf + 28);
-    palette_count = read_int32(buf + 46);
+    bi_compression = ptr_read_uint32_le(buf + 30);
+    bit_count = ptr_read_uint16_le(buf + 28);
+    palette_count = ptr_read_uint32_le(buf + 46);
 
     if (bi_compression != BI_RGB && bi_compression != BI_BITFIELDS) {
         goto ERROR_INVALID_FORMAT;
@@ -322,15 +323,15 @@ int load_image_bmp_sub(RefImage *image, Value r, int info_only)
         // BITMAPV4HEADER
         // BITMAPV5HEADER
         read_size = bi_size - BITMAPINFOHEADER_SIZE;
-        if (!fs->stream_read_data(r, NULL, (char*)buf, &read_size, FALSE, TRUE)) {
+        if (!fs->stream_read_data(r, NULL, buf, &read_size, FALSE, TRUE)) {
             free(buf);
             return FALSE;
         }
         if (bi_compression == BI_BITFIELDS) {
-            rmask = read_int32(buf + 0);
-            gmask = read_int32(buf + 4);
-            bmask = read_int32(buf + 8);
-            amask = read_int32(buf + 12);
+            rmask = ptr_read_uint32_le(buf + 0);
+            gmask = ptr_read_uint32_le(buf + 4);
+            bmask = ptr_read_uint32_le(buf + 8);
+            amask = ptr_read_uint32_le(buf + 12);
         }
         read_total += read_size;
     } else {
@@ -343,7 +344,7 @@ int load_image_bmp_sub(RefImage *image, Value r, int info_only)
         int i;
         uint32_t *palette = malloc(sizeof(uint32_t) * PALETTE_NUM);
         read_size = RGBQUAD_SIZE * palette_count;
-        if (!fs->stream_read_data(r, NULL, (char*)buf, &read_size, FALSE, TRUE)) {
+        if (!fs->stream_read_data(r, NULL, buf, &read_size, FALSE, TRUE)) {
             free(buf);
             return FALSE;
         }
@@ -351,7 +352,7 @@ int load_image_bmp_sub(RefImage *image, Value r, int info_only)
         memset(palette, 0, sizeof(uint32_t) * PALETTE_NUM);
         
         for (i = 0; i < palette_count; i++) {
-            palette[i] = (buf[i * 4 + 2] << COLOR_R_SHIFT) | (buf[i * 4 + 1] << COLOR_G_SHIFT) | (buf[i * 4 + 0] << COLOR_B_SHIFT) | COLOR_A_MASK;
+            palette[i] = (((uint8_t)buf[i * 4 + 2]) << COLOR_R_SHIFT) | (((uint8_t)buf[i * 4 + 1]) << COLOR_G_SHIFT) | (((uint8_t)buf[i * 4 + 0]) << COLOR_B_SHIFT) | COLOR_A_MASK;
         }
         image->palette = palette;
     }
@@ -434,7 +435,7 @@ ERROR_INVALID_FORMAT:
 
 int save_image_bmp_sub(RefImage *image, Value w)
 {
-    uint8_t *buf;
+    char *buf;
     int total_size = 0;
     int off_bits = 0;
     int bit_count;
@@ -467,22 +468,22 @@ int save_image_bmp_sub(RefImage *image, Value w)
 
     buf[0] = 'B';
     buf[1] = 'M';
-    write_int32(buf + 2, total_size);
-    write_int32(buf + 10, off_bits);
+    ptr_write_uint32_le(buf + 2, total_size);
+    ptr_write_uint32_le(buf + 10, off_bits);
 
-    write_int32(buf + 14, 40);                           // biSize
-    write_int32(buf + 18, image->width);
-    write_int32(buf + 22, image->height);
-    write_int16(buf + 26, 1);                            // biPlanes
-    write_int16(buf + 28, bit_count);
-    write_int32(buf + 30, BI_RGB);
-    write_int32(buf + 34, pitch_align * image->height);  // biSizeImage
-    write_int32(buf + 38, PIX_PER_METER);
-    write_int32(buf + 42, PIX_PER_METER);
-    write_int32(buf + 46, (bit_count == 8 ? 256 : 0));   // biClrUsed
-    write_int32(buf + 50, 0);                            // biCirImportant
+    ptr_write_uint32_le(buf + 14, 40);                           // biSize
+    ptr_write_uint32_le(buf + 18, image->width);
+    ptr_write_uint32_le(buf + 22, image->height);
+    ptr_write_uint16_le(buf + 26, 1);                            // biPlanes
+    ptr_write_uint16_le(buf + 28, bit_count);
+    ptr_write_uint32_le(buf + 30, BI_RGB);
+    ptr_write_uint32_le(buf + 34, pitch_align * image->height);  // biSizeImage
+    ptr_write_uint32_le(buf + 38, PIX_PER_METER);
+    ptr_write_uint32_le(buf + 42, PIX_PER_METER);
+    ptr_write_uint32_le(buf + 46, (bit_count == 8 ? 256 : 0));   // biClrUsed
+    ptr_write_uint32_le(buf + 50, 0);                            // biCirImportant
 
-    if (!fs->stream_write_data(w, (const char*)buf, BMPHEADER_TOTAL_SIZE)) {
+    if (!fs->stream_write_data(w, buf, BMPHEADER_TOTAL_SIZE)) {
         free(buf);
         return FALSE;
     }
@@ -508,7 +509,7 @@ int save_image_bmp_sub(RefImage *image, Value w)
                 buf[i * 4 + 3] = 0;
             }
         }
-        if (!fs->stream_write_data(w, (const char*)buf, PALETTE_NUM * RGBQUAD_SIZE)) {
+        if (!fs->stream_write_data(w, buf, PALETTE_NUM * RGBQUAD_SIZE)) {
             free(buf);
             return FALSE;
         }

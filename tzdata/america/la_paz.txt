@@ -1,5 +1,0 @@
-=America/La_Paz
-8000000000000000 -16356 0 LMT
-fffffdb437c2fea0 -16356 0 CMT
-fffffee7377d6aa0 -12756 1 BOST
-fffffeea64f34420 -14400 0 BOT

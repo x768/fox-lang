@@ -1,0 +1,8 @@
+Ä	AE
+Ö	OE
+Ü	UE
+ß	ss
+ä	ae
+ö	oe
+ü	ue
+ẞ	SS

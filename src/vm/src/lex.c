@@ -481,11 +481,11 @@ static void Tok_parse_double_str(TokValue *v, Tok *tk, int cat, int term)
                 } else if (ch2 < 0x800) {
                     *dst++ = 0xC0 | (ch2 >> 6);
                     *dst++ = 0x80 | (ch2 & 0x3F);
-                } else if (ch2 < 0xD800) {
+                } else if (ch2 < SURROGATE_U_BEGIN) {
                     *dst++ = 0xE0 | (ch2 >> 12);
                     *dst++ = 0x80 | ((ch2 >> 6) & 0x3F);
                     *dst++ = 0x80 | (ch2 & 0x3F);
-                } else if (ch2 < 0xDC00) {
+                } else if (ch2 < SURROGATE_L_BEGIN) {
                     // 上位サロゲート
                     int ch3;
                     if (*tk->p != '\\' || tk->p[1] != 'u') {
@@ -495,19 +495,19 @@ static void Tok_parse_double_str(TokValue *v, Tok *tk, int cat, int term)
                     }
                     tk->p += 2;
                     ch3 = parse_hex((const char**)&tk->p, NULL, 4);
-                    if (ch3 < 0xDC00 || ch3 >= 0xE000) {
+                    if (ch3 < SURROGATE_L_BEGIN || ch3 >= SURROGATE_END) {
                         throw_errorf(fs->mod_lang, "TokenError", "Invalid Low Surrogate");
                         v->type = T_ERR;
                         return;
                     }
-                    ch2 = (ch2 - 0xD800) * 0x400 + 0x10000;
-                    ch3 = ch2 | (ch3 - 0xDC00);
+                    ch2 = (ch2 - SURROGATE_U_BEGIN) * 0x400 + 0x10000;
+                    ch3 = ch2 | (ch3 - SURROGATE_L_BEGIN);
 
                     *dst++ = 0xF0 | (ch3 >> 18);
                     *dst++ = 0x80 | ((ch3 >> 12) & 0x3F);
                     *dst++ = 0x80 | ((ch3 >> 6) & 0x3F);
                     *dst++ = 0x80 | (ch3 & 0x3F);
-                } else if (ch2 < 0xE000) {
+                } else if (ch2 < SURROGATE_END) {
                     // 下位サロゲート
                     throw_errorf(fs->mod_lang, "TokenError", "Illigal codepoint (Surrogate) %U", ch2);
                     v->type = T_ERR;

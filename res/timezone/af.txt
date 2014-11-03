@@ -1,7 +1,0 @@
-locale=af
-Antarctica/South_Pole:Suidpool
-Asia/Bahrain:Bagrein
-Asia/Shanghai:Sjanghai
-America/Mexico_City:Mexikostad
-Europe/Lisbon:Lissabon
-Europe/Moscow:Moskou

@@ -213,7 +213,7 @@ static int integer_marshal_read(Value *vret, Value *v, RefNode *node)
     if (!stream_read_data(r, NULL, &minus, &rd_size, FALSE, TRUE)) {
         return FALSE;
     }
-    if (!read_int32(&digits, r)) {
+    if (!stream_read_uint32(&digits, r)) {
         return FALSE;
     }
     if (digits > 0xffff) {
@@ -315,7 +315,7 @@ static int integer_marshal_write(Value *vret, Value *v, RefNode *node)
     if (!stream_write_data(w, &minus, 1)) {
         return FALSE;
     }
-    if (!write_int32(digits, w)) {
+    if (!stream_write_uint32(digits, w)) {
         return FALSE;
     }
     if (!write_int16_array(data, digits, w)) {
@@ -712,13 +712,13 @@ ERROR_END:
     throw_errorf(fs->mod_lang, "ValueError", "Negative value is not supported");
     return FALSE;
 }
-static int get_msb_pos(int64_t val)
+static int get_msb_pos(int32_t val)
 {
     int i;
 
-    for (i = 31; i >= 0; i--) {
+    for (i = 30; i >= 0; i--) {
         if (((1LL << i) & val) != 0) {
-            return i;
+            return i + 1;
         }
     }
     return 0;
@@ -1476,7 +1476,7 @@ static int frac_marshal_read(Value *vret, Value *v, RefNode *node)
         return FALSE;
     }
 
-    if (!read_int32(&digits, r)) {
+    if (!stream_read_uint32(&digits, r)) {
         return FALSE;
     }
     if (digits > 0xffff) {
@@ -1489,7 +1489,7 @@ static int frac_marshal_read(Value *vret, Value *v, RefNode *node)
     }
     md->md[0].used = digits;
 
-    if (!read_int32(&digits, r)) {
+    if (!stream_read_uint32(&digits, r)) {
         return FALSE;
     }
     if (digits > 0xffff) {
@@ -1521,14 +1521,14 @@ static int frac_marshal_write(Value *vret, Value *v, RefNode *node)
         return FALSE;
     }
 
-    if (!write_int32(md->md[0].used, w)) {
+    if (!stream_write_uint32(md->md[0].used, w)) {
         return FALSE;
     }
     if (!write_int16_array(md->md[0].dp, md->md[0].used, w)) {
         return FALSE;
     }
 
-    if (!write_int32(md->md[1].used, w)) {
+    if (!stream_write_uint32(md->md[1].used, w)) {
         return FALSE;
     }
     if (!write_int16_array(md->md[1].dp, md->md[1].used, w)) {

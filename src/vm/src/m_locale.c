@@ -41,7 +41,7 @@ static RefStr *locale_alias(const char *name_p, int name_size)
 
     if (locales.entry == NULL) {
         Hash_init(&locales, &fg->st_mem, 64);
-        load_aliases_file(&locales, "data" SEP_S "locale.txt");
+        load_aliases_file(&locales, "data" SEP_S "locale-alias.txt");
     }
     return Hash_get(&locales, name_p, name_size);
 }
@@ -414,7 +414,7 @@ static int locale_marshal_read(Value *vret, Value *v, RefNode *node)
     RefLocale *loc;
     char cbuf[64];
 
-    if (!read_int32(&size, r)) {
+    if (!stream_read_uint32(&size, r)) {
         return FALSE;
     }
     if (size > 63) {
@@ -438,7 +438,7 @@ static int locale_marshal_write(Value *vret, Value *v, RefNode *node)
     RefStr *name = loc->tag;
     Value w = Value_ref(v[1])->v[INDEX_MARSHALDUMPER_SRC];
 
-    if (!write_int32(name->size, w)) {
+    if (!stream_write_uint32(name->size, w)) {
         return FALSE;
     }
     if (!stream_write_data(w, name->c, name->size)) {

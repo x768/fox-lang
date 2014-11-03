@@ -1,3 +1,0 @@
-=Africa/Ouagadougou
-8000000000000000 -364 0 LMT
-fffffe55d4a231e0 0 0 GMT

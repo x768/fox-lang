@@ -422,7 +422,7 @@ static int file_marshal_read(Value *vret, Value *v, RefNode *node)
     int rd_size;
     RefStr *rs;
 
-    if (!read_int32(&size, r)) {
+    if (!stream_read_uint32(&size, r)) {
         return FALSE;
     }
     if (size > 0xffffff) {
@@ -449,7 +449,7 @@ static int file_marshal_write(Value *vret, Value *v, RefNode *node)
     Value w = Value_ref(v[1])->v[INDEX_MARSHALDUMPER_SRC];
     RefStr *rs = Value_vp(*v);
 
-    if (!write_int32(rs->size, w)) {
+    if (!stream_write_uint32(rs->size, w)) {
         return FALSE;
     }
     if (!stream_write_data(w, rs->c, rs->size)) {
@@ -704,6 +704,52 @@ static int file_fopen(Value *vret, Value *v, RefNode *node)
     ref->v[INDEX_TEXTIO_TEXTIO] = vp_Value(fv->ref_textio_utf8);
 
     return TRUE;
+}
+
+static int make_directory(const char *path)
+{
+    int result = TRUE;
+    char *cp = str_dup_p(path, -1, NULL);
+    char *cp_end = &cp[strlen(cp)];
+    char *path_ptr = cp_end - 1;
+    int type;
+
+    // 既に存在している
+    type = exists_file(cp);
+    if (type != EXISTS_NONE) {
+        free(cp);
+        return type == EXISTS_DIR;
+    }
+
+    // ディレクトリが存在する階層を探す
+    while (path_ptr > cp) {
+        if (*path_ptr == SEP_C) {
+            *path_ptr = '\0';
+            type = exists_file(cp);
+            if (type == EXISTS_DIR) {
+                break;
+            } else if (type == EXISTS_FILE) {
+                free(cp);
+                return FALSE;
+            }
+        }
+        path_ptr--;
+    }
+
+    // ディレクトリを作成する
+    while (path_ptr < cp_end) {
+        if (*path_ptr == '\0') {
+            *path_ptr = SEP_C;
+            if (mkdir_fox(cp, DEFAULT_PERMISSION_DIR) != 0) {
+                result = FALSE;
+                break;
+            }
+        }
+        path_ptr++;
+    }
+
+    free(cp);
+    return result;
 }
 static int file_mkdir(Value *vret, Value *v, RefNode *node)
 {
@@ -993,6 +1039,19 @@ static int file_write_stream_sub(const char *path, Value v1, int append)
     close_fox(fd);
 
     return TRUE;
+}
+static int write_to_file(const char *path, const char *write_p, int write_size, int append)
+{
+    int fd = open_fox(path, (append ? O_CREAT|O_WRONLY|O_APPEND : O_CREAT|O_WRONLY|O_TRUNC), DEFAULT_PERMISSION);
+    int ret;
+
+    if (fd == -1) {
+        return FALSE;
+    }
+    ret = (write_fox(fd, write_p, write_size) == write_size);
+    close_fox(fd);
+
+    return ret;
 }
 static int file_writefile(Value *vret, Value *v, RefNode *node)
 {

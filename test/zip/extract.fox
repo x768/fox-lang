@@ -1,0 +1,18 @@
+import util.assert
+import archive.zip
+
+
+let zip = ZipRandomReader("test.zip")
+let entry1 = zip[0]
+
+assert_equal entry1.filename, "test"
+assert_equal entry1.size, 24
+
+assert_equal entry1.read(), b"abcdefg\nあいうえお\n"
+
+
+let entry2 = zip["test"]
+
+assert_equal entry1.filename, "test"
+assert_equal entry1.size, 24
+

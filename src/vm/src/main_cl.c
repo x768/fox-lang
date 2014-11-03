@@ -318,17 +318,15 @@ static void show_configure(void)
             if (tz_error) {
                 stream_write_data(fg->v_cio, "*UNKNOWN*", -1);
             } else {
-                RefStr *rs = tz->name;
                 stream_write_data(fg->v_cio, "(", 1);
-                stream_write_data(fg->v_cio, rs->c, rs->size);
+                stream_write_data(fg->v_cio, tz->name, -1);
                 stream_write_data(fg->v_cio, ")", 1);
             }
         } else {
             stream_write_data(fg->v_cio, "(Etc/UTC)", -1);
         }
     } else {
-        RefStr *rs = tz->name;
-        stream_write_data(fg->v_cio, rs->c, rs->size);
+        stream_write_data(fg->v_cio, tz->name, -1);
     }
     stream_write_data(fg->v_cio, "\n", 1);
 }
@@ -399,6 +397,10 @@ static int parse_args(ArgumentInfo *ai, int argc, const char **argv)
                 case 'c':
                     ai->syntax_only = TRUE;
                     break;
+#else
+                case 'c':
+                    throw_errorf(fs->mod_lang, "ArgumentError", "Use foxd -c for validate syntax", p);
+                    return FALSE;
 #endif
                 case 'v':
 #ifdef DEBUGGER

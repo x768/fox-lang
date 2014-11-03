@@ -1,3 +1,0 @@
-=Africa/Bujumbura
-8000000000000000 7048 0 LMT
-fffffdb4365de0c0 7200 0 CAT

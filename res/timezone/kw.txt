@@ -1,2 +1,0 @@
-locale=kw
-Etc/Unknown:Ankoth

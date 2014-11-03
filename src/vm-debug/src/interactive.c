@@ -128,6 +128,7 @@ void fox_intaractive(RefNode *module)
                 stream_flush_sub(fg->v_cio);
             }
         } else {
+            Value *stk_prev = fg->stk_top;
             input_continue = input_buffer_add(&buf, module, input);
             if (!input_continue && fg->error == VALUE_NULL) {
                 RefNode *toplevel;
@@ -158,6 +159,13 @@ void fox_intaractive(RefNode *module)
                 stream_flush_sub(fg->v_cio);
             }
             if (fg->error != VALUE_NULL) {
+                if (fg->stk_base > fg->stk) {
+                    fg->stk_base = fg->stk;
+                }
+                while (fg->stk_top > stk_prev) {
+                    Value_dec(fg->stk_top[-1]);
+                    fg->stk_top--;
+                }
                 print_error();
                 stream_flush_sub(fg->v_cio);
                 Value_dec(fg->error);

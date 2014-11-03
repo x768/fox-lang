@@ -1,12 +1,16 @@
 #include "c_posix_osx.c"
 #include "config.h"
 
+#if (defined(__unix__) || defined(unix)) && !defined(USG)
+#include <sys/param.h>
+#endif
+
 
 const char *get_fox_home()
 {
 #ifdef FOX_HOME
     return FOX_HOME;
-#elif 0
+#elif defined(BSD)
     enum {
         FOX_PATH_MAX = 512,
     };

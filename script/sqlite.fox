@@ -11,35 +11,35 @@ EOS
 
 var db = null
 if ARGV.size > 0 {
-	db = SQLite(ARGV[0], "w")
+    db = SQLite(ARGV[0], "w")
 } else {
-	db = SQLite.memory()
+    db = SQLite.memory()
 }
 
 while let line = readline("sqlite> ") {
-	try {
-		if line.find(/^\./) {
-			if let m = line.match(/^\.(\w+)\s*(.*)$/) {
-				switch m[1] {
-				case 'exit', 'quit', 'q'
-					break
-				case 'open'
-					db = SQLite(m[1], "w")
-				case 'memory'
-					db = SQLite.memory()
-				case 'help'
-				default
-					puts 'Unknown command ', m[1]
-				}
-			} else {
-				puts 'Unknown statement ', line
-			}
-		} else {
-			// SQL statement
-		}
-	} catch e:SQLiteError {
-		puts e.message
-	}
-	add_history(line)
+    try {
+        if line.find(/^\./) {
+            if let m = line.match(/^\.(\w+)\s*(.*)$/) {
+                switch m[1] {
+                case 'exit', 'quit', 'q'
+                    break
+                case 'open'
+                    db = SQLite(m[1], "w")
+                case 'memory'
+                    db = SQLite.memory()
+                case 'help'
+                default
+                    puts 'Unknown command ', m[1]
+                }
+            } else {
+                puts 'Unknown statement ', line
+            }
+        } else {
+            // SQL statement
+        }
+    } catch e:SQLiteError {
+        puts e.message
+    }
+    add_history(line)
 }
 

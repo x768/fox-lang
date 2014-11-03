@@ -69,30 +69,6 @@ static int name_to_bands(int *bands, int *channels, RefStr *rs)
     }
     return TRUE;
 }
-static int read_int32(uint32_t *val, Value r)
-{
-    int size = 4;
-    uint8_t buf[4];
-
-    if (!fs->stream_read_data(r, NULL, (char*)buf, &size, FALSE, TRUE)) {
-        return FALSE;
-    }
-    *val = (buf[0] << 24) | (buf[1] << 16) | (buf[2] << 8) | buf[3];
-    return TRUE;
-}
-static int write_int32(uint32_t val, Value w)
-{
-    uint8_t buf[4];
-    buf[0] = (val >> 24) & 0xFF;
-    buf[1] = (val >> 16) & 0xFF;
-    buf[2] = (val >> 8) & 0xFF;
-    buf[3] = val & 0xFF;
-
-    if (!fs->stream_write_data(w, (char*)buf, 4)) {
-        return FALSE;
-    }
-    return TRUE;
-}
 
 static const char *bands_to_name(int bands)
 {
@@ -571,7 +547,7 @@ static int color_marshal_read(Value *vret, Value *v, RefNode *node)
     Value r = Value_ref(v[1])->v[INDEX_MARSHALDUMPER_SRC];
     uint32_t ival;
 
-    if (!read_int32(&ival, r)) {
+    if (!fs->stream_read_uint32(&ival, r)) {
         return FALSE;
     }
     *vret = integral_Value(cls_color, ival);
@@ -583,7 +559,7 @@ static int color_marshal_write(Value *vret, Value *v, RefNode *node)
     Value w = Value_ref(v[1])->v[INDEX_MARSHALDUMPER_SRC];
     uint32_t ival = Value_integral(*v);
 
-    if (!write_int32(ival, w)) {
+    if (!fs->stream_write_uint32(ival, w)) {
         return FALSE;
     }
     return TRUE;
@@ -772,7 +748,7 @@ static int palette_marshal_read(Value *vret, Value *v, RefNode *node)
     ra->rh.type = cls_palette;
     for (i = 0; i < PALETTE_NUM; i++) {
         uint32_t ival;
-        if (!read_int32(&ival, r)) {
+        if (!fs->stream_read_uint32(&ival, r)) {
             return FALSE;
         }
         ra->p[i] = integral_Value(cls_color, ival);
@@ -788,7 +764,7 @@ static int palette_marshal_write(Value *vret, Value *v, RefNode *node)
 
     for (i = 0; i < PALETTE_NUM; i++) {
         uint32_t ival = Value_integral(ra->p[i]);
-        if (!write_int32(ival, w)) {
+        if (!fs->stream_write_uint32(ival, w)) {
             return FALSE;
         }
     }
@@ -1209,7 +1185,7 @@ static int image_marshal_read(Value *vret, Value *v, RefNode *node)
     }
     image->bands = bands;
 
-    if (!read_int32(&ival, r)) {
+    if (!fs->stream_read_uint32(&ival, r)) {
         return FALSE;
     }
     if (ival > MAX_IMAGE_SIZE) {
@@ -1219,7 +1195,7 @@ static int image_marshal_read(Value *vret, Value *v, RefNode *node)
     image->width = ival;
     image->pitch = ival * bands_to_channels(image->bands);
 
-    if (!read_int32(&ival, r)) {
+    if (!fs->stream_read_uint32(&ival, r)) {
         return FALSE;
     }
     if (ival > MAX_IMAGE_SIZE) {
@@ -1231,14 +1207,14 @@ static int image_marshal_read(Value *vret, Value *v, RefNode *node)
         int i;
         image->palette = malloc(sizeof(uint32_t) * PALETTE_NUM);
         for (i = 0; i < PALETTE_NUM; i++) {
-            if (!read_int32(&image->palette[i], r)) {
+            if (!fs->stream_read_uint32(&image->palette[i], r)) {
                 return FALSE;
             }
         }
     }
 
     image->height = ival;
-    if (!read_int32(&ival, r)) {
+    if (!fs->stream_read_uint32(&ival, r)) {
         return FALSE;
     }
     if (ival > 0) {
@@ -1264,16 +1240,16 @@ static int image_marshal_write(Value *vret, Value *v, RefNode *node)
     if (!fs->stream_write_data(w, &bands, 1)) {
         return FALSE;
     }
-    if (!write_int32(image->width, w)) {
+    if (!fs->stream_write_uint32(image->width, w)) {
         return FALSE;
     }
-    if (!write_int32(image->height, w)) {
+    if (!fs->stream_write_uint32(image->height, w)) {
         return FALSE;
     }
     if (image->bands == BAND_P) {
         int i;
         for (i = 0; i < PALETTE_NUM; i++) {
-            if (!write_int32(image->palette[i], w)) {
+            if (!fs->stream_write_uint32(image->palette[i], w)) {
                 return FALSE;
             }
         }
@@ -1283,7 +1259,7 @@ static int image_marshal_write(Value *vret, Value *v, RefNode *node)
         int width = image->width * bands_to_channels(image->bands);
         int y;
 
-        if (!write_int32(width * image->height, w)) {
+        if (!fs->stream_write_uint32(width * image->height, w)) {
             return FALSE;
         }
         for (y = 0; y < image->height; y++) {
@@ -1292,7 +1268,7 @@ static int image_marshal_write(Value *vret, Value *v, RefNode *node)
             }
         }
     } else {
-        if (!write_int32(0, w)) {
+        if (!fs->stream_write_uint32(0, w)) {
             return FALSE;
         }
     }

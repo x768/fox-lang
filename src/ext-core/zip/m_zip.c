@@ -377,7 +377,7 @@ static int zip_randomreader_new(Value *vret, Value *v, RefNode *node)
     if (fg->stk_top > v + 3) {
         tz = Value_vp(v[3]);
     } else {
-        tz = NULL;
+        tz = fs->get_local_tz();
     }
 
     if (!fs->value_to_streamio(&reader, v1, FALSE, 0)) {

@@ -1,3 +1,0 @@
-=America/Dominica
-8000000000000000 -14736 0 LMT
-fffffe5221ec48e0 -14400 0 AST

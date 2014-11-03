@@ -1,5 +1,0 @@
-=Africa/Banjul
-8000000000000000 -3996 0 LMT
-fffffe55d4d99d60 -3996 0 BMT
-fffffefed4aab960 -3600 0 WAT
-ffffffd3e7c32e80 0 0 GMT

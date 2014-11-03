@@ -1,3 +1,0 @@
-=Africa/Lubumbashi
-8000000000000000 6592 0 LMT
-fffffdeded49e200 7200 0 CAT

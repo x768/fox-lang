@@ -10,7 +10,7 @@ static FoxGlobal *fg;
 static RefNode *mod_unicode;
 
 enum {
-    NUM_CODEPOINT = 0x10000,  // 1つの面のコードポイント数
+    CODEPOINTS_PLANE = 0x10000,
     MAX_PLANE = 16,
     COMPO_HASH_SIZE = 128,
 };
@@ -242,8 +242,8 @@ static void load_composition_data(void)
 
 static int ch_get_property(uint8_t **data, const char *type, int code)
 {
-    if (code >= 0 && code < 0x110000) {
-        int plane = code / NUM_CODEPOINT;
+    if (code >= 0 && code < CODEPOINT_END) {
+        int plane = code / CODEPOINTS_PLANE;
         uint8_t *ch;
 
         if (data[plane] == NULL) {
@@ -253,7 +253,7 @@ static int ch_get_property(uint8_t **data, const char *type, int code)
         if (ch == PTR_NO_DATA) {
             return 0;
         } else {
-            int i = code % NUM_CODEPOINT;
+            int i = code % CODEPOINTS_PLANE;
             return ch[i];
         }
     } else {
@@ -262,8 +262,8 @@ static int ch_get_property(uint8_t **data, const char *type, int code)
 }
 static int ch_get_unicode16(uint8_t **data, const char *type, int code)
 {
-    if (code >= 0 && code < 0x110000) {
-        int plane = code / NUM_CODEPOINT;
+    if (code >= 0 && code < CODEPOINT_END) {
+        int plane = code / CODEPOINTS_PLANE;
         uint8_t *ch;
 
         if (data[plane] == NULL) {
@@ -273,14 +273,14 @@ static int ch_get_unicode16(uint8_t **data, const char *type, int code)
         if (ch == PTR_NO_DATA) {
             return 0;
         } else {
-            int i = (code % NUM_CODEPOINT * 2);
+            int i = (code % CODEPOINTS_PLANE * 2);
             return (ch[i] << 8) | ch[i + 1];
         }
     } else {
         return 0;
     }
 }
-int ch_get_category(int code)
+static int ch_get_category(int code)
 {
     return ch_get_property(ch_category, "ct", code);
 }
@@ -737,7 +737,7 @@ static int unicode_composition(uint32_t *buffer, int size)
 {
     int i;
     int dst = 0;
-    int min_cc = 0;
+    int max_cc = 0;
     uint32_t *starter = NULL;
 
     for (i = 0; i < size; i++) {
@@ -745,7 +745,7 @@ static int unicode_composition(uint32_t *buffer, int size)
         int ch = buffer[i];
         int cc = ch_get_property(ch_combi_class, "cc", ch);
 
-        if (starter != NULL) {
+        if (starter != NULL && max_cc < cc) {
             int l_index = *starter - HANGUL_L_BASE;
             int s_index = *starter - HANGUL_S_BASE;
 
@@ -764,18 +764,21 @@ static int unicode_composition(uint32_t *buffer, int size)
                 }
             }
         }
-        if (starter != NULL && ((cmp = get_composition(*starter, ch)) != 0)) {
+        if (starter != NULL && max_cc < cc && ((cmp = get_composition(*starter, ch)) != 0)) {
             // 結合済み文字
             *starter = cmp;
-            min_cc = 0;
+            cc = ch_get_property(ch_combi_class, "cc", cmp);
+            if (cc == 0) {
+                max_cc = -1;
+            } else if (max_cc < cc) {
+                max_cc = cc;
+            }
         } else {
             if (cc == 0) {
-                min_cc = 0;
+                max_cc = -1;
                 starter = &buffer[dst];
-            } else if (min_cc == 0) {
-                min_cc = cc;
-            } else if (min_cc < cc) {
-                starter = NULL;
+            } else if (max_cc < cc) {
+                max_cc = cc;
             }
             buffer[dst++] = ch;
         }
@@ -794,6 +797,7 @@ static int unicode_normalize(Value *vret, Value *v, RefNode *node)
     const char *norm_name;
     int composition = FALSE;
     int srclen;
+    int case_fold = FALSE;
 
     if (code_normalize == NULL) {
         int size = 0, i;
@@ -832,6 +836,12 @@ static int unicode_normalize(Value *vret, Value *v, RefNode *node)
         ch_normalize = ch_normalize_k;
         norm_name = "nk";
         composition = TRUE;
+    } else if (str_eq(mode->c, mode->size, "KC_CF", 5)) {
+        // 互換分解・正準合成・Casefold
+        ch_normalize = ch_normalize_k;
+        norm_name = "nk";
+        composition = TRUE;
+        case_fold = TRUE;
     } else {
         fs->throw_errorf(fs->mod_lang, "ValueError", "Unknown option %Q", mode);
         free(cbuf);
@@ -851,6 +861,9 @@ static int unicode_normalize(Value *vret, Value *v, RefNode *node)
             compo_hash_loaded = TRUE;
         }
         cbuf_size = unicode_composition(cbuf, cbuf_size);
+    }
+    if (case_fold) {
+        // NFKC_Casefold
     }
 
     {

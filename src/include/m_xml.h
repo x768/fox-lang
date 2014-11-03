@@ -12,6 +12,7 @@ enum {
 
 typedef struct {
     int (*resolve_entity)(const char *p, const char *end);
+    int (*is_valid_elem_name)(const char *s_p, int s_size);
 } XMLStatic;
 
 #endif /* _M_UNICODE_H_ */

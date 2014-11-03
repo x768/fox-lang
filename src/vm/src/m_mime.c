@@ -680,7 +680,7 @@ RefStr *resolve_mimetype_alias(RefStr *name)
 
     if (aliases.entry == NULL) {
         Hash_init(&aliases, &fg->st_mem, 64);
-        load_aliases_file(&aliases, "data" SEP_S "mime.txt");
+        load_aliases_file(&aliases, "data" SEP_S "mime-alias.txt");
     }
     pret = Hash_get(&aliases, name->c, name->size);
 

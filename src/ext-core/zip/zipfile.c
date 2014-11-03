@@ -16,6 +16,29 @@ enum {
     MAX_ZIP_BUF = 64*1024,
 };
 
+static uint16_t ptr_read_uint16_le(const char *p)
+{
+    return ((uint8_t)p[0]) | ((uint8_t)p[1] << 8);
+}
+static uint32_t ptr_read_uint32_le(const char *p)
+{
+    return ((uint8_t)p[0]) | ((uint8_t)p[1] << 8) | ((uint8_t)p[2] << 16) | ((uint8_t)p[3] << 24);
+}
+
+static void ptr_write_uint16_le(char *p, uint16_t val)
+{
+    p[0] = val & 0xFF;
+    p[1] = val >> 8;
+}
+static void ptr_write_uint32_le(char *p, uint32_t val)
+{
+    p[0] = val & 0xFF;
+    p[1] = (val >> 8) & 0xFF;
+    p[2] = (val >> 16) & 0xFF;
+    p[3] = (val >> 24) & 0xFF;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////
 
 void CentralDirEnd_add(CentralDirEnd *cdir, CentralDir *cd, int32_t offset)
 {
@@ -64,29 +87,6 @@ static int align_pow2(int sz, int min)
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-static int read_int16(const char *p)
-{
-    return (p[0] & 0xFF) | (p[1] & 0xFF) << 8;
-}
-static int read_int32(const char *p)
-{
-    return (p[0] & 0xFF) | (p[1] & 0xFF) << 8 | (p[2] & 0xFF) << 16 | (p[3] & 0xFF) << 24;
-}
-static void write_int16(char *p, int val)
-{
-    p[0] = val & 0xFF;
-    p[1] = (val >> 8) & 0xFF;
-}
-static void write_int32(char *p, int val)
-{
-    p[0] = val & 0xFF;
-    p[1] = (val >> 8) & 0xFF;
-    p[2] = (val >> 16) & 0xFF;
-    p[3] = (val >> 24) & 0xFF;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 #define MAKE_2C(c1, c2) ((c1) | ((c2) << 8))
 
 static CentralDir *read_local_dir(Value reader)
@@ -129,19 +129,19 @@ static CentralDirEnd *find_central_dir_end(char *buf, int size, int offset)
     for (i = size - EOCD_SIZE; i >= 0; i--) {
         if (memcmp(buf + i, EOCD_MAGIC, 4) == 0) {
             // コメントの長さと末尾の長さが(ほぼ)同じ
-            int com_end = i + EOCD_SIZE + read_int16(buf + i + 20);
+            int com_end = i + EOCD_SIZE + ptr_read_uint16_le(buf + i + 20);
 
             if (com_end <= size && com_end + 4 > size) {
                 // 分割書庫には対応しないため、0になる
-                if (read_int32(buf + i + 4) == 0) {
+                if (ptr_read_uint32_le(buf + i + 4) == 0) {
                     // オフセットがだいたい合っているか調べる
-                    int cdir_size = read_int32(buf + i + 12);
-                    int cdir_offset = read_int32(buf + i + 16);
+                    int cdir_size = ptr_read_uint32_le(buf + i + 12);
+                    int cdir_offset = ptr_read_uint32_le(buf + i + 16);
                     if (cdir_size < MAX_ALLOC && cdir_offset + cdir_size <= offset + i && cdir_offset + cdir_size + 4 > offset + i) {
                         CentralDirEnd *cd = malloc(sizeof(CentralDirEnd));
                         cd->offset_of_cdir = cdir_offset;
                         cd->size_of_cdir = cdir_size;
-                        cd->cdir_size = read_int16(buf + i + 10);
+                        cd->cdir_size = ptr_read_uint16_le(buf + i + 10);
                         cd->cdir_max = align_pow2(cd->cdir_size, 16);
                         cd->cdir = NULL;
                         return cd;
@@ -152,20 +152,19 @@ static CentralDirEnd *find_central_dir_end(char *buf, int size, int offset)
     }
     return NULL;
 }
-static void parse_ntfs_field(CentralDir *cdir, Str data, int *time_ntfs)
+static void parse_ntfs_field(CentralDir *cdir, const char *p, int p_size, int *time_ntfs)
 {
-    const char *p = data.p;
-    const char *end = p + data.size;
+    const char *end = p + p_size;
 
     while (p + 4 < end) {
-        int len = read_int16(p + 2);
+        int len = ptr_read_uint16_le(p + 2);
 
         switch (p[0] | (p[1] << 8)) {
         case 0x0001:
             if (len >= 8) {
                 // FILETIME
-                uint32_t lo = read_int32(p + 4);
-                uint32_t hi = read_int32(p + 8);
+                uint32_t lo = ptr_read_uint32_le(p + 4);
+                uint32_t hi = ptr_read_uint32_le(p + 8);
                 int64_t i64 = (uint64_t)lo | ((uint64_t)hi << 32);
                 cdir->modified = i64 / 10000 - 11644473600000LL;
                 *time_ntfs = TRUE;
@@ -175,26 +174,25 @@ static void parse_ntfs_field(CentralDir *cdir, Str data, int *time_ntfs)
         p += len + 4;
     }
 }
-static void parse_ext_field(CentralDir *cdir, Str data)
+static void parse_ext_field(CentralDir *cdir, const char *p, int p_size)
 {
-    const char *p = data.p;
-    const char *end = p + data.size;
+    const char *end = p + p_size;
     int time_ntfs = FALSE;  // NTFS Time優先
 
     while (p + 4 < end) {
-        int len = read_int16(p + 2);
+        int len = ptr_read_uint16_le(p + 2);
 
         switch (p[0] | (p[1] << 8)) {
         case MAKE_2C('U', 'T'):
             if (len >= 5 && !time_ntfs) {
                 // 更新時刻(Unix epoch UTC)
-                cdir->modified = (int64_t)read_int32(p + 5) * 1000LL;
+                cdir->modified = (int64_t)ptr_read_uint32_le(p + 5) * 1000LL;
                 cdir->time_valid = TRUE;
             }
             break;
         case 0x000a: // NTFS TimeStamp
             if (len >= 4) {
-                parse_ntfs_field(cdir, Str_new(p + 8, len - 4), &time_ntfs);
+                parse_ntfs_field(cdir, p + 8, len - 4, &time_ntfs);
                 cdir->time_valid = TRUE;
             }
             break;
@@ -252,17 +250,17 @@ static CentralDir *read_central_dirs(CentralDirEnd *cdir_end, char *cbuf, RefCha
         if (memcmp(cbuf + offset, CENTRAL_MAGIC, 4) != 0) {
             goto ERROR_END;
         }
-        p->flags = read_int16(cbuf + offset + 8);
-        p->method = read_int16(cbuf + offset + 10);
+        p->flags = ptr_read_uint16_le(cbuf + offset + 8);
+        p->method = ptr_read_uint16_le(cbuf + offset + 10);
 
 
-        p->crc32 = read_int32(cbuf + offset + 16);
-        p->size_compressed = read_int32(cbuf + offset + 20);
-        p->size = read_int32(cbuf + offset + 24);
+        p->crc32 = ptr_read_uint32_le(cbuf + offset + 16);
+        p->size_compressed = ptr_read_uint32_le(cbuf + offset + 20);
+        p->size = ptr_read_uint32_le(cbuf + offset + 24);
 
-        filename_len = read_int16(cbuf + offset + 28);
-        ext_len = read_int16(cbuf + offset + 30);
-        comment_len = read_int16(cbuf + offset + 32);
+        filename_len = ptr_read_uint16_le(cbuf + offset + 28);
+        ext_len = ptr_read_uint16_le(cbuf + offset + 30);
+        comment_len = ptr_read_uint16_le(cbuf + offset + 32);
         if (offset + CENTRAL_SIZE + filename_len + ext_len + comment_len > cdir_end->size_of_cdir) {
             goto ERROR_END;
         }
@@ -270,10 +268,10 @@ static CentralDir *read_central_dirs(CentralDirEnd *cdir_end, char *cbuf, RefCha
         fs->StrBuf_init(&p->filename, filename_len);
         fs->StrBuf_add(&p->filename, cbuf + offset + CENTRAL_SIZE, filename_len);
 
-        parse_ext_field(p, Str_new(cbuf + offset + CENTRAL_SIZE + filename_len, ext_len));
+        parse_ext_field(p, cbuf + offset + CENTRAL_SIZE + filename_len, ext_len);
         if (!p->time_valid) {
-            int modified_time = read_int16(cbuf + offset + 12);
-            int modified_date = read_int16(cbuf + offset + 14);
+            int modified_time = ptr_read_uint16_le(cbuf + offset + 12);
+            int modified_date = ptr_read_uint16_le(cbuf + offset + 14);
             if (modified_date != 0) {
                 p->modified = dostime_to_time(modified_date, modified_time, tz);
                 p->time_valid = TRUE;
@@ -281,7 +279,7 @@ static CentralDir *read_central_dirs(CentralDirEnd *cdir_end, char *cbuf, RefCha
         }
 
         p->cs = cs;
-        p->offset = read_int32(cbuf + offset + 42);
+        p->offset = ptr_read_uint32_le(cbuf + offset + 42);
 
         offset += CENTRAL_SIZE + filename_len + ext_len + comment_len;
     }
@@ -392,8 +390,8 @@ int get_local_header_size(Value reader, CentralDir *cdir)
         fs->throw_errorf(mod_zip, "ZipError", "Invalid zipfile format");
         return FALSE;
     }
-    filename_len = read_int16(cbuf + 26);
-    ext_len = read_int16(cbuf + 28);
+    filename_len = ptr_read_uint16_le(cbuf + 26);
+    ext_len = ptr_read_uint16_le(cbuf + 28);
     cdir->pos += LOCAL_SIZE + filename_len + ext_len;
 
     return TRUE;
@@ -473,25 +471,25 @@ int write_local_data(CentralDirEnd *cdir, Value writer, Ref *r)
     int offset = cdir->current_offset;
 
     memcpy(local, LOCAL_MAGIC, 4);
-    write_int16(local + 4, 20);         // 要求バージョン
-    write_int16(local + 6, cd->flags);  // 汎用フラグ
-    write_int16(local + 8, cd->method); // 圧縮メソッド
+    ptr_write_uint16_le(local + 4, 20);         // 要求バージョン
+    ptr_write_uint16_le(local + 6, cd->flags);  // 汎用フラグ
+    ptr_write_uint16_le(local + 8, cd->method); // 圧縮メソッド
     if (cd->time_valid) {
         int tm, dt;
         time_to_dostime(&tm, &dt, cd->modified, cdir->tz);
-        write_int16(local + 10, tm);
-        write_int16(local + 12, dt);
+        ptr_write_uint16_le(local + 10, tm);
+        ptr_write_uint16_le(local + 12, dt);
     } else {
         int dt = (1 << 5) | 1;
         int tm = 0;
-        write_int16(local + 10, tm);
-        write_int16(local + 12, dt);
+        ptr_write_uint16_le(local + 10, tm);
+        ptr_write_uint16_le(local + 12, dt);
     }
-    write_int32(local + 14, cd->crc32);
-    write_int32(local + 18, cd->size_compressed);
-    write_int32(local + 22, cd->size);
-    write_int16(local + 26, cd->filename.size);
-    write_int16(local + 28, 0);        // 拡張フィールド
+    ptr_write_uint32_le(local + 14, cd->crc32);
+    ptr_write_uint32_le(local + 18, cd->size_compressed);
+    ptr_write_uint32_le(local + 22, cd->size);
+    ptr_write_uint16_le(local + 26, cd->filename.size);
+    ptr_write_uint16_le(local + 28, 0);        // 拡張フィールド
 
     if (!write_bin_data(cdir, writer, local, LOCAL_SIZE)) {
         return FALSE;
@@ -525,9 +523,9 @@ static void make_extra_time(char *p, int64_t tm)
 {
     // Unix time
     memcpy(p, "UT", 2);
-    write_int16(p + 2, 5);
+    ptr_write_uint16_le(p + 2, 5);
     p[4] = 3;
-    write_int32(p + 5, tm / 1000LL);
+    ptr_write_uint32_le(p + 5, tm / 1000LL);
 
     // TODO NTFS time
 }
@@ -547,21 +545,21 @@ int write_central_dir(CentralDirEnd *cdir, Value writer)
         CentralDir *cd = &cdir->cdir[i];
 
         memcpy(central, "PK\x01\x02", 4);
-        write_int16(central + 4, 30);          // 作成されたバージョン
-        write_int16(central + 6, 20);          // 要求バージョン
-        write_int16(central + 8, cd->flags);   // 汎用フラグ
-        write_int16(central + 10, cd->method); // 圧縮メソッド
+        ptr_write_uint16_le(central + 4, 30);          // 作成されたバージョン
+        ptr_write_uint16_le(central + 6, 20);          // 要求バージョン
+        ptr_write_uint16_le(central + 8, cd->flags);   // 汎用フラグ
+        ptr_write_uint16_le(central + 10, cd->method); // 圧縮メソッド
 
         if (cd->time_valid) {
             int tm, dt;
             time_to_dostime(&dt, &tm, cd->modified, cdir->tz);
-            write_int16(central + 12, tm);
-            write_int16(central + 14, dt);
+            ptr_write_uint16_le(central + 12, tm);
+            ptr_write_uint16_le(central + 14, dt);
         } else {
             int dt = (1 << 5) | 1;
             int tm = 0;
-            write_int16(central + 12, tm);
-            write_int16(central + 14, dt);
+            ptr_write_uint16_le(central + 12, tm);
+            ptr_write_uint16_le(central + 14, dt);
         }
 
         if (cd->time_valid) {
@@ -569,16 +567,16 @@ int write_central_dir(CentralDirEnd *cdir, Value writer)
             extra_size = EXTRA_SIZE;
         }
 
-        write_int32(central + 16, cd->crc32);
-        write_int32(central + 20, cd->size_compressed);
-        write_int32(central + 24, cd->size);
-        write_int16(central + 28, cd->filename.size);
-        write_int16(central + 30, extra_size); // 拡張フィールドの長さ
-        write_int16(central + 32, 0);          // ファイルコメントの長さ
-        write_int16(central + 34, 0);          // ファイルが開始するディスク番号
-        write_int16(central + 36, 0);          // 内部ファイル属性
-        write_int32(central + 38, 0);          // 外部ファイル属性
-        write_int32(central + 42, cd->offset); // ローカルファイルヘッダの相対オフセット
+        ptr_write_uint32_le(central + 16, cd->crc32);
+        ptr_write_uint32_le(central + 20, cd->size_compressed);
+        ptr_write_uint32_le(central + 24, cd->size);
+        ptr_write_uint16_le(central + 28, cd->filename.size);
+        ptr_write_uint16_le(central + 30, extra_size); // 拡張フィールドの長さ
+        ptr_write_uint16_le(central + 32, 0);          // ファイルコメントの長さ
+        ptr_write_uint16_le(central + 34, 0);          // ファイルが開始するディスク番号
+        ptr_write_uint16_le(central + 36, 0);          // 内部ファイル属性
+        ptr_write_uint32_le(central + 38, 0);          // 外部ファイル属性
+        ptr_write_uint32_le(central + 42, cd->offset); // ローカルファイルヘッダの相対オフセット
 
         if (!write_bin_data(cdir, writer, central, CENTRAL_SIZE)) {
             return FALSE;
@@ -602,13 +600,13 @@ int write_end_of_cdir(CentralDirEnd *cdir, Value writer)
     char eocd[EOCD_SIZE];
 
     memcpy(eocd, "PK\x05\x06", 4);
-    write_int16(eocd + 4, 0);                // このディスクの数
-    write_int16(eocd + 6, 0);                // セントラルディレクトリが開始するディスク
-    write_int16(eocd + 8, cdir->cdir_size);  // このディスク上のセントラルディレクトリレコードの数
-    write_int16(eocd + 10, cdir->cdir_size); // セントラルディレクトリレコードの合計数
-    write_int32(eocd + 12, cdir->size_of_cdir);
-    write_int32(eocd + 16, cdir->offset_of_cdir);
-    write_int16(eocd + 20, 0);               // コメントの長さ
+    ptr_write_uint16_le(eocd + 4, 0);                // このディスクの数
+    ptr_write_uint16_le(eocd + 6, 0);                // セントラルディレクトリが開始するディスク
+    ptr_write_uint16_le(eocd + 8, cdir->cdir_size);  // このディスク上のセントラルディレクトリレコードの数
+    ptr_write_uint16_le(eocd + 10, cdir->cdir_size); // セントラルディレクトリレコードの合計数
+    ptr_write_uint32_le(eocd + 12, cdir->size_of_cdir);
+    ptr_write_uint32_le(eocd + 16, cdir->offset_of_cdir);
+    ptr_write_uint16_le(eocd + 20, 0);               // コメントの長さ
 
     if (!write_bin_data(cdir, writer, eocd, EOCD_SIZE)) {
         return FALSE;

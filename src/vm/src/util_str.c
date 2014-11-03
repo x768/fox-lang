@@ -424,8 +424,8 @@ void add_backslashes_sub(StrBuf *buf, const char *src_p, int src_size, int mode)
                     char c_buf[16];
                     int hi, lo;
                     code -= 0x10000;
-                    hi = code / 0x400 + 0xD800;
-                    lo = code % 0x400 + 0xDC00;
+                    hi = code / 0x400 + SURROGATE_U_BEGIN;
+                    lo = code % 0x400 + SURROGATE_L_BEGIN;
                     sprintf(c_buf, "\\u%04x\\u%04x", hi, lo);
                     StrBuf_add(buf, c_buf, 12);
                 }
@@ -620,11 +620,11 @@ int str_add_codepoint(char **pdst, int ch, const char *error_type)
     } else if (ch < 0x800) {
         *dst++ = 0xC0 | (ch >> 6);
         *dst++ = 0x80 | (ch & 0x3F);
-    } else if (ch < 0xD800) {
+    } else if (ch < SURROGATE_U_BEGIN) {
         *dst++ = 0xE0 | (ch >> 12);
         *dst++ = 0x80 | ((ch >> 6) & 0x3F);
         *dst++ = 0x80 | (ch & 0x3F);
-    } else if (ch < 0xE000) {
+    } else if (ch < SURROGATE_END) {
         if (error_type != NULL) {
             throw_errorf(fs->mod_lang, error_type, "Invalid codepoint (Surrogate) %U", ch);
         }
@@ -633,7 +633,7 @@ int str_add_codepoint(char **pdst, int ch, const char *error_type)
         *dst++ = 0xE0 | (ch >> 12);
         *dst++ = 0x80 | ((ch >> 6) & 0x3F);
         *dst++ = 0x80 | (ch & 0x3F);
-    } else if (ch < 0x110000) {
+    } else if (ch < CODEPOINT_END) {
         *dst++ = 0xF0 | (ch >> 18);
         *dst++ = 0x80 | ((ch >> 12) & 0x3F);
         *dst++ = 0x80 | ((ch >> 6) & 0x3F);

@@ -1,3 +1,0 @@
-=America/Montserrat
-8000000000000000 -14932 0 LMT
-fffffe5221ef4680 -14400 0 AST

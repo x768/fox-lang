@@ -665,7 +665,7 @@ static int array_marshal_read(Value *vret, Value *v, RefNode *node)
     uint32_t size;
     int i;
 
-    if (!read_int32(&size, Value_ref(d)->v[INDEX_MARSHALDUMPER_SRC])) {
+    if (!stream_read_uint32(&size, Value_ref(d)->v[INDEX_MARSHALDUMPER_SRC])) {
         return FALSE;
     }
     if (size > 0xffffff) {
@@ -701,7 +701,7 @@ static int array_marshal_write(Value *vret, Value *v, RefNode *node)
     int i;
 
     ra->lock_count++;
-    if (!write_int32(ra->size, Value_ref(d)->v[INDEX_MARSHALDUMPER_SRC])) {
+    if (!stream_write_uint32(ra->size, Value_ref(d)->v[INDEX_MARSHALDUMPER_SRC])) {
         goto ERROR_END;
     }
     for (i = 0; i < ra->size; i++) {
@@ -1185,20 +1185,21 @@ static int value_cmp_invoke(Value v1, Value v2, Value fn)
     } else {
         RefNode *v1_type = Value_type(v1);
 
-        if (v1_type == fs->cls_str) {
+        if (v1_type == fs->cls_str || v1_type == fs->cls_bytes) {
             RefNode *v2_type = Value_type(v2);
+            int cmp;
             if (v2_type != v1_type) {
-                throw_errorf(fs->mod_lang, "TypeError", "Str required but %n", v2_type);
+                throw_errorf(fs->mod_lang, "TypeError", "%n required but %n", v1_type, v2_type);
                 return VALUE_CMP_ERROR;
             }
-            return refstr_cmp(Value_vp(v1), Value_vp(v2));
-        } else if (v1_type == fs->cls_bytes) {
-            RefNode *v2_type = Value_type(v2);
-            if (v2_type != v1_type) {
-                throw_errorf(fs->mod_lang, "TypeError", "Bytes required but %n", v2_type);
-                return VALUE_CMP_ERROR;
+            cmp = refstr_cmp(Value_vp(v1), Value_vp(v2));
+            if (cmp < 0) {
+                return VALUE_CMP_LT;
+            } else if (cmp > 0) {
+                return VALUE_CMP_GT;
+            } else {
+                return VALUE_CMP_EQ;
             }
-            return refstr_cmp(Value_vp(v1), Value_vp(v2));
         }
 
         Value_push("vv", v1, v2);
@@ -1269,6 +1270,10 @@ static int msort_sub(Value *v, int low, int high, Value fn, Value *tmp)
         for (k = low; k < high; k++) {
             int comp = value_cmp_invoke(tmp[i], tmp[j], fn);
             if (comp == VALUE_CMP_ERROR) {
+                // エラーで巻き戻った時に配列の状態が中途半端にならないようにする
+                for (; k < high; k++) {
+                    v[k] = tmp[i++];
+                }
                 return FALSE;
             }
             if (comp == VALUE_CMP_LT) {
@@ -1322,19 +1327,17 @@ static int array_sort_self(Value *vret, Value *v, RefNode *node)
  */
 static int array_map_sub(Value *va, int size, Value fn);
 
-static int array_dispose_all(Value *v, int size)
+static void array_dispose_all(Value *v, int size)
 {
     int i;
-    int ret = TRUE;
     for (i = 0; i < size; i++) {
         Value_dec(v[i]);
     }
-    return ret;
 }
 /**
  * v[low] - v[high - 1]までの範囲をソート
  */
-static int msort_by_sub(Value *v, Value *by, int low, int high, Value *fn, Value *tmp, Value *by_tmp)
+static int msort_by_sub(Value *v, Value *by, int low, int high, Value *tmp, Value *by_tmp)
 {
     // 要素数が少ない場合は単純なソート
     if (high - low <= MSORT_MIN) {
@@ -1364,10 +1367,10 @@ static int msort_by_sub(Value *v, Value *by, int low, int high, Value *fn, Value
     {
         int mid = (low + high) / 2;
         int i, j, k;
-        if (!msort_by_sub(v, by, low, mid, fn, tmp, by_tmp)) {
+        if (!msort_by_sub(v, by, low, mid, tmp, by_tmp)) {
             return FALSE;
         }
-        if (!msort_by_sub(v, by, mid, high, fn, tmp, by_tmp)) {
+        if (!msort_by_sub(v, by, mid, high, tmp, by_tmp)) {
             return FALSE;
         }
         // 前半の要素をそのままtmpにコピー
@@ -1383,6 +1386,12 @@ static int msort_by_sub(Value *v, Value *by, int low, int high, Value *fn, Value
         for (k = low; k < high; k++) {
             int comp = value_cmp_invoke(by_tmp[i], by_tmp[j], VALUE_NULL);
             if (comp == VALUE_CMP_ERROR) {
+                // エラーで巻き戻った時に配列の状態が中途半端にならないようにする
+                for (; k < high; k++) {
+                    v[k] = tmp[i];
+                    by[k] = by_tmp[i];
+                    i++;
+                }
                 return FALSE;
             }
             if (comp == VALUE_CMP_LT) {
@@ -1401,10 +1410,10 @@ static int msort_by_sub(Value *v, Value *by, int low, int high, Value *fn, Value
 }
 static int array_sort_by_self(Value *vret, Value *v, RefNode *node)
 {
-    RefArray *ra = Value_vp(*v);
     Value *by = NULL;
     Value *tmp = NULL;
     Value *by_tmp = NULL;
+    RefArray *ra = Value_vp(*v);
 
     if (ra->lock_count > 0) {
         throw_error_select(THROW_CANNOT_MODIFY_ON_ITERATION);
@@ -1413,6 +1422,7 @@ static int array_sort_by_self(Value *vret, Value *v, RefNode *node)
     if (ra->size >= 2) {
         int i;
         int size = ra->size;
+
         by = malloc(size * sizeof(Value));
 
         if (size > MSORT_MIN) {
@@ -1427,16 +1437,13 @@ static int array_sort_by_self(Value *vret, Value *v, RefNode *node)
         if (!array_map_sub(by, size, v[1])) {
             goto ERROR_END;
         }
-        if (!msort_by_sub(ra->p, by, 0, ra->size, v + 1, tmp, by_tmp)) {
+        if (!msort_by_sub(ra->p, by, 0, ra->size, tmp, by_tmp)) {
             goto ERROR_END;
         }
 
         free(tmp);
         free(by_tmp);
-        if (!array_dispose_all(by, size)) {
-            free(by);
-            return FALSE;
-        }
+        array_dispose_all(by, size);
         free(by);
     }
     *vret = Value_cp(*v);
@@ -2073,7 +2080,6 @@ static int iterator_to_list(Value *vret, Value *v, RefNode *node)
         fg->stk_top--;
         *va = *fg->stk_top;
     }
-
     return TRUE;
 }
 static int iterator_to_set(Value *vret, Value *v, RefNode *node)
@@ -2215,6 +2221,42 @@ static int iterator_count_if(Value *vret, Value *v, RefNode *node)
         }
     }
     *vret = int32_Value(count);
+    return TRUE;
+}
+static int iterator_find_if(Value *vret, Value *v, RefNode *node)
+{
+    Value *v_fn = v + 1;
+
+    for (;;) {
+        Value_push("v", *v);
+        if (!call_member_func(fs->str_next, 0, TRUE)) {
+            if (Value_type(fg->error) == fs->cls_stopiter) {
+                // throw StopIteration
+                Value_dec(fg->error);
+                fg->error = VALUE_NULL;
+                break;
+            } else {
+                return FALSE;
+            }
+        }
+        fg->stk_top[1] = fg->stk_top[-1];
+        fg->stk_top[0] = *v_fn;
+        Value_inc(fg->stk_top[-1]);
+        Value_inc(*v_fn);
+        fg->stk_top += 2;
+        if (!call_function_obj(1)) {
+            return FALSE;
+        }
+        if (Value_bool(fg->stk_top[-1])) {
+            Value_pop();
+            fg->stk_top--;
+            *vret = *fg->stk_top;
+            return TRUE;
+        } else {
+            fg->stk_top--;
+            Value_pop();
+        }
+    }
     return TRUE;
 }
 static int iterator_skip(Value *vret, Value *v, RefNode *node)
@@ -2363,6 +2405,7 @@ static int iterator_sort(Value *vret, Value *v, RefNode *node)
     if (!call_member_func(intern("to_list", -1), 0, TRUE)) {
         return FALSE;
     }
+
     if (argc >= 1) {
         Value_push("v", v[1]);
     }
@@ -2525,6 +2568,8 @@ void define_lang_col_class(RefNode *m)
     define_native_func_a(n, iterator_count, 1, 1, NULL, NULL);
     n = define_identifier(m, cls, "count_if", NODE_FUNC_N, 0);
     define_native_func_a(n, iterator_count_if, 1, 1, NULL, fs->cls_fn);
+    n = define_identifier(m, cls, "find_if", NODE_FUNC_N, 0);
+    define_native_func_a(n, iterator_find_if, 1, 1, NULL, fs->cls_fn);
     n = define_identifier(m, cls, "skip", NODE_FUNC_N, 0);
     define_native_func_a(n, iterator_skip, 1, 1, NULL, fs->cls_int);
     n = define_identifier(m, cls, "limit", NODE_FUNC_N, 0);
@@ -2592,6 +2637,8 @@ void define_lang_col_class(RefNode *m)
     n = define_identifier(m, cls, "count", NODE_FUNC_N, 0);
     define_native_func_a(n, iterable_invoke, 1, 1, NULL, NULL);
     n = define_identifier(m, cls, "count_if", NODE_FUNC_N, 0);
+    define_native_func_a(n, iterable_invoke, 1, 1, NULL, fs->cls_fn);
+    n = define_identifier(m, cls, "find_if", NODE_FUNC_N, 0);
     define_native_func_a(n, iterable_invoke, 1, 1, NULL, fs->cls_fn);
     n = define_identifier(m, cls, "map", NODE_FUNC_N, 0);
     define_native_func_a(n, iterable_invoke, 1, 1, NULL, fs->cls_fn);

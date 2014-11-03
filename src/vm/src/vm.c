@@ -133,7 +133,13 @@ void init_so_func(void)
 
     fs->init_stream_ref = init_stream_ref;
     fs->stream_read_data = stream_read_data;
+    fs->stream_read_uint8 = stream_read_uint8;
+    fs->stream_read_uint16 = stream_read_uint16;
+    fs->stream_read_uint32 = stream_read_uint32;
     fs->stream_write_data = stream_write_data;
+    fs->stream_write_uint8 = stream_write_uint8;
+    fs->stream_write_uint16 = stream_write_uint16;
+    fs->stream_write_uint32 = stream_write_uint32;
     fs->stream_seek_sub = stream_seek;
     fs->stream_flush_sub = stream_flush_sub;
 
@@ -609,7 +615,9 @@ void fox_close()
     if (fs->cgi_mode) {
         send_headers();
     }
-    stream_flush_sub(fg->v_cio);
+    if (Value_isref(fg->v_cio)) {
+        stream_flush_sub(fg->v_cio);
+    }
     Mem_close(&fv->cmp_mem);
 }
 

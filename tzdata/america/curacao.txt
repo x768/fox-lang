@@ -1,4 +1,0 @@
-=America/Curacao
-8000000000000000 -16544 0 LMT
-fffffe56ade42d00 -16200 0 ANT
-ffffffdb455af940 -14400 0 AST

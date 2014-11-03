@@ -89,17 +89,6 @@ static int marshal_save(Value *vret, Value *v, RefNode *node)
     return TRUE;
 }
 
-int read_int32(uint32_t *val, Value r)
-{
-    int size = 4;
-    uint8_t buf[4];
-
-    if (!stream_read_data(r, NULL, (char*)buf, &size, FALSE, TRUE)) {
-        return FALSE;
-    }
-    *val = (buf[0] << 24) | (buf[1] << 16) | (buf[2] << 8) | buf[3];
-    return TRUE;
-}
 static char *read_str(Str *val, Value r)
 {
     uint8_t size;
@@ -172,19 +161,6 @@ static int validate_class_name(Str s)
     }
 
     return valid;
-}
-int write_int32(uint32_t val, Value w)
-{
-    uint8_t buf[4];
-    buf[0] = (val >> 24) & 0xFF;
-    buf[1] = (val >> 16) & 0xFF;
-    buf[2] = (val >> 8) & 0xFF;
-    buf[3] = val & 0xFF;
-
-    if (!stream_write_data(w, (char*)buf, 4)) {
-        return FALSE;
-    }
-    return TRUE;
 }
 static int write_str(RefStr *rs, Value w)
 {
