@@ -7,7 +7,7 @@
  * The MIT License
  * http://opensource.org/licenses/mit-license.php
  */
-import biff.ole_reader
+import spreadsheet.ole_reader
 import time
 import image
 
@@ -758,7 +758,7 @@ class ExcelReader
     var m_ole
     var m_default_format
 
-    new(src)
+    new(src:StreamIO)
     {
         m_standard_col_width = 0
         m_default_col_width = 0
@@ -773,15 +773,7 @@ class ExcelReader
         m_sheets = []
 
         m_default_format = _EXCEL_READER_DEF_NUM_FORMAT
-
-        let type = typeof(src)
-        if type == Str || type == File {
-            m_ole = OLERead(FileIO(src))
-        } elif type in StreamIO {
-            m_ole = OLERead(src)
-        } else {
-            throw TypeError("Str, File or StreamIO required but $type")
-        }
+        m_ole = OLERead(src)
         m_data = m_ole.get(/^(work)?book$/i)
         if !m_data {
             throw ExcelReaderError("Not a Excel book")

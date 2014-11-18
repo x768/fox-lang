@@ -237,7 +237,7 @@ static int gui_alert(Value *vret, Value *v, RefNode *node)
 
         type = fs->Value_type(fg->stk_top[-1]);
         if (type != fs->cls_str) {
-            fs->throw_errorf(fs->mod_lang, "TypeError", "Return value must be Str but %n", type);
+            fs->throw_error_select(THROW_RETURN_TYPE__NODE_NODE, fs->cls_str, type);
             return FALSE;
         }
         msg = Value_vp(fg->stk_top[-1]);
@@ -709,6 +709,7 @@ static int timer_new(Value *vret, Value *v, RefNode *node)
         return FALSE;
     }
     r->v[INDEX_TIMER_FN] = fs->Value_cp(v[2]);
+    native_timer_new(millisec, r);
 
     return TRUE;
 }

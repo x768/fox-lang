@@ -1,0 +1,19 @@
+import foxtk
+import time
+
+class MyForm : Form
+{
+    new() {
+        super.fixed(340, 32)
+        Timer(1000, this.update_time)
+		this.update_time(null)
+    }
+    def update_time(e) {
+        this.title = sprintf(Locale('best'), "%{0:XX xx}", Time.now())
+    }
+}
+
+let f = MyForm()
+f.visible = true
+f.wait()
+

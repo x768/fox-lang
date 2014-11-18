@@ -677,16 +677,16 @@ int is_string_only_ascii(const char *p, int size, const char *except)
  */
 int invalid_utf8_pos(const char *src_p, int size)
 {
-    const char *p = src_p;
-    const char *end;
+    const uint8_t *p = (const uint8_t*)src_p;
+    const uint8_t *end;
     int last = 0;
     if (size < 0) {
-        size = strlen(p);
+        size = strlen(src_p);
     }
     end = p + size;
 
     while (p < end) {
-        const char *cend;
+        const uint8_t *cend;
         int c = *p;
 
         if ((c & 0x80) == 0) {
@@ -695,56 +695,56 @@ int invalid_utf8_pos(const char *src_p, int size)
         } else if ((c & 0xE0) == 0xC0) {
             // 非最短型
             if ((c & 0xFF) < 0xC2) {
-                return p - src_p;
+                return p - (const uint8_t*)src_p;
             }
             last = 1;
         } else if ((c & 0xF0) == 0xE0) {
             // サロゲートのチェック
             cend = p + 3;
             if (cend <= end){
-                switch (c & 0xFF) {
+                switch (c) {
                 case 0xE0:
                     // 非最短型
-                    if ((p[1] & 0xFF) < 0xA0) {
-                        return p - src_p;
+                    if (p[1] < 0xA0) {
+                        return p - (const uint8_t*)src_p;
                     }
                     break;
                 case 0xED:
                     if ((p[1] << 8 | p[2]) >= 0xA080) {  // Surrogate開始(D800)
-                        return p - src_p;
+                        return p - (const uint8_t*)src_p;
                     }
                     break;
                 case 0xEE:
                     if ((p[1] << 8 | p[2]) < 0x8080) {   // Surrogate終了(E000)
-                        return p - src_p;
+                        return p - (const uint8_t*)src_p;
                     }
                     break;
                 }
             } else {
-                return p - src_p;
+                return p - (const uint8_t*)src_p;
             }
             last = 2;
         } else if ((c & 0xF8) == 0xF0) {
-            if ((c & 0xFF) == 0xF0) {
+            if (c == 0xF0) {
                 // 非最短型
-                if ((p[1] & 0xFF) < 0x90) {
-                    return p - src_p;
+                if (p[1] < 0x90) {
+                    return p - (const uint8_t*)src_p;
                 }
             }
             last = 3;
         } else {
-            return p - src_p;
+            return p - (const uint8_t*)src_p;
         }
 
         p++;
         cend = p + last;
         if (cend > end) {
-            return p - src_p;
+            return p - (const uint8_t*)src_p;
         }
 
         while (p < cend) {
             if ((*p & 0xC0) != 0x80) {
-                return p - src_p;
+                return p - (const uint8_t*)src_p;
             }
             p++;
         }

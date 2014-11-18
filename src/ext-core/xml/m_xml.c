@@ -578,7 +578,7 @@ static int node_tostr_xml(StrBuf *buf, Value dst, Value v, XMLOutputFormat *xof,
 {
     if (fs->Value_type(v) == cls_text) {
         Str s = fs->Value_str(v);
-        if (level >= 0 && !xof->keep_space) {
+        if (level >= 0 && !xof->pretty && !xof->keep_space) {
             s = Str_trim(s);
             if (s.size == 0) {
                 s.p = " ";
@@ -588,6 +588,24 @@ static int node_tostr_xml(StrBuf *buf, Value dst, Value v, XMLOutputFormat *xof,
         if (!text_convert_html(buf, s, FALSE, xof)) {
             return FALSE;
         }
+        if (dst != VALUE_NULL && !stream_write_data(dst, buf, xof)) {
+            return FALSE;
+        }
+    } else if (fs->Value_type(v) == cls_comment) {
+        Str s = fs->Value_str(v);
+        if (level >= 0 && !xof->pretty && !xof->keep_space) {
+            s = Str_trim(s);
+            if (s.size == 0) {
+                s.p = " ";
+                s.size = 1;
+            }
+        }
+        fs->StrBuf_add(buf, "<!--", -1);
+        // TODO &<>"の変換をしない
+        if (!text_convert_html(buf, s, FALSE, xof)) {
+            return FALSE;
+        }
+        fs->StrBuf_add(buf, "-->", -1);
         if (dst != VALUE_NULL && !stream_write_data(dst, buf, xof)) {
             return FALSE;
         }
@@ -829,6 +847,7 @@ static int xml_parse_format(XMLOutputFormat *xof, const char *fmt_p, int fmt_siz
             }
         }
     }
+    xof->keep_space = !xof->pretty;
     return TRUE;
 }
 static int xml_node_tostr(Value *vret, Value *v, RefNode *node)
@@ -846,6 +865,7 @@ static int xml_node_tostr(Value *vret, Value *v, RefNode *node)
         if (FUNC_INT(node)) {
             xof.html = TRUE;
         }
+        xof.keep_space = TRUE;
     }
 
     fs->StrBuf_init_refstr(&buf, 0);
@@ -1078,6 +1098,95 @@ static int xml_elem_set_index_key(Value *vret, Value *v, RefNode *node)
 
     return TRUE;
 }
+
+static int xml_attr_eq_sub(RefMap *r1, RefMap *r2)
+{
+    int i;
+    for (i = 0; i < r1->entry_num; i++) {
+        HashValueEntry *ve1 = r1->entry[i];
+        for (; ve1 != NULL; ve1 = ve1->next) {
+            HashValueEntry *ve2 = NULL;
+            fs->refmap_get(&ve2, r2, ve1->key);
+
+            if (ve2 == NULL) {
+                return FALSE;
+            }
+            if (!refstr_eq(Value_vp(ve1->val), Value_vp(ve2->val))) {
+                return FALSE;
+            }
+        }
+    }
+    return TRUE;
+}
+static int xml_node_eq_sub(Value *v1, int v1_size, Value *v2, int v2_size)
+{
+    int i;
+
+    if (v1_size != v2_size) {
+        return FALSE;
+    }
+    if (v1 == v2) {
+        return TRUE;
+    }
+
+    for (i = 0; i < v1_size; i++) {
+        RefNode *v1_type = fs->Value_type(v1[i]);
+        RefNode *v2_type = fs->Value_type(v2[i]);
+
+        if (v1_type != v2_type) {
+            return FALSE;
+        } else if (v1_type == cls_elem) {
+            Ref *r1 = Value_vp(v1[i]);
+            Ref *r2 = Value_vp(v2[i]);
+            if (r1 != r2) {
+                RefMap *rm1 = Value_vp(r1->v[INDEX_ELEM_ATTR]);
+                RefMap *rm2 = Value_vp(r2->v[INDEX_ELEM_ATTR]);
+                RefArray *ra1 = Value_vp(r1->v[INDEX_ELEM_CHILDREN]);
+                RefArray *ra2 = Value_vp(r2->v[INDEX_ELEM_CHILDREN]);
+                int rm1_count, rm2_count;
+
+                if (!refstr_eq(Value_vp(r1->v[INDEX_ELEM_NAME]), Value_vp(r2->v[INDEX_ELEM_NAME]))) {
+                    return FALSE;
+                }
+                if (rm1 != NULL) {
+                    rm1_count = rm1->count;
+                } else {
+                    rm1_count = 0;
+                }
+                if (rm2 != NULL) {
+                    rm2_count = rm2->count;
+                } else {
+                    rm2_count = 0;
+                }
+                if (rm1_count != rm2_count) {
+                    return FALSE;
+                }
+                if (rm1_count > 0) {
+                    if (!xml_attr_eq_sub(rm1, rm2)) {
+                        return FALSE;
+                    }
+                }
+                if (!xml_node_eq_sub(ra1->p, ra1->size, ra2->p, ra2->size)) {
+                    return FALSE;
+                }
+            }
+        } else {
+            if (!refstr_eq(Value_vp(v1[i]), Value_vp(v2[i]))) {
+                return FALSE;
+            }
+        }
+    }
+    return TRUE;
+}
+static int xml_elem_eq(Value *vret, Value *v, RefNode *node)
+{
+    if (xml_node_eq_sub(v, 1, v + 1, 1)) {
+        *vret = VALUE_TRUE;
+    } else {
+        *vret = VALUE_FALSE;
+    }
+    return TRUE;
+}
 /**
  * 子要素を追加
  */
@@ -1289,11 +1398,13 @@ static int xml_elem_attr(Value *vret, Value *v, RefNode *node)
  */
 static int node_text_xml(StrBuf *buf, Value v)
 {
-    if (fs->Value_type(v) == cls_text) {
+    RefNode *type = fs->Value_type(v);
+
+    if (type == cls_text) {
         if (!fs->StrBuf_add_r(buf, Value_vp(v))) {
             return FALSE;
         }
-    } else {
+    } else if (type == cls_elem) {
         Ref *r = Value_ref(v);
         RefArray *ra = Value_vp(r->v[INDEX_ELEM_CHILDREN]);
         int i;
@@ -1354,6 +1465,24 @@ static int xml_text_text(Value *vret, Value *v, RefNode *node)
 {
     const RefStr *rs = Value_vp(*v);
     *vret = fs->cstr_Value(fs->cls_str, rs->c, rs->size);
+    return TRUE;
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////
+
+static int xml_comment_new(Value *vret, Value *v, RefNode *node)
+{
+    const RefStr *rs = Value_vp(v[1]);
+    int i;
+
+    // -->が含まれていたらエラー
+    for (i = 0; i < rs->size - 2; i++) {
+        if (memcmp(rs->c + i, "-->", 3) == 0) {
+            fs->throw_errorf(fs->mod_lang, "ValueError", "Parameter contains '-->'");
+            return FALSE;
+        }
+    }
+    *vret = fs->cstr_Value(cls_comment, rs->c, rs->size);
     return TRUE;
 }
 
@@ -1448,6 +1577,18 @@ static int xml_node_list_index_key(Value *vret, Value *v, RefNode *node)
 
     return TRUE;
 }
+static int xml_node_list_eq(Value *vret, Value *v, RefNode *node)
+{
+    RefArray *ra1 = Value_vp(*v);
+    RefArray *ra2 = Value_vp(v[1]);
+
+    if (xml_node_eq_sub(ra1->p, ra1->size, ra2->p, ra2->size)) {
+        *vret = VALUE_TRUE;
+    } else {
+        *vret = VALUE_FALSE;
+    }
+    return TRUE;
+}
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -1525,7 +1666,7 @@ static int xml_document_print_header(StrBuf *buf, Ref *r, XMLOutputFormat *xof)
         if (cs == NULL) {
             cs = fs->cs_utf8;
         }
-        if (!fs->StrBuf_add(buf, "<?xml charset=\"", -1)) {
+        if (!fs->StrBuf_add(buf, "<?xml version=\"1.0\" encoding=\"", -1)) {
             return FALSE;
         }
         if (!fs->StrBuf_add_r(buf, cs->iana)) {
@@ -1595,6 +1736,7 @@ static int xml_document_tostr(Value *vret, Value *v, RefNode *node)
         if (FUNC_INT(node)) {
             xof.html = TRUE;
         }
+        xof.keep_space = TRUE;
     }
 
     fs->StrBuf_init_refstr(&buf, 0);
@@ -1709,6 +1851,7 @@ static void define_class(RefNode *m)
     cls_nodelist = fs->define_identifier(m, m, "XMLNodeList", NODE_CLASS, 0);
     cls_elem = fs->define_identifier(m, m, "XMLElem", NODE_CLASS, 0);
     cls_text = fs->define_identifier(m, m, "XMLText", NODE_CLASS, NODEOPT_STRCLASS);
+    cls_comment = fs->define_identifier(m, m, "XMLComment", NODE_CLASS, NODEOPT_STRCLASS);
 
     // XMLDocument
     cls = cls_document;
@@ -1769,7 +1912,7 @@ static void define_class(RefNode *m)
     n = fs->define_identifier_p(m, cls, fs->str_missing_set, NODE_FUNC_N, 0);
     fs->define_native_func_a(n, xml_elem_set_index_key, 2, 2, (void*) TRUE, NULL, fs->cls_str);
     n = fs->define_identifier_p(m, cls, fs->symbol_stock[T_EQ], NODE_FUNC_N, 0);
-    fs->define_native_func_a(n, get_function_ptr(fs->cls_list, fs->symbol_stock[T_EQ]), 1, 1, NULL, cls_nodelist);
+    fs->define_native_func_a(n, xml_node_list_eq, 1, 1, NULL, cls_nodelist);
     n = fs->define_identifier_p(m, cls, fs->symbol_stock[T_LET_B], NODE_FUNC_N, 0);
     fs->define_native_func_a(n, get_function_ptr(fs->cls_list, fs->symbol_stock[T_LET_B]), 2, 2, NULL, fs->cls_int, cls_node);
     n = fs->define_identifier_p(m, cls, fs->str_iterator, NODE_FUNC_N, NODEOPT_PROPERTY);
@@ -1813,6 +1956,8 @@ static void define_class(RefNode *m)
     fs->define_native_func_a(n, xml_elem_index_key, 1, 1, (void*) FALSE, NULL);
     n = fs->define_identifier_p(m, cls, fs->str_missing_set, NODE_FUNC_N, 0);
     fs->define_native_func_a(n, xml_elem_set_index_key, 2, 2, (void*) FALSE, NULL, fs->cls_str);
+    n = fs->define_identifier_p(m, cls, fs->symbol_stock[T_EQ], NODE_FUNC_N, 0);
+    fs->define_native_func_a(n, xml_elem_eq, 1, 1, NULL, cls_elem);
     n = fs->define_identifier(m, cls, "push", NODE_FUNC_N, 0);
     fs->define_native_func_a(n, xml_elem_push, 1, 1, (void*)FALSE, NULL);
     n = fs->define_identifier(m, cls, "unshift", NODE_FUNC_N, 0);
@@ -1834,6 +1979,13 @@ static void define_class(RefNode *m)
     fs->define_native_func_a(n, xml_text_new, 1, 1, NULL, fs->cls_str);
     n = fs->define_identifier(m, cls, "as_text", NODE_FUNC_N, NODEOPT_PROPERTY);
     fs->define_native_func_a(n, xml_text_text, 0, 0, NULL);
+    fs->extends_method(cls, cls_node);
+
+
+    // XMLComment
+    cls = cls_comment;
+    n = fs->define_identifier_p(m, cls, fs->str_new, NODE_NEW_N, 0);
+    fs->define_native_func_a(n, xml_comment_new, 1, 1, NULL, fs->cls_str);
     fs->extends_method(cls, cls_node);
 
 

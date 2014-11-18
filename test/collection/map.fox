@@ -15,8 +15,8 @@ assert_true 'foo' in {'foo':1, 'bar':2}
 assert_false 'piyo' in {'foo':1, 'bar':2}
 
 for p in {foo=1} {
-	assert_equal p.key, 'foo'
-	assert_equal p.value, 1
+    assert_equal p.key, 'foo'
+    assert_equal p.value, 1
 }
 
 let map = {}

@@ -518,7 +518,7 @@ int StrBuf_add_v(StrBuf *s, Value v)
             ret_type = Value_type(fg->stk_top[-1]);
             // 戻り値チェック
             if (ret_type != fs->cls_str) {
-                throw_errorf(fs->mod_lang, "TypeError", "Return value must be Str but %n", ret_type);
+                throw_error_select(THROW_RETURN_TYPE__NODE_NODE, fs->cls_str, ret_type);
                 return FALSE;
             }
             if (!StrBuf_add_r(s, Value_vp(vret))) {

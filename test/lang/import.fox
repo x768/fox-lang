@@ -1,0 +1,13 @@
+#FOX_IMPORT+=lib
+import util.assert
+import test
+import test => test_alias
+
+
+assert_equal CONST, 3
+assert_equal add(1, 2), 3
+assert_equal Add(1, 2).add(), 3
+
+assert_equal test_alias.CONST, 3
+assert_equal test_alias.add(1, 2), 3
+assert_equal test_alias.Add(1, 2).add(), 3

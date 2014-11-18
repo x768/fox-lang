@@ -1,0 +1,15 @@
+def CONST = 1 + 2
+
+def add(a, b) => a + b
+
+class Add
+{
+    var m_a
+    var m_b
+
+    new(a, b) {
+        m_a = a
+        m_b = b
+    }
+    def add() => m_a + m_b
+}

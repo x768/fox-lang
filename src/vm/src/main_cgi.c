@@ -386,18 +386,6 @@ static void show_configure(void)
     show_configure_path(fv->import_path, "FOX_IMPORT</th><td>");
     show_configure_path(fv->resource_path, "FOX_RESOURCE</th><td>");
 
-    stream_write_data(fg->v_cio, "FOX_STDIO_CHARSET</th><td>", -1);
-    if (defs[ENVSET_STDIO_CHARSET]) {
-        RefStr *rs = fs->cs_stdio->name;
-        stream_write_data(fg->v_cio, rs->c, rs->size);
-    } else {
-        RefStr *rs = fs->cs_stdio->name;
-        stream_write_data(fg->v_cio, "<span class=\"def\">", -1);
-        stream_write_data(fg->v_cio, rs->c, rs->size);
-        stream_write_data(fg->v_cio, "</span>", -1);
-    }
-    stream_write_data(fg->v_cio, tlend, -1);
-
     stream_write_data(fg->v_cio, "FOX_TZ</th><td>", -1);
     if (default_timezone) {
         if (tz != NULL) {
@@ -474,17 +462,19 @@ void print_foxinfo()
     const char *header = 
         "Content-Type: text/html; charset=UTF-8\n"
         "\n"
-        "<!doctype html>\n"
+        "<!DOCTYPE html>\n"
         "<html>\n<head>\n"
         "<meta charset=\"UTF-8\">\n"
         "<style type=\"text/css\">\n"
-        "body{color:black;background:#fcfcfc;}\n"
+        "body{color:black;background:white;}\n"
         "h1,h2{text-align:center;}\n"
         "h1{font-size:120%;}\n"
         "table{font-size:90%;width:600px;margin:auto;}\n"
-        "th,td{border:1px solid;border-color:white gray gray white;padding:2px 4px;}\n"
-        "th{width:50%;background:#ccf;}\n"
-        "td{width:50%;background:#ddd;}\n"
+        "th,td{border:none;padding:3px 5px;width:50%;}\n"
+        "tr:nth-child(odd) th{background:#ccf;}\n"
+        "tr:nth-child(even) th{background:#ddf;}\n"
+        "tr:nth-child(odd) td{background:#ddd;}\n"
+        "tr:nth-child(even) td{background:#eee;}\n"
         ".err{color:red;}\n"
         ".def{color:#666;}\n"
         "</style>\n"
@@ -524,27 +514,19 @@ void print_last_error()
             StrBuf_init(&sb2, 0);
 
             if (is_content_type_html()) {
-                fox_error_dump(&sb, -1, fs->cs_utf8, FALSE);
+                fox_error_dump(&sb, -1, FALSE);
                 convert_html_entity(&sb2, sb.p, sb.size, TRUE);
             } else {
-                fox_error_dump(&sb2, -1, fs->cs_utf8, FALSE);
+                fox_error_dump(&sb2, -1, FALSE);
             }
-
             send_headers();
-            if (fs->cs_stdio == fs->cs_utf8) {
-                stream_write_data(fg->v_cio, sb2.p, sb2.size);
-            } else {
-                sb.size = 0;
-                convert_str_to_bin_sub(&sb, sb2.p, sb2.size, fs->cs_stdio, "?");
-                stream_write_data(fg->v_cio, sb.p, sb.size);
-            }
-
+            stream_write_data(fg->v_cio, sb2.p, sb2.size);
             StrBuf_close(&sb2);
             StrBuf_close(&sb);
         } else if (strcmp(fv->err_dst, "stderr") == 0) {
-            fox_error_dump(NULL, STDERR_FILENO, fs->cs_stdio, TRUE);
+            fox_error_dump(NULL, STDERR_FILENO, TRUE);
         } else {
-            fox_error_dump(NULL, -1, fs->cs_utf8, TRUE);
+            fox_error_dump(NULL, -1, TRUE);
         }
     }
 }
@@ -583,7 +565,6 @@ int main_fox(int argc, const char **argv)
     fs->max_alloc = 32 * 1024 * 1024; // 32MB
     fs->max_stack = 32768;
     fv->err_dst = "stdout";
-    fs->cs_stdio = get_console_charset();
 
     fox_init_compile(FALSE);
 

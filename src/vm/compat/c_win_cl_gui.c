@@ -128,15 +128,6 @@ void get_local_timezone_name(char *buf, int max)
     windows_tz_to_tzid(buf, max, Str_new(cbuf, -1));
 }
 
-RefCharset *get_console_charset(void)
-{
-    RefCharset *cs = get_charset_from_cp(GetConsoleCP());
-    if (cs != NULL) {
-        return cs;
-    }
-    return fs->cs_utf8;
-}
-
 //////////////////////////////////////////////////////////////////////////////////////////////
 
 static const char **get_cmd_args(int *pargc)

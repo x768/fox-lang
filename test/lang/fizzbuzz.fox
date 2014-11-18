@@ -4,15 +4,15 @@ import util.assert
 let fb = []
 
 for i in 1...15 {
-	if i % 15 == 0 {
-		fb.push "FizzBuzz"
-	} elif i % 3 == 0 {
-		fb.push "Fizz"
-	} elif i % 5 == 0 {
-		fb.push "Buzz"
-	} else {
-		fb.push "$i"
-	}
+    if i % 15 == 0 {
+        fb.push "FizzBuzz"
+    } elif i % 3 == 0 {
+        fb.push "Fizz"
+    } elif i % 5 == 0 {
+        fb.push "Buzz"
+    } else {
+        fb.push "$i"
+    }
 }
 
 assert_equal fb.join(","), "1,2,Fizz,4,Buzz,Fizz,7,8,Fizz,Buzz,11,Fizz,13,14,FizzBuzz"

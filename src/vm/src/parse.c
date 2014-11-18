@@ -3360,18 +3360,6 @@ static int load_max_alloc(void)
     }
     return FALSE;
 }
-static int load_stdio_charset(void)
-{
-    const char *name = Hash_get(&fs->envs, "FOX_STDIO_CHARSET", -1);
-    if (name != NULL) {
-        RefCharset *cs = get_charset_from_name(name, -1);
-        if (cs != NULL) {
-            fs->cs_stdio = cs;
-            return TRUE;
-        }
-    }
-    return FALSE;
-}
 static int load_error_dst(void)
 {
     const char *edst = Hash_get(&fs->envs, "FOX_ERROR", -1);
@@ -3391,9 +3379,6 @@ void load_env_settings(int *defs)
     }
     if (load_max_alloc() && defs != NULL) {
         defs[ENVSET_MAX_ALLOC] = TRUE;
-    }
-    if (load_stdio_charset() && defs != NULL) {
-        defs[ENVSET_STDIO_CHARSET] = TRUE;
     }
     if (load_error_dst() && defs != NULL) {
         defs[ENVSET_ERROR] = TRUE;

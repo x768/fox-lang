@@ -301,17 +301,6 @@ static void show_configure(void)
     show_configure_path(fv->import_path, "\nFOX_IMPORT: ");
     show_configure_path(fv->resource_path, "\nFOX_RESOURCE: ");
 
-    stream_write_data(fg->v_cio, "\nFOX_STDIO_CHARSET: ", -1);
-    if (defs[ENVSET_STDIO_CHARSET]) {
-        RefStr *rs = fs->cs_stdio->name;
-        stream_write_data(fg->v_cio, rs->c, rs->size);
-    } else {
-        RefStr *rs = fs->cs_stdio->name;
-        stream_write_data(fg->v_cio, "(", 1);
-        stream_write_data(fg->v_cio, rs->c, rs->size);
-        stream_write_data(fg->v_cio, ")", 1);
-    }
-
     stream_write_data(fg->v_cio, "\nFOX_TZ: ", -1);
     if (default_timezone) {
         if (tz != NULL) {
@@ -459,14 +448,14 @@ void print_last_error()
         if (strcmp(fv->err_dst, "stdout") == 0) {
             StrBuf sb;
             StrBuf_init(&sb, 0);
-            fox_error_dump(&sb, -1, fs->cs_stdio, FALSE);
+            fox_error_dump(&sb, -1, FALSE);
             stream_write_data(fg->v_cio, sb.p, sb.size);
             StrBuf_close(&sb);
         } else if (strcmp(fv->err_dst, "stderr") == 0) {
             stream_flush_sub(fg->v_cio);
-            fox_error_dump(NULL, STDERR_FILENO, fs->cs_stdio, FALSE);
+            fox_error_dump(NULL, STDERR_FILENO, FALSE);
         } else {
-            fox_error_dump(NULL, -1, fs->cs_utf8, TRUE);
+            fox_error_dump(NULL, -1, TRUE);
         }
     }
 }
@@ -502,7 +491,6 @@ int main_fox(int argc, const char **argv)
         fv->cur_dir = rs;
         free(pwd);
     }
-    fs->cs_stdio = get_console_charset();
 
     if (!parse_args(&ai, argc, argv)) {
         goto ERROR_END;

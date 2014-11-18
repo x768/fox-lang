@@ -598,7 +598,7 @@ NORMAL:
         case OP_NEW_REF: {
             Value *v = fg->stk_base;
             RefHeader *rh = Value_ref_header(*v);
-            if (rh->type == fs->cls_fn) {
+            if (rh->type == fs->cls_fn || rh->type == fs->cls_class) {
                 *v = vp_Value(ref_new(Value_vp(p->op[0])));
             }
             pc += 2;

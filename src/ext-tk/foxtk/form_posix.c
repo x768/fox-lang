@@ -313,7 +313,7 @@ static gint timeout_callback(gpointer data)
     int ret_code;
     int result = TRUE;
 
-    fs->Value_push("v", &sender_r->v[INDEX_TIMER_FN]);
+    fs->Value_push("v", sender_r->v[INDEX_TIMER_FN]);
     *fg->stk_top++ = event_object_new(sender_r);
     ret_code = fs->call_function_obj(1);
 

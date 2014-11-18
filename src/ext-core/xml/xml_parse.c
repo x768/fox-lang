@@ -743,20 +743,8 @@ static void XMLTok_parse_text(XMLTok *tk)
 
         if (ch == '<') {
             if (tk->p[1] == '!' && tk->p[2] == '-' && tk->p[3] == '-') {
-                // コメントを飛ばす
-                tk->p += 4;
-                while (*tk->p != '\0') {
-                    if (tk->p[0] == '-' && tk->p[1] == '-' && tk->p[2] == '>') {
-                        tk->p += 3;
-                        break;
-                    }
-                    tk->p++;
-                }
-                if (*tk->p == '\0' && !tk->loose) {
-                    // コメントが閉じていない
-                    tk->type = TK_ERROR;
-                    return;
-                }
+                // コメントが出現したら中断
+                break;
             } else if (tk->xml) {
                 // <![CDATA[が出現したら ]]>まで飛ばす
                 if (memcmp(tk->p + 1, "![CDATA[", 8) == 0) {
@@ -839,7 +827,6 @@ static void XMLTok_tolower(XMLTok *tk)
  */
 static void XMLTok_next(XMLTok *tk)
 {
-START:
     switch (*tk->p) {
     case '\0':
         tk->type = TK_EOS;
@@ -850,15 +837,23 @@ START:
             if (tk->p[2] == '-' && tk->p[3] == '-') {
                 // コメント
                 tk->p += 4;
+                tk->val.p = tk->p;
                 while (tk->p[0] != '\0') {
                     if (tk->p[0] == '-' && tk->p[1] == '-' && tk->p[2] == '>') {
+                        tk->val.size = tk->p - tk->val.p;
                         tk->p += 3;
                         break;
                     }
                     tk->p++;
                 }
-                goto START;
-            } else if (memcmp(tk->p + 1, "![CDATA[", 8) == 0) {
+                if (*tk->p == '\0' && !tk->loose) {
+                    // コメントが閉じていない
+                    tk->type = TK_ERROR;
+                    return;
+                }
+                tk->type = TK_COMMENT;
+                return;
+            } else if (memcmp(tk->p + 2, "[CDATA[", 7) == 0) {
                 XMLTok_parse_text(tk);
             } else {
                 tk->p += 2;
@@ -890,10 +885,15 @@ START:
                 tk->p++;
             }
             if (*tk->p != '>') {
+                while (*tk->p != '\0' && *tk->p != '>') {
+                    tk->p++;
+                }
                 tk->type = TK_ERROR;
                 return;
             }
-            tk->p++;
+            if (*tk->p != '\0') {
+                tk->p++;
+            }
             tk->type = TK_TAG_CLOSE;
             break;
         default:
@@ -1109,6 +1109,13 @@ static void parse_pcdata(RefArray *ra, Str tag_name, XMLTok *tk)
             }
             XMLTok_next(tk);
             break;
+        case TK_COMMENT:
+            // 無視
+            XMLTok_next(tk);
+            break;
+        default:
+            XMLTok_next(tk);
+            return;
         }
     BREAK_TAG:
         ;
@@ -1364,8 +1371,14 @@ static int parse_html_sub(Value *v, RefArray *v_ra, HTMLDoc *html, XMLTok *tk, S
         XMLTok_next(tk);
         break;
     }
+    case TK_COMMENT: {
+        Value *vp = fs->refarray_push(v_ra);
+        *vp = fs->cstr_Value(cls_comment, tk->val.p, tk->val.size);
+        XMLTok_next(tk);
+        break;
+    }
     default:
-        // エラーは無視
+        // 不明なトークンは無視
         XMLTok_next(tk);
         break;
     }
@@ -1483,7 +1496,8 @@ int parse_xml_body(Value *v, XMLTok *tk, int first)
                 for (;;) {
                     switch (tk->type) {
                     case TK_TAG_START:
-                    case TK_TEXT: {
+                    case TK_TEXT:
+                    case TK_COMMENT: {
                         Value *ve = fs->refarray_push(ra);
                         if (!parse_xml_body(ve, tk, FALSE)) {
                             return FALSE;
@@ -1552,6 +1566,15 @@ int parse_xml_body(Value *v, XMLTok *tk, int first)
             return FALSE;
         } else {
             *v = fs->cstr_Value(cls_text, tk->val.p, tk->val.size);
+            XMLTok_next(tk);
+        }
+        break;
+    case TK_COMMENT:
+        if (first) {
+            fs->throw_errorf(mod_xml, "XMLParseError", "Unexpected token at line %d", tk->line);
+            return FALSE;
+        } else {
+            *v = fs->cstr_Value(cls_comment, tk->val.p, tk->val.size);
             XMLTok_next(tk);
         }
         break;

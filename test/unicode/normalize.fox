@@ -4,56 +4,56 @@ import text.unicode
 
 def hex_to_str(hex:Str)
 {
-	return hex.replace(/(\w+) ?/, m => Str.chr(Int.parse(m[1], 16)))
+    return hex.replace(/(\w+) ?/, m => Str.chr(Int.parse(m[1], 16)))
 }
 def str_to_hex(src:Str)
 {
-	return src.map(c => c.to_str('04X')).join(' ')
+    return src.map(c => c.to_str('04X')).join(' ')
 }
 
 def assert(line_num:Int, a:List, n1:Int, n2:Int, mode:Str)
 {
-	let s1 = a[n1 - 1]
-	let s2 = normalize(a[n2 - 1], mode)
+    let s1 = a[n1 - 1]
+    let s2 = normalize(a[n2 - 1], mode)
 
-	if s1 != s2 {
-		throw AssertError("line(${line_num:5d}): c$n1 == toNF$mode(c$n2): ${str_to_hex(s1)} expected but ${str_to_hex(s2)}")
-	}
+    if s1 != s2 {
+        throw AssertError("line(${line_num:5d}): c$n1 == toNF$mode(c$n2): ${str_to_hex(s1)} expected but ${str_to_hex(s2)}")
+    }
 }
 
 var line_num = 0
 
 for line in fopen("NormalizationTest.txt") {
-	line_num++
+    line_num++
 
-	let a = line.replace(/#.*$/, "").split(";")
-	if a.size < 5 {
-		continue
-	}
-	a.map_self(hex_to_str)
+    let a = line.replace(/#.*$/, "").split(";")
+    if a.size < 5 {
+        continue
+    }
+    a.map_self(hex_to_str)
 
-	assert line_num, a, 3, 1, "D"
-	assert line_num, a, 3, 2, "D"
-	assert line_num, a, 3, 3, "D"
-	assert line_num, a, 5, 4, "D"
-	assert line_num, a, 5, 5, "D"
+    assert line_num, a, 3, 1, "D"
+    assert line_num, a, 3, 2, "D"
+    assert line_num, a, 3, 3, "D"
+    assert line_num, a, 5, 4, "D"
+    assert line_num, a, 5, 5, "D"
 
-	assert line_num, a, 2, 1, "C"
-	assert line_num, a, 2, 2, "C"
-	assert line_num, a, 2, 3, "C"
-	assert line_num, a, 4, 4, "C"
-	assert line_num, a, 4, 5, "C"
+    assert line_num, a, 2, 1, "C"
+    assert line_num, a, 2, 2, "C"
+    assert line_num, a, 2, 3, "C"
+    assert line_num, a, 4, 4, "C"
+    assert line_num, a, 4, 5, "C"
 
-	assert line_num, a, 5, 1, "KD"
-	assert line_num, a, 5, 2, "KD"
-	assert line_num, a, 5, 3, "KD"
-	assert line_num, a, 5, 4, "KD"
-	assert line_num, a, 5, 5, "KD"
+    assert line_num, a, 5, 1, "KD"
+    assert line_num, a, 5, 2, "KD"
+    assert line_num, a, 5, 3, "KD"
+    assert line_num, a, 5, 4, "KD"
+    assert line_num, a, 5, 5, "KD"
 
-	assert line_num, a, 4, 1, "KC"
-	assert line_num, a, 4, 2, "KC"
-	assert line_num, a, 4, 3, "KC"
-	assert line_num, a, 4, 4, "KC"
-	assert line_num, a, 4, 5, "KC"
+    assert line_num, a, 4, 1, "KC"
+    assert line_num, a, 4, 2, "KC"
+    assert line_num, a, 4, 3, "KC"
+    assert line_num, a, 4, 4, "KC"
+    assert line_num, a, 4, 5, "KC"
 }
 

@@ -1,0 +1,9 @@
+import image
+
+let img = Image.load("dice.png")
+
+let img256 = img.quantize("rgba")
+img256.save "dice-256.png"
+
+let img_dither = img.quantize("rgba", true)
+img_dither.save "dice-dither.png"

@@ -595,7 +595,7 @@ class QRCode
 
         var data_string = source
         if typeof(source) == Str {
-            data_string = data_string.to_bytes("US-ASCII")
+            data_string = data_string.to_bytes(Charset("US-ASCII"))
         }
         if data_string.size == 0 {
             throw ValueError("data_string.size is 0")

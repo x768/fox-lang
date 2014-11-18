@@ -34,6 +34,10 @@ enum {
 typedef struct {
     RefHeader rh;
 
+#ifdef WIN32
+    int console_read;
+    int console_write;
+#endif
     FileHandle fd_read;
     FileHandle fd_write;
 } RefFileHandle;

@@ -1,3 +1,4 @@
+application/cdfv2-corrupt:\xD0\xCF\x11\xE0\xA1\xB1\x1A\xE1
 application/font-woff:wOFF
 application/pdf:%PDF-1.
 application/vnd.ms-cab-compressed:MSCF\0\0\0\0

@@ -1,0 +1,22 @@
+import foxtk
+
+class MyForm : Form
+{
+    new() {
+		this.title = "Drag & Drop files into this window"
+		this.dropped.push this.on_drop
+		this.closed.push this.on_close
+    }
+
+    def on_drop(e) {
+		alert(e.files.join("\n"), "test", this)
+    }
+	def on_close(e) {
+		return confirm("Exit anyway?", "test", this)
+	}
+}
+
+let f = MyForm()
+f.visible = true
+f.wait()
+

@@ -55,6 +55,9 @@ void *dlopen_fox(const char *fname, int dummy);
 void *dlsym_fox(void *handle, const char *name);
 const char *dlerror_fox(void);
 
+int win_read_console(FileHandle fd, char *dst, int dst_size);
+void win_write_console(FileHandle fd, const char *str, int size);
+
 #else
 
 #define opendir_fox opendir
@@ -84,7 +87,6 @@ void get_local_timezone_name(char *buf, int max);
 int64_t get_now_time(void);
 void get_random(void *buf, int len);
 
-RefCharset *get_console_charset(void);
 void init_stdio(void);
 char *get_current_directory(void);
 int set_current_directory(const char *path);

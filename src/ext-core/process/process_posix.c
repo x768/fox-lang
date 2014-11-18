@@ -84,17 +84,6 @@ int process_new_sub(RefProcessHandle *ph, int create_pipe, const char *path, cha
 
     return TRUE;
 }
-void put_log(const char *msg, int msg_size)
-{
-    FileHandle fd = open_fox("/home/frog/Public/logs/log.txt", O_CREAT|O_WRONLY|O_APPEND, DEFAULT_PERMISSION);
-    if (fd != -1) {
-        if (msg_size < 0) {
-            msg_size = strlen(msg);
-        }
-        write_fox(fd, msg, msg_size);
-        close_fox(fd);
-    }
-}
 int process_wait_sub(RefProcessHandle *ph)
 {
     pid_t pid = ph->pid;

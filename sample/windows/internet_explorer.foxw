@@ -1,0 +1,15 @@
+import windows
+import foxtk
+import time
+
+
+let ie = OLEObject("InternetExplorer.Application")
+ie.Visible = true
+
+ie.Navigate2 "https://github.com/x768"
+
+while ie.Busy || ie.ReadyState != 4 {
+    sleep 250
+}
+
+alert ie.document.title

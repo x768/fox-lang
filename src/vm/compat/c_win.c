@@ -326,3 +326,67 @@ static void init_env(void)
     FreeEnvironmentStringsW(wenv_top);
 }
 
+/*
+ * UTF-8で返す
+ */
+int win_read_console(FileHandle fd, char *dst, int dst_size)
+{
+    enum {
+        INPUT_MAX_CHARS = 2048,
+    };
+    static int is_eof = FALSE;
+    static StrBuf buf;
+
+    if (buf.size == 0 && !is_eof) {
+        if (buf.p == NULL) {
+            StrBuf_init(&buf, INPUT_MAX_CHARS * 3);
+            buf.size = 0;
+        }
+    }
+
+    if (buf.size == 0) {
+        wchar_t *wbuf = malloc(INPUT_MAX_CHARS * sizeof(wchar_t));
+        DWORD rd;
+        if (ReadConsoleW((HANDLE)fd, wbuf, INPUT_MAX_CHARS, &rd, NULL) != 0) {
+            int len = WideCharToMultiByte(CP_UTF8, 0, wbuf, rd, NULL, 0, NULL, NULL);
+            StrBuf_alloc(&buf, len);
+            WideCharToMultiByte(CP_UTF8, 0, wbuf, rd, buf.p, len, NULL, NULL);
+        } else {
+            is_eof = TRUE;
+            buf.size = 0;
+        }
+        free(wbuf);
+    }
+
+    if (is_eof || buf.size == 0) {
+        return -1;
+    }
+    // 残っているバッファを返す
+    if (buf.size > dst_size) {
+        memcpy(dst, buf.p, dst_size);
+        memmove(buf.p, buf.p + dst_size, buf.size - dst_size);
+        buf.size -= dst_size;
+        return dst_size;
+    } else {
+        int written = buf.size;
+        memcpy(dst, buf.p, buf.size);
+        buf.size = 0;
+        return written;
+    }
+}
+
+/*
+ * str:  UTF-8文字列
+ * size: 長さ or -1
+ */
+void win_write_console(FileHandle fd, const char *str, int size)
+{
+    DWORD written;
+    wchar_t *wstr;
+    if (size < 0) {
+        size = strlen(str);
+    }
+    wstr = cstr_to_utf16(str, size);
+    WriteConsoleW((HANDLE)fd, wstr, wcslen(wstr), &written, NULL);
+    free(wstr);
+}

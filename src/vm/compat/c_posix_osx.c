@@ -101,12 +101,6 @@ void native_sleep(int ms)
     nanosleep(&tv, NULL);
 }
 
-// 手抜き
-RefCharset *get_console_charset()
-{
-    return fs->cs_utf8;
-}
-
 char *get_current_directory(void)
 {
     return getcwd(NULL, 0);

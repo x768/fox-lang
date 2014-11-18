@@ -2839,17 +2839,19 @@ static void v_ctextio_init(void)
 
     fg->v_ctextio = vp_Value(ref);
     ref->v[INDEX_TEXTIO_STREAM] = Value_cp(fg->v_cio);
+    ref->v[INDEX_TEXTIO_TEXTIO] = vp_Value(fv->ref_textio_utf8);
+}
+static int stdout_gets(Value *vret, Value *v, RefNode *node)
+{
+    int trim = FUNC_INT(node);
 
-    if (fs->cs_stdio == fs->cs_utf8) {
-        ref->v[INDEX_TEXTIO_TEXTIO] = vp_Value(fv->ref_textio_utf8);
-    } else {
-        RefTextIO *tio = buf_new(NULL, sizeof(RefTextIO));
-        ref->v[INDEX_TEXTIO_TEXTIO] = vp_Value(tio);
-        tio->cs = fs->cs_stdio;
-        tio->in.ic = (void*)-1;
-        tio->out.ic = (void*)-1;
-        tio->trans = TRUE;
+    if (fg->v_ctextio == VALUE_NULL) {
+        v_ctextio_init();
     }
+    if (!textio_gets_sub(vret, Value_vp(fg->v_ctextio), trim)) {
+        return FALSE;
+    }
+    return TRUE;
 }
 static int stdout_print(Value *vret, Value *v, RefNode *node)
 {
@@ -2905,6 +2907,12 @@ static void define_io_func(RefNode *m)
     RefNode *n;
 
     // 標準出力系
+    n = define_identifier(m, m, "gets", NODE_FUNC_N, 0);
+    define_native_func_a(n, stdout_gets, 0, 0, (void*)FALSE, NULL);
+
+    n = define_identifier(m, m, "getln", NODE_FUNC_N, 0);
+    define_native_func_a(n, stdout_gets, 0, 0, (void*)TRUE, NULL);
+
     n = define_identifier(m, m, "print", NODE_FUNC_N, 0);
     define_native_func_a(n, stdout_print, 0, -1, (void*)FALSE, NULL);
 

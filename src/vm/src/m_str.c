@@ -584,7 +584,7 @@ static int sequence_replace_sub(StrBuf *buf, RefNode *v_type)
         }
         Value_pop();
     } else {
-        throw_errorf(fs->mod_lang, "TypeError", "Return value must be %n but %n", v_type, ret_type);
+        throw_error_select(THROW_RETURN_TYPE__NODE_NODE, v_type, ret_type);
         return FALSE;
     }
     return TRUE;

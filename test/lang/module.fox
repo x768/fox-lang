@@ -1,0 +1,8 @@
+#FOX_IMPORT+=lib
+import util.assert
+
+
+let m = Module('test')
+assert_equal m.CONST, 3
+assert_equal m.add(1, 2), 3
+assert_equal m.Add(1, 2).add(), 3

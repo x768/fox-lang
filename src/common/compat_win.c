@@ -4,6 +4,62 @@
 #include <ctype.h>
 
 
+/*
+int utf8_to_utf16(wchar_t *dst_p, const char *src, int len)
+{
+    const wchar_t *dst = dst_p;
+    const unsigned char *p = (const unsigned char*)ptr;
+    const unsigned char *end;
+
+    if (len < 0) {
+        len = strlen(src) + 1;
+    }
+    end = p + len;
+
+    while (p < end) {
+        int c = *p;
+        int code;
+
+        if ((c & 0x80) == 0) {
+            code = c & 0x7F;
+            p += 1;
+        } else if ((c & 0xE0) == 0xC0) {
+            code = ((c & 0x1F) << 6) | (p[1] & 0x3F);
+            p += 2;
+        } else if ((c & 0xF0) == 0xE0) {
+            code = ((c & 0x0F) << 12) | ((p[1] & 0x3F) << 6) | (p[2] & 0x3F);
+            p += 3;
+        } else if ((c & 0xF8) == 0xF0) {
+            code = ((c & 0x07) << 18) | ((p[1] & 0x3F) << 12)  | ((p[2] & 0x3F) << 6) | (p[3] & 0x3F);
+            p += 4;
+        } else {
+            p++;
+            while (p < end && (*p & 0xC0) == 0x80) {
+                p++;
+            }
+            code = 0xFFFD;
+        }
+
+        if (dst_p != NULL) {
+            if (code >= 0x10000) {
+                code -= 0x10000;
+                *dst++ = code / 0x400 + SURROGATE_U_BEGIN;
+                *dst++ = code % 0x400 + SURROGATE_L_BEGIN;
+            } else {
+                *dst++ = code;
+            }
+        } else {
+            if (code >= 0x10000) {
+                dst += 2;
+            } else {
+                dst++;
+            }
+        }
+    }
+    return dst - dst_p;
+}
+*/
+
 char *utf16to8(const wchar_t *src)
 {
     int len = WideCharToMultiByte(CP_UTF8, 0, src, -1, NULL, 0, NULL, NULL);

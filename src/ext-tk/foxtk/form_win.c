@@ -211,7 +211,10 @@ static LRESULT CALLBACK WndProcBase(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
         break;
     }
     }
-    return CallWindowProc(Value_ptr(r->v[INDEX_WBASE_CALLBACK]), hWnd, msg, wParam, lParam);
+    {
+        WNDPROC proc = Value_handle(r->v[INDEX_WBASE_CALLBACK]);
+        return CallWindowProc(proc, hWnd, msg, wParam, lParam);
+    }
 }
 
 /**
@@ -255,7 +258,7 @@ void create_form_window(Value *v, WndHandle parent, int *size)
     fs->Value_inc(*v);
     root_window_count++;
     SetWindowLongPtr(window, GWLP_USERDATA, (LONG_PTR)r);
-    r->v[INDEX_WBASE_CALLBACK] = ptr_Value((void*)GetWindowLongPtr(window, GWLP_WNDPROC));
+    r->v[INDEX_WBASE_CALLBACK] = handle_Value((void*)GetWindowLongPtr(window, GWLP_WNDPROC));
     connect_widget_events(window);
 
     if (size != NULL) {

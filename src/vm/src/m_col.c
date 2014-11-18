@@ -215,11 +215,14 @@ static int col_hash_sub(uint32_t *pret, Value v, Hash *hash, Mem *mem)
             he->p = (void*)1;
         }
 
+        r->lock_count++;
         for (i = 0; i < r->size; i++) {
             if (!col_hash_sub(pret, r->p[i], hash, mem)) {
+                r->lock_count--;
                 return TRUE;
             }
         }
+        r->lock_count--;
         he->p = NULL;
     } else if (type == fs->cls_map || type == fs->cls_set) {
         RefMap *r = Value_vp(v);
@@ -233,18 +236,21 @@ static int col_hash_sub(uint32_t *pret, Value v, Hash *hash, Mem *mem)
             he->p = (void*)1;
         }
 
+        r->lock_count++;
         for (i = 0; i < r->entry_num; i++) {
             HashValueEntry *ve = r->entry[i];
             for (; ve != NULL; ve = ve->next) {
-
                 if (!col_hash_sub(pret, ve->key, hash, mem)) {
-                    return TRUE;
+                    r->lock_count--;
+                    return FALSE;
                 }
                 if (!col_hash_sub(pret, ve->val, hash, mem)) {
-                    return TRUE;
+                    r->lock_count--;
+                    return FALSE;
                 }
             }
         }
+        r->lock_count--;
         he->p = NULL;
     } else {
         int32_t ret;
@@ -310,15 +316,22 @@ static int col_eq_sub(int *ret, Value v1, Value v2, Hash *hash1, Hash *hash2, Me
         he1->p = (void*)1;
         he2->p = (void*)1;
 
-        // 途中で長さを変えられた場合でも最低限落ちないようにする
-        for (i = 0; i < r1->size && i < r2->size; i++) {
+        r1->lock_count++;
+        r2->lock_count++;
+        for (i = 0; i < r1->size; i++) {
             if (!col_eq_sub(ret, r1->p[i], r2->p[i], hash1, hash2, mem)) {
+                r1->lock_count--;
+                r2->lock_count--;
                 return FALSE;
             }
             if (!*ret) {
+                r1->lock_count--;
+                r2->lock_count--;
                 return TRUE;
             }
         }
+        r1->lock_count--;
+        r2->lock_count--;
 
         he1->p = NULL;
         he2->p = NULL;
@@ -327,7 +340,7 @@ static int col_eq_sub(int *ret, Value v1, Value v2, Hash *hash1, Hash *hash2, Me
         RefMap *r2 = Value_vp(v2);
         HashEntry *he1 = Hash_get_add_entry(hash1, mem, (RefStr*)r1);
         HashEntry *he2 = Hash_get_add_entry(hash2, mem, (RefStr*)r2);
-        int idx;
+        int i;
 
         // 循環参照チェック
         if (he1->p != NULL || he2->p != NULL) {
@@ -347,35 +360,37 @@ static int col_eq_sub(int *ret, Value v1, Value v2, Hash *hash1, Hash *hash2, Me
         he1->p = (void*)1;
         he2->p = (void*)1;
 
-        for (idx = 0; idx < r1->entry_num; idx++) {
-            int i;
-            for (i = 0; ; i++) {
-                int j = i;
-                HashValueEntry *ve1 = r1->entry[idx];
+        r1->lock_count++;
+        r2->lock_count++;
+        for (i = 0; i < r1->entry_num; i++) {
+            HashValueEntry *ve1 = r1->entry[i];
+            for (; ve1 != NULL; ve1 = ve1->next) {
                 HashValueEntry *ve2;
-                while (j > 0 && ve1 != NULL) {
-                    ve1 = ve1->next;
-                    j--;
-                }
-                if (ve1 == NULL) {
-                    break;
-                }
-
                 if (!refmap_get(&ve2, r2, ve1->key)) {
+                    r1->lock_count--;
+                    r2->lock_count--;
                     return FALSE;
                 }
                 if (ve2 == NULL) {
                     *ret = FALSE;
+                    r1->lock_count--;
+                    r2->lock_count--;
                     return TRUE;
                 }
                 if (!col_eq_sub(ret, ve1->val, ve2->val, hash1, hash2, mem)) {
+                    r1->lock_count--;
+                    r2->lock_count--;
                     return FALSE;
                 }
                 if (!*ret) {
+                    r1->lock_count--;
+                    r2->lock_count--;
                     return TRUE;
                 }
             }
         }
+        r1->lock_count--;
+        r2->lock_count--;
 
         he1->p = NULL;
         he2->p = NULL;
@@ -1522,18 +1537,16 @@ static int array_map_self(Value *vret, Value *v, RefNode *node)
 static int array_select_self(Value *vret, Value *v, RefNode *node)
 {
     RefArray *ra = Value_vp(*v);
-    Value *fn = v + 1;
+    Value fn = v[1];
     int i, j = 0;
 
     if (ra->lock_count > 0) {
         throw_error_select(THROW_CANNOT_MODIFY_ON_ITERATION);
         return FALSE;
     }
-    // 配列自身が変更される可能性がある
-    for (i = 0; i < ra->size; i++) {
-        Value *va = ra->p;
 
-        Value_push("vv", fn, va[i]);
+    for (i = 0; i < ra->size; i++) {
+        Value_push("vv", fn, ra->p[i]);
         if (!call_function_obj(1)) {
             return FALSE;
         }
@@ -1545,13 +1558,13 @@ static int array_select_self(Value *vret, Value *v, RefNode *node)
             Value_dec(*fg->stk_top);
 
             if (j < i) {
-                va[j] = va[i];
-                va[i] = VALUE_NULL;
+                ra->p[j] = ra->p[i];
+                ra->p[i] = VALUE_NULL;
             }
             j++;
         } else {
-            Value_dec(va[i]);
-            va[i] = VALUE_NULL;
+            Value_dec(ra->p[i]);
+            ra->p[i] = VALUE_NULL;
         }
     }
     ra->size = j;

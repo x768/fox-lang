@@ -82,6 +82,11 @@ void throw_error_select(int err_type, ...)
         err_name = "TypeError";
         fmt = "%n or %n required but %n (argument #%d)";
         break;
+    case THROW_RETURN_TYPE__NODE_NODE:
+        err_m = fs->mod_lang;
+        err_name = "TypeError";
+        fmt = "Return type %n required but %n";
+        break;
     case THROW_INVALID_UTF8:
         err_m = fs->mod_lang;
         err_name = "CharsetError";

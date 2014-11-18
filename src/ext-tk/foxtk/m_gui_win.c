@@ -102,8 +102,12 @@ HBITMAP duplicate_bitmap(HBITMAP hSrcBmp)
 
 void *Value_handle(Value v)
 {
-    RefHandle *rh = Value_vp(v);
-    return (void*)rh->handle;
+    if (Value_isref(v)) {
+        RefHandle *rh = Value_vp(v);
+        return (void*)rh->handle;
+    } else {
+        return NULL;
+    }
 }
 Value handle_Value(void *handle)
 {

@@ -65,6 +65,7 @@ enum {
     THROW_MAX_ALLOC_OVER__INT,
     THROW_ARGMENT_TYPE__NODE_NODE_INT,
     THROW_ARGMENT_TYPE2__NODE_NODE_NODE_INT,
+    THROW_RETURN_TYPE__NODE_NODE,
     THROW_INVALID_UTF8,
     THROW_LOOP_REFERENCE,
     THROW_CANNOT_OPEN_FILE__STR,
@@ -415,7 +416,6 @@ struct FoxStatic
     RefNode *mod_mime;
     RefNode *mod_locale;
     RefCharset *cs_utf8;
-    RefCharset *cs_stdio;
     RefLocale *loc_neutral;
     RefTimeZone *tz_utc;
 
@@ -622,7 +622,7 @@ struct FoxGlobal
 ////////////////////////////////////////////////////////////////////////////////
 
 #define FOX_VERSION_MAJOR    0
-#define FOX_VERSION_MINOR    8
+#define FOX_VERSION_MINOR    9
 #define FOX_VERSION_REVISION 0
 
 

@@ -78,11 +78,11 @@ void print_last_error()
         if (strcmp(fv->err_dst, "alert") == 0) {
             StrBuf sb;
             StrBuf_init(&sb, 0);
-            fox_error_dump(&sb, -1, fs->cs_utf8, FALSE);
+            fox_error_dump(&sb, -1, FALSE);
             show_error_message(sb.p, sb.size, FALSE);
             StrBuf_close(&sb);
         } else {
-            fox_error_dump(NULL, -1, fs->cs_utf8, TRUE);
+            fox_error_dump(NULL, -1, TRUE);
         }
     }
 }
@@ -101,7 +101,6 @@ int main_fox(int argc, const char **argv)
     fs->max_alloc = 32 * 1024 * 1024; // 32MB
     fs->max_stack = 32768;
     fv->err_dst = "alert";
-    fs->cs_stdio = fs->cs_utf8;
 
     if (!parse_args(&ai, argc, argv)) {
         goto ERROR_END;

@@ -1179,7 +1179,7 @@ static int mimeheader_write(Value *vret, Value *v, RefNode *node)
                 stream_write_data(v1, val->c, val->size);
             } else {
                 buf.size = 0;
-                convert_str_to_bin_sub(&buf, val->c, val->size, fs->cs_stdio, "?");
+                convert_str_to_bin_sub(&buf, val->c, val->size, cs, "?");
                 stream_write_data(v1, buf.p, buf.size);
             }
             stream_write_data(v1, "\n", 1);

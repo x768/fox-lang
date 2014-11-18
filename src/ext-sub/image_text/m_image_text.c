@@ -443,6 +443,7 @@ static int ft_draw_text(Value *vret, Value *v, RefNode *node)
     FT_Face *a_face = NULL;
 
     int i;
+    int ret = FALSE;
     long cx = FLOAT_TO_26_6(Value_float2(v[2]));
     long cy = FLOAT_TO_26_6(Value_float2(v[3]));
 
@@ -515,19 +516,14 @@ static int ft_draw_text(Value *vret, Value *v, RefNode *node)
             goto ERROR_END;
         }
     }
-
-    StrBuf_close(&indexes);
-    StrBuf_close(&offsets);
-    free(a_face);
-    free(src.palette);
-    return TRUE;
+    ret = TRUE;
 
 ERROR_END:
     StrBuf_close(&indexes);
     StrBuf_close(&offsets);
     free(a_face);
     free(src.palette);
-    return FALSE;
+    return ret;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -30,7 +30,7 @@ void cgi_init_responce()
 
     key = cstr_Value(fs->cls_str, "Content-Type", -1);
     ve = refmap_add(rm, key, TRUE, FALSE);
-    ve->val = printf_Value("text/plain; charset=%r", fs->cs_stdio->iana);
+    ve->val = printf_Value("text/plain; charset=UTF-8");
 }
 
 int is_content_type_html()
@@ -131,16 +131,11 @@ void send_headers()
             if (et != NULL) {
                 RefStr *val = Value_vp(et->val);
                 StrBuf_add(&buf, "Content-Type: ", -1);
-                if (fs->cs_stdio == fs->cs_utf8) {
-                    StrBuf_add(&buf, val->c, val->size);
-                } else {
-                    convert_str_to_bin_sub(&buf, val->c, val->size, fs->cs_stdio, "?");
-                }
+                StrBuf_add(&buf, val->c, val->size);
+                StrBuf_add_c(&buf, '\n');
             } else {
-                StrBuf_add(&buf, "Content-Type: text/plain; charset=", -1);
-                StrBuf_add_r(&buf, fs->cs_stdio->iana);
+                StrBuf_add(&buf, "Content-Type: text/plain; charset=UTF-8\n", -1);
             }
-            StrBuf_add_c(&buf, '\n');
         }
 
         for (i = 0; i < rm->entry_num; i++) {
@@ -152,11 +147,7 @@ void send_headers()
 
                     StrBuf_add(&buf, key->c, key->size);
                     StrBuf_add(&buf, ": ", 2);
-                    if (fs->cs_stdio == fs->cs_utf8) {
-                        StrBuf_add(&buf, val->c, val->size);
-                    } else {
-                        convert_str_to_bin_sub(&buf, val->c, val->size, fs->cs_stdio, "?");
-                    }
+                    StrBuf_add(&buf, val->c, val->size);
                     StrBuf_add_c(&buf, '\n');
                 }
             }
@@ -509,7 +500,7 @@ static void map_false_to_null(RefMap *rm)
     }
 }
 
-static int cgi_stdin_param(Value keys)
+static int cgi_stdin_param(Value keys, RefCharset *cs)
 {
     int result = TRUE;
     RefMap *map_post;
@@ -544,7 +535,7 @@ static int cgi_stdin_param(Value keys)
         if (!parse_header_sub(&boundary, "boundary", -1, ctype_p, -1)) {
             return TRUE;
         }
-        if (!mimerandomreader_sub(map_post, fg->v_cio, boundary, fs->cs_stdio, "Content-Disposition", -1, "name", -1, TRUE)) {
+        if (!mimerandomreader_sub(map_post, fg->v_cio, boundary, cs, "Content-Disposition", -1, "name", -1, TRUE)) {
             return FALSE;
         }
         map_false_to_null(map_post);
@@ -555,7 +546,7 @@ static int cgi_stdin_param(Value keys)
         if (stream_read_data(fg->v_cio, &buf, NULL, &size, FALSE, FALSE)) {
             StrBuf_add_c(&buf, '\0');
             buf.size--;
-            result = param_string_to_hash(map_post, buf.p, keys, fs->cs_stdio);
+            result = param_string_to_hash(map_post, buf.p, keys, cs);
             map_false_to_null(map_post);
         } else {
             result = FALSE;
@@ -731,8 +722,9 @@ static int cgi_get_param(Value *vret, Value *v, RefNode *node)
     if (fs->cgi_mode) {
         const char *src = Hash_get(&fs->envs, "QUERY_STRING", -1);
         RefMap *rm = refmap_new(32);
+        RefCharset *cs = (fg->stk_top > v + 2 ? Value_vp(v[2]) : fs->cs_utf8);
         *vret = vp_Value(rm);
-        return param_string_to_hash(rm, src, v[1], fs->cs_stdio);
+        return param_string_to_hash(rm, src, v[1], cs);
     } else {
         for_cgi_mode_error();
         return FALSE;
@@ -741,7 +733,8 @@ static int cgi_get_param(Value *vret, Value *v, RefNode *node)
 static int cgi_post_param(Value *vret, Value *v, RefNode *node)
 {
     if (fs->cgi_mode) {
-        if (!cgi_stdin_param(v[1])) {
+        RefCharset *cs = (fg->stk_top > v + 2 ? Value_vp(v[2]) : fs->cs_utf8);
+        if (!cgi_stdin_param(v[1], cs)) {
             return FALSE;
         }
         *vret = Value_cp(ref_map_post);
@@ -815,10 +808,10 @@ static void define_lang_cgi_func(RefNode *m)
     define_native_func_a(n, cgi_session_id, 0, 0, NULL);
 
     n = define_identifier(m, m, "get_param", NODE_FUNC_N, 0);
-    define_native_func_a(n, cgi_get_param, 1, 1, NULL, fs->cls_map);
+    define_native_func_a(n, cgi_get_param, 1, 2, NULL, fs->cls_map, fs->cls_charset);
 
     n = define_identifier(m, m, "post_param", NODE_FUNC_N, 0);
-    define_native_func_a(n, cgi_post_param, 1, 1, NULL, fs->cls_map);
+    define_native_func_a(n, cgi_post_param, 1, 2, NULL, fs->cls_map, fs->cls_charset);
 
     n = define_identifier(m, m, "cookie_param", NODE_FUNC_N, 0);
     define_native_func_a(n, cgi_cookie_param, 1, 1, NULL, fs->cls_map);

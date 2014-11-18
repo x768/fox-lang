@@ -395,12 +395,6 @@ static int charset_iana(Value *vret, Value *v, RefNode *node)
     return TRUE;
 }
 
-static int charset_get_stdio(Value *vret, Value *v, RefNode *node)
-{
-    *vret = Value_cp(vp_Value(fs->cs_stdio));
-    return TRUE;
-}
-
 //////////////////////////////////////////////////////////////////////////////////////////////////////
 
 static void RefStr_copy(char *dst, RefStr *src, int max)
@@ -628,9 +622,6 @@ void define_charset_class(RefNode *m)
 
     n = define_identifier(m, cls, "UTF8", NODE_CONST, 0);
     n->u.k.val = vp_Value(fs->cs_utf8);
-
-    n = define_identifier(m, cls, "STDIO", NODE_CONST_U_N, 0);
-    define_native_func_a(n, charset_get_stdio, 0, 0, NULL);
 
     extends_method(cls, fs->cls_obj);
 

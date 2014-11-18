@@ -392,7 +392,7 @@ static void define_func(RefNode *m)
 
 #ifdef WIN32
     n = fs->define_identifier_p(m, m, fs->str_dispose, NODE_FUNC_N, 0);
-    fs->define_native_func_a(n, net_dispose, 1, 1, (void*) TRUE, NULL, NULL, fs->cls_str);
+    fs->define_native_func_a(n, net_dispose, 0, 0, NULL);
 #endif
 }
 static void define_class(RefNode *m)

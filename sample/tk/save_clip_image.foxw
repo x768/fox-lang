@@ -1,0 +1,10 @@
+import foxtk
+import image
+
+if let img = clip_get(Image) {
+    if let f = save_file_dialog("save clipboard image", ["PNG:*.png", "GIF:*.gif", "JPEG:*.jpg", "All files:*"]) {
+        img.save f
+    }
+} else {
+    alert "Clipboard has no image"
+}

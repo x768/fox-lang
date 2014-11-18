@@ -56,7 +56,6 @@ enum {
 enum {
     ENVSET_IMPORT,
     ENVSET_RESOURCE,
-    ENVSET_STDIO_CHARSET,
     ENVSET_TZ,
     ENVSET_LANG,
     ENVSET_ERROR,
@@ -365,7 +364,7 @@ void init_fox_vm(void);
 void init_fox_stack(void);
 void fox_init_compile(int dynamic);
 int fox_link(void);
-void fox_error_dump(StrBuf *sb, FileHandle fh, const RefCharset *cs, int log_style);
+void fox_error_dump(StrBuf *sb, FileHandle fh, int log_style);
 void fox_close(void);
 
 

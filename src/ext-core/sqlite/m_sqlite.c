@@ -404,15 +404,13 @@ static int sqlite_callback_return(Value v, sqlite3_context *ctx)
 
 static void sqlite_callback_func(sqlite3_context *ctx, int argc, sqlite3_value **argv)
 {
-    int ret_code;
     Value *fn = (Value*)sqlite3_user_data(ctx);
 
     fs->Value_push("v", *fn);
     // 引数の設定
     sqlite_callback_args(argc, argv);
-    ret_code = fs->call_function_obj(argc);
 
-    if (!ret_code) {
+    if (!fs->call_function_obj(argc)) {
         sqlite3_result_error_code(ctx, SQLITE_ERROR_USER);
         return;
     }

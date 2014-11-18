@@ -26,6 +26,7 @@ enum {
     TK_CMD_START,     // <?xml
     TK_CMD_END,       // ?>
     TK_DOCTYPE,       // <!hoge
+    TK_COMMENT,       // <!--COMMENT-->
 
     TK_ATTR_NAME,     // key
     TK_STRING,        // "value"
@@ -67,6 +68,7 @@ extern RefNode *cls_nodelist;
 extern RefNode *cls_node;
 extern RefNode *cls_elem;
 extern RefNode *cls_text;
+extern RefNode *cls_comment;
 
 #ifdef DEFINE_GLOBALS
 #undef extern

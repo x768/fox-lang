@@ -1,7 +1,25 @@
 #include "fox_vm.h"
 #include <windows.h>
 #include "c_win.c"
-#include "c_win_cl_cgi.c"
+
+
+void init_stdio()
+{
+    RefFileHandle *fh;
+    Ref *r = ref_new(fv->cls_fileio);
+    fg->v_cio = vp_Value(r);
+
+    init_stream_ref(r, STREAM_READ|STREAM_WRITE);
+
+    STDIN_FILENO = (FileHandle)GetStdHandle(STD_INPUT_HANDLE);
+    STDOUT_FILENO = (FileHandle)GetStdHandle(STD_OUTPUT_HANDLE);
+    STDERR_FILENO = (FileHandle)GetStdHandle(STD_ERROR_HANDLE);
+
+    fh = buf_new(NULL, sizeof(RefFileHandle));
+    r->v[INDEX_FILEIO_HANDLE] = vp_Value(fh);
+    fh->fd_read = STDIN_FILENO;
+    fh->fd_write = STDOUT_FILENO;
+}
 
 /**
  * OSで設定されている地域と言語を取得
@@ -13,10 +31,6 @@ const char *get_default_locale(void)
 void get_local_timezone_name(char *buf, int max)
 {
     strcpy(buf, "Etc/UTC");
-}
-RefCharset *get_console_charset()
-{
-    return fs->cs_utf8;
 }
 
 // UTF-8 -> ISO-8859-1

@@ -55,7 +55,7 @@ static char *make_cmd_string(char **argv)
     fs->StrBuf_init(&sb, 0);
 
     for (; *argv != NULL; argv++) {
-        Str s = Str_new(*argv, -1);
+        const char *arg = *argv;
         int quot = FALSE;
 
         if (first) {
@@ -65,8 +65,8 @@ static char *make_cmd_string(char **argv)
         }
         {
             int i;
-            for (i = 0; i < s.size; i++) {
-                if (s.p[i] == '"' || s.p[i] == ' ') {
+            for (i = 0; arg[i] != '\0'; i++) {
+                if (arg[i] == '"' || arg[i] == ' ') {
                     quot = TRUE;
                     break;
                 }
@@ -76,7 +76,7 @@ static char *make_cmd_string(char **argv)
         if (quot) {
             fs->StrBuf_add_c(&sb, '"');
         }
-        fs->StrBuf_add(&sb, s.p, s.size);
+        fs->StrBuf_add(&sb, arg, -1);
         if (quot) {
             fs->StrBuf_add_c(&sb, '"');
         }
@@ -128,14 +128,6 @@ int process_new_sub(RefProcessHandle *ph, int create_pipe, const char *path, cha
         ph->p_cin = (intptr_t)pipe_cin;
         ph->p_cout = (intptr_t)pipe_cout;
         ph->p_cerr = (intptr_t)pipe_cerr;
-/*
-        fs->Value_setint(&r->v[INDEX_P_IN], fs->cls_int, (intptr_t)pipe_out);  // 子プロセスがstdoutなので、親側は入力
-        fs->Value_setint(&r->v[INDEX_P_OUT], fs->cls_int, (intptr_t)pipe_in);  // 上の逆
-        fs->Value_setint(&r->v[INDEX_P_ERR], fs->cls_int, (intptr_t)pipe_err);
-        fs->Value_setint(&r->v[INDEX_P_CIN], fs->cls_int, (intptr_t)pipe_cin);
-        fs->Value_setint(&r->v[INDEX_P_COUT], fs->cls_int, (intptr_t)pipe_cout);
-        fs->Value_setint(&r->v[INDEX_P_CERR], fs->cls_int, (intptr_t)pipe_cerr);
-*/
     }
 
     return TRUE;

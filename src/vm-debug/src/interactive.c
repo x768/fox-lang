@@ -78,7 +78,7 @@ static void print_error(void)
 {
     StrBuf sb;
     StrBuf_init(&sb, 0);
-    fox_error_dump(&sb, -1, fs->cs_stdio, FALSE);
+    fox_error_dump(&sb, -1, FALSE);
     stream_write_data(fg->v_cio, sb.p, sb.size);
     StrBuf_close(&sb);
 

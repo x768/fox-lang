@@ -1,3 +1,4 @@
+application/cdfv2-corrupt:application/msword	application/vnd.ms-excel	application/vnd.ms-powerpoint
 application/javascript:application/json
 application/ogg:video/ogg	audio/ogg
 application/xml:application/atom+xml	application/rss+xml	application/xhtml+xml	image/svg+xml

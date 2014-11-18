@@ -16,17 +16,23 @@ enum {
     FILEPATH_SUFFIX_BYTES,
 };
 enum {
-    DIRITER_FILE,
-    DIRITER_DIR,
-    DIRITER_TYPE,
-    DIRITER_GLOB,
-    DIRITER_NUM,
-};
-enum {
     DIRITER_BOTH,
     DIRITER_DIRS,
     DIRITER_FILES,
+    DIRITER_GLOB,
 };
+
+enum {
+    DIRGLOB_MAX_STACK = 256,
+};
+
+typedef struct {
+    Value vfile;
+    DIR *dir;
+    DIR **dir_top;
+    DIR **dir_stk;
+    int type;
+} RefDirIter;
 
 static RefNode *cls_diriter;
 
@@ -395,7 +401,7 @@ static int file_iter(Value *vret, Value *v, RefNode *node)
 {
     RefStr *path = Value_vp(*v);
     DIR *d;
-    Ref *r;
+    RefDirIter *r;
 
     errno = 0;
     d = opendir_fox(path->c);
@@ -403,11 +409,13 @@ static int file_iter(Value *vret, Value *v, RefNode *node)
     if (d == NULL) {
         goto FINALLY;
     }
-    r = ref_new(cls_diriter);
+    r = buf_new(cls_diriter, sizeof(RefDirIter));
     *vret = vp_Value(r);
-    r->v[DIRITER_FILE] = Value_cp(*v);
-    r->v[DIRITER_DIR] = ptr_Value(d);
-    r->v[DIRITER_TYPE] = int32_Value(FUNC_INT(node));
+    r->vfile = Value_cp(*v);
+    r->dir = d;
+    r->dir_top = NULL;
+    r->dir_stk = NULL;
+    r->type = FUNC_INT(node);
 
     return TRUE;
 
@@ -463,10 +471,10 @@ static int file_marshal_write(Value *vret, Value *v, RefNode *node)
 
 static int diriter_next(Value *vret, Value *v, RefNode *node)
 {
-    Ref *r = Value_ref(*v);
-    DIR *d = Value_ptr(r->v[DIRITER_DIR]);
+    RefDirIter *r = Value_vp(*v);
+    DIR *d = r->dir;
     struct dirent *dh;
-    int type = Value_integral(r->v[DIRITER_TYPE]);
+    int type = r->type;
 
     if (d == NULL) {
         return TRUE;
@@ -494,7 +502,7 @@ static int diriter_next(Value *vret, Value *v, RefNode *node)
     }
 
     if (dh != NULL) {
-        RefStr *path = Value_vp(r->v[DIRITER_FILE]);
+        RefStr *path = Value_vp(r->vfile);
         Value vf = printf_Value("%r" SEP_S "%s", path, dh->d_name);
         Value_ref_header(vf)->type = fs->cls_file;
         *vret = vf;
@@ -507,12 +515,18 @@ static int diriter_next(Value *vret, Value *v, RefNode *node)
 }
 static int diriter_close(Value *vret, Value *v, RefNode *node)
 {
-    Ref *r = Value_ref(*v);
-    DIR *d = Value_ptr(r->v[DIRITER_DIR]);
-    
-    if (d != NULL) {
-        closedir_fox(d);
-        r->v[DIRITER_DIR] = VALUE_NULL;
+    RefDirIter *r = Value_vp(*v);
+
+    if (r->dir_stk != NULL) {
+        while (r->dir_top > r->dir_stk) {
+            closedir_fox(r->dir_top[-1]);
+            r->dir_top--;
+        }
+        free(r->dir_stk);
+        r->dir_stk = NULL;
+    } else if (r->dir != NULL) {
+        closedir_fox(r->dir);
+        r->dir = NULL;
     }
     return TRUE;
 }
@@ -610,7 +624,15 @@ static int fileio_read(Value *vret, Value *v, RefNode *node)
         throw_error_select(THROW_NOT_OPENED_FOR_READ);
         return FALSE;
     }
+#ifdef WIN32
+    if (fh->console_read) {
+        rd = win_read_console(fh->fd_read, mb->buf.p + mb->buf.size, size);
+    } else {
+        rd = read_fox(fh->fd_read, mb->buf.p + mb->buf.size, size);
+    }
+#else
     rd = read_fox(fh->fd_read, mb->buf.p + mb->buf.size, size);
+#endif
     mb->buf.size += rd;
 
     return TRUE;
@@ -625,7 +647,15 @@ static int fileio_write(Value *vret, Value *v, RefNode *node)
     RefBytesIO *mb = Value_vp(v[1]);
 
     if (fh->fd_write != -1) {
+#ifdef WIN32
+        if (fh->console_write) {
+            win_write_console(fh->fd_write, mb->buf.p, mb->buf.size);
+        } else {
+            write_fox(fh->fd_write, mb->buf.p, mb->buf.size);
+        }
+#else
         write_fox(fh->fd_write, mb->buf.p, mb->buf.size);
+#endif
     }
 
     return TRUE;
@@ -1157,13 +1187,45 @@ static int file_chdir(Value *vret, Value *v, RefNode *node)
 
     return TRUE;
 }
+// def dir(f) => File(f).iterator()
+static int file_dir(Value *vret, Value *v, RefNode *node)
+{
+    if (Value_type(v[1]) == fs->cls_file) {
+        *v = v[1];
+    } else {
+        Value vf;
+        if (!file_new(&vf, v, node)) {
+            return FALSE;
+        }
+        *v = vf;
+        Value_dec(v[1]);
+    }
+    fg->stk_top = fg->stk_base + 1;
+
+    if (!file_iter(vret, v, node)) {
+        return FALSE;
+    }
+    return TRUE;
+}
+
+// \はエスケープ文字として使うため、Windowsでも/を区切り文字として使う
+static int file_glob(Value *vret, Value *v, RefNode *node)
+{
+    RefStr *rs_path = Value_vp(v[1]);
+
+    if (str_has0(rs_path->c, rs_path->size)) {
+        throw_errorf(fs->mod_file, "FileOpenError", "Path contains '\\0'");
+        return FALSE;
+    }
+
+    return TRUE;
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 static void define_file_const(RefNode *m)
 {
     RefNode *n;
-//  Ref *r;
 
     n = define_identifier(m, m, "FOX_HOME", NODE_CONST, 0);
     n->u.k.val = Value_cp(vp_Value(fs->fox_home));
@@ -1204,6 +1266,12 @@ static void define_file_func(RefNode *m)
 
     n = define_identifier(m, m, "chdir", NODE_FUNC_N, 0);
     define_native_func_a(n, file_chdir, 1, 1, NULL, NULL);
+
+    n = define_identifier(m, m, "dir", NODE_FUNC_N, 0);
+    define_native_func_a(n, file_dir, 1, 1, NULL, NULL);
+
+    n = define_identifier(m, m, "glob", NODE_FUNC_N, 0);
+    define_native_func_a(n, file_glob, 1, 1, NULL, fs->cls_str);
 }
 static void define_file_class(RefNode *m)
 {
@@ -1268,8 +1336,6 @@ static void define_file_class(RefNode *m)
 
     // DirIterator
     cls = cls_diriter;
-    cls->u.c.n_memb = DIRITER_NUM;
-
     n = define_identifier_p(m, cls, fs->str_next, NODE_FUNC_N, 0);
     define_native_func_a(n, diriter_next, 0, 0, NULL);
     n = define_identifier_p(m, cls, fs->str_dispose, NODE_FUNC_N, 0);
