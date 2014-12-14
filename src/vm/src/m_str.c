@@ -1916,7 +1916,6 @@ static int str_base64decode(Value *vret, Value *v, RefNode *node)
     int size;
 
     rs = refstr_new_n(fs->cls_bytes, src->size * 3 / 4 + 4);
-    *v = vp_Value(rs);
     size = decode_b64_sub(rs->c, src->c, src->size, TRUE);
     if (size < 0) {
         throw_errorf(fs->mod_lang, "ValueError", "Invalid base64 sequence");

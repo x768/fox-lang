@@ -199,16 +199,16 @@ int Value_frac10(int64_t *val, Value v, int factor)
  */
 Str Value_str(Value v)
 {
-#ifdef DEBUG
-    if (!Value_isref(v) || (Value_ref_header(v)->type->opt & NODEOPT_STRCLASS) == 0) {
-        fatal_errorf(NULL, "Value_str failed (not Str)");
-    }
-#endif
-    {
+    if (Value_isref(v) && (Value_ref_header(v)->type->opt & NODEOPT_STRCLASS) != 0) {
         RefStr *s = Value_vp(v);
         Str ret;
         ret.p = s->c;
         ret.size = s->size;
+        return ret;
+    } else {
+        Str ret;
+        ret.p = NULL;
+        ret.size = 0;
         return ret;
     }
 }

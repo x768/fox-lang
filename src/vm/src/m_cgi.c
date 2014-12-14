@@ -227,7 +227,6 @@ static int param_string_to_hash(RefMap *v_map, const char *p, Value keys, RefCha
     if (p == NULL) {
         return TRUE;
     }
-
     if (!param_string_init_hash(v_map, keys)) {
         return FALSE;
     }
@@ -569,6 +568,7 @@ static int param_string_init_cookie(Value v, Value keys)
         HashValueEntry *ve = rm->entry[i];
         for (; ve != NULL; ve = ve->next) {
             HashValueEntry *ve2;
+            RefNode *klass;
             if (Value_type(ve->key) != fs->cls_str) {
                 goto ERROR_END;
             }
@@ -576,7 +576,15 @@ static int param_string_init_cookie(Value v, Value keys)
                 goto ERROR_END;
             }
             ve2 = refmap_add(v_map, ve->key, FALSE, FALSE);
-            ve2->val = Value_cp(ve->val);
+            klass = Value_vp(ve->val);
+            if (klass == fs->cls_str) {
+                ve2->val = VALUE_NULL;
+            } else if (klass == fs->cls_list) {
+                RefArray *ra = refarray_new(0);
+                ve2->val = vp_Value(ra);
+            } else {
+                goto ERROR_END;
+            }
         }
     }
     return TRUE;

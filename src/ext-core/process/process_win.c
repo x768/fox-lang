@@ -48,25 +48,29 @@ static void init_pipe(STARTUPINFO *si, int flags, HANDLE *p_in, HANDLE *p_out, H
     si->hStdOutput = cout;
     si->hStdInput = cin;
 }
-static char *make_cmd_string(char **argv)
+static wchar_t *make_cmd_string(char **argv)
 {
     int first = TRUE;
+    wchar_t *ret;
     StrBuf sb;
     fs->StrBuf_init(&sb, 0);
 
     for (; *argv != NULL; argv++) {
         const char *arg = *argv;
         int quot = FALSE;
+        int i;
 
         if (first) {
             first = FALSE;
         } else {
             fs->StrBuf_add_c(&sb, ' ');
         }
-        {
-            int i;
+        // スペースがある場合または長さ0の場合、""で囲む
+        if (arg[0] == '\0') {
+            quot = TRUE;
+        } else {
             for (i = 0; arg[i] != '\0'; i++) {
-                if (arg[i] == '"' || arg[i] == ' ') {
+                if (arg[i] == ' ') {
                     quot = TRUE;
                     break;
                 }
@@ -76,14 +80,22 @@ static char *make_cmd_string(char **argv)
         if (quot) {
             fs->StrBuf_add_c(&sb, '"');
         }
-        fs->StrBuf_add(&sb, arg, -1);
+        for (i = 0; arg[i] != '\0'; i++) {
+            if (arg[i] == '"') {
+                // '"' => '\"'
+                fs->StrBuf_add(&sb, "\\\"", 2);
+            } else {
+                fs->StrBuf_add_c(&sb, arg[i]);
+            }
+        }
         if (quot) {
             fs->StrBuf_add_c(&sb, '"');
         }
     }
 
-    fs->StrBuf_add_c(&sb, '\0');
-    return sb.p;
+    ret = cstr_to_utf16(sb.p, sb.size);
+    StrBuf_close(&sb);
+    return ret;
 }
 
 int process_new_sub(RefProcessHandle *ph, int create_pipe, const char *path, char **argv, int flags)
@@ -108,11 +120,13 @@ int process_new_sub(RefProcessHandle *ph, int create_pipe, const char *path, cha
         si.wShowWindow = SW_SHOW;
     }
     {
-        char *cmd = make_cmd_string(argv);
-        if (CreateProcess(path, cmd, NULL, NULL, TRUE, 0, NULL, NULL, &si, &pi) == 0) {
+        wchar_t *wpath = cstr_to_utf16(path, -1);
+        wchar_t *cmd = make_cmd_string(argv);
+        if (CreateProcessW(wpath, cmd, NULL, NULL, TRUE, 0, NULL, NULL, &si, &pi) == 0) {
             return FALSE;
         }
         free(cmd);
+        free(wpath);
     }
     ph->valid = TRUE;
     {

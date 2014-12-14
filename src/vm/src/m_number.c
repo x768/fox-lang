@@ -1897,7 +1897,7 @@ static int frac_tostr(Value *vret, Value *v, RefNode *node)
             } else if (get_recurrence(recr, &md->md[1])) {
                 // 循環小数
                 if (recr[1] - recr[0] > 6) {
-                    n_ex = recr[1] - 1;
+                    n_ex = recr[1];
                 } else {
                     n_ex = recr[0] + 5;
                 }

@@ -3280,7 +3280,7 @@ static int get_module_from_native(RefNode **pmod, const char *filename)
 static void set_env_value(const char *ptr, const char *p, const char *end)
 {
     RefStr *key = intern(ptr, p - ptr);
-    char *val = str_dup_p(p + 1, (end - p) - 1, &fg->st_mem);
+    char *val = str_dup_p(p + 1, end - (p + 1), &fg->st_mem);
     Hash_add_p(&fs->envs, &fg->st_mem, key, val);
 }
 

@@ -14,6 +14,7 @@ enum {
     // 1行
     MD_EMPTY_LINE,    // 空行
     MD_HEADING,       // opt=1...6 <h1>child</h1>, <h2>child</h2>
+    MD_HEADING_D,     // === or ---
     MD_PARAGRAPH,     // <p>child</p>
     MD_HORIZONTAL,    // <hr>
     MD_BLOCK_PLUGIN,  // %plugin
@@ -77,8 +78,8 @@ typedef struct MDNode {
     uint16_t opt;
     uint16_t indent;
 
-    const char *cstr;
-    const char *href;
+    char *cstr;
+    char *href;
 } MDNode;
 
 typedef struct SimpleHash
@@ -342,7 +343,7 @@ static void MDTok_next(MDTok *tk)
         while (*tk->p != '\0') {
             if (*tk->p == '\t') {
                 int ts = tk->md->tabstop;
-                tk->indent = tk->indent / ts * ts + 1;
+                tk->indent = (tk->indent / ts) * ts + 1;
                 tk->p++;
             } else if ((*tk->p & 0xFF) <= ' ' && *tk->p != '\n' && *tk->p != '\r') {
                 tk->p++;
@@ -356,6 +357,11 @@ static void MDTok_next(MDTok *tk)
         case '\0':
             tk->type = MD_EOS;
             return;
+        case '\n':
+            tk->p++;
+            tk->type = MD_EMPTY_LINE;
+            tk->head = TRUE;
+            return;
         case '#':
             tk->type = MD_HEADING;
             tk->opt = 1;
@@ -366,7 +372,37 @@ static void MDTok_next(MDTok *tk)
             }
             MDTok_skip_space(tk);
             return;
-        case '*': case '-':
+        case '-':
+        case '=':
+            {
+                // 1行全て '='か'-'
+                const char *top = tk->p;
+                const char *p = tk->p + 1;
+                int ch = *tk->p;
+                while (*p != '\0' && *p != '\n') {
+                    if (*p != ch) {
+                        break;
+                    }
+                    p++;
+                }
+                if (*p == '\0' || *p == '\n') {
+                    fs->StrBuf_alloc(&tk->val, p - top);
+                    memset(tk->val.p, ch, p - top);
+                    if (*p == '\n') {
+                        p++;
+                    }
+                    tk->p = p;
+                    tk->type = MD_HEADING_D;
+                    tk->opt = (ch == '=' ? 1 : 2);
+                    tk->head = TRUE;
+                    return;
+                }
+                if (ch == '=') {
+                    break;
+                }
+            }
+            // fall throught
+        case '*':
             {
                 int i;
                 int c = 0;
@@ -450,11 +486,6 @@ static void MDTok_next(MDTok *tk)
                     tk->type = MD_ORDERD_LIST;
                     return;
                 }
-            } else if (*tk->p == '\n') {
-                tk->p++;
-                tk->type = MD_EMPTY_LINE;
-                tk->head = TRUE;
-                return;
             }
             break;
         }
@@ -586,6 +617,10 @@ RETRY:
         tk->type = MD_FATAL_ERROR;
         return;
     }
+    // 末尾の\nを' 'に変換
+    if (tk->head) {
+        fs->StrBuf_add_c(&tk->val, ' ');
+    }
     if (tk->val.size > 0) {
         tk->type = MD_TEXT;
     } else {
@@ -650,6 +685,7 @@ const char *tktype_to_name(int type)
         "MD_FATAL_ERROR",
         "MD_EMPTY_LINE",
         "MD_HEADING",
+        "MD_HEADING_D",
         "MD_SENTENSE",
         "MD_HORIZONTAL",
         "MD_BLOCK_PLUGIN",
@@ -719,18 +755,24 @@ static int parse_markdown_code_block(Markdown *r, MDTok *tk, MDNode **ppnode, co
 }
 static int parse_markdown_line(Markdown *r, MDTok *tk, MDNode **ppnode, int term)
 {
-    MDNode *node;
+    MDNode *node = NULL;
+    int first = TRUE;
     int bq_level = tk->bq_level;
 
     for (;;) {
         if (tk->bq_level != bq_level) {
-            return TRUE;
+            goto FINALLY;
         }
         if (tk->type == term) {
             MDTok_next(tk);
-            return TRUE;
+            goto FINALLY;
         }
         switch (tk->type) {
+        case MD_HEADING_D:
+            if (!first) {
+                goto FINALLY;
+            }
+            // fall through
         case MD_TEXT:
             node = MDNode_new(MD_TEXT, r);
             node->cstr = fs->str_dup_p(tk->val.p, tk->val.size, &r->mem);
@@ -740,7 +782,7 @@ static int parse_markdown_line(Markdown *r, MDTok *tk, MDNode **ppnode, int term
             break;
         case MD_COLON:
             node = MDNode_new(MD_TEXT, r);
-            node->cstr = ":";
+            node->cstr = fs->str_dup_p(tk->val.p, tk->val.size, &r->mem);
             *ppnode = node;
             ppnode = &node->next;
             MDTok_next(tk);
@@ -803,9 +845,20 @@ static int parse_markdown_line(Markdown *r, MDTok *tk, MDNode **ppnode, int term
         case MD_FATAL_ERROR:
             return FALSE;
         default:
-            return TRUE;
+            goto FINALLY;
+        }
+        first = FALSE;
+    }
+FINALLY:
+    // 末尾のスペースを除去
+    if (node != NULL && node->type != MD_CODE_INLINE && node->cstr != NULL) {
+        char *p = node->cstr + strlen(node->cstr) - 1;
+        while (p >= node->cstr && isspace_fox(*p)) {
+            *p = '\0';
+            p--;
         }
     }
+    return TRUE;
 }
 
 static int parse_markdown_list_block(Markdown *r, MDTok *tk, MDNode **ppnode)
@@ -851,6 +904,7 @@ static int parse_markdown_list_block(Markdown *r, MDTok *tk, MDNode **ppnode)
 static int parse_markdown_block(Markdown *r, MDTok *tk, MDNode **ppnode, int bq_level)
 {
     MDNode *node;
+    MDNode *prev_node = NULL;
 
     for (;;) {
         if (tk->bq_level > bq_level) {
@@ -865,11 +919,13 @@ static int parse_markdown_block(Markdown *r, MDTok *tk, MDNode **ppnode, int bq_
         } else if (tk->bq_level < bq_level) {
             return TRUE;
         }
+
         switch (tk->type) {
         case MD_HEADING:
             node = MDNode_new(MD_HEADING, r);
             node->indent = tk->indent;
             node->opt = tk->opt;
+            prev_node = node;
             *ppnode = node;
             ppnode = &node->next;
             MDTok_next(tk);
@@ -877,6 +933,7 @@ static int parse_markdown_block(Markdown *r, MDTok *tk, MDNode **ppnode, int bq_
             break;
         case MD_HORIZONTAL:
             node = MDNode_new(MD_HORIZONTAL, r);
+            prev_node = node;
             *ppnode = node;
             ppnode = &node->next;
             MDTok_next(tk);
@@ -885,6 +942,7 @@ static int parse_markdown_block(Markdown *r, MDTok *tk, MDNode **ppnode, int bq_
         case MD_UNORDERD_LIST:
             node = MDNode_new(tk->type, r);
             node->indent = tk->indent;
+            prev_node = node;
             *ppnode = node;
             ppnode = &node->next;
             if (!parse_markdown_list_block(r, tk, &node->child)) {
@@ -894,6 +952,7 @@ static int parse_markdown_block(Markdown *r, MDTok *tk, MDNode **ppnode, int bq_
         case MD_CODE:
             node = MDNode_new(MD_CODE, r);
             node->cstr = fs->str_dup_p(tk->val.p, tk->val.size, &r->mem);
+            prev_node = node;
             *ppnode = node;
             ppnode = &node->next;
             MDTok_next_code(tk);
@@ -910,22 +969,35 @@ static int parse_markdown_block(Markdown *r, MDTok *tk, MDNode **ppnode, int bq_
                 MDTok_next(tk);
                 parse_markdown_line(r, tk, &node, MD_NONE);
                 SimpleHash_add_node(r->link_map, &r->mem, name, node);
-            } else {
+ 
+                prev_node = NULL;
+           } else {
                 node = MDNode_new(MD_PARAGRAPH, r);
                 node->indent = tk->indent;
+                prev_node = node;
                 *ppnode = node;
                 ppnode = &node->next;
                 parse_markdown_line(r, tk, &node->child, MD_NONE);
             }
             break;
-        case MD_LINK:
+        case MD_HEADING_D:
+            if (prev_node != NULL && prev_node->type == MD_PARAGRAPH) {
+                prev_node->type = MD_HEADING;
+                prev_node->opt = tk->opt;
+                prev_node = NULL;
+                MDTok_next(tk);
+                break;
+            }
+            // fall through
         case MD_TEXT:
+        case MD_LINK:
         case MD_EM:
         case MD_STRONG:
         case MD_STRIKE:
         case MD_CODE_INLINE:
             node = MDNode_new(MD_PARAGRAPH, r);
             node->indent = tk->indent;
+            prev_node = node;
             *ppnode = node;
             ppnode = &node->next;
             parse_markdown_line(r, tk, &node->child, MD_NONE);
@@ -935,6 +1007,7 @@ static int parse_markdown_block(Markdown *r, MDTok *tk, MDNode **ppnode, int bq_
         case MD_BLOCK_PLUGIN:
             node = MDNode_new(MD_BLOCK_PLUGIN, r);
             node->cstr = fs->str_dup_p(tk->val.p, tk->val.size, &r->mem);
+            prev_node = node;
             *ppnode = node;
             MDTok_next(tk);
             break;
@@ -944,6 +1017,7 @@ static int parse_markdown_block(Markdown *r, MDTok *tk, MDNode **ppnode, int bq_
             return TRUE;
         default:
             MDTok_next(tk);
+            prev_node = NULL;
             break;
         }
     }
@@ -1501,7 +1575,7 @@ void define_module(RefNode *m, const FoxStatic *a_fs, FoxGlobal *a_fg)
     fs = a_fs;
     fg = a_fg;
     mod_markdown = m;
-    mod_xml = fs->get_module_by_name("datafmt.xml", -1, TRUE, FALSE);
+    mod_xml = fs->get_module_by_name("marshal.xml", -1, TRUE, FALSE);
     xst = mod_xml->u.m.ext;
 
     fs->add_unresolved_ptr(m, mod_xml, "XMLElem", &cls_xmlelem);

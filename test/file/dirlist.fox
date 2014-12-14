@@ -1,0 +1,8 @@
+import util.assert
+
+assert_equal File('dir').list.map(f => f.filename).to_set(), Set("a.txt", "b.js", "c", "d")
+assert_equal File('dir').files.map(f => f.filename).to_set(), Set("a.txt", "b.js")
+assert_equal File('dir').dirs.map(f => f.filename).to_set(), Set("c", "d")
+
+assert_equal dir('dir').map(f => f.filename).to_set(), Set("a.txt", "b.js", "c", "d")
+

@@ -717,10 +717,14 @@ static int node_tostr_xml(StrBuf *buf, Value dst, Value v, XMLOutputFormat *xof,
 
                 for (i = 0; i < ra->size; i++) {
                     Value vp = ra->p[i];
-                    if (fs->Value_type(vp) == cls_text) {
+                    RefNode *vp_type = fs->Value_type(vp);
+                    if (vp_type == cls_text) {
                         if (!Str_isspace(fs->Value_str(vp))) {
                             space_only = FALSE;
                         }
+                    } else if (vp_type == cls_comment) {
+                        space_only = FALSE;
+                        has_block = TRUE;
                     } else if (xof->html) {
                         Ref *rp = Value_ref(vp);
                         int type2 = get_tag_type_icase(fs->Value_str(rp->v[INDEX_ELEM_NAME]));
@@ -1028,7 +1032,7 @@ static int xml_elem_new(Value *vret, Value *v, RefNode *node)
     }
     for (; v + pos < fg->stk_top; pos++) {
         RefNode *v_type = fs->Value_type(v[pos]);
-        if (v_type == cls_elem || v_type == cls_text) {
+        if (v_type == cls_elem || v_type == cls_text || v_type == cls_comment) {
             Value *pv = fs->refarray_push(ra);
             *pv = fs->Value_cp(v[pos]);
         } else if (v_type == fs->cls_str) {

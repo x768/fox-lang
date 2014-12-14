@@ -27,11 +27,19 @@ enum {
 };
 
 typedef struct {
+    DIR *d;
+    char *cur;
+    const char *rest;
+} DirGlob;
+typedef struct {
+    RefHeader rh;
+
     Value vfile;
-    DIR *dir;
-    DIR **dir_top;
-    DIR **dir_stk;
     int type;
+
+    DIR *dir;
+    DirGlob *dir_top;
+    DirGlob *dir_stk;
 } RefDirIter;
 
 static RefNode *cls_diriter;
@@ -469,20 +477,219 @@ static int file_marshal_write(Value *vret, Value *v, RefNode *node)
 
 //////////////////////////////////////////////////////////////////////////////////////
 
+// .と..を除外した列挙
+static struct dirent *readdir_except_self(DIR *d)
+{
+    struct dirent *dh;
+    while ((dh = readdir_fox(d)) != NULL) {
+        const char *name = dh->d_name;
+        if (strcmp(name, ".") != 0 && strcmp(name, "..") != 0) {
+            return dh;
+        }
+    }
+    return NULL;
+}
+static int file_glob_dir(RefDirIter *r, char *cur, const char *rest)
+{
+    DIR *d;
+    errno = 0;
+    d = opendir_fox(cur);
+    if (d == NULL) {
+        goto FINALLY;
+    }
+    r->dir_top->d = d;
+    r->dir_top->cur = cur;
+    r->dir_top->rest = rest;
+    return TRUE;
+
+FINALLY:
+    throw_errorf(fs->mod_file, "DirOpenError", "Cannot open directory %q", cur);
+    return FALSE;
+}
+static int match_glob_sub(const char *fname, const char *fend, const char *rest, const char *end)
+{
+    {
+        const char *p;
+        for (p = rest; p < end; p++) {
+            if (*p != '*') {
+                break;
+            }
+        }
+        // 全て"*"
+        if (p == end) {
+            return TRUE;
+        }
+    }
+    while (rest < end) {
+        if (*rest == '*') {
+            rest++;
+            if (rest == end) {
+                return TRUE;
+            }
+            while (fname < fend) {
+                if (match_glob_sub(fname, fend, rest, end)) {
+                    return TRUE;
+                }
+                utf8_next(&fname, fend);
+            }
+            return FALSE;
+        } else if (*rest == '?') {
+            // 1文字(コードポイント)食べる
+            rest++;
+            if (fname >= fend) {
+                return FALSE;
+            }
+            utf8_next(&fname, fend);
+        } else {
+#ifndef WIN32
+            if (*rest == '\\') {
+                rest++;
+                if (fname >= fend) {
+                    return rest == end;
+                }
+            }
+#endif
+            if (fname >= fend) {
+                return FALSE;
+            }
+            if (*fname != *rest) {
+                return FALSE;
+            }
+            rest++;
+            fname++;
+        }
+    }
+    return fname == fend;
+}
+#if 0
+static int match_double_aster(struct dirent *dh, const char **prest)
+{
+    const char *rest = *prest;
+    if (rest[0] == '*' && rest[1] == '*') {
+#ifdef WIN32
+        if (rest[2] == '/' || rest[2] == '\\') {
+            *prest = rest + 3;
+            return TRUE;
+        }
+#else
+        if (rest[2] == '/') {
+            *prest = rest + 3;
+            return TRUE;
+        }
+#endif
+    }
+    return FALSE;
+}
+#endif
+
+static int match_glob_name(struct dirent *dh, const char **prest)
+{
+    const char *rest = *prest;
+    const char *end = rest;
+
+    while (*end != '\0') {
+#ifdef WIN32
+        if (*end == '/' || *end == '\\') {
+            break;
+        }
+#else
+        if (*end == '/') {
+            break;
+        }
+#endif
+        end++;
+    }
+
+    if (*end != '\0') {
+        if (dh->d_type != DT_DIR) {
+            return FALSE;
+        }
+        if (match_glob_sub(dh->d_name, dh->d_name + strlen(dh->d_name), rest, end)) {
+            *prest = end + 1;
+            return TRUE;
+        }
+    } else {
+        if (match_glob_sub(dh->d_name, dh->d_name + strlen(dh->d_name), rest, end)) {
+            *prest = end;
+            return TRUE;
+        }
+    }
+    return FALSE;
+}
+
 static int diriter_next(Value *vret, Value *v, RefNode *node)
 {
     RefDirIter *r = Value_vp(*v);
-    DIR *d = r->dir;
-    struct dirent *dh;
     int type = r->type;
+    struct dirent *dh;
 
-    if (d == NULL) {
-        return TRUE;
-    }
-    while ((dh = readdir_fox(d)) != NULL) {
-        const char *name = dh->d_name;
+    if (type == DIRITER_GLOB) {
+        DIR *d;
+        const char *rest;
+        if (r->dir_stk == NULL) {
+            throw_stopiter();
+            return FALSE;
+        }
+        if (r->dir_top < r->dir_stk) {
+            throw_stopiter();
+            return FALSE;
+        }
 
-        if (strcmp(name, ".") != 0 && strcmp(name, "..") != 0) {
+        d = r->dir_top->d;
+        rest = r->dir_top->rest;
+        for (;;) {
+            for (;;) {
+                dh = readdir_except_self(d);
+                if (dh != NULL) {
+                    break;
+                }
+                free(r->dir_top->cur);
+                closedir_fox(r->dir_top->d);
+                r->dir_top--;
+                if (r->dir_top < r->dir_stk) {
+                    break;
+                }
+                d = r->dir_top->d;
+                rest = r->dir_top->rest;
+            }
+            if (dh == NULL) {
+                break;
+            }
+
+            if (match_glob_name(dh, &rest)) {
+                if (rest[0] != '\0') {
+                    // 下の階層へ
+                    if (r->dir_top < r->dir_stk + DIRGLOB_MAX_STACK - 1) {
+                        char *path2 = str_printf("%s" SEP_S "%s", r->dir_top->cur, dh->d_name);
+                        r->dir_top++;
+                        if (!file_glob_dir(r, path2, rest)) {
+                            return FALSE;
+                        }
+                        d = r->dir_top->d;
+                        rest = r->dir_top->rest;
+                    } else {
+                        throw_errorf(fs->mod_file, "DirOpenError", "Directory too depth (max:%d)", DIRGLOB_MAX_STACK);
+                        return FALSE;
+                    }
+                } else {
+                    break;
+                }
+            }
+        }
+        if (dh != NULL) {
+            const char *path = r->dir_top->cur;
+            Value vf = printf_Value("%s" SEP_S "%s", path, dh->d_name);
+            Value_ref_header(vf)->type = fs->cls_file;
+            *vret = vf;
+            return TRUE;
+        }
+    } else {
+        DIR *d = r->dir;
+        if (d == NULL) {
+            throw_stopiter();
+            return FALSE;
+        }
+        while ((dh = readdir_except_self(d)) != NULL) {
             if (type == DIRITER_DIRS) {
                 // ディレクトリのみを列挙
                 if (dh->d_type != DT_DIR) {
@@ -499,27 +706,27 @@ static int diriter_next(Value *vret, Value *v, RefNode *node)
                 break;
             }
         }
+
+        if (dh != NULL) {
+            RefStr *path = Value_vp(r->vfile);
+            Value vf = printf_Value("%r" SEP_S "%s", path, dh->d_name);
+            Value_ref_header(vf)->type = fs->cls_file;
+            *vret = vf;
+            return TRUE;
+        }
     }
 
-    if (dh != NULL) {
-        RefStr *path = Value_vp(r->vfile);
-        Value vf = printf_Value("%r" SEP_S "%s", path, dh->d_name);
-        Value_ref_header(vf)->type = fs->cls_file;
-        *vret = vf;
-    } else {
-        throw_stopiter();
-        return FALSE;
-    }
-
-    return TRUE;
+    throw_stopiter();
+    return FALSE;
 }
 static int diriter_close(Value *vret, Value *v, RefNode *node)
 {
     RefDirIter *r = Value_vp(*v);
 
     if (r->dir_stk != NULL) {
-        while (r->dir_top > r->dir_stk) {
-            closedir_fox(r->dir_top[-1]);
+        while (r->dir_top >= r->dir_stk) {
+            free(r->dir_top->cur);
+            closedir_fox(r->dir_top->d);
             r->dir_top--;
         }
         free(r->dir_stk);
@@ -528,6 +735,9 @@ static int diriter_close(Value *vret, Value *v, RefNode *node)
         closedir_fox(r->dir);
         r->dir = NULL;
     }
+    Value_dec(r->vfile);
+    r->vfile = VALUE_NULL;
+
     return TRUE;
 }
 
@@ -1208,16 +1418,80 @@ static int file_dir(Value *vret, Value *v, RefNode *node)
     return TRUE;
 }
 
-// \はエスケープ文字として使うため、Windowsでも/を区切り文字として使う
+static char *split_glob_path(char *path)
+{
+    char *p = path;
+    char *last = p;
+
+    while (*p != '\0') {
+        if (*p == '/') {
+            if (p[1] != '\0') {
+                last = p;
+            }
+        }
+#ifdef WIN32
+        if (*p == '\\') {
+            if (p[1] != '\0') {
+                last = p;
+            }
+        } else {
+            if (*p == '*' || *p == '?') {
+                break;
+            }
+        }
+#else
+        if (*p == '\\') {
+            p++;
+            if (*p == '\0') {
+                break;
+            }
+            if (*p == '/') {
+                if (p[1] != '\0') {
+                    last = p;
+                }
+            }
+        } else {
+            if (*p == '*' || *p == '?') {
+                break;
+            }
+        }
+#endif
+        p++;
+    }
+    if (*last != '\0') {
+        *last++ = '\0';
+    }
+    return last;
+}
+
 static int file_glob(Value *vret, Value *v, RefNode *node)
 {
     RefStr *rs_path = Value_vp(v[1]);
+    RefDirIter *r;
+    char *path;
+    char *last;
+    Str path_s;
 
-    if (str_has0(rs_path->c, rs_path->size)) {
+    path = path_normalize(&path_s, fv->cur_dir, rs_path->c, rs_path->size, NULL);
+    if (str_has0(path_s.p, path_s.size)) {
         throw_errorf(fs->mod_file, "FileOpenError", "Path contains '\\0'");
         return FALSE;
     }
 
+    last = split_glob_path(path);
+
+    r = buf_new(cls_diriter, sizeof(RefDirIter));
+    *vret = vp_Value(r);
+
+    r->vfile = Value_cp(v[1]);
+    r->dir_stk = malloc(sizeof(DirGlob) * DIRGLOB_MAX_STACK);
+    memset(r->dir_stk, 0, sizeof(sizeof(DirGlob) * DIRGLOB_MAX_STACK));
+    r->dir_top = r->dir_stk;
+    r->type = DIRITER_GLOB;
+
+    if (!file_glob_dir(r, path, last)) {
+        return FALSE;
+    }
     return TRUE;
 }
 

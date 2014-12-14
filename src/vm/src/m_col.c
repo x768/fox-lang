@@ -602,13 +602,13 @@ static int array_new_sub(Value *vret, int n)
     RefNode *type = Value_type(*v);
     RefArray *r;
 
-    if (Value_type(*v) != fs->cls_int) {
+    if (type != fs->cls_int) {
         throw_error_select(THROW_ARGMENT_TYPE__NODE_NODE_INT, fs->cls_int, type, n);
         return FALSE;
     }
 
     size = Value_int64(*v, NULL);
-    if (size < 0 || size > 0xffffff) {
+    if (size < 0 || size > INT32_MAX) {
         throw_errorf(fs->mod_lang, "ValueError", "Invalid size number (argument #%d)", n);
         return FALSE;
     }

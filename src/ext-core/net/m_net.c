@@ -15,6 +15,7 @@ struct RefSockAddr {
 static RefNode *mod_net;
 static RefNode *cls_socketio;
 static RefNode *cls_ipaddr;
+static RefNode *cls_ipaddrrange;
 
 ///////////////////////////////////////////////////////////////////////////////////////////
 
@@ -353,6 +354,13 @@ static int ipaddr_tostr(Value *vret, Value *v, RefNode *node)
 
 ///////////////////////////////////////////////////////////////////////////////////////////
 
+static int ipaddrrange_new(Value *vret, Value *v, RefNode *node)
+{
+    return TRUE;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////
+
 static int ifaddr_new(Value *vret, Value *v, RefNode *node)
 {
     *vret = vp_Value(fs->ref_new(cls_ifaddr));
@@ -402,6 +410,7 @@ static void define_class(RefNode *m)
 
     cls_socketio = fs->define_identifier(m, m, "SocketIO", NODE_CLASS, 0);
     cls_ipaddr = fs->define_identifier(m, m, "IPAddr", NODE_CLASS, 0);
+    cls_ipaddrrange = fs->define_identifier(m, m, "IPAddrRange", NODE_CLASS, 0);
     cls_ifaddr = fs->define_identifier(m, m, "IFAddr", NODE_CLASS, 0);
 
     // SocketIO
@@ -434,6 +443,13 @@ static void define_class(RefNode *m)
     fs->define_native_func_a(n, ipaddr_tostr, 0, 2, NULL, fs->cls_str, fs->cls_locale);
     n = fs->define_identifier(m, cls, "family", NODE_FUNC_N, NODEOPT_PROPERTY);
     fs->define_native_func_a(n, ipaddr_family, 0, 0, NULL);
+    fs->extends_method(cls, fs->cls_obj);
+
+
+    // IPAddrRange
+    cls = cls_ipaddrrange;
+    n = fs->define_identifier_p(m, cls, fs->str_new, NODE_NEW_N, 0);
+    fs->define_native_func_a(n, ipaddrrange_new, 1, 1, NULL, fs->cls_str);
     fs->extends_method(cls, fs->cls_obj);
 
 

@@ -221,14 +221,30 @@ static void color_to_hsl(double *ph, double *ps, double *pv, int color)
 
 static int color_gray(Value *vret, Value *v, RefNode *node)
 {
-    int val = fs->Value_int64(v[1], NULL);
+    int64_t val64 = fs->Value_int64(v[1], NULL);
+    int val;
+    int alpha;
 
-    if (val < 0) {
+    if (val64 < 0) {
         val = 0;
-    } else if (val > 255) {
+    } else if (val64 > 255) {
         val = 255;
+    } else {
+        val = val64;
     }
-    *vret = integral_Value(cls_color, val | (val << 8) | (val << 16) | COLOR_A_MASK);
+    if (fg->stk_top > v + 2) {
+        int64_t alpha64 = fs->Value_int64(v[2], NULL);
+        if (alpha64 < 0) {
+            alpha = 0;
+        } else if (alpha64 > 255) {
+            alpha = 255;
+        } else {
+            alpha = alpha64;
+        }
+    } else {
+        alpha = 255;
+    }
+    *vret = integral_Value(cls_color, val | (val << 8) | (val << 16) | (alpha << 24));
 
     return TRUE;
 }
@@ -1882,8 +1898,8 @@ static void define_class(RefNode *m, RefNode *mod_math)
     cls_color = fs->define_identifier(m, m, "Color", NODE_CLASS, NODEOPT_INTEGRAL);
 
     cls = cls_color;
-    n = fs->define_identifier(m, cls, "v", NODE_NEW_N, 0);
-    fs->define_native_func_a(n, color_gray, 1, 1, NULL, fs->cls_int);
+    n = fs->define_identifier(m, cls, "gray", NODE_NEW_N, 0);
+    fs->define_native_func_a(n, color_gray, 1, 2, NULL, fs->cls_int, fs->cls_int);
     n = fs->define_identifier(m, cls, "rgb", NODE_NEW_N, 0);
     fs->define_native_func_a(n, color_rgb, 3, 3, NULL, fs->cls_int, fs->cls_int, fs->cls_int);
     n = fs->define_identifier(m, cls, "rgba", NODE_NEW_N, 0);

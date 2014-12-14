@@ -16,7 +16,7 @@ CFLAGS = -I../../include
 LFLAGS = $(COMMON_DLFLAGS)
 endif
 
-DEST = ../../../import/datafmt/json.so
+DEST = ../../../import/marshal/json.so
 VPATH = ../../common
 
 OBJS = \

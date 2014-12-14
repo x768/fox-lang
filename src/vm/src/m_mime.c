@@ -74,7 +74,7 @@ typedef struct {
 } MimeData;
 
 
-static Ref *mimedata_new_ref(Value *v, int flags);
+static Ref *mimedata_new_ref(int flags);
 static RefStr *mimetype_from_abbr(RefStr *name);
 
 static void MimeTok_init(MimeTok *tk, const char *p, int size)
@@ -402,51 +402,54 @@ int mimereader_next_sub(Value *vret, Value v, Str s_bound, RefCharset *cs)
         return FALSE;
     }
 
-    r = mimedata_new_ref(vret, STREAM_READ);
+    r = mimedata_new_ref(STREAM_READ);
+    *vret = vp_Value(r);
+
     r->v[INDEX_MIMEDATA_HEADER] = headers;
     mb = Value_vp(r->v[INDEX_MIMEDATA_BUF]);
 
     if (s_bound.size == 0) {
-        if (!stream_read_data(v, &mb->buf, NULL, NULL, FALSE, TRUE)) {
+        int size_read = fs->max_alloc;
+        if (!stream_read_data(v, &mb->buf, NULL, &size_read, FALSE, FALSE)) {
             return FALSE;
         }
-        return TRUE;
-    }
-    for (;;) {
-        int size = BUFFER_SIZE;
-        int size_trim;
-        char *buf;
+    } else {
+        for (;;) {
+            int size = BUFFER_SIZE;
+            int size_trim;
+            char *buf;
 
-        // mb->bufの後ろに領域を確保
-        StrBuf_alloc(&mb->buf, mb->buf.size + BUFFER_SIZE);
-        mb->buf.size -= BUFFER_SIZE;
-        buf = mb->buf.p + mb->buf.size;
+            // mb->bufの後ろに領域を確保
+            StrBuf_alloc(&mb->buf, mb->buf.size + BUFFER_SIZE);
+            mb->buf.size -= BUFFER_SIZE;
+            buf = mb->buf.p + mb->buf.size;
 
-        // 次の改行までを取得
-        if (!stream_gets_limit(v, buf, &size)) {
-            return FALSE;
-        }
-        if (size <= 0) {
-            break;
-        }
-
-        size_trim = size;
-        if (size_trim >= 1 && buf[size_trim - 1] == '\n') {
-            size_trim--;
-        }
-        if (size_trim >= 1 && buf[size_trim - 1] == '\r') {
-            size_trim--;
-        }
-        if (size_trim == s_bound.size + 4) {
-            if (buf[0] == '-' && buf[1] == '-' && memcmp(buf + 2, s_bound.p, s_bound.size) == 0 && buf[s_bound.size + 2] == '-' && buf[s_bound.size + 3] == '-') {
+            // 次の改行までを取得
+            if (!stream_gets_limit(v, buf, &size)) {
+                return FALSE;
+            }
+            if (size <= 0) {
                 break;
             }
-        } else if (size_trim == s_bound.size + 2) {
-            if (buf[0] == '-' && buf[1] == '-' && memcmp(buf + 2, s_bound.p, s_bound.size) == 0) {
-                break;
+
+            size_trim = size;
+            if (size_trim >= 1 && buf[size_trim - 1] == '\n') {
+                size_trim--;
             }
+            if (size_trim >= 1 && buf[size_trim - 1] == '\r') {
+                size_trim--;
+            }
+            if (size_trim == s_bound.size + 4) {
+                if (buf[0] == '-' && buf[1] == '-' && memcmp(buf + 2, s_bound.p, s_bound.size) == 0 && buf[s_bound.size + 2] == '-' && buf[s_bound.size + 3] == '-') {
+                    break;
+                }
+            } else if (size_trim == s_bound.size + 2) {
+                if (buf[0] == '-' && buf[1] == '-' && memcmp(buf + 2, s_bound.p, s_bound.size) == 0) {
+                    break;
+                }
+            }
+            mb->buf.size += size;
         }
-        mb->buf.size += size;
     }
 
     // EOF
@@ -469,6 +472,11 @@ int mimereader_next_sub(Value *vret, Value v, Str s_bound, RefCharset *cs)
 
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+/**
+ * 1:source
+ * 2:charset
+ * 3:boundary
+ */
 static int mimereader_new(Value *vret, Value *v, RefNode *node)
 {
     RefNode *cls_mimereader = FUNC_VP(node);
@@ -482,13 +490,13 @@ static int mimereader_new(Value *vret, Value *v, RefNode *node)
         return FALSE;
     }
 
-    if (fg->stk_top > v + 3) {
-        cs = Value_vp(v[3]);
+    if (fg->stk_top > v + 2) {
+        cs = Value_vp(v[2]);
     }
     r->v[INDEX_MIMEREADER_CHARSET] = vp_Value(cs);
 
-    if (fg->stk_top > v + 2) {
-        r->v[INDEX_MIMEREADER_BOUNDARY] = Value_cp(v[2]);
+    if (fg->stk_top > v + 3) {
+        r->v[INDEX_MIMEREADER_BOUNDARY] = Value_cp(v[3]);
     } else {
         Str boundary;
         int found = FALSE;
@@ -1533,7 +1541,7 @@ static int mimeheader_set_content_type(Value *vret, Value *v, RefNode *node)
 
 /////////////////////////////////////////////////////////////////////////////////////
 
-static Ref *mimedata_new_ref(Value *v, int flags)
+static Ref *mimedata_new_ref(int flags)
 {
     RefBytesIO *bio;
     Ref *r = ref_new(fv->cls_mimedata);
@@ -1541,7 +1549,6 @@ static Ref *mimedata_new_ref(Value *v, int flags)
     RefMap *rm = refmap_new(32);
     r->v[INDEX_MIMEDATA_HEADER] = vp_Value(rm);
     rm->rh.type = fv->cls_mimeheader;
-    *v = vp_Value(r);
 
     bio = buf_new(fs->cls_bytesio, sizeof(RefBytesIO));
     r->v[INDEX_MIMEDATA_BUF] = vp_Value(bio);
@@ -1553,7 +1560,8 @@ static Ref *mimedata_new_ref(Value *v, int flags)
 
 static int mimedata_new(Value *vret, Value *v, RefNode *node)
 {
-    mimedata_new_ref(v, STREAM_WRITE);
+    Ref *r = mimedata_new_ref(STREAM_WRITE);
+    *vret = vp_Value(r);
     return TRUE;
 }
 static int mimedata_header(Value *vret, Value *v, RefNode *node)
@@ -1633,6 +1641,13 @@ static int mimedata_size(Value *vret, Value *v, RefNode *node)
     Ref *r = Value_ref(*v);
     RefBytesIO *mb = Value_vp(r->v[INDEX_MIMEDATA_BUF]);
     *vret = int32_Value(mb->buf.size);
+    return TRUE;
+}
+static int mimedata_data(Value *vret, Value *v, RefNode *node)
+{
+    Ref *r = Value_ref(*v);
+    RefBytesIO *mb = Value_vp(r->v[INDEX_MIMEDATA_BUF]);
+    *vret = cstr_Value(fs->cls_bytes, mb->buf.p, mb->buf.size);
     return TRUE;
 }
 
@@ -2036,6 +2051,8 @@ static void define_mime_class(RefNode *m)
     define_native_func_a(n, mimedata_set_pos, 1, 1, NULL, fs->cls_int);
     n = define_identifier(m, cls, "size", NODE_FUNC_N, NODEOPT_PROPERTY);
     define_native_func_a(n, mimedata_size, 0, 0, NULL);
+    n = define_identifier(m, cls, "data", NODE_FUNC_N, NODEOPT_PROPERTY);
+    define_native_func_a(n, mimedata_data, 0, 0, NULL);
 
     cls->u.c.n_memb = INDEX_MIMEDATA_NUM;
     extends_method(cls, fs->cls_streamio);
@@ -2044,7 +2061,7 @@ static void define_mime_class(RefNode *m)
     // MimeReader
     cls = define_identifier(m, m, "MimeReader", NODE_CLASS, 0);
     n = define_identifier_p(m, cls, fs->str_new, NODE_NEW_N, 0);
-    define_native_func_a(n, mimereader_new, 1, 3, cls, NULL, fs->cls_str, fs->cls_charset);
+    define_native_func_a(n, mimereader_new, 1, 3, cls, NULL, fs->cls_charset, fs->cls_str);
 
     n = define_identifier(m, cls, "next", NODE_FUNC_N, 0);
     define_native_func_a(n, mimereader_next, 0, 0, NULL);

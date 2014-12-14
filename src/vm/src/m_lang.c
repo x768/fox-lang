@@ -278,11 +278,42 @@ static int function_tostr(Value *vret, Value *v, RefNode *node)
     }
     return TRUE;
 }
+/**
+ * let f = function...
+ * f.op_call()
+ */
 static int function_call(Value *vret, Value *v, RefNode *node)
 {
     int argc = fg->stk_top - v - 1;
 
     if (!call_function_obj(argc)) {
+        return FALSE;
+    }
+    *vret = *v;
+    *v = VALUE_NULL;
+
+    return TRUE;
+}
+/**
+ * 配列を展開して引数に渡す
+ * f(1, 2, 3)
+ * f.call([1, 2, 3])
+ */
+static int function_call_list(Value *vret, Value *v, RefNode *node)
+{
+    RefArray *ra = Value_vp(v[1]);
+
+    if ((fg->stk_top + ra->size) - fg->stk_base > fs->max_stack) {
+        throw_errorf(fs->mod_lang, "StackOverflowError", "Stack overflow");
+        return FALSE;
+    }
+    if (ra->size > 0) {
+        memcpy(v + 1, ra->p, sizeof(Value) * ra->size);
+    }
+    fg->stk_top = v + 1 + ra->size;
+    free(ra->p);
+
+    if (!call_function_obj(ra->size)) {
         return FALSE;
     }
     *vret = *v;
@@ -772,6 +803,8 @@ static void define_lang_class(RefNode *m)
     define_native_func_a(n, function_tostr, 0, 2, NULL, fs->cls_str, fs->cls_locale);
     n = define_identifier_p(m, cls, fs->symbol_stock[T_LP_C], NODE_FUNC_N, 0);
     define_native_func_a(n, function_call, 0, -1, NULL);
+    n = define_identifier(m, cls, "call", NODE_FUNC_N, 0);
+    define_native_func_a(n, function_call_list, 1, 1, NULL, fs->cls_list);
     extends_method(cls, fs->cls_obj);
 
     // Ref

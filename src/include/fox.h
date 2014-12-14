@@ -622,24 +622,24 @@ struct FoxGlobal
 ////////////////////////////////////////////////////////////////////////////////
 
 #define FOX_VERSION_MAJOR    0
-#define FOX_VERSION_MINOR    9
+#define FOX_VERSION_MINOR    10
 #define FOX_VERSION_REVISION 0
 
 
 extern const char *fox_ctype_flags;
 
 // alphabet | '_'
-#define isalphau_fox(c)   (fox_ctype_flags[(c) & 0xFF] & 1)
+#define isalphau_fox(c)   (fox_ctype_flags[(c) & 0xFF] & 0x01)
 // number | '_'
-#define isalnumu_fox(c)   (fox_ctype_flags[(c) & 0xFF] & 2)
+#define isalnumu_fox(c)   (fox_ctype_flags[(c) & 0xFF] & 0x02)
 
-#define isupper_fox(c)    (fox_ctype_flags[(c) & 0xFF] & 4)
-#define islower_fox(c)    (fox_ctype_flags[(c) & 0xFF] & 8)
-#define isdigit_fox(c)    (fox_ctype_flags[(c) & 0xFF] & 16)
-#define isxdigit_fox(c)   (fox_ctype_flags[(c) & 0xFF] & 32)
+#define isupper_fox(c)    (fox_ctype_flags[(c) & 0xFF] & 0x04)
+#define islower_fox(c)    (fox_ctype_flags[(c) & 0xFF] & 0x08)
+#define isdigit_fox(c)    (fox_ctype_flags[(c) & 0xFF] & 0x10)
+#define isxdigit_fox(c)   (fox_ctype_flags[(c) & 0xFF] & 0x20)
 
-#define isspace_fox(c)    (fox_ctype_flags[(c) & 0xFF] & 64)
-#define islexspace_fox(c) (fox_ctype_flags[(c) & 0xFF] & 128)
+#define isspace_fox(c)    (fox_ctype_flags[(c) & 0xFF] & 0x40)
+#define islexspace_fox(c) (fox_ctype_flags[(c) & 0xFF] & 0x80)
 
 #define tolower_fox(c)    (isupper_fox(c) ? (c) | ('A' ^ 'a') : (c))
 
