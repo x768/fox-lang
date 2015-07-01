@@ -1,5 +1,4 @@
 #include "fox.h"
-#include "config.h"
 #include <wincrypt.h>
 
 
@@ -234,7 +233,7 @@ int exists_file(const char *file)
 void get_random(void *buf, int len)
 {
     HCRYPTPROV hProv;
-    CryptAcquireContext(&hProv, NULL, NULL, PROV_RSA_FULL, CRYPT_VERIFYCONTEXT|CRYPT_SILENT);
+    CryptAcquireContextW(&hProv, NULL, NULL, PROV_RSA_FULL, CRYPT_VERIFYCONTEXT|CRYPT_SILENT);
     if (CryptGenRandom(hProv, len, (BYTE*)buf) == 0) {
         // an error occured
     }
@@ -375,18 +374,60 @@ int win_read_console(FileHandle fd, char *dst, int dst_size)
     }
 }
 
+// 末尾の泣き別れになっているところを削除した長さを返す
+static int rtrim_illigal_utf8(const char *p, int size)
+{
+    const char *end = p + size;
+
+    if (p < end) {
+        const char *ptr = end - 1;
+        int c;
+
+        if ((*ptr & 0x80) == 0) {
+            return size;
+        }
+
+        while (ptr >= p && (*ptr & 0xC0) == 0x80) {
+            ptr--;
+        }
+        if (ptr < p) {
+            return 0;
+        }
+        c = *ptr;
+        if ((c & 0xE0) == 0xC0){
+            if (end - ptr == 2) {
+                return size;
+            }
+        } else if ((c & 0xF0) == 0xE0){
+            if (end - ptr == 3) {
+                return size;
+            }
+        } else if ((c & 0xF8) == 0xF0){
+            if (end - ptr == 4) {
+                return size;
+            }
+        }
+        return ptr - p;
+    } else {
+        return size;
+    }
+}
+
 /*
  * str:  UTF-8文字列
  * size: 長さ or -1
  */
-void win_write_console(FileHandle fd, const char *str, int size)
+int win_write_console(FileHandle fd, const char *str, int size)
 {
     DWORD written;
     wchar_t *wstr;
     if (size < 0) {
         size = strlen(str);
     }
+    size = rtrim_illigal_utf8(str, size);
     wstr = cstr_to_utf16(str, size);
     WriteConsoleW((HANDLE)fd, wstr, wcslen(wstr), &written, NULL);
     free(wstr);
+
+    return size;
 }

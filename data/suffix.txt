@@ -38,8 +38,10 @@ application/x-gtar:gtar	tgz	taz
 application/x-gzip:gz
 application/x-iso9660-image:iso
 application/x-lha:lha	lzh
-application/x-font-ttf:ttf
+application/x-perl:pl	pm
 application/x-rar:rar
+application/x-ruby:rb
+application/x-shellscript:sh
 application/x-shockwave-flash:swf
 application/x-tar:tar
 application/x-xz:xz
@@ -73,10 +75,16 @@ image/x-quicktime:qif	qtif
 image/x-webp:webp
 image/x-xpixmap:xpm
 message/rfc822:eml
+text/x-chdr:h
+text/x-csrc:c
+text/x-c++src:cpp
 text/css:css
 text/csv:csv
 text/html:htm	html
+text/x-fox:fox
 text/x-markdown:md	markdown
+text/x-objcsrc:m
+text/x-python:py
 text/plain:txt	text	ini
 video/mp4:mp4
 video/mpeg:mpeg	mpg	mpe

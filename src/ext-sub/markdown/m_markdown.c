@@ -95,6 +95,7 @@ typedef struct {
     int enable_tex;
     int quiet_error;
     int tabstop;
+    int heading;
 
     Mem mem;
     SimpleHash *link_map[SIMPLE_HASH_MAX];
@@ -900,6 +901,12 @@ static int parse_markdown_list_block(Markdown *r, MDTok *tk, MDNode **ppnode)
         }
     }
 }
+// | cell1 | cell2 |
+// | ....
+static int parse_markdown_list_table_block(Markdown *r, MDTok *tk, MDNode **ppnode)
+{
+    return TRUE;
+}
 
 static int parse_markdown_block(Markdown *r, MDTok *tk, MDNode **ppnode, int bq_level)
 {
@@ -946,6 +953,16 @@ static int parse_markdown_block(Markdown *r, MDTok *tk, MDNode **ppnode, int bq_
             *ppnode = node;
             ppnode = &node->next;
             if (!parse_markdown_list_block(r, tk, &node->child)) {
+                return FALSE;
+            }
+            break;
+        case MD_TABLE:
+            node = MDNode_new(MD_TABLE, r);
+            prev_node = node;
+            *ppnode = node;
+            ppnode = &node->next;
+            // TODO
+            if (!parse_markdown_list_table_block(r, tk, &node->child)) {
                 return FALSE;
             }
             break;
@@ -1120,7 +1137,7 @@ static int link_markdown_sub(Ref *ref, Markdown *r, MDNode *node)
                     RefNode *ret_type;
                     RefStr *ret_str;
 
-                    fs->Value_push("rs", ref, str_link_callback, node->href);
+                    fs->Value_push("rs", ref, node->href);
                     if (!fs->call_member_func(str_link_callback, 1, TRUE)) {
                         return FALSE;
                     }
@@ -1171,7 +1188,7 @@ static Ref *xmlelem_new(const char *name)
     ra = fs->refarray_new(0);
     ra->rh.type = cls_nodelist;
     r->v[INDEX_ELEM_CHILDREN] = vp_Value(ra);
-    
+
     return r;
 }
 static void xmlelem_add(Ref *r, Ref *elem)
@@ -1208,8 +1225,7 @@ static int xml_convert_line(Ref *r, MDNode *node)
             xmlelem_add(r, Value_vp(fs->cstr_Value(cls_xmltext, node->cstr, -1)));
             break;
         case MD_LINK: {
-            Ref *child;
-            child = xmlelem_new("a");
+            Ref *child = xmlelem_new("a");
             xmlelem_add(r, child);
             if (node->href != NULL) {
                 xmlelem_add_attr(child, "href", node->href);
@@ -1294,9 +1310,10 @@ static int xml_from_markdown(Ref *root, Markdown *r, MDNode *node)
         switch (node->type) {
         case MD_HEADING: {
             char tag[4];
+            int head = node->opt + r->heading - 1;
             Ref *heading;
             tag[0] = 'h';
-            tag[1] = (node->opt <= 6 ? '0' + node->opt : '6');
+            tag[1] = (head <= 6 ? '0' + head : '6');
             tag[2] = '\0';
             heading = xmlelem_new(tag);
             xmlelem_add(root, heading);
@@ -1379,6 +1396,7 @@ static int markdown_new(Value *vret, Value *v, RefNode *node)
 
     fs->Mem_init(&md->mem, 1024);
     md->tabstop = 4;
+    md->heading = 1;
 
     return TRUE;
 }
@@ -1439,6 +1457,23 @@ static int markdown_tabstop(Value *vret, Value *v, RefNode *node)
         md->tabstop = (int)i64;
     } else {
         *vret = int32_Value(md->tabstop);
+    }
+    return TRUE;
+}
+static int markdown_heading(Value *vret, Value *v, RefNode *node)
+{
+    Ref *r = Value_vp(*v);
+    Markdown *md = Value_ptr(r->v[INDEX_MARKDOWN_MD]);
+    if (fg->stk_top > v + 1) {
+        int err;
+        int64_t i64 = fs->Value_int64(v[1], &err);
+        if (err || i64 < 1 || i64 > 6) {
+            fs->throw_errorf(fs->mod_lang, "ValueError", "Out of range (1 - 6)");
+            return FALSE;
+        }
+        md->heading = (int)i64;
+    } else {
+        *vret = int32_Value(md->heading);
     }
     return TRUE;
 }
@@ -1558,6 +1593,10 @@ static void define_class(RefNode *m)
     fs->define_native_func_a(n, markdown_tabstop, 0, 0, NULL);
     n = fs->define_identifier(m, cls, "tabstop=", NODE_FUNC_N, 0);
     fs->define_native_func_a(n, markdown_tabstop, 1, 1, NULL, fs->cls_int);
+    n = fs->define_identifier(m, cls, "heading", NODE_FUNC_N, NODEOPT_PROPERTY);
+    fs->define_native_func_a(n, markdown_heading, 0, 0, NULL);
+    n = fs->define_identifier(m, cls, "heading=", NODE_FUNC_N, 0);
+    fs->define_native_func_a(n, markdown_heading, 1, 1, NULL, fs->cls_int);
 
     n = fs->define_identifier(m, cls, "compile", NODE_FUNC_N, 0);
     fs->define_native_func_a(n, markdown_compile, 1, 1, NULL, fs->cls_str);

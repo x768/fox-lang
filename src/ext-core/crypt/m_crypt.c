@@ -176,10 +176,12 @@ static int sslsocket_write(Value *vret, Value *v, RefNode *node)
     Ref *r = Value_ref(*v);
     SSL *ssl = Value_ptr(r->v[INDEX_SSL_SSL]);
     RefBytesIO *mb = Value_vp(v[1]);
+    int wrote_size = 0;
 
     if (ssl != NULL) {
-        SSL_write(ssl, mb->buf.p, mb->buf.size);
+        wrote_size = SSL_write(ssl, mb->buf.p, mb->buf.size);
     }
+    *vret = int32_Value(wrote_size);
     return TRUE;
 }
 static int sslsocket_cipher(Value *vret, Value *v, RefNode *node)

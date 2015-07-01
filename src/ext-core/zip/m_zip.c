@@ -1,10 +1,3 @@
-/*
- * m_zip.c
- *
- *  Created on: 2012/01/09
- *      Author: frog
- */
-
 #define DEFINE_GLOBALS
 #include "zipfile.h"
 #include <string.h>

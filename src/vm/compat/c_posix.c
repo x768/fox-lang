@@ -1,5 +1,4 @@
 #include "c_posix_osx.c"
-#include "config.h"
 
 #if (defined(__unix__) || defined(unix)) && !defined(USG)
 #include <sys/param.h>

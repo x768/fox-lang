@@ -622,7 +622,7 @@ struct FoxGlobal
 ////////////////////////////////////////////////////////////////////////////////
 
 #define FOX_VERSION_MAJOR    0
-#define FOX_VERSION_MINOR    10
+#define FOX_VERSION_MINOR    11
 #define FOX_VERSION_REVISION 0
 
 
@@ -649,6 +649,7 @@ extern const char *fox_ctype_flags;
 
 #define Value_isref(v)       ((v) != 0ULL && ((v) & 3ULL) == 0ULL)
 #define Value_isintegral(v)  ((v) != 0ULL && ((v) & 3ULL) == 1ULL)
+#define Value_isint(v)       (((v) & 0xFFFFFFFFULL) == 5ULL)
 #define Value_isptr(v)       ((v) != 0ULL && ((v) & 3ULL) == 2ULL)
 
 #define Value_vp(v)          ((void*)(uintptr_t)((v) | 0))

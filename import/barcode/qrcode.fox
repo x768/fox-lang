@@ -135,7 +135,7 @@ def _b_bio_and_bio_b(b1:Bytes, bi1:BytesIO, bi2:BytesIO, b2:Bytes)
         s1[i] &= s2[i]
     }
     if s2.size > s1.size {
-        s1.write b"\0" * s2.size - s2.size
+        s1.write b"\0" * (s2.size - s1.size)
     }
     return s1
 }

@@ -22,8 +22,9 @@ void init_stdio()
     fh->fd_read = STDIN_FILENO;
     fh->fd_write = STDOUT_FILENO;
 
-    fh->console_read = (GetFileType((HANDLE)STDIN_FILENO) == FILE_TYPE_CHAR);
-    fh->console_write = (GetFileType((HANDLE)STDOUT_FILENO) == FILE_TYPE_CHAR);
+    fv->console_read = (GetFileType((HANDLE)STDIN_FILENO) == FILE_TYPE_CHAR);
+    fv->console_write = (GetFileType((HANDLE)STDOUT_FILENO) == FILE_TYPE_CHAR);
+    fv->console_error = (GetFileType((HANDLE)STDERR_FILENO) == FILE_TYPE_CHAR);
 }
 
 static void write_errmsg(const char *str)

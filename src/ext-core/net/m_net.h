@@ -8,11 +8,12 @@
 enum {
     INDEX_IFADDR_NAME,
     INDEX_IFADDR_ADDR,
-    INDEX_IFADDR_MASK,
     INDEX_IFADDR_NUM,
 };
 
 typedef struct RefSockAddr RefSockAddr;
+typedef struct RefListener RefListener;
+
 
 #ifdef WIN32
 
@@ -41,7 +42,8 @@ void shutdown_winsock(void);
 
 #endif
 
-RefSockAddr *new_refsockaddr(struct sockaddr *sa);
+int sockaddr_get_bit_count(struct sockaddr *addr);
+RefSockAddr *new_refsockaddr(struct sockaddr *sa, int is_range);
 int getifaddrs_sub(RefArray *ra);
 
 #ifdef DEFINE_GLOBALS
@@ -55,6 +57,20 @@ extern RefNode *cls_ifaddr;
 #ifdef DEFINE_GLOBALS
 #undef extern
 #endif
+
+struct RefSockAddr {
+    RefHeader rh;
+    int mask_bits;
+    int len;
+    struct sockaddr addr[0];
+};
+
+struct RefListener {
+    RefHeader rh;
+    FileHandle sock;
+    int len;
+    struct sockaddr addr[0];
+};
 
 
 #endif /* _M_NET_H_ */

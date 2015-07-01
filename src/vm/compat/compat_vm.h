@@ -56,7 +56,7 @@ void *dlsym_fox(void *handle, const char *name);
 const char *dlerror_fox(void);
 
 int win_read_console(FileHandle fd, char *dst, int dst_size);
-void win_write_console(FileHandle fd, const char *str, int size);
+int win_write_console(FileHandle fd, const char *str, int size);
 
 #else
 

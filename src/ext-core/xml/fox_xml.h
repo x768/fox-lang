@@ -23,8 +23,9 @@ enum {
     TK_TAG_END,       // >
     TK_TAG_END_CLOSE, // />
     TK_TAG_CLOSE,     // </abc>
-    TK_CMD_START,     // <?xml
-    TK_CMD_END,       // ?>
+    TK_DECL_START,    // <?xml
+    TK_DECL_END,      // ?>
+    TK_DECL_BODY,      // <?xml ******?>
     TK_DOCTYPE,       // <!hoge
     TK_COMMENT,       // <!--COMMENT-->
 
@@ -35,11 +36,13 @@ enum {
     TK_TEXT,
 };
 enum {
+    INDEX_DOCUMENT_XML_COMMAND,
     INDEX_DOCUMENT_HAS_DTD,
     INDEX_DOCUMENT_IS_PUBLIC,
     INDEX_DOCUMENT_FPI,
     INDEX_DOCUMENT_DTD_URI,
-    INDEX_DOCUMENT_ROOT,
+    INDEX_DOCUMENT_ROOT,  // root node
+    INDEX_DOCUMENT_LIST,  // コメントとrootnodeのリスト
     INDEX_DOCUMENT_NUM,
 };
 
@@ -67,6 +70,7 @@ extern RefNode *cls_document;
 extern RefNode *cls_nodelist;
 extern RefNode *cls_node;
 extern RefNode *cls_elem;
+extern RefNode *cls_decl;
 extern RefNode *cls_text;
 extern RefNode *cls_comment;
 
@@ -78,14 +82,14 @@ extern RefNode *cls_comment;
 int ch_get_category(int ch);
 
 // xml_parse.c
-int get_tag_type_icase(Str s);
+int get_tag_type_icase(const char *s_p, int s_size);
 int is_valid_elem_name(const char *s_p, int s_size);
 int resolve_entity(const char *p, const char *end);
 void XMLTok_init(XMLTok *tk, char *src, const char *end, int xml, int loose);
 void XMLTok_skip_next(XMLTok *tk);
-int parse_html_body(Value *html, XMLTok *tk);
+int parse_html_body(Value *html, RefArray *ra, XMLTok *tk);
 int parse_xml_begin(Ref *r, XMLTok *tk);
-int parse_xml_body(Value *v, XMLTok *tk, int first);
+int parse_xml_body(Value *v, XMLTok *tk);
 int parse_doctype_declaration(Ref *r, XMLTok *tk);
 
 // xml_select.c

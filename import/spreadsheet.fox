@@ -1,5 +1,3 @@
-import spreadsheet.excel_reader
-
 def spreadsheet_open(src)
 {
     var f = null

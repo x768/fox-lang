@@ -3,4 +3,4 @@ application/javascript:application/json
 application/ogg:video/ogg	audio/ogg
 application/xml:application/atom+xml	application/rss+xml	application/xhtml+xml	image/svg+xml
 application/zip:application/epub+zip	application/java-archive	application/vnd.oasis.opendocument.chart	application/vnd.oasis.opendocument.database	application/vnd.oasis.opendocument.formula	application/vnd.oasis.opendocument.graphics	application/vnd.oasis.opendocument.image	application/vnd.oasis.opendocument.presentation	application/vnd.oasis.opendocument.spreadsheet	application/vnd.oasis.opendocument.text:odt	application/vnd.openxmlformats-officedocument.wordprocessingml.document	application/vnd.openxmlformats-officedocument.presentationml.presentation	application/vnd.openxmlformats-officedocument.spreadsheetml.sheet	image/svg+xml-compressed
-text/plain:application/javascript	application/xml
+text/plain:application/javascript	application/xml	application/x-perl	application/x-ruby

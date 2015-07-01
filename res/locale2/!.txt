@@ -1,0 +1,8 @@
+langtag = '(neutral)'
+am_pm = ['AM', 'PM']
+date = ['yy-MM-dd', 'yyyy-MM-dd', 'yyyy-MM-dd', 'yyyy-MM-dd']
+time = ['HH:mm', 'HH:mm:ss', 'HH:mm:ss z', 'HH:mm:ss Z']
+decimal = '.'
+group = ' '
+group_n = 3
+bidi = 'ltr'

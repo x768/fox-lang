@@ -1,0 +1,16 @@
+import spreadsheet
+
+let book = spreadsheet_open("test.xls")
+let sheet = book[0]
+
+for row in 0..sheet.rows {
+    for col in 0..sheet.cols {
+        if col > 0 {
+            print "\t"
+        }
+        let cell = sheet[col, row]
+        print "(", cell.type, ")", cell
+    }
+    print "\n"
+}
+

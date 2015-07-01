@@ -1,0 +1,7 @@
+if(WIN32)
+set(LINK_FLAGS "${LINK_FLAGS} -Wl,--version-script,../../../fox-ext.map -static-libgcc")
+elseif(APPLE)
+set(LINK_FLAGS "${LINK_FLAGS} -Wl,-order_file,../../../fox-ext.order")
+else()
+set(LINK_FLAGS "${LINK_FLAGS} -Wl,--version-script,../../../fox-ext.map -fPIC")
+endif()

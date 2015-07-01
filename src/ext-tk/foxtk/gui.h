@@ -123,6 +123,7 @@ void connect_widget_events(WndHandle window);
 void create_image_pane_window(Value *v, WndHandle parent);
 int image_pane_set_image_sub(WndHandle window, RefImage *img);
 
+// monitor.c
 void native_timer_new(int millisec, Ref *r);
 void native_timer_remove(Ref *r);
 int native_filemonitor_new(Ref *r, const char *path);

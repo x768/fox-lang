@@ -16,6 +16,12 @@ typedef struct {
 
 typedef struct {
     RefHeader rh;
+    double re;
+    double im;
+} RefComplex;
+
+typedef struct {
+    RefHeader rh;
 
     int size;
     double d[0];

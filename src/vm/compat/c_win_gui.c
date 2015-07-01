@@ -9,6 +9,10 @@ void init_stdio()
     Ref *r = ref_new(fv->cls_nullio);
     fg->v_cio = vp_Value(r);
     init_stream_ref(r, STREAM_READ | STREAM_WRITE);
+
+    fv->console_read = FALSE;
+    fv->console_write = FALSE;
+    fv->console_error = FALSE;
 }
 void show_error_message(const char *msg, int msg_size, int warn)
 {

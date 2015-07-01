@@ -1,5 +1,6 @@
 #include "fox_xml.h"
 #include <string.h>
+#include <stdlib.h>
 
 
 typedef struct {
@@ -23,6 +24,9 @@ typedef struct {
     Value *body;
     RefArray *body_ra;
     Value *body_vm;
+    
+    RefArray *ra_list;
+    int html_node_done;
 } HTMLDoc;
 
 ////////////////////////////////////////////////////////////////////////////////////
@@ -536,20 +540,20 @@ static int get_tag_type(Str s)
     }
     return 0;
 }
-int get_tag_type_icase(Str s)
+int get_tag_type_icase(const char *s_p, int s_size)
 {
     char cbuf[16];
-    const char *p = s.p + s.size;
+    const char *p = s_p + s_size;
     int i;
     int size;
 
-    while (p > s.p) {
+    while (p > s_p) {
         if (p[-1] == ':') {
             break;
         }
         p--;
     }
-    size = s.size - (p - s.p);
+    size = s_size - (p - s_p);
 
     for (i = 0; i < size && i < 15; i++) {
         cbuf[i] = tolower_fox(p[i]);
@@ -588,6 +592,10 @@ int is_valid_elem_name(const char *s_p, int s_size)
         first = FALSE;
     }
     return TRUE;
+}
+static void throw_unexpected_token(XMLTok *tk)
+{
+    fs->throw_errorf(mod_xml, "XMLParseError", "Unexpected token at line %d", tk->line);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////
@@ -868,7 +876,7 @@ static void XMLTok_next(XMLTok *tk)
                 tk->type = TK_ERROR;
                 return;
             }
-            tk->type = TK_CMD_START;
+            tk->type = TK_DECL_START;
             return;
         case '/':  // </tag>
             tk->p += 2;
@@ -918,7 +926,7 @@ static void XMLTok_next(XMLTok *tk)
 }
 
 /**
- * タグの中
+ * タグ終了まで
  */
 static void XMLTok_next_tag(XMLTok *tk)
 {
@@ -953,7 +961,7 @@ static void XMLTok_next_tag(XMLTok *tk)
     case '?':
         if (tk->p[1] == '>') {
             tk->p += 2;
-            tk->type = TK_CMD_END;
+            tk->type = TK_DECL_END;
         } else {
             tk->p++;
             tk->type = TK_ERROR;
@@ -973,6 +981,35 @@ static void XMLTok_next_tag(XMLTok *tk)
         break;
     }
 }
+
+/**
+ * <?xml ... ?>
+ */
+static void XMLTok_next_decl(XMLTok *tk)
+{
+    const char *top;
+
+    while (tk->p < tk->end && isspace_fox(*tk->p)) {
+        if (*tk->p == '\n') {
+            tk->line++;
+        }
+        tk->p++;
+    }
+
+    top = tk->p;
+    while (tk->p < tk->end - 1) {
+        if (tk->p[0] == '?' && tk->p[1] == '>') {
+            tk->val.p = top;
+            tk->val.size = tk->p - top;
+            tk->p += 2;
+            tk->type = TK_DECL_BODY;
+            return;
+        }
+        tk->p++;
+    }
+    tk->type = TK_ERROR;
+}
+
 /**
  * <script></script>
  */
@@ -1207,23 +1244,27 @@ static int parse_html_sub(Value *v, RefArray *v_ra, HTMLDoc *html, XMLTok *tk, S
         // 無視
         XMLTok_next(tk);
         break;
-    case TK_CMD_START:  // <?
-        // ?>まで無視する
-        XMLTok_next_tag(tk);
+    case TK_DECL_START: { // <?
+        // ?>までコメント扱い
+        StrBuf sb;
+        fs->StrBuf_init_refstr(&sb, 0);
+        fs->StrBuf_add_c(&sb, '?');
+        fs->StrBuf_add(&sb, tk->val.p, tk->val.size);
 
-        for (;;) {
-            switch (tk->type) {
-            case TK_EOS:
-                return TRUE;
-            case TK_CMD_END:
-                XMLTok_next(tk);
-                goto BREAK_ALL;
-            default:
-                XMLTok_next_tag(tk);
-                break;
-            }
+        XMLTok_next_decl(tk);
+        if (tk->type == TK_DECL_BODY) {
+            Value *vp = fs->refarray_push(v_ra);
+            fs->StrBuf_add_c(&sb, ' ');
+            fs->StrBuf_add(&sb, tk->val.p, tk->val.size);
+            fs->StrBuf_add_c(&sb, '?');
+            *vp = fs->StrBuf_str_Value(&sb, cls_comment);
+            XMLTok_next(tk);
+        } else {
+            StrBuf_close(&sb);
+            return TRUE;
         }
         break;
+    }
     case TK_DOCTYPE:  // <!
         // >まで無視する
         XMLTok_next_tag(tk);
@@ -1259,6 +1300,10 @@ static int parse_html_sub(Value *v, RefArray *v_ra, HTMLDoc *html, XMLTok *tk, S
             if (str_eq(tag_name.p, tag_name.size, parent_tag.p, parent_tag.size)) {
                 return FALSE;
             }
+        }
+        if (!html->html_node_done) {
+            *fs->refarray_push(html->ra_list) = fs->Value_cp(*html->html);
+            html->html_node_done = TRUE;
         }
 
         if (Str_eq_p(tag_name, "html")) {
@@ -1386,7 +1431,7 @@ static int parse_html_sub(Value *v, RefArray *v_ra, HTMLDoc *html, XMLTok *tk, S
 BREAK_ALL:
     return TRUE;
 }
-int parse_html_body(Value *html, XMLTok *tk)
+int parse_html_body(Value *html, RefArray *ra, XMLTok *tk)
 {
     HTMLDoc ht;
     Str body = Str_new("body", 4);
@@ -1399,11 +1444,16 @@ int parse_html_body(Value *html, XMLTok *tk)
     xml_elem_init(ht.title, &ht.title_ra, &ht.title_vm, "title", 5);
     ht.body = fs->refarray_push(ht.html_ra);
     xml_elem_init(ht.body, &ht.body_ra, &ht.body_vm, body.p, body.size);
+    ht.ra_list = ra;
+    ht.html_node_done = FALSE;
 
     while (tk->type != TK_EOS) {
         if (!parse_html_sub(ht.body, ht.body_ra, &ht, tk, body)) {
             return FALSE;
         }
+    }
+    if (!ht.html_node_done) {
+        *fs->refarray_push(ra) = fs->Value_cp(*html);
     }
     return TRUE;
 }
@@ -1412,7 +1462,7 @@ int parse_xml_begin(Ref *r, XMLTok *tk)
     r->v[INDEX_DOCUMENT_HAS_DTD] = VALUE_FALSE;
     r->v[INDEX_DOCUMENT_IS_PUBLIC] = VALUE_TRUE;
 
-    if (tk->type == TK_CMD_START) {
+    if (tk->type == TK_DECL_START) {
         // ?>まで無視する
         XMLTok_next_tag(tk);
 
@@ -1424,7 +1474,7 @@ int parse_xml_begin(Ref *r, XMLTok *tk)
             case TK_ERROR:
                 fs->throw_errorf(mod_xml, "XMLParseError", "Unknown token at line %d", tk->line);
                 return FALSE;
-            case TK_CMD_END:
+            case TK_DECL_END:
                 XMLTok_next(tk);
                 goto BREAK_CMD;
             case TK_ATTR_NAME: {
@@ -1441,7 +1491,7 @@ int parse_xml_begin(Ref *r, XMLTok *tk)
                 break;
             }
             default:
-                fs->throw_errorf(mod_xml, "XMLParseError", "Unexpected token at line %d", tk->line);
+                throw_unexpected_token(tk);
                 return FALSE;
             }
         }
@@ -1456,7 +1506,7 @@ int parse_xml_begin(Ref *r, XMLTok *tk)
             return FALSE;
         }
         if (tk->type != TK_TAG_END) {
-            fs->throw_errorf(mod_xml, "XMLParseError", "Unexpected token at line %d", tk->line);
+            throw_unexpected_token(tk);
             return FALSE;
         }
         XMLTok_next(tk);
@@ -1470,7 +1520,7 @@ int parse_xml_begin(Ref *r, XMLTok *tk)
 /**
  * 一つの要素または1つのテキスト要素を解析する
  */
-int parse_xml_body(Value *v, XMLTok *tk, int first)
+int parse_xml_body(Value *v, XMLTok *tk)
 {
     switch (tk->type) {
     case TK_TAG_START: {
@@ -1486,7 +1536,7 @@ int parse_xml_body(Value *v, XMLTok *tk, int first)
                 fs->throw_errorf(mod_xml, "XMLParseError", "Missing '>' at line %d", tk->line);
                 return FALSE;
             case TK_ERROR:
-                fs->throw_errorf(mod_xml, "XMLParseError", "Unknown token at line %d", tk->line);
+                throw_unexpected_token(tk);
                 return FALSE;
             case TK_TAG_END_CLOSE:
                 XMLTok_next(tk);
@@ -1496,10 +1546,11 @@ int parse_xml_body(Value *v, XMLTok *tk, int first)
                 for (;;) {
                     switch (tk->type) {
                     case TK_TAG_START:
+                    case TK_DECL_START:
                     case TK_TEXT:
                     case TK_COMMENT: {
                         Value *ve = fs->refarray_push(ra);
-                        if (!parse_xml_body(ve, tk, FALSE)) {
+                        if (!parse_xml_body(ve, tk)) {
                             return FALSE;
                         }
                         break;
@@ -1522,7 +1573,7 @@ int parse_xml_body(Value *v, XMLTok *tk, int first)
                         }
                         goto BREAK_ALL;
                     default:
-                        fs->throw_errorf(mod_xml, "XMLParseError", "Unknown token at line %d", tk->line);
+                        throw_unexpected_token(tk);
                         return FALSE;
                     }
                 }
@@ -1554,37 +1605,44 @@ int parse_xml_body(Value *v, XMLTok *tk, int first)
                 break;
             }
             default:
-                fs->throw_errorf(mod_xml, "XMLParseError", "Unexpected token at line %d", tk->line);
+                throw_unexpected_token(tk);
                 return FALSE;
             }
         }
         break;
     }
     case TK_TEXT:
-        if (first) {
-            fs->throw_errorf(mod_xml, "XMLParseError", "Unexpected token at line %d", tk->line);
-            return FALSE;
-        } else {
-            *v = fs->cstr_Value(cls_text, tk->val.p, tk->val.size);
-            XMLTok_next(tk);
-        }
+        *v = fs->cstr_Value(cls_text, tk->val.p, tk->val.size);
+        XMLTok_next(tk);
         break;
     case TK_COMMENT:
-        if (first) {
-            fs->throw_errorf(mod_xml, "XMLParseError", "Unexpected token at line %d", tk->line);
-            return FALSE;
-        } else {
-            *v = fs->cstr_Value(cls_comment, tk->val.p, tk->val.size);
+        *v = fs->cstr_Value(cls_comment, tk->val.p, tk->val.size);
+        XMLTok_next(tk);
+        break;
+    case TK_DECL_START: {
+        Ref *r = fs->ref_new(cls_decl);
+        *v = vp_Value(r);
+
+        r->v[INDEX_DECL_NAME] = fs->cstr_Value(fs->cls_str, tk->val.p, tk->val.size);
+        XMLTok_next_decl(tk);
+        if (tk->type == TK_DECL_BODY) {
+            r->v[INDEX_DECL_CONTENT] = fs->cstr_Value(fs->cls_str, tk->val.p, tk->val.size);
             XMLTok_next(tk);
+        } else {
+            if (!tk->loose) {
+                throw_unexpected_token(tk);
+                return FALSE;
+            }
         }
         break;
+    }
     case TK_EOS:
         break;
     case TK_ERROR:
         fs->throw_errorf(mod_xml, "XMLParseError", "Unknown token at line %d", tk->line);
         return FALSE;
     default:
-        fs->throw_errorf(mod_xml, "XMLParseError", "Unexpected token at line %d", tk->line);
+        throw_unexpected_token(tk);
         return FALSE;
     }
 

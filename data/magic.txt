@@ -7,7 +7,9 @@ application/x-bzip:BZh
 application/x-fox-object:\x89fox\r\n\0\0
 application/x-gzip:\x1F\x8B
 application/x-ms-dos-executable:MZ
+application/x-perl:#!/usr/bin/perl	#!/usr/bin/env perl
 application/x-rar:Rar!
+application/x-shellscript:#!/bin/sh	#!/usr/bin/env sh
 application/x-shockwave-flash:FWS	CWS
 application/x-sqlite3:SQLite format 3
 application/x-xz:\xFD7zXZ\0

@@ -4,8 +4,12 @@
 #include <stdlib.h>
 
 
-typedef struct
-{
+typedef struct {
+    RefHeader rh;
+    SDL_Event e;
+} RefSDLEvent;
+
+typedef struct {
     RefStr *which;
     RefStr *button;
     RefStr *state;
@@ -14,13 +18,6 @@ typedef struct
     RefStr *xrel, *yrel;
 } SDLEventID;
 
-
-static const FoxStatic *fs;
-static FoxGlobal *fg;
-static RefNode *mod_sdl;
-
-static RefNode *cls_window;
-static RefNode *cls_surface;
 
 
 void throw_sdl_error()
@@ -117,6 +114,11 @@ static int sdlwindow_close(Value *vret, Value *v, RefNode *node)
     if (window->w != NULL) {
         SDL_DestroyWindow(window->w);
         window->w = NULL;
+
+        if (gl_cur_window == window) {
+            gl_cur_window = NULL;
+            gl_cur_context = NULL;
+        }
     }
 
     return TRUE;
@@ -163,6 +165,38 @@ static int sdlwindow_get_surface(Value *vret, Value *v, RefNode *node)
     }
     sf = fs->buf_new(cls_surface, sizeof(RefSDLSurface));
     sf->sf = s;
+
+    return TRUE;
+}
+static int sdlwindow_gl_context(Value *vret, Value *v, RefNode *node)
+{
+    RefSDLWindow *window = Value_vp(*v);
+    RefGLContext *gl;
+    SDL_GLContext *g;
+
+    if (window->w == NULL) {
+        throw_already_closed(*v);
+        return FALSE;
+    }
+    g = SDL_GL_CreateContext(window->w);
+    if (g == NULL) {
+        throw_sdl_error();
+        return FALSE;
+    }
+    gl = fs->buf_new(cls_glcontext, sizeof(RefGLContext));
+    gl->gl = g;
+
+    return TRUE;
+}
+static int sdlwindow_gl_swap(Value *vret, Value *v, RefNode *node)
+{
+    RefSDLWindow *window = Value_vp(*v);
+
+    if (window->w == NULL) {
+        throw_already_closed(*v);
+        return FALSE;
+    }
+    SDL_GL_SwapWindow(window->w);
 
     return TRUE;
 }
@@ -400,9 +434,6 @@ static void define_class(RefNode *m)
     RefNode *cls;
     RefNode *n;
 
-    cls_window = fs->define_identifier(m, m, "SDLWindow", NODE_CLASS, 0);
-    cls_surface = fs->define_identifier(m, m, "SDLSurface", NODE_CLASS, 0);
-
 
     cls = cls_window;
     n = fs->define_identifier_p(m, cls, fs->str_new, NODE_NEW_N, 0);
@@ -410,7 +441,7 @@ static void define_class(RefNode *m)
 
     n = fs->define_identifier(m, cls, "close", NODE_FUNC_N, 0);
     fs->define_native_func_a(n, sdlwindow_close, 0, 0, NULL);
-    n = fs->define_identifier(m, cls, "destroy", NODE_FUNC_N, 0);
+    n = fs->define_identifier_p(m, cls, fs->str_dispose, NODE_FUNC_N, 0);
     fs->define_native_func_a(n, sdlwindow_close, 0, 0, NULL);
 
     n = fs->define_identifier(m, cls, "title", NODE_FUNC_N, NODEOPT_PROPERTY);
@@ -419,6 +450,10 @@ static void define_class(RefNode *m)
     fs->define_native_func_a(n, sdlwindow_set_title, 1, 1, NULL, fs->cls_str);
     n = fs->define_identifier(m, cls, "surface", NODE_FUNC_N, NODEOPT_PROPERTY);
     fs->define_native_func_a(n, sdlwindow_get_surface, 0, 0, NULL);
+    n = fs->define_identifier(m, cls, "create_context", NODE_FUNC_N, 0);
+    fs->define_native_func_a(n, sdlwindow_gl_context, 0, 0, NULL);
+    n = fs->define_identifier(m, cls, "gl_swap", NODE_FUNC_N, 0);
+    fs->define_native_func_a(n, sdlwindow_gl_swap, 0, 0, NULL);
     fs->extends_method(cls, fs->cls_obj);
 
 
@@ -453,13 +488,27 @@ static void define_class(RefNode *m)
 
 void define_module(RefNode *m, const FoxStatic *a_fs, FoxGlobal *a_fg)
 {
+    RefNode *mod_math;
+
     fs = a_fs;
     fg = a_fg;
     mod_sdl = m;
 
+    mod_math = fs->get_module_by_name("math", -1, TRUE, FALSE);
+
+    cls_window = fs->define_identifier(m, m, "SDLWindow", NODE_CLASS, 0);
+    cls_glcontext = fs->define_identifier(m, m, "GLContext", NODE_CLASS, 0);
+    cls_surface = fs->define_identifier(m, m, "SDLSurface", NODE_CLASS, 0);
+
     define_const(m);
     define_class(m);
     define_func(m);
+
+    define_gl_class(m);
+    define_gl_func(m);
+
+    fs->add_unresolved_ptr(m, mod_math, "Vector", &cls_vector);
+    fs->add_unresolved_ptr(m, mod_math, "Matrix", &cls_matrix);
 }
 
 const char *module_version(const FoxStatic *a_fs)

@@ -19,6 +19,10 @@ void init_stdio()
     r->v[INDEX_FILEIO_HANDLE] = vp_Value(fh);
     fh->fd_read = STDIN_FILENO;
     fh->fd_write = STDOUT_FILENO;
+
+    fv->console_read = FALSE;
+    fv->console_write = FALSE;
+    fv->console_error = FALSE;
 }
 
 /**

@@ -788,8 +788,10 @@ static int filemonitor_wait(Value *vret, Value *v, RefNode *node)
 static int filemonitor_close(Value *vret, Value *v, RefNode *node)
 {
     Ref *r = Value_ref(*v);
+
     if (r->v[INDEX_FILEMONITOR_STRUCT] != VALUE_NULL) {
         native_filemonitor_remove(r);
+        r->v[INDEX_FILEMONITOR_STRUCT] = VALUE_NULL;
     }
     return TRUE;
 }
@@ -976,7 +978,7 @@ static int evthandler_del(Value *vret, Value *v, RefNode *node)
 
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-static int gui_message_loop(Value *vret, Value *v, RefNode *node)
+static int gui_wait_message(Value *vret, Value *v, RefNode *node)
 {
     int loop = TRUE;
 
@@ -1009,8 +1011,8 @@ static void define_func(RefNode *m)
     RefNode *n;
 
 
-    n = fs->define_identifier(m, m, "message_loop", NODE_FUNC_N, 0);
-    fs->define_native_func_a(n, gui_message_loop, 0, 0, NULL);
+    n = fs->define_identifier(m, m, "wait_message", NODE_FUNC_N, 0);
+    fs->define_native_func_a(n, gui_wait_message, 0, 0, NULL);
 
     n = fs->define_identifier(m, m, "alert", NODE_FUNC_N, 0);
     fs->define_native_func_a(n, gui_alert, 1, 3, (void*)FALSE, NULL, fs->cls_str, cls_form);

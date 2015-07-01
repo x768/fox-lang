@@ -22,9 +22,12 @@ int getifaddrs_sub(RefArray *ra)
         *v = vp_Value(r);
 
         r->v[INDEX_IFADDR_NAME] = fs->cstr_Value_conv(ifa->ifa_name, -1, NULL);
-        r->v[INDEX_IFADDR_ADDR] = vp_Value(new_refsockaddr(ifa->ifa_addr));
         if (ifa->ifa_netmask != NULL) {
-            r->v[INDEX_IFADDR_MASK] = vp_Value(new_refsockaddr(ifa->ifa_netmask));
+            RefSockAddr *addr = new_refsockaddr(ifa->ifa_addr, TRUE);
+            addr->mask_bits = sockaddr_get_bit_count(ifa->ifa_netmask);
+            r->v[INDEX_IFADDR_ADDR] = vp_Value(addr);
+        } else {
+            r->v[INDEX_IFADDR_ADDR] = vp_Value(new_refsockaddr(ifa->ifa_addr, FALSE));
         }
     }
     freeifaddrs(ifaddr);

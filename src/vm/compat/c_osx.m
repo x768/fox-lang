@@ -5,7 +5,6 @@
 #import <Foundation/NSDate.h>
 #import <Foundation/NSLocale.h>
 
-#include "config.h"
 #include "fox_vm.h"
 #include <unistd.h>
 #include <time.h>

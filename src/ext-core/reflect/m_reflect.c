@@ -133,10 +133,10 @@ static int ref_get_this(Value *vret, Value *v, RefNode *node)
     Ref *fn_obj = Value_ref(v[1]);
 
     if (fn_obj->rh.n_memb == 0) {
-        fs->throw_errorf(fs->mod_lang, "ValueError", "Not a class method");
-        return FALSE;
+        *vret = VALUE_NULL;
+    } else {
+        *vret = fs->Value_cp(fn_obj->v[INDEX_FUNC_THIS]);
     }
-    *vret = fs->Value_cp(fn_obj->v[INDEX_FUNC_THIS]);
     return TRUE;
 }
 static int get_module_path(Value *vret, Value *v, RefNode *node)

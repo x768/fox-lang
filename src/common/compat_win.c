@@ -118,10 +118,6 @@ FileHandle open_fox(const char *fname, int mode, int dummy)
         dwCreationDisposition = OPEN_EXISTING;
         break;
     case O_CREAT|O_WRONLY|O_TRUNC:
-        dwDesiredAccess = GENERIC_WRITE;
-        dwShareMode = 0;
-        dwCreationDisposition = CREATE_ALWAYS;
-        break;
     case O_CREAT|O_WRONLY|O_APPEND:
         dwDesiredAccess = GENERIC_WRITE;
         dwShareMode = 0;
@@ -133,7 +129,7 @@ FileHandle open_fox(const char *fname, int mode, int dummy)
     wtmp = filename_to_utf16(fname, NULL);
     fd = (FileHandle)CreateFileW(wtmp, dwDesiredAccess, dwShareMode, NULL, dwCreationDisposition, FILE_ATTRIBUTE_NORMAL, NULL);
 
-    if (mode == (O_CREAT|O_WRONLY|O_APPEND)) {
+    if (fd != -1 && mode == (O_CREAT|O_WRONLY|O_APPEND)) {
         SetFilePointer((HANDLE)fd, 0, NULL, FILE_END);
     }
     free(wtmp);

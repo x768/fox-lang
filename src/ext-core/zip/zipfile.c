@@ -4,10 +4,10 @@
 #include <stdlib.h>
 #include <limits.h>
 
-#define CENTRAL_MAGIC "PK\1\2"
-#define LOCAL_MAGIC   "PK\3\4"
-#define EOCD_MAGIC    "PK\5\6"
-#define DATADES_MAGIC "PK\7\8"
+#define CENTRAL_MAGIC "PK\x01\x02"
+#define LOCAL_MAGIC   "PK\x03\x04"
+#define EOCD_MAGIC    "PK\x05\x06"
+#define DATADES_MAGIC "PK\x07\x08"
 
 enum {
     CENTRAL_SIZE = 46,

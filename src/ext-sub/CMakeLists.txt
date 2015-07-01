@@ -1,0 +1,21 @@
+cmake_minimum_required(VERSION 3.0)
+
+include(../common.cmake)
+include(../library.cmake)
+
+set(DEST_DIR ../../../../import)
+
+add_subdirectory(image_formula)
+add_subdirectory(image_text)
+add_subdirectory(json)
+add_subdirectory(lzma)
+add_subdirectory(markdown)
+#add_subdirectory(mongo)
+#add_subdirectory(mysql)
+add_subdirectory(rawimage)
+add_subdirectory(webimage)
+#add_subdirectory(webm)
+add_subdirectory(webp)
+if("${TARGET_OS}" STREQUAL "win")
+  add_subdirectory(windows)
+endif()
