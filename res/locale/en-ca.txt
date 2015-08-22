@@ -1,0 +1,2 @@
+langtag = "en_CA"
+date = "yy-MM-dd", "yyyy-MM-dd", "d MMMM, y", "dddd, d MMMM, y"

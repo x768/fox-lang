@@ -48,7 +48,7 @@ static int vector_marshal_read(Value *vret, Value *v, RefNode *node)
     RefVector *vec;
     Value r = Value_ref(v[1])->v[INDEX_MARSHALDUMPER_SRC];
 
-    if (!fs->stream_read_uint32(&size, r)) {
+    if (!fs->stream_read_uint32(r, &size)) {
         return FALSE;
     }
     if (size > fs->max_alloc || size * sizeof(double) > fs->max_alloc) {
@@ -69,8 +69,8 @@ static int vector_marshal_read(Value *vret, Value *v, RefNode *node)
     
     for (i = 0; i < vec->size; i++) {
         double val = bytes_to_double(data + i * 8);
-        if (isinf(val) || isnan(val)) {
-            fs->throw_error_select(THROW_FLOAT_VALUE_OVERFLOW);
+        if (isnan(val)) {
+            fs->throw_error_select(THROW_FLOAT_DOMAIN_ERROR);
             return FALSE;
         }
         vec->d[i] = val;
@@ -85,7 +85,7 @@ static int vector_marshal_write(Value *vret, Value *v, RefNode *node)
     uint8_t *data;
     int i;
 
-    if (!fs->stream_write_uint32(vec->size, w)) {
+    if (!fs->stream_write_uint32(w, vec->size)) {
         return FALSE;
     }
     data = malloc(8 * vec->size);
@@ -407,10 +407,10 @@ static int matrix_marshal_read(Value *vret, Value *v, RefNode *node)
     RefMatrix *mat;
     Value r = Value_ref(v[1])->v[INDEX_MARSHALDUMPER_SRC];
 
-    if (!fs->stream_read_uint32(&cols, r)) {
+    if (!fs->stream_read_uint32(r, &cols)) {
         return FALSE;
     }
-    if (!fs->stream_read_uint32(&rows, r)) {
+    if (!fs->stream_read_uint32(r, &rows)) {
         return FALSE;
     }
     if (cols > MATRIX_MAX_SIZE || rows > MATRIX_MAX_SIZE) {
@@ -437,8 +437,8 @@ static int matrix_marshal_read(Value *vret, Value *v, RefNode *node)
     
     for (i = 0; i < size; i++) {
         double val = bytes_to_double(data + i * 8);
-        if (isinf(val) || isnan(val)) {
-            fs->throw_error_select(THROW_FLOAT_VALUE_OVERFLOW);
+        if (isnan(val)) {
+            fs->throw_error_select(THROW_FLOAT_DOMAIN_ERROR);
             return FALSE;
         }
         mat->d[i] = val;
@@ -454,10 +454,10 @@ static int matrix_marshal_write(Value *vret, Value *v, RefNode *node)
     int size;
     int i;
 
-    if (!fs->stream_write_uint32(mat->cols, w)) {
+    if (!fs->stream_write_uint32(w, mat->cols)) {
         return FALSE;
     }
-    if (!fs->stream_write_uint32(mat->rows, w)) {
+    if (!fs->stream_write_uint32(w, mat->rows)) {
         return FALSE;
     }
     size = mat->cols * mat->rows;

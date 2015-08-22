@@ -1,9 +1,0 @@
-langtag:mg
-language:mg
-month_w:Janoary	Febroary	Martsa	Aprily	Mey	Jona	Jolay	Aogositra	Septambra	Oktobra	Novambra	Desambra
-month:Jan	Feb	Mar	Apr	Mey	Jon	Jol	Aog	Sep	Okt	Nov	Des
-days_w:Alatsinainy	Talata	Alarobia	Alakamisy	Zoma	Asabotsy	Alahady
-days:Alats	Tal	Alar	Alak	Zom	Asab	Alah
-date:d/M/yyyy	d MMM, y	d MMMM y	dddd d MMMM y
-time:HH:mm	HH:mm:ss	HH:mm:ss z	HH:mm:ss Z
-bidi:ltr

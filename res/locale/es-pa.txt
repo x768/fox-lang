@@ -1,0 +1,4 @@
+langtag = "es_PA"
+date = "MM/dd/yy", "MM/dd/yyyy", "", ""
+decimal = "."
+group = ","

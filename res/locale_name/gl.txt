@@ -1,0 +1,3 @@
+locale=gl
+gl:galego
+ES:España

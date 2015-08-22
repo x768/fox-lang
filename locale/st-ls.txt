@@ -1,4 +1,0 @@
-langtag:st_LS
-language:st
-territory:LS
-bidi:ltr

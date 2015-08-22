@@ -1,5 +1,0 @@
-langtag:ha_Latn_NG
-language:ha
-script:Latn
-territory:NG
-bidi:ltr

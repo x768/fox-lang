@@ -553,6 +553,7 @@ static int ipaddr_cmp(Value *vret, Value *v, RefNode *node)
         if (cmp != 0) {
             *vret = int32_Value(cmp);
         } else {
+            // IPAddrではmask_bitsは常に0
             if (rs1->mask_bits < rs2->mask_bits) {
                 *vret = int32_Value(-1);
             } else if (rs1->mask_bits > rs2->mask_bits) {

@@ -1,0 +1,6 @@
+langtag = "ku_Latn"
+month_w = "çile", "sibat", "adar", "nîsan", "gulan", "hezîran", "", "", "", "", "", ""
+month = "çil", "sib", "adr", "nîs", "gul", "hez", "tîr", "", "", "", "", ""
+days_w = "duşem", "şê", "çarşem", "pêncşem", "în", "şemî", "yekşem"
+days = "dş", "sş", "çş", "pş", "în", "ş", "yş"
+am_pm = "BN", "PN"

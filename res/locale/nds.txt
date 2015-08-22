@@ -1,0 +1,3 @@
+langtag = "nds"
+decimal = ","
+group = "."

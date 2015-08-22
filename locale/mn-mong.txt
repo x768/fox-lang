@@ -1,4 +1,0 @@
-langtag:mn_Mong
-language:mn
-script:Mong
-bidi:ltr

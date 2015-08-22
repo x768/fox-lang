@@ -1,10 +1,11 @@
-locale=ja
-usage=使用方法
-options=オプション
-source=ソースコードファイル名
-arg=引数
-immediate="srccode"をfoxスクリプトとして実行
-validate=文法チェックのみ行う
-show_help=ヘルプを表示
-show_version=バージョン情報を表示
-show_version_more=モジュールのバージョン情報と設定情報を表示
+locale = "ja"
+message = <<<EOS
+使用方法: fox [オプション...] ソースファイル名 [引数...]
+オプション
+  -e srccode: "srccode"をfoxスクリプトとして実行
+  -c srccode: 文法チェックのみ行う
+  --help: ヘルプを表示
+  -v: バージョン情報を表示
+  --version: モジュールのバージョン情報と設定情報を表示
+
+EOS

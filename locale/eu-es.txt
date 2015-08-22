@@ -1,4 +1,0 @@
-langtag:eu_ES
-language:eu
-territory:ES
-bidi:ltr

@@ -1,4 +1,0 @@
-langtag:ig_NG
-language:ig
-territory:NG
-bidi:ltr

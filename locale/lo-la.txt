@@ -1,4 +1,0 @@
-langtag:lo_LA
-language:lo
-territory:LA
-bidi:ltr

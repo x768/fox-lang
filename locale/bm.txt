@@ -1,9 +1,0 @@
-langtag:bm
-language:bm
-month_w:zanwuye	feburuye	marisi	awirili	mɛ	zuwɛn	zuluye	uti	sɛtanburu	ɔkutɔburu	nowanburu	desanburu
-month:zan	feb	nar	awi	mɛ	zuw	zul	uti	sɛt	ɔku	now	des
-days_w:ntɛnɛ	tarata	araba	alamisa	juma	sibiri	kari
-days:ntɛ	tar	ara	ala	jum	sib	kar
-date:d/M/yyyy	d MMM, y	d MMMM y	dddd d MMMM y
-time:HH:mm	HH:mm:ss	HH:mm:ss z	HH:mm:ss Z
-bidi:ltr

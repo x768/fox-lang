@@ -1,4 +1,0 @@
-langtag:ar_EG
-language:ar
-territory:EG
-bidi:ltr

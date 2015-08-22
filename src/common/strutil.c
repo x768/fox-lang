@@ -103,6 +103,9 @@ int Str_eq_p(Str s, const char *p)
 
 int refstr_eq(RefStr *r1, RefStr *r2)
 {
+    if (r1 == NULL || r2 == NULL) {
+        return r1 == r2;
+    }
     return r1->size == r2->size && memcmp(r1->c, r2->c, r1->size) == 0;
 }
 int refstr_cmp(RefStr *r1, RefStr *r2)

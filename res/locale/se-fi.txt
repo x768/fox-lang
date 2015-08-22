@@ -1,0 +1,3 @@
+langtag = "se_FI"
+month = "ođđajage", "guovva", "njukča", "cuoŋo", "miesse", "geasse", "suoidne", "borge", "čakča", "golggot", "skábma", "juovla"
+days_w = "måanta", "däjsta", "gaskevahkoe", "dåarsta", "bearjadahke", "laavadahke", "aejlege"

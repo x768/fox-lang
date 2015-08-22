@@ -1,4 +1,0 @@
-langtag:wo_Latn
-language:wo
-script:Latn
-bidi:ltr

@@ -438,7 +438,7 @@ static int file_marshal_read(Value *vret, Value *v, RefNode *node)
     int rd_size;
     RefStr *rs;
 
-    if (!stream_read_uint32(&size, r)) {
+    if (!stream_read_uint32(r, &size)) {
         return FALSE;
     }
     if (size > 0xffffff) {
@@ -465,7 +465,7 @@ static int file_marshal_write(Value *vret, Value *v, RefNode *node)
     Value w = Value_ref(v[1])->v[INDEX_MARSHALDUMPER_SRC];
     RefStr *rs = Value_vp(*v);
 
-    if (!stream_write_uint32(rs->size, w)) {
+    if (!stream_write_uint32(w, rs->size)) {
         return FALSE;
     }
     if (!stream_write_data(w, rs->c, rs->size)) {
@@ -1487,7 +1487,7 @@ static int file_glob(Value *vret, Value *v, RefNode *node)
 
     r->vfile = Value_cp(v[1]);
     r->dir_stk = malloc(sizeof(DirGlob) * DIRGLOB_MAX_STACK);
-    memset(r->dir_stk, 0, sizeof(sizeof(DirGlob) * DIRGLOB_MAX_STACK));
+    memset(r->dir_stk, 0, sizeof(DirGlob) * DIRGLOB_MAX_STACK);
     r->dir_top = r->dir_stk;
     r->type = DIRITER_GLOB;
 
@@ -1621,6 +1621,7 @@ static void define_file_class(RefNode *m)
 
     // FileIO
     cls = fv->cls_fileio;
+    cls->u.c.n_memb = INDEX_FILEIO_NUM;
     n = define_identifier_p(m, cls, fs->str_new, NODE_NEW_N, 0);
     define_native_func_a(n, fileio_new, 1, 2, fv->cls_fileio, NULL, fs->cls_str);
 
@@ -1637,7 +1638,6 @@ static void define_file_class(RefNode *m)
     define_native_func_a(n, fileio_seek, 1, 1, NULL, fs->cls_int);
     n = define_identifier(m, cls, "size", NODE_FUNC_N, NODEOPT_PROPERTY);
     define_native_func_a(n, fileio_size, 0, 0, NULL);
-    cls->u.c.n_memb = INDEX_FILEIO_NUM;
     extends_method(cls, fs->cls_streamio);
 
 

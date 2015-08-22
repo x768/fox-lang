@@ -1,6 +1,0 @@
-langtag:ar_TN
-language:ar
-territory:TN
-days:الاثنين	الثلاثاء	الأربعاء	الخميس	الجمعة	السبت	الأحد
-date:yyyy/M/d	yyyy/MM/dd		
-bidi:ltr

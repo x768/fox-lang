@@ -103,54 +103,6 @@ int64_t get_now_time()
 
 //////////////////////////////////////////////////////////////////////////////////////////
 
-DIR *opendir_fox(const char *dname)
-{
-    DIR *d = malloc(sizeof(DIR) + sizeof(WIN32_FIND_DATAW));
-    wchar_t *wtmp = filename_to_utf16(dname, L"\\*");
-    d->hDir = FindFirstFileW(wtmp, (WIN32_FIND_DATAW*)d->wfd);
-    free(wtmp);
-
-    if (d->hDir != INVALID_HANDLE_VALUE) {
-        WIN32_FIND_DATAW *p = (WIN32_FIND_DATAW*)d->wfd;
-        d->first = TRUE;
-        WideCharToMultiByte(CP_UTF8, 0, p->cFileName, -1, d->ent.d_name, sizeof(d->ent.d_name), NULL, NULL);
-        if ((p->dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0) {
-            d->ent.d_type = DT_DIR;
-        } else {
-            d->ent.d_type = DT_REG;
-        }
-        return d;
-    } else {
-        free(d);
-        return NULL;
-    }
-}
-struct dirent *readdir_fox(DIR *d)
-{
-    if (d->first) {
-        d->first = FALSE;
-        return &d->ent;
-    } else if (FindNextFileW(d->hDir, (WIN32_FIND_DATAW*)d->wfd)) {
-        WIN32_FIND_DATAW *p = (WIN32_FIND_DATAW*) &d->wfd;
-        WideCharToMultiByte(CP_UTF8, 0, p->cFileName, -1, d->ent.d_name, sizeof(d->ent.d_name), NULL, NULL);
-        if ((p->dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0) {
-            d->ent.d_type = DT_DIR;
-        } else {
-            d->ent.d_type = DT_REG;
-        }
-        return &d->ent;
-    } else {
-        return NULL;
-    }
-}
-void closedir_fox(DIR *d)
-{
-    FindClose((HANDLE)d->hDir);
-    free(d);
-}
-
-//////////////////////////////////////////////////////////////////////////////////////////
-
 int mkdir_fox(const char *dname, int dummy)
 {
     wchar_t *wtmp = filename_to_utf16(dname, NULL);

@@ -1,0 +1,4 @@
+langtag = "es_GT"
+date = "d/MM/yy", "d/MM/yyyy", "", ""
+decimal = "."
+group = ","

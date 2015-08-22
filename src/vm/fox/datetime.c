@@ -55,7 +55,7 @@ static char *fread_buffer(FileHandle fh, int size, Mem *mem)
 {
     char *p = Mem_get(mem, size);
     if (read_fox(fh, p, size) != size) {
-        fatal_errorf(NULL, "Failed to load file");
+        fatal_errorf("Failed to load file");
     }
     return p;
 }
@@ -75,7 +75,7 @@ static void load_tzdata(void)
     int i;
 
     if (fh == -1) {
-        fatal_errorf(NULL, "Cannot load file %q", path);
+        fatal_errorf("Cannot load file %q", path);
     }
     free(path);
 
@@ -135,7 +135,7 @@ static void load_tzdata(void)
     return;
 
 ERROR_END:
-    fatal_errorf(NULL, "Failed to load tzdata");
+    fatal_errorf("Failed to load tzdata");
 }
 /**
  * nameは、全て小文字。別名でも構わない

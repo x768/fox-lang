@@ -8,6 +8,21 @@ enum {
     LOCALE_LEN = 64,
 };
 
+enum {
+    ADDSTR_CAPITALIZE,
+    ADDSTR_LOWER,
+    ADDSTR_UPPER,
+};
+
+typedef struct {
+    RefHeader rh;
+
+    Mem mem;
+    const char *locale_tag;
+    Value locale;
+    Hash h;
+} RefResource;
+
 ////////////////////////////////////////////////////////////////////////////////
 
 static void make_locale_name(char *dst, int size, const char *name_p, int name_size)
@@ -15,7 +30,7 @@ static void make_locale_name(char *dst, int size, const char *name_p, int name_s
     int i;
     int len = name_size;
 
-    if (len == 1 && name_p[0] == '!') {
+    if (len == 0) {
         strcpy(dst, "!");
         return;
     }
@@ -44,6 +59,26 @@ static RefStr *locale_alias(const char *name_p, int name_size)
         load_aliases_file(&locales, "data" SEP_S "locale-alias.txt");
     }
     return Hash_get(&locales, name_p, name_size);
+}
+static void locale_filename_trim(char *fname, const char *suffix)
+{
+    char *p;
+    for (p = fname + strlen(fname) - 1; p >= fname; p--) {
+        if (*p == '-') {
+            if (suffix != NULL) {
+                strcpy(p, suffix);
+            } else {
+                *p = '\0';
+            }
+            return;
+        }
+    }
+    fname[0] = '!';
+    if (suffix != NULL) {
+        strcpy(&fname[1], suffix);
+    } else {
+        fname[1] = '\0';
+    }
 }
 
 
@@ -158,6 +193,7 @@ RefStr **get_best_locale_list()
             int i;
             char cbuf[LOCALE_LEN];
             int lang_size = strlen(lang);
+            int hyphen_count = 0;
 
             // .以降を除去
             for (i = 0; i < lang_size; i++) {
@@ -175,10 +211,20 @@ RefStr **get_best_locale_list()
                     cbuf[alias->size] = '\0';
                 }
             }
+            for (i = 0; cbuf[i] != '\0'; i++) {
+                if (cbuf[i] == '-') {
+                    hyphen_count++;
+                }
+            }
+            // -を除去
 
-            list = Mem_get(&fg->st_mem, sizeof(RefStr*) * 3);
-            list[0] = intern(cbuf, -1);
-            list[1] = NULL;
+            list = Mem_get(&fg->st_mem, sizeof(RefStr*) * (hyphen_count + 2));
+            for (i = 0; i < hyphen_count; i++) {
+                list[0] = intern(cbuf, -1);
+                locale_filename_trim(cbuf, NULL);
+            }
+            list[i++] = intern(cbuf, -1);
+            list[i] = NULL;
         } else {
             // ニュートラル言語
             list = Mem_get(&fg->st_mem, sizeof(RefStr*) * 2);
@@ -189,784 +235,33 @@ RefStr **get_best_locale_list()
     return list;
 }
 
+LocaleData *Value_locale_data(Value v)
+{
+    Ref *r = Value_ref(v);
+    return Value_ptr(r->v[INDEX_LOCALE_LOCALE]);
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-static int load_locale_file(IniTok *tk, Str name)
+// 過剰の場合エラー
+static int parse_ini_array(const char **ret, int num, Tok *tk, Mem *mem)
 {
-    char *path = str_printf("%r" SEP_S "locale" SEP_S "%S.txt", fs->fox_home, name);
-    int ret = IniTok_load(tk, path);
-    free(path);
-    return ret;
-}
-
-static RefLocale *load_locale_sub(RefLocale *loc_src, Str name)
-{
-    static Hash locales;
-
-    RefLocale *loc;
-    IniTok tk;
-
-    if (locales.entry == NULL) {
-        Hash_init(&locales, &fg->st_mem, 32);
-    }
-
-    loc = Hash_get(&locales, name.p, name.size);
-    if (loc != NULL) {
-        return loc;
-    }
-
-    if (!load_locale_file(&tk, name)) {
-        return NULL;
-    }
-
-    if (loc_src != NULL) {
-        loc = Mem_get(&fg->st_mem, sizeof(RefLocale));
-        memcpy(loc, loc_src, sizeof(RefLocale));
-    } else {
-        loc = Mem_get(&fg->st_mem, sizeof(RefLocale));
-        memset(loc, 0, sizeof(*loc));
-        loc->rh.type = fs->cls_locale;
-        loc->group_n = 3;
-    }
-
-    while (IniTok_next(&tk)) {
-        if (tk.type == INITYPE_STRING) {
-            Str key = tk.key;
-            Str val = tk.val;
-
-            switch (key.p[0]) {
-            case 'a':
-                if (Str_eq_p(key, "am_pm")) {
-                    Str_split(val, loc->am_pm, lengthof(loc->am_pm), '\t');
-                }
-                break;
-            case 'b':
-                if (Str_eq_p(key, "bidi")) {
-                    if (Str_eq_p(val, "rtl")) {
-                        loc->rtl = TRUE;
-                    }
-                }
-                break;
-            case 'd':
-                if (Str_eq_p(key, "date")) {
-                    Str_split(val, loc->date, lengthof(loc->date), '\t');
-                } else if (Str_eq_p(key, "decimal")) {
-                    loc->decimal = str_dup_p(val.p, val.size, &fg->st_mem);
-                } else if (Str_eq_p(key, "days")) {
-                    Str_split(val, loc->week, lengthof(loc->week), '\t');
-                } else if (Str_eq_p(key, "days_w")) {
-                    Str_split(val, loc->week_w, lengthof(loc->week_w), '\t');
-                }
-                break;
-            case 'g':
-                if (Str_eq_p(key, "group")) {
-                    loc->group = str_dup_p(val.p, val.size, &fg->st_mem);
-                } else if (Str_eq_p(key, "group_n")) {
-                    loc->group_n = parse_int(val.p, val.size, 256);
-                }
-                break;
-            case 'l':
-                if (Str_eq_p(key, "langtag")) {
-                    loc->tag = intern(val.p, val.size);
-                } else if (Str_eq_p(key, "language")) {
-                    loc->param[LOCALE_LANGUAGE] = intern(val.p, val.size);
-                }
-                break;
-            case 'm':
-                if (Str_eq_p(key, "month")) {
-                    Str_split(val, loc->month, lengthof(loc->month), '\t');
-                } else if (Str_eq_p(key, "month_w")) {
-                    Str_split(val, loc->month_w, lengthof(loc->month_w), '\t');
-                }
-                break;
-            case 's':
-                if (Str_eq_p(key, "script")) {
-                    loc->param[LOCALE_SCRIPT] = intern(val.p, val.size);
-                }
-                break;
-            case 't':
-                if (Str_eq_p(key, "time")) {
-                    Str_split(val, loc->time, lengthof(loc->time), '\t');
-                } else if (Str_eq_p(key, "territory")) {
-                    loc->param[LOCALE_TERRITORY] = intern(val.p, val.size);
-                }
-                break;
-            case 'v':
-                if (Str_eq_p(key, "valiant")) {
-                    loc->param[LOCALE_VALIANT] = intern(val.p, val.size);
-                }
-                break;
-            }
-        }
-    }
-    IniTok_close(&tk);
-    {
-        RefStr *p_name = intern(name.p, name.size);
-        loc->name = p_name;
-        Hash_add_p(&locales, &fg->st_mem, p_name, loc);
-    }
-
-    return loc;
-}
-
-/**
- * エイリアス解決済みのlocaleを返す
- * 見つからなければデフォルトロケール "!" を返す
- */
-static RefLocale *load_locale(Str name)
-{
-    char buf[LOCALE_LEN];
-    RefLocale *loc = NULL;
-    int i;
-
-    make_locale_name(buf, LOCALE_LEN, name.p, name.size);
-
-    // デフォルトロケールからコピー
-    loc = load_locale_sub(NULL, Str_new("!", 1));
-    if (loc == NULL) {
-        loc = Mem_get(&fg->st_mem, sizeof(*loc));
-        memset(loc, 0, sizeof(*loc));
-        loc->name = intern("!", 1);
-        loc->rh.type = fs->cls_locale;
-        loc->group_n = 3;
-    }
-    // 長さ0の文字列の場合はデフォルトロケールを返す
-    if (buf[0] == '\0') {
-        return loc;
-    }
-
-    // localeのエイリアスの解決
-    if (name.size > 0) {
-        RefStr *alias = locale_alias(buf, -1);
-        if (alias != NULL) {
-            memcpy(buf, alias->c, alias->size);
-            buf[alias->size] = '\0';
-        }
-    }
-    // -で分割して順番に探す
-    name = Str_new(buf, -1);
-
-    // x-hoge などに対応するため、最初の1文字の区間は分割しない
-    for (i = 2; i < name.size; i++) {
-        if (buf[i] == '-') {
-            buf[i] = '\0';
-        }
-    }
-
+    int i = 0;
     for (;;) {
-        Str name2 = Str_new(buf, -1);
-        int found = FALSE;
-        RefLocale *loc2 = load_locale_sub(loc, name2);
-
-        if (loc2 == NULL) {
-            break;
-        }
-        loc = loc2;
-
-        for (i = 0; i < name.size; i++) {
-            if (buf[i] == '\0') {
-                buf[i] = '-';
-                found = TRUE;
-                break;
-            }
-        }
-        if (!found) {
-            break;
-        }
-    }
-
-    return loc;
-}
-
-//////////////////////////////////////////////////////////////////////////////////
-
-static int locale_new(Value *vret, Value *v, RefNode *node)
-{
-    Str name;
-    RefLocale *loc;
-
-    if (fg->stk_top > v + 1) {
-        name = Value_str(v[1]);
-        if (Str_eq_p(name, "best")) {
-            RefStr* const *list = get_best_locale_list();
-            while (*list != NULL) {
-                loc = load_locale(Str_new((*list)->c, (*list)->size));
-                if (loc != fs->loc_neutral) {
-                    *vret = Value_cp(vp_Value(loc));
-                    return TRUE;
-                }
-                list++;
-            }
-        }
-    } else {
-        name = fs->Str_EMPTY;
-    }
-    loc = load_locale(name);
-    *vret = Value_cp(vp_Value(loc));
-
-    return TRUE;
-}
-static int locale_marshal_read(Value *vret, Value *v, RefNode *node)
-{
-    Value r = Value_ref(v[1])->v[INDEX_MARSHALDUMPER_SRC];
-    uint32_t size;
-    int rd_size;
-    RefLocale *loc;
-    char cbuf[64];
-
-    if (!stream_read_uint32(&size, r)) {
-        return FALSE;
-    }
-    if (size > 63) {
-        throw_errorf(fs->mod_lang, "ValueError", "Invalid size number");
-        return FALSE;
-    }
-    rd_size = size;
-    if (!stream_read_data(r, NULL, cbuf, &rd_size, FALSE, TRUE)) {
-        return FALSE;
-    }
-    cbuf[rd_size] = '\0';
-
-    loc = load_locale(Str_new(cbuf, -1));
-    *vret = Value_cp(vp_Value(loc));
-
-    return TRUE;
-}
-static int locale_marshal_write(Value *vret, Value *v, RefNode *node)
-{
-    RefLocale *loc = Value_vp(*v);
-    RefStr *name = loc->tag;
-    Value w = Value_ref(v[1])->v[INDEX_MARSHALDUMPER_SRC];
-
-    if (!stream_write_uint32(name->size, w)) {
-        return FALSE;
-    }
-    if (!stream_write_data(w, name->c, name->size)) {
-        return FALSE;
-    }
-
-    return TRUE;
-}
-
-static void locale_str_word_sub(StrBuf *buf, RefLocale *loc, RefStr *key)
-{
-    if (loc->locale_name != VALUE_NULL) {
-        RefResource *res = Value_vp(loc->locale_name);
-        ResEntry *re = Hash_get_p(&res->h, key);
-        if (re != NULL && re->type == INITYPE_STRING) {
-            StrBuf_add(buf, re->val.p, re->val.size);
-        } else {
-            StrBuf_add_r(buf, key);
-        }
-    } else {
-        StrBuf_add_r(buf, key);
-    }
-}
-static int locale_str_sub(StrBuf *buf, RefLocale *loc, RefLocale *dsp_loc, int option)
-{
-    RefStr *language = loc->param[LOCALE_LANGUAGE];
-    RefStr *script = loc->param[LOCALE_SCRIPT];
-    RefStr *territory = loc->param[LOCALE_TERRITORY];
-    RefStr *valiant = loc->param[LOCALE_VALIANT];
-
-    // Resourceが読み込まれていない場合は読み込む
-    if (dsp_loc->locale_name == VALUE_NULL) {
-        int found = FALSE;
-        char *path_p = str_printf("%r" SEP_S "resource" SEP_S "locale", fs->fox_home);
-        RefResource *res = buf_new(fs->cls_resource, sizeof(RefResource));
-        RefStr *loc_name = dsp_loc->name;
-        loc->locale_name = vp_Value(res);
-        load_resource(res, &found, Str_new(path_p, -1), Str_new(loc_name->c, loc_name->size), FALSE);
-        if (!found) {
-            Value_dec(loc->locale_name);
-            loc->locale_name = VALUE_NULL;
-        }
-        free(path_p);
-    }
-
-    // language (territory), script, valiant
-    if (language != NULL) {
-        locale_str_word_sub(buf, dsp_loc, language);
-    }
-    if (territory != NULL) {
-        StrBuf_add(buf, " (", 2);
-        locale_str_word_sub(buf, dsp_loc, territory);
-        StrBuf_add_c(buf, ')');
-    }
-    if (option) {
-        if (script != NULL) {
-            StrBuf_add(buf, ", ", 2);
-            locale_str_word_sub(buf, dsp_loc, script);
-        }
-        if (valiant != NULL) {
-            StrBuf_add(buf, ", ", 2);
-            locale_str_word_sub(buf, dsp_loc, valiant);
-        }
-    }
-    return TRUE;
-}
-static int locale_tostr(Value *vret, Value *v, RefNode *node)
-{
-    RefLocale *loc = Value_vp(*v);
-    Str fmt = fs->Str_EMPTY;
-
-    if (fg->stk_top > v + 1) {
-        fmt = Value_str(v[1]);
-    }
-    if (fmt.size == 0) {
-        *vret = printf_Value("Locale(%r)", loc->tag);
-    } else if (fmt.p[0] == 't') {
-        *vret = Value_cp(vp_Value(loc->tag));
-    } else if (fmt.p[0] == 'f') {
-        *vret = Value_cp(vp_Value(loc->name));
-    } else if (fmt.p[0] == 'N' || fmt.p[0] == 'n') {
-        StrBuf buf;
-        RefLocale *dsp_loc = fs->loc_neutral;
-        if (fg->stk_top > v + 2) {
-            dsp_loc = Value_vp(v[2]);
-        }
-        StrBuf_init(&buf, 0);
-        locale_str_sub(&buf, loc, dsp_loc, fmt.p[0] == 'N');
-        *vret = cstr_Value(fs->cls_str, buf.p, buf.size);
-        StrBuf_close(&buf);
-    } else {
-        throw_errorf(fs->mod_lang, "FormatError", "Unknown format string %Q", fmt);
-        return FALSE;
-    }
-
-    return TRUE;
-}
-static int locale_tag(Value *vret, Value *v, RefNode *node)
-{
-    RefLocale *loc = Value_vp(*v);
-    *vret = Value_cp(vp_Value(loc->tag));
-    return TRUE;
-}
-static int locale_filename(Value *vret, Value *v, RefNode *node)
-{
-    RefLocale *loc = Value_vp(*v);
-    *vret = Value_cp(vp_Value(loc->name));
-    return TRUE;
-}
-static int locale_get_param(Value *vret, Value *v, RefNode *node)
-{
-    RefLocale *loc = Value_vp(*v);
-    int idx = FUNC_INT(node);
-    RefStr *rs = loc->param[idx];
-    if (rs != NULL) {
-        *vret = cstr_Value(fs->cls_str, rs->c, rs->size);
-    }
-    return TRUE;
-}
-
-static int locale_bidi(Value *vret, Value *v, RefNode *node)
-{
-    RefLocale *loc = Value_vp(*v);
-    *vret = cstr_Value(fs->cls_str, (loc->rtl ? "rtl" : "ltr"), 3);
-    return TRUE;
-}
-static void locale_put_array(StrBuf *buf, const char **arr, int size)
-{
-    enum {
-        SEP_SIZE = 3,
-    };
-    const char *sep = "\",\"";
-    int i;
-
-    for (i = 0; i < size; i++) {
-        if (i > 0) {
-            StrBuf_add(buf, sep, SEP_SIZE);
-        }
-        if (arr[i] != NULL) {
-            add_backslashes_sub(buf, arr[i], -1, ADD_BACKSLASH_U_UCS2);
-        }
-    }
-}
-/**
- * localeの情報をjson文字列で返す
- */
-static int locale_get_json(Value *vret, Value *v, RefNode *node)
-{
-    RefLocale *loc = Value_vp(*v);
-    StrBuf buf;
-
-    StrBuf_init_refstr(&buf, 0);
-    StrBuf_add(&buf, "{\"tag\":\"", -1);
-    StrBuf_add_r(&buf, loc->tag);
-
-    StrBuf_add(&buf, "\",\"month\":[\"", -1);
-    locale_put_array(&buf, loc->month, lengthof(loc->month));
-
-    StrBuf_add(&buf, "\"],\"month_w\":[\"", -1);
-    locale_put_array(&buf, loc->month_w, lengthof(loc->month_w));
-
-    StrBuf_add(&buf, "\"],\"days\":[\"", -1);
-    locale_put_array(&buf, loc->week, lengthof(loc->week));
-
-    StrBuf_add(&buf, "\"],\"days_w\":[\"", -1);
-    locale_put_array(&buf, loc->week_w, lengthof(loc->week_w));
-
-    StrBuf_add(&buf, "\"],\"date\":[\"", -1);
-    locale_put_array(&buf, loc->date, lengthof(loc->date));
-
-    StrBuf_add(&buf, "\"],\"time\":[\"", -1);
-    locale_put_array(&buf, loc->time, lengthof(loc->time));
-
-    StrBuf_add(&buf, "\"],\"am\":\"", -1);
-    add_backslashes_sub(&buf, loc->am_pm[0], -1, ADD_BACKSLASH_U_UCS2);
-    StrBuf_add(&buf, "\",\"pm\":\"", -1);
-    add_backslashes_sub(&buf, loc->am_pm[1], -1, ADD_BACKSLASH_U_UCS2);
-
-    StrBuf_add(&buf, "\",\"bidi\":\"", -1);
-    StrBuf_add(&buf, (loc->rtl ? "rtl\"}" : "ltr\"}"), 5);
-
-    *vret = StrBuf_str_Value(&buf, fs->cls_str);
-    return TRUE;
-}
-
-////////////////////////////////////////////////////////////////////////////
-
-/**
- * ResourceLoadErrorは戻り値FALSE
- * ファイルが見つかったかどうかは引数で返す
- */
-static int load_resource_sub(RefResource *res, int *found, Mem *mem, Str path, const char *path_p, const char *file_p)
-{
-    IniTok tk;
-
-    if (!IniTok_load(&tk, path_p)) {
-        *found = FALSE;
-        return TRUE;
-    }
-
-    while (IniTok_next(&tk)) {
-        switch (tk.type) {
-        case INITYPE_STRING:
-        case INITYPE_FILE: {
-            Str key = tk.key;
-
-            if (Str_eq_p(key, "locale")) {
-                if (res->locale == NULL) {
-                    res->locale = load_locale(tk.val);
-                }
-            } else if (Hash_get(&res->h, key.p, key.size) == NULL) {
-                if (invalid_utf8_pos(tk.val.p, tk.val.size) >= 0) {
-                    throw_error_select(THROW_INVALID_UTF8);
-                    IniTok_close(&tk);
-                    return FALSE;
-                } else {
-                    ResEntry *re = Mem_get(&res->mem, sizeof(*re));
-                    re->type = tk.type;
-
-                    if (tk.type == INITYPE_STRING) {
-                        re->val.p = str_dup_p(tk.val.p, tk.val.size, mem);
-                        re->val.size = tk.val.size;
-                    } else {
-                        // ファイルパス
-                        char *p1 = str_printf("%S" SEP_S "%S" SEP_S "%s", path, key, file_p);
-                        char *p2 = str_dup_p(p1, -1, mem);
-                        free(p1);
-                        re->val = Str_new(p2, -1);
-                    }
-
-                    Hash_add_p(&res->h, &res->mem, intern(key.p, key.size), re);
-                }
-            }
-            break;
-        }
-        case INITYPE_ERROR:
-            throw_errorf(fs->mod_locale, "ResourceError", "Illigal Resource format in %q", path_p);
-            IniTok_close(&tk);
+        if (tk->v.type != TL_STR) {
             return FALSE;
         }
-    }
-    if (res->locale == NULL) {
-        res->locale = fs->loc_neutral;
-    }
-    IniTok_close(&tk);
-    *found = TRUE;
-
-    return TRUE;
-}
-
-/**
- * エラー:return FALSE
- * ファイルが見つからない:pres == NULL
- * res->memは内部で確保した領域がセットされる
- * e == NULLの場合はエラーを返さない
- */
-int load_resource(RefResource *res, int *pfound, Str path, Str locale, int no_default)
-{
-    Mem mem;
-    char *path_p;
-    char *file_p;
-    int found = FALSE;
-
-    *pfound = FALSE;
-
-    Mem_init(&mem, 8 * 1024);
-    Hash_init(&res->h, &mem, 16);
-    path_p = malloc(path.size + 72);
-
-    memcpy(path_p, path.p, path.size);
-    path_p[path.size] = SEP_C;
-    file_p = path_p + path.size + 1;
-
-    make_locale_name(file_p, 64, locale.p, locale.size);
-    {
-        RefStr *alias = locale_alias(file_p, -1);
-        if (alias != NULL) {
-            memcpy(file_p, alias->c, alias->size);
-            file_p[alias->size] = '\0';
+        if (i < num && ret[i] == NULL) {
+            ret[i] = str_dup_p(tk->str_val.p, tk->str_val.size, mem);
         }
-    }
-    strcat(file_p, ".txt");
-
-    for (;;) {
-        char *p;
-
-        if (!load_resource_sub(res, &found, &mem, path, path_p, file_p)) {
-            goto ERROR_END;
+        i++;
+        Tok_simple_next(tk);
+        if (tk->v.type != T_COMMA) {
+            return i <= num;
         }
-        if (found) {
-            *pfound = TRUE;
-        }
-
-        // ja-jp.txt -> ja.txt
-        p = file_p + strlen(file_p) - 1;
-        for (; *p != '-'; p--) {
-            if (*p == SEP_C) {
-                // おわり
-                if (!no_default || *pfound) {
-                    strcpy(file_p, "!.txt");
-                    if (!load_resource_sub(res, &found, &mem, path, path_p, file_p)) {
-                        goto ERROR_END;
-                    }
-                    if (found) {
-                        *pfound = TRUE;
-                    }
-                }
-                free(path_p);
-                if (*pfound) {
-                    res->mem = mem;
-                } else {
-                    Mem_close(&mem);
-                }
-                return TRUE;
-            }
-        }
-        strcpy(p, ".txt");
-    }
-
-ERROR_END:
-    Mem_close(&mem);
-    return FALSE;
-}
-/**
- * エラー:return FALSE
- * ファイルが見つからない:pres == NULL
- */
-static int load_best_resource(RefResource *res, int *found, Str path)
-{
-    RefStr* const *list = get_best_locale_list();
-    RefStr* const *pp = list;
-    RefStr *rs;
-
-    while (*pp != NULL) {
-        rs = *pp;
-        if (!load_resource(res, found, path, Str_new(rs->c, rs->size), TRUE)) {
-            return FALSE;
-        }
-        if (*found) {
-            return TRUE;
-        }
-        pp++;
-    }
-
-    rs = *list;
-    return load_resource(res, found, path, Str_new(rs->c, rs->size), FALSE);
-}
-
-int Resource_get(Str *ret, RefResource *res, Str name)
-{
-    ResEntry *re = Hash_get(&res->h, name.p, name.size);
-
-    if (re != NULL) {
-        if (re->type == INITYPE_FILE) {
-            // ファイルから読み取り
-            int fd = open_fox(re->val.p, O_RDONLY, DEFAULT_PERMISSION);
-            int64_t size = get_file_size(fd);
-            if (size < 0) {
-                throw_error_select(THROW_CANNOT_OPEN_FILE__STR, re->val);
-                return FALSE;
-            } else if (size == 0) {
-                *ret = fs->Str_EMPTY;
-            } else {
-                char *buf = Mem_get(&res->mem, size);
-                int read_size = read_fox(fd, buf, size);
-                re->val = Str_new(buf, read_size);
-                re->type = INITYPE_STRING;
-            }
-            if (fd != -1) {
-                close_fox(fd);
-            }
-        }
-        *ret = re->val;
-        return TRUE;
-    } else {
-        throw_errorf(fs->mod_lang, "IndexError", "Resource key %Q not found", name);
-        return FALSE;
+        Tok_simple_next(tk);
     }
 }
-void Resource_close(RefResource *res)
-{
-    Mem_close(&res->mem);
-    free(res);
-}
-
-static int resource_new(Value *vret, Value *v, RefNode *node)
-{
-    Str name_s = Value_str(v[1]);
-    Value v2 = v[2];
-    const RefNode *v2_type = Value_type(v2);
-    Str loc;
-    char *path;
-
-    // 型チェックを先に行う
-    if (v2_type == fs->cls_locale) {
-        RefLocale *lc = Value_vp(v2);
-        loc = Str_new(lc->name->c, lc->name->size);
-    } else if (v2_type == fs->cls_str) {
-        loc = Value_str(v2);
-    } else {
-        throw_error_select(THROW_ARGMENT_TYPE2__NODE_NODE_NODE_INT, fs->cls_locale, fs->cls_str, v2_type, 2);
-        return FALSE;
-    }
-
-    path = resource_to_path(name_s, SEP_S "!.txt");
-    if (path == NULL) {
-        return FALSE;
-    } else {
-        int found;
-        Str path_s = Str_new(path, -1);
-        RefResource *res = buf_new(fs->cls_resource, sizeof(RefResource));
-        *vret = vp_Value(res);
-
-        // pathから"/!.txt"を削除
-        path_s.size -= 6;
-
-        if (Str_eq_p(loc, "best")) {
-            if (!load_best_resource(res, &found, path_s)) {
-                free(path);
-                return FALSE;
-            }
-        } else {
-            if (!load_resource(res, &found, path_s, loc, FALSE)) {
-                free(path);
-                return FALSE;
-            }
-        }
-        if (!found) {
-            throw_errorf(fs->mod_file, "FileOpenError", "Cannot find file for %S", name_s);
-            free(path);
-            return FALSE;
-        }
-    }
-    return TRUE;
-}
-
-/**
- * 文字列をそのまま返す
- */
-static int resource_getstr(Value *vret, Value *v, RefNode *node)
-{
-    RefResource *res = Value_vp(*v);
-    Str key = Value_str(v[1]);
-    Str ret_s;
-
-    if (!Resource_get(&ret_s, res, key)) {
-        return FALSE;
-    }
-    *vret = cstr_Value(fs->cls_str, ret_s.p, ret_s.size);
-
-    return TRUE;
-}
-static int resource_locale(Value *vret, Value *v, RefNode *node)
-{
-    RefResource *res = Value_vp(*v);
-    RefLocale *loc = res->locale;
-
-    if (loc != NULL) {
-        *vret = Value_cp(vp_Value(loc));
-    }
-    return TRUE;
-}
-static int resource_add(Value *vret, Value *v, RefNode *node)
-{
-    RefResource *res = Value_vp(*v);
-    RefResource *res2 = Value_vp(v[1]);
-    int i;
-
-    for (i = 0; i < res2->h.entry_num; i++) {
-        HashEntry *he = res2->h.entry[i];
-        while (he != NULL) {
-            HashEntry *h2 = Hash_get_add_entry(&res->h, &res->mem, he->key);
-            ResEntry *re = he->p;
-            ResEntry *re2 = h2->p;
-            if (re2 == NULL) {
-                char *cbuf = Mem_get(&res->mem, re->val.size + 1);
-                memcpy(cbuf, re->val.p, re->val.size);
-                cbuf[re->val.size] = '\0';  // ファイルパスの場合NUL終端でなければならない
-
-                re2 = Mem_get(&res->mem, sizeof(*re2));
-                re2->type = re->type;
-                re2->val = Str_new(cbuf, re->val.size);
-                h2->p = re2;
-            }
-            he = he->next;
-        }
-    }
-    return TRUE;
-}
-static int resource_dispose(Value *vret, Value *v, RefNode *node)
-{
-    RefResource *res = Value_vp(*v);
-    Mem_close(&res->mem);
-    return TRUE;
-}
-
-static int resource_file(Value *vret, Value *v, RefNode *node)
-{
-    char *path;
-    Str name_s = Value_str(v[1]);
-    Str ext_s = Value_str(v[2]);
-    char *ext = malloc(ext_s.size + 4);
-
-    ext[0] = '.';
-    strcpy(ext + 1, ext_s.p);
-    path = resource_to_path(name_s, ext);
-    free(ext);
-
-    if (path == NULL) {
-        return FALSE;
-    }
-    *vret = cstr_Value(fs->cls_file, path, -1);
-    free(path);
-
-    return TRUE;
-}
-
-////////////////////////////////////////////////////////////////////////////
-
-#if 0
-
-static RefNode *cls_locale2;
-
-enum {
-    ADDSTR_CAPITALIZE,
-    ADDSTR_LOWER,
-    ADDSTR_UPPER,
-};
 
 static int parse_locale_word(const char *src, const char *end)
 {
@@ -1028,17 +323,21 @@ static int parse_separator(const char **pp, const char *end, int loose)
     }
 }
 
-static int parse_locale_tag(Ref *r, RefStr *rs, int loose)
+static int parse_locale_tag(Ref *r, const char *src, int src_size, int loose)
 {
-    const char *src = rs->c;
-    const char *end = src + rs->size;
+    const char *end = src + src_size;
     int n;
     int subtag = '\0';
 
     // (?<language>[a-z]{2,3}) 必須
     n = parse_locale_word(src, end);
     if (n != 2 && n != 3) {
-        return FALSE;
+        if (loose) {
+            // NEUTRAL
+            return TRUE;
+        } else {
+            return FALSE;
+        }
     }
     parse_locale_addstr(&r->v[INDEX_LOCALE_LANGUAGE], src, n, ADDSTR_LOWER);
     src += n;
@@ -1116,180 +415,378 @@ static int parse_locale_tag(Ref *r, RefStr *rs, int loose)
     return TRUE;
 }
 
-static void refstr_cat_lower(char *dst, ...)
+static char *locale_ref_to_filename(Ref *r)
 {
-    int first = TRUE;
-    va_list va;
-    va_start(va, dst);
+    if (r->v[INDEX_LOCALE_LANGUAGE] == VALUE_NULL) {
+        char *p_str = malloc(2);
+        strcpy(p_str, "!");
+        return p_str;
+    } else {
+        int i, j;
+        int first = TRUE;
+        StrBuf sb;
 
-    for (;;) {
-        int i;
-        RefStr *rs = va_arg(va, RefStr*);
-        if (rs == NULL) {
-            break;
-        }
-        if (first) {
-            first = FALSE;
-        } else {
-            *dst++ = '-';
-        }
-        for (i = 0; i < rs->size; i++) {
-            *dst++ = tolower_fox(rs->c[i]);
-        }
-    }
-    *dst = '\0';
-
-    va_end(va);
-}
-static char *get_best_resource_path(Ref *r, const char *path, const char *ext)
-{
-    char cbuf[32];
-
-    RefStr *lang = Value_vp(r->v[INDEX_LOCALE_LANGUAGE]);
-    RefStr *territory = Value_vp(r->v[INDEX_LOCALE_TERRITORY]);
-    RefStr *script = Value_vp(r->v[INDEX_LOCALE_SCRIPT]);
-
-    for (;;) {
-        // 1.language-script-territory
-        // 2.language-territory
-        // 3.language
-        // 4.!
-        if (territory != NULL && script != NULL) {
-            refstr_cat_lower(cbuf, lang, territory, script, NULL);
-            territory = NULL;
-        } else if (script != NULL) {
-            refstr_cat_lower(cbuf, lang, script, NULL);
-            script = NULL;
-        } else if (territory != NULL) {
-            refstr_cat_lower(cbuf, lang, territory, NULL);
-            territory = NULL;
-        } else if (lang != NULL) {
-            refstr_cat_lower(cbuf, lang, NULL);
-            lang = NULL;
-        } else {
-            strcpy(cbuf, "!");
-        }
-
-        {
-            // resource_pathを順に探索
-            PtrList *res_path = fv->resource_path;
-            while (res_path != NULL) {
-                char *fpath = str_printf("%s/%s/%s%s", res_path->u.c, path, cbuf, ext);
-                if (exists_file(fpath) == EXISTS_FILE) {
-                    return fpath;
+        StrBuf_init(&sb, 16);
+        for (i = INDEX_LOCALE_LANGUAGE; i < INDEX_LOCALE_EXTENTIONS; i++) {
+            RefStr *rs = Value_vp(r->v[i]);
+            if (rs != NULL) {
+                if (first) {
+                    first = FALSE;
+                } else {
+                    StrBuf_add_c(&sb, '-');
                 }
-                free(fpath);
-                res_path = res_path->next;
+                for (j = 0; j < rs->size; j++) {
+                    StrBuf_add_c(&sb, tolower_fox(rs->c[j]));
+                }
             }
         }
-        if (cbuf[0] == '!') {
-            break;
-        }
+        StrBuf_add_c(&sb, '\0');
+        return sb.p;
     }
-    return NULL;
 }
-static RefLocale *load_locale2(const char *path)
+static int load_locale_from_file(LocaleData *loc, const char *fname)
 {
     Tok tk;
-    RefLocale *loc;
-    char *srcfile = read_from_file(NULL, path, NULL);
+    char *buf = read_from_file(NULL, fname, NULL);
 
-    if (srcfile == NULL) {
-        return NULL;
+    if (buf == NULL) {
+        return FALSE;
     }
-    loc = buf_new(NULL, sizeof(RefLocale));
-    Tok_simple_init(&tk, srcfile);
+    Tok_simple_init(&tk, buf);
 
+    Tok_simple_next(&tk);
+    for (;;) {
+    LINE_BEGIN:
+        switch (tk.v.type) {
+        case TL_VAR:
+        case TL_CONST:
+        case TL_CLASS: {
+            Str key = tk.str_val;
+            Tok_simple_next(&tk);
+            if (tk.v.type != T_LET) {
+                goto ERROR_END;
+            }
+            Tok_simple_next(&tk);
+            switch (key.p[0]) {
+            case 'a':
+                if (Str_eq_p(key, "am_pm")) {
+                    if (!parse_ini_array(loc->am_pm, lengthof(loc->am_pm), &tk, &loc->mem)) {
+                        goto ERROR_END;
+                    }
+                    goto LINE_END;
+                }
+                break;
+            case 'b':
+                if (Str_eq_p(key, "bidi")) {
+                    if (tk.v.type != TL_VAR) {
+                        goto ERROR_END;
+                    }
+                    if (loc->bidi == '\0') {
+                        if (Str_eq_p(tk.str_val, "ltr")) {
+                            loc->bidi = 'L';
+                        } else if (Str_eq_p(tk.str_val, "rtl")) {
+                            loc->bidi = 'R';
+                        } else {
+                            goto ERROR_END;
+                        }
+                    }
+                    Tok_simple_next(&tk);
+                    goto LINE_END;
+                }
+                break;
+            case 'd':
+                if (Str_eq_p(key, "date")) {
+                    if (!parse_ini_array(loc->date, lengthof(loc->date), &tk, &fg->st_mem)) {
+                        goto ERROR_END;
+                    }
+                    goto LINE_END;
+                } else if (Str_eq_p(key, "decimal")) {
+                    if (!parse_ini_array(&loc->decimal, 1, &tk, &fg->st_mem)) {
+                        goto ERROR_END;
+                    }
+                    goto LINE_END;
+                } else if (Str_eq_p(key, "days")) {
+                    if (!parse_ini_array(loc->week, lengthof(loc->week), &tk, &fg->st_mem)) {
+                        goto ERROR_END;
+                    }
+                    goto LINE_END;
+                } else if (Str_eq_p(key, "days_w")) {
+                    if (!parse_ini_array(loc->week_w, lengthof(loc->week_w), &tk, &fg->st_mem)) {
+                        goto ERROR_END;
+                    }
+                    goto LINE_END;
+                }
+                break;
+            case 'g':
+                if (Str_eq_p(key, "group")) {
+                    if (!parse_ini_array(&loc->group, 1, &tk, &fg->st_mem)) {
+                        goto ERROR_END;
+                    }
+                    goto LINE_END;
+                } else if (Str_eq_p(key, "group_n")) {
+                    if (tk.v.type != TL_INT) {
+                        goto ERROR_END;
+                    }
+                    if (loc->group_n == 0) {
+                        loc->group_n = tk.int_val;
+                    }
+                    Tok_simple_next(&tk);
+                    goto LINE_END;
+                }
+                break;
+            case 'l':
+                if (Str_eq_p(key, "langtag")) {
+                    if (tk.v.type != TL_STR) {
+                        goto ERROR_END;
+                    }
+                    if (loc->langtag == NULL) {
+                        loc->langtag = intern(tk.str_val.p, tk.str_val.size);
+                    }
+                    Tok_simple_next(&tk);
+                    goto LINE_END;
+                }
+                break;
+            case 'm':
+                if (Str_eq_p(key, "month")) {
+                    if (!parse_ini_array(loc->month, lengthof(loc->month), &tk, &fg->st_mem)) {
+                        goto ERROR_END;
+                    }
+                    goto LINE_END;
+                } else if (Str_eq_p(key, "month_w")) {
+                    if (!parse_ini_array(loc->month_w, lengthof(loc->month_w), &tk, &fg->st_mem)) {
+                        goto ERROR_END;
+                    }
+                    goto LINE_END;
+                }
+                break;
+            case 't':
+                if (Str_eq_p(key, "time")) {
+                    if (!parse_ini_array(loc->time, lengthof(loc->time), &tk, &fg->st_mem)) {
+                        goto ERROR_END;
+                    }
+                    goto LINE_END;
+                }
+                break;
+            }
+            throw_errorf(fs->mod_locale, "ResourceError", "Unknown key %Q at line %d (%s)", key, tk.v.line, fname);
+            free(buf);
+            return FALSE;
+        }
+        case T_NL:
+            Tok_simple_next(&tk);
+            goto LINE_BEGIN;
+        case T_EOF:
+            free(buf);
+            return TRUE;
+        case T_ERR:
+            free(buf);
+            return FALSE;
+        default:
+            goto ERROR_END;
+        }
+    LINE_END:
+        if (tk.v.type != T_NL && tk.v.type != T_EOF) {
+            goto ERROR_END;
+        }
+    }
 
-    free(srcfile);
+ERROR_END:
+    throw_errorf(fs->mod_locale, "ResourceError", "Error at line %d (%s)", tk.v.line, fname);
+    free(buf);
+    return FALSE;
+}
+static LocaleData *get_locale_from_ref(Ref *r)
+{
+    enum {
+        INDEX_LOCALE_REFSTR_NUM = INDEX_LOCALE_EXTENTIONS - INDEX_LOCALE_LANGUAGE,
+    };
+    Mem mem;
+    LocaleData *loc;
+    char *filename = locale_ref_to_filename(r);
+
+    Mem_init(&mem, 256);
+    loc = Mem_get(&mem, sizeof(LocaleData));
+    memset(loc, 0, sizeof(LocaleData));
+    loc->mem = mem;
+
+    for (;;) {
+        // resource_pathを順に探索
+        PtrList *res_path;
+
+        for (res_path = fs->resource_path; res_path != NULL; res_path = res_path->next) {
+            char *fname = str_printf("%s" SEP_S "locale" SEP_S "%s%s", res_path->u.c, filename, ".txt");
+            if (exists_file(fname) == EXISTS_FILE) {
+                if (!load_locale_from_file(loc, fname)) {
+                    Mem_close(&loc->mem);
+                    free(fname);
+                    return NULL;
+                }
+            }
+            free(fname);
+        }
+        if (filename[0] == '!') {
+            break;
+        }
+        locale_filename_trim(filename, NULL);
+    }
+
+    free(filename);
     return loc;
 }
-static RefLocale *get_best_locale(Ref *r)
+static void locale_tag_strbuf(StrBuf *sb, Ref *r)
 {
-    char *path = get_best_resource_path(r, "locale2", ".txt");
-    if (path != NULL) {
-        static Hash locales;
-        RefLocale *loc;
-
-        if (locales.entry == NULL) {
-            Hash_init(&locales, &fg->st_mem, 32);
+    if (r->v[INDEX_LOCALE_LANGUAGE] != VALUE_NULL) {
+        int i;
+        StrBuf_add_r(sb, Value_vp(r->v[INDEX_LOCALE_LANGUAGE]));
+        for (i = INDEX_LOCALE_LANGUAGE + 1; i <= INDEX_LOCALE_VARIANT; i++) {
+            if (r->v[i] != VALUE_NULL) {
+                StrBuf_add_c(sb, '_');
+                StrBuf_add_r(sb, Value_vp(r->v[i]));
+            }
         }
-
-        loc = Hash_get(&locales, path, -1);
-        if (loc != NULL) {
-            return loc;
-        }
-        loc = load_locale2(path);
-
-        Hash_add_p(&locales, &fg->st_mem, intern(path, -1), loc);
-        free(path);
-        return loc;
     }
-    return NULL;
 }
-static int locale2_new(Value *vret, Value *v, RefNode *node)
+static Ref *get_locale_from_name(const char *name, int name_size, int loose)
 {
-    Ref *r = ref_new(cls_locale2);
-    RefStr *rs = Value_vp(v[1]);
-    RefLocale *loc;
+    Ref *r = ref_new(fs->cls_locale);
+    LocaleData *loc;
 
-    *vret = vp_Value(r);
-
-    if (!parse_locale_tag(r, rs, FALSE)) {
+    if (!parse_locale_tag(r, name, name_size, FALSE)) {
         throw_errorf(fs->mod_lang, "ValueError", "Illformed locale string");
-        return FALSE;
+        return NULL;
+    }
+    {
+        StrBuf sb;
+        StrBuf_init_refstr(&sb, 32);
+        locale_tag_strbuf(&sb, r);
+        r->v[INDEX_LOCALE_LANGTAG] = StrBuf_str_Value(&sb, fs->cls_str);
     }
 
     // 最も適合するLocaleを取得
-    loc = get_best_locale(r);
+    loc = get_locale_from_ref(r);
     if (loc == NULL) {
+        Value_dec(vp_Value(r));
+        return NULL;
+    }
+    r->v[INDEX_LOCALE_LOCALE] = ptr_Value(loc);
+
+    return r;
+}
+static Ref *get_locale_neutral(void)
+{
+    Ref *r = ref_new(fs->cls_locale);
+    fv->loc_neutral = get_locale_from_ref(r);
+    r->v[INDEX_LOCALE_LANGTAG] = vp_Value(fs->str_0);
+    r->v[INDEX_LOCALE_LOCALE] = ptr_Value(fv->loc_neutral);
+    return r;
+}
+static int locale_new(Value *vret, Value *v, RefNode *node)
+{
+    RefStr *rs = Value_vp(v[1]);
+
+    if (rs->size == 1 && rs->c[0] == '!') {
+        *vret = vp_Value(get_locale_neutral());
+    } else {
+        Ref *r = get_locale_from_name(rs->c, rs->size, FALSE);
+        if (r == NULL) {
+            return FALSE;
+        }
+        *vret = vp_Value(r);
+    }
+    return TRUE;
+}
+static int locale_marshal_read(Value *vret, Value *v, RefNode *node)
+{
+    Value r = Value_ref(v[1])->v[INDEX_MARSHALDUMPER_SRC];
+    uint32_t size;
+    int rd_size;
+
+    if (!stream_read_uint32(r, &size)) {
         return FALSE;
     }
-    r->v[INDEX_LOCALE_LOCALE] = vp_Value(loc);
-
+    if (size > 256) {
+        throw_errorf(fs->mod_lang, "ValueError", "Invalid size number");
+        return FALSE;
+    }
+    rd_size = size;
+    if (size == 0) {
+        *vret = vp_Value(get_locale_neutral());
+    } else {
+        char *cbuf = malloc(size + 1);
+        Ref *r_loc;
+        if (!stream_read_data(r, NULL, cbuf, &rd_size, FALSE, TRUE)) {
+            return FALSE;
+        }
+        cbuf[rd_size] = '\0';
+        r_loc = get_locale_from_name(cbuf, rd_size, FALSE);
+        if (r_loc == NULL) {
+            return FALSE;
+        }
+        *vret = vp_Value(r_loc);
+    }
     return TRUE;
 }
-// Locale.best(["ja","en"])
-static int locale2_best(Value *vret, Value *v, RefNode *node)
-{
-    return TRUE;
-}
-static int locale2_tostr(Value *vret, Value *v, RefNode *node)
+static int locale_marshal_write(Value *vret, Value *v, RefNode *node)
 {
     Ref *r = Value_ref(*v);
-    StrBuf sb;
-    int i;
-    
-    StrBuf_init_refstr(&sb, 32);
-    StrBuf_add_r(&sb, Value_vp(r->v[INDEX_LOCALE_LANGUAGE]));
+    RefStr *langtag = Value_vp(r->v[INDEX_LOCALE_LANGTAG]);
+    Value w = Value_ref(v[1])->v[INDEX_MARSHALDUMPER_SRC];
 
-    for (i = INDEX_LOCALE_LANGUAGE + 1; i <= INDEX_LOCALE_VARIANT; i++) {
-        if (r->v[i] != VALUE_NULL) {
-            StrBuf_add_c(&sb, '-');
-            StrBuf_add_r(&sb, Value_vp(r->v[i]));
+    if (langtag != NULL) {
+        if (!stream_write_uint32(w, langtag->size)) {
+            return FALSE;
+        }
+        if (!stream_write_data(w, langtag->c, langtag->size)) {
+            return FALSE;
         }
     }
+    return TRUE;
+}
+static int locale_dispose(Value *vret, Value *v, RefNode *node)
+{
+    Ref *r = Value_ref(*v);
+    LocaleData *loc = Value_ptr(r->v[INDEX_LOCALE_LOCALE]);
+    if (loc != NULL) {
+        Mem_close(&loc->mem);
+        r->v[INDEX_LOCALE_LOCALE] = VALUE_NULL;
+    }
+    return TRUE;
+}
+static int locale_tostr(Value *vret, Value *v, RefNode *node)
+{
+    Ref *r = Value_ref(*v);
+    RefStr *tagname = Value_vp(r->v[INDEX_LOCALE_LANGTAG]);
+    StrBuf sb;
+
+    StrBuf_init_refstr(&sb, 32);
+    StrBuf_add(&sb, "Locale(", -1);
+    if (tagname->size > 0) {
+        StrBuf_add_r(&sb, tagname);
+    } else {
+        StrBuf_add(&sb, "NEUTRAL", -1);
+    }
+    StrBuf_add_c(&sb, ')');
     *vret = StrBuf_str_Value(&sb, fs->cls_str);
 
     return TRUE;
 }
-static int locale2_eq(Value *vret, Value *v, RefNode *node)
+static int locale_hash(Value *vret, Value *v, RefNode *node)
+{
+    Ref *r = Value_ref(*v);
+    RefStr *rs = Value_vp(r->v[INDEX_LOCALE_LANGTAG]);
+    uint32_t hash = str_hash(rs->c, rs->size);
+    *vret = int32_Value(hash & INT32_MAX);
+    return TRUE;
+}
+static int locale_eq(Value *vret, Value *v, RefNode *node)
 {
     Ref *r1 = Value_ref(*v);
     Ref *r2 = Value_ref(v[1]);
-    int result = TRUE;
-    int i;
-
-    for (i = INDEX_LOCALE_LANGUAGE; i < INDEX_LOCALE_EXTENTIONS; i++) {
-        if (!refstr_eq(Value_vp(r1->v[i]), Value_vp(r2->v[i]))) {
-            result = FALSE;
-            break;
-        }
-    }
+    int result = refstr_eq(Value_vp(r1->v[INDEX_LOCALE_LANGTAG]), Value_vp(r2->v[INDEX_LOCALE_LANGTAG]));
     *vret = bool_Value(result);
     return TRUE;
 }
-static int locale2_get_param(Value *vret, Value *v, RefNode *node)
+static int locale_get_param(Value *vret, Value *v, RefNode *node)
 {
     Ref *r = Value_ref(*v);
     int idx = FUNC_INT(node);
@@ -1298,10 +795,388 @@ static int locale2_get_param(Value *vret, Value *v, RefNode *node)
 
     return TRUE;
 }
+static int locale_data_langtag(Value *vret, Value *v, RefNode *node)
+{
+    LocaleData *loc = Value_locale_data(*v);
+    if (loc != NULL && loc->langtag != NULL) {
+        *vret = vp_Value(loc->langtag);
+    }
+    return TRUE;
+}
+static int locale_data_bidi(Value *vret, Value *v, RefNode *node)
+{
+    LocaleData *loc = Value_locale_data(*v);
+    if (loc != NULL) {
+        switch (loc->bidi) {
+        case 'L':
+            *vret = cstr_Value(fs->cls_str, "ltr", 3);
+            break;
+        case 'R':
+            *vret = cstr_Value(fs->cls_str, "rtl", 3);
+            break;
+        }
+    }
+    return TRUE;
+}
 
-#endif
+static void locale_put_array(StrBuf *buf, const char **arr, int size)
+{
+    enum {
+        SEP_SIZE = 3,
+    };
+    const char *sep = "\",\"";
+    int i;
+
+    for (i = 0; i < size; i++) {
+        if (i > 0) {
+            StrBuf_add(buf, sep, SEP_SIZE);
+        }
+        if (arr[i] != NULL) {
+            add_backslashes_sub(buf, arr[i], -1, ADD_BACKSLASH_U_UCS2);
+        }
+    }
+}
+/**
+ * localeの情報をjson文字列で返す
+ */
+static int locale_data_json(Value *vret, Value *v, RefNode *node)
+{
+    LocaleData *loc = Value_locale_data(*v);
+    if (loc != NULL) {
+        StrBuf buf;
+
+        StrBuf_init_refstr(&buf, 0);
+        StrBuf_add(&buf, "{\"tag\":\"", -1);
+        StrBuf_add_r(&buf, loc->langtag);
+
+        StrBuf_add(&buf, "\",\"month\":[\"", -1);
+        locale_put_array(&buf, loc->month, lengthof(loc->month));
+
+        StrBuf_add(&buf, "\"],\"month_w\":[\"", -1);
+        locale_put_array(&buf, loc->month_w, lengthof(loc->month_w));
+
+        StrBuf_add(&buf, "\"],\"days\":[\"", -1);
+        locale_put_array(&buf, loc->week, lengthof(loc->week));
+
+        StrBuf_add(&buf, "\"],\"days_w\":[\"", -1);
+        locale_put_array(&buf, loc->week_w, lengthof(loc->week_w));
+
+        StrBuf_add(&buf, "\"],\"date\":[\"", -1);
+        locale_put_array(&buf, loc->date, lengthof(loc->date));
+
+        StrBuf_add(&buf, "\"],\"time\":[\"", -1);
+        locale_put_array(&buf, loc->time, lengthof(loc->time));
+
+        StrBuf_add(&buf, "\"],\"am\":\"", -1);
+        add_backslashes_sub(&buf, loc->am_pm[0], -1, ADD_BACKSLASH_U_UCS2);
+        StrBuf_add(&buf, "\",\"pm\":\"", -1);
+        add_backslashes_sub(&buf, loc->am_pm[1], -1, ADD_BACKSLASH_U_UCS2);
+
+        StrBuf_add(&buf, "\",\"bidi\":\"", -1);
+        StrBuf_add(&buf, (loc->bidi == 'R' ? "rtl\"}" : "ltr\"}"), 5);
+
+        *vret = StrBuf_str_Value(&buf, fs->cls_str);
+    }
+    return TRUE;
+}
 
 ////////////////////////////////////////////////////////////////////////////
+
+char *resource_to_path(Str name_s, const char *ext_p)
+{
+    char *name_p = str_dup_p(name_s.p, name_s.size, NULL);
+    PtrList *lst;
+    int i;
+
+    if (ext_p == NULL) {
+        ext_p = "";
+    }
+
+    // 識別子文字以外はエラー
+    for (i = 0; i < name_s.size; i++) {
+        if (name_p[i] == '.') {
+            name_p[i] = SEP_C;
+        } else if (!isalnumu_fox(name_p[i])) {
+            goto ERROR_END;
+        }
+    }
+
+    for (lst = fs->resource_path; lst != NULL; lst = lst->next) {
+        char *path = str_printf("%s" SEP_S "%s%s", lst->u.c, name_p, ext_p);
+        if (exists_file(path) == EXISTS_FILE) {
+            free(name_p);
+            return path;
+        }
+        free(path);
+        path = NULL;
+    }
+
+ERROR_END:
+    throw_errorf(fs->mod_file, "FileOpenError", "Cannot find file for %Q", name_s);
+    free(name_p);
+    return NULL;
+}
+
+static int load_resource_sub(RefResource *res, const char *fname)
+{
+    Tok tk;
+    char *buf = read_from_file(NULL, fname, NULL);
+
+    if (buf == NULL) {
+        // ファイルが見つからない場合は何もしない
+        return TRUE;
+    }
+    Tok_simple_init(&tk, buf);
+
+    Tok_simple_next(&tk);
+    for (;;) {
+    LINE_BEGIN:
+        switch (tk.v.type) {
+        case TL_VAR:
+        case TL_CONST:
+        case TL_CLASS: {
+            Str key = tk.str_val;
+            Tok_simple_next(&tk);
+            if (tk.v.type != T_LET) {
+                goto ERROR_END;
+            }
+            Tok_simple_next(&tk);
+            if (tk.v.type != TL_STR) {
+                goto ERROR_END;
+            }
+            if (Str_eq_p(key, "locale")) {
+                if (tk.v.type != TL_STR) {
+                    goto ERROR_END;
+                }
+                if (res->locale_tag == NULL) {
+                    res->locale_tag = str_dup_p(tk.str_val.p, tk.str_val.size, &res->mem);
+                }
+            } else if (Hash_get(&res->h, key.p, key.size) == NULL) {
+                if (tk.v.type == TL_STR) {
+                    Str *ps = Mem_get(&res->mem, sizeof(Str));
+                    ps->p = str_dup_p(tk.str_val.p, tk.str_val.size, &res->mem);
+                    ps->size = tk.str_val.size;
+                    Hash_add_p(&res->h, &res->mem, intern(key.p, key.size), ps);
+                } else {
+                    goto ERROR_END;
+                }
+            } else {
+            }
+            Tok_simple_next(&tk);
+            break;
+        }
+        case T_NL:
+            Tok_simple_next(&tk);
+            goto LINE_BEGIN;
+        case T_EOF:
+            free(buf);
+            return TRUE;
+        case T_ERR:
+            free(buf);
+            return FALSE;
+        default:
+            goto ERROR_END;
+        }
+        if (tk.v.type != T_NL && tk.v.type != T_EOF) {
+            goto ERROR_END;
+        }
+    }
+
+ERROR_END:
+    throw_errorf(fs->mod_locale, "ResourceError", "Error at line %d (%s)", tk.v.line, fname);
+    free(buf);
+    return FALSE;
+}
+static char *fname_pos(char *fpath)
+{
+    char *p = fpath + strlen(fpath) - 1;
+    while (p > fpath) {
+        if (p[-1] == SEP_C) {
+            return p;
+        }
+        p--;
+    }
+    return fpath;
+}
+static RefResource *load_resource_from_locale(RefStr *name_r, const char *loc_name)
+{
+    // resource_pathを順に探索
+    PtrList *res_path;
+
+    for (res_path = fs->resource_path; res_path != NULL; res_path = res_path->next) {
+        char *fpath = str_printf("%s" SEP_S "%r" SEP_S "%s.txt", res_path->u.c, name_r, loc_name);
+        char *fname = fname_pos(fpath);
+        int found = FALSE;
+
+        for (;;) {
+            if (exists_file(fpath) == EXISTS_FILE) {
+                found = TRUE;
+                break;
+            }
+            if (fname[0] == '!') {
+                break;
+            }
+            locale_filename_trim(fname, ".txt");
+        }
+        if (found) {
+            //load_resource
+            RefResource *res = buf_new(fs->cls_resource, sizeof(RefResource));
+            Mem_init(&res->mem, 256);
+            Hash_init(&res->h, &res->mem, 32);
+            res->locale_tag = NULL;
+            res->locale = VALUE_NULL;
+            for (;;) {
+                if (!load_resource_sub(res, fpath)) {
+                    free(fpath);
+                    Value_dec(vp_Value(res));
+                    return NULL;
+                }
+                if (fname[0] == '!') {
+                    break;
+                }
+                locale_filename_trim(fname, ".txt");
+            }
+            free(fpath);
+            return res;
+        }
+    }
+    return NULL;
+}
+static int resource_new(Value *vret, Value *v, RefNode *node)
+{
+    RefStr *name_r = Value_vp(v[1]);
+    RefResource *res = NULL;
+
+    if (fg->stk_top > v + 2) {
+        char *name = locale_ref_to_filename(Value_ref(v[2]));
+        res = load_resource_from_locale(name_r, name);
+    } else {
+        // load best resource
+        RefStr **list = get_best_locale_list();
+        int i;
+        for (i = 0; list[i] != NULL; i++) {
+            const char *name = list[i]->c;
+            res = load_resource_from_locale(name_r, name);
+            if (res != NULL) {
+                break;
+            }
+        }
+    }
+    if (res != NULL) {
+        *vret = vp_Value(res);
+        return TRUE;
+    } else {
+        if (fg->error == VALUE_NULL) {
+            throw_errorf(fs->mod_locale, "ResourceError", "Cannot open resource file");
+        }
+        return FALSE;
+    }
+}
+
+static int resource_dispose(Value *vret, Value *v, RefNode *node)
+{
+    RefResource *res = Value_vp(*v);
+    Value_dec(res->locale);
+    res->locale = VALUE_NULL;
+    Mem_close(&res->mem);
+    return TRUE;
+}
+
+/**
+ * 文字列をそのまま返す
+ */
+static int resource_getstr(Value *vret, Value *v, RefNode *node)
+{
+    RefResource *res = Value_vp(*v);
+    RefStr *key = Value_vp(v[1]);
+    Str *ps = Hash_get(&res->h, key->c, key->size);
+
+    if (ps != NULL) {
+        *vret = cstr_Value(fs->cls_str, ps->p, ps->size);
+        return TRUE;
+    } else {
+        throw_errorf(fs->mod_lang, "IndexError", "Resource key %r not found", key);
+        return FALSE;
+    }
+
+    return TRUE;
+}
+
+static int resource_locale(Value *vret, Value *v, RefNode *node)
+{
+    RefResource *res = Value_vp(*v);
+
+    if (res->locale == VALUE_NULL) {
+        const char *tag = res->locale_tag;
+        if (tag[0] == '!' && tag[1] == '\0') {
+            res->locale = vp_Value(get_locale_neutral());
+        } else {
+            res->locale = vp_Value(get_locale_from_name(tag, strlen(tag), FALSE));
+        }
+    }
+    *vret = Value_cp(res->locale);
+    return TRUE;
+}
+
+static int resource_file(Value *vret, Value *v, RefNode *node)
+{
+    char *path;
+    Str name_s = Value_str(v[1]);
+    Str ext_s = Value_str(v[2]);
+    char *ext = malloc(ext_s.size + 4);
+
+    ext[0] = '.';
+    strcpy(ext + 1, ext_s.p);
+    path = resource_to_path(name_s, ext);
+    free(ext);
+
+    if (path == NULL) {
+        return FALSE;
+    }
+    *vret = cstr_Value(fs->cls_file, path, -1);
+    free(path);
+
+    return TRUE;
+}
+
+////////////////////////////////////////////////////////////////////////////
+
+static int locale_get_best(Value *vret, Value *v, RefNode *node)
+{
+    int i;
+    RefArray *ra = refarray_new(0);
+    RefStr **list = get_best_locale_list();
+
+    *vret = vp_Value(ra);
+
+    for (i = 0; list[i] != NULL; i++) {
+        Ref *loc = get_locale_from_name(list[i]->c, list[i]->size, FALSE);
+        if (loc != NULL) {
+            Value *vp = refarray_push(ra);
+            *vp = vp_Value(loc);
+        }
+    }
+
+    return TRUE;
+}
+
+// RESOURCE_PATHが設定された直後に呼び出す
+void set_neutral_locale()
+{
+    RefNode *cls = fs->cls_locale;
+    RefNode *n = define_identifier(cls->defined_module, cls, "NEUTRAL", NODE_CONST, 0);
+    n->u.k.val = vp_Value(get_locale_neutral());
+}
+
+////////////////////////////////////////////////////////////////////////////
+
+static void define_locale_const(RefNode *m)
+{
+    RefNode *n;
+
+    n = define_identifier(m, m, "BEST_LOCALE", NODE_CONST_U_N, 0);
+    define_native_func_a(n, locale_get_best, 0, 0, NULL);
+}
 
 static void define_locale_func(RefNode *m)
 {
@@ -1315,54 +1190,55 @@ static void define_locale_class(RefNode *m)
     RefNode *cls;
     RefNode *n;
 
-    fs->loc_neutral = load_locale(fs->Str_EMPTY);
-
     // Locale
-    // deprecated
     redefine_identifier(m, m, "Locale", NODE_CLASS, 0, fs->cls_locale);
     cls = fs->cls_locale;
+    cls->u.c.n_memb = INDEX_LOCALE_NUM;
+
     n = define_identifier_p(m, cls, fs->str_new, NODE_NEW_N, 0);
-    define_native_func_a(n, locale_new, 0, 1, NULL, fs->cls_str);
+    define_native_func_a(n, locale_new, 1, 1, NULL, fs->cls_str);
     n = define_identifier_p(m, cls, fs->str_marshal_read, NODE_NEW_N, 0);
     define_native_func_a(n, locale_marshal_read, 1, 1, NULL, fs->cls_marshaldumper);
 
+    n = define_identifier_p(m, cls, fs->str_dispose, NODE_FUNC_N, 0);
+    define_native_func_a(n, locale_dispose, 0, 0, NULL);
+
     n = define_identifier_p(m, cls, fs->str_tostr, NODE_FUNC_N, 0);
     define_native_func_a(n, locale_tostr, 0, 2, NULL, fs->cls_str, fs->cls_locale);
+    n = define_identifier_p(m, cls, fs->str_hash, NODE_FUNC_N, NODEOPT_PROPERTY);
+    define_native_func_a(n, locale_hash, 0, 0, NULL);
+    n = define_identifier_p(m, cls, fs->symbol_stock[T_EQ], NODE_FUNC_N, 0);
+    define_native_func_a(n, locale_eq, 1, 1, NULL, fs->cls_locale);
     n = define_identifier_p(m, cls, fs->str_marshal_write, NODE_FUNC_N, 0);
     define_native_func_a(n, locale_marshal_write, 1, 1, NULL, fs->cls_marshaldumper);
-
-    n = define_identifier_p(m, cls, fs->symbol_stock[T_EQ], NODE_FUNC_N, 0);
-    define_native_func_a(n, object_eq, 1, 1, NULL, fs->cls_locale);
-    n = define_identifier(m, cls, "tag", NODE_FUNC_N, NODEOPT_PROPERTY);
-    define_native_func_a(n, locale_tag, 0, 0, NULL);
-    n = define_identifier(m, cls, "filename", NODE_FUNC_N, NODEOPT_PROPERTY);
-    define_native_func_a(n, locale_filename, 0, 0, NULL);
+    n = define_identifier(m, cls, "langtag", NODE_FUNC_N, NODEOPT_PROPERTY);
+    define_native_func_a(n, locale_get_param, 0, 0, (void*)INDEX_LOCALE_LANGTAG);
     n = define_identifier(m, cls, "language", NODE_FUNC_N, NODEOPT_PROPERTY);
-    define_native_func_a(n, locale_get_param, 0, 0, (void*)LOCALE_LANGUAGE);
+    define_native_func_a(n, locale_get_param, 0, 0, (void*)INDEX_LOCALE_LANGUAGE);
+    n = define_identifier(m, cls, "extended", NODE_FUNC_N, NODEOPT_PROPERTY);
+    define_native_func_a(n, locale_get_param, 0, 0, (void*)INDEX_LOCALE_EXTENDED);
     n = define_identifier(m, cls, "script", NODE_FUNC_N, NODEOPT_PROPERTY);
-    define_native_func_a(n, locale_get_param, 0, 0, (void*)LOCALE_SCRIPT);
+    define_native_func_a(n, locale_get_param, 0, 0, (void*)INDEX_LOCALE_SCRIPT);
     n = define_identifier(m, cls, "territory", NODE_FUNC_N, NODEOPT_PROPERTY);
-    define_native_func_a(n, locale_get_param, 0, 0, (void*)LOCALE_TERRITORY);
-    n = define_identifier(m, cls, "valiant", NODE_FUNC_N, NODEOPT_PROPERTY);
-    define_native_func_a(n, locale_get_param, 0, 0, (void*)LOCALE_VALIANT);
+    define_native_func_a(n, locale_get_param, 0, 0, (void*)INDEX_LOCALE_TERRITORY);
+    n = define_identifier(m, cls, "extentions", NODE_FUNC_N, NODEOPT_PROPERTY);
+    define_native_func_a(n, locale_get_param, 0, 0, (void*)INDEX_LOCALE_EXTENTIONS);
 
-    n = define_identifier(m, cls, "bidi", NODE_FUNC_N, NODEOPT_PROPERTY);
-    define_native_func_a(n, locale_bidi, 0, 0, NULL);
-    n = define_identifier(m, cls, "json", NODE_FUNC_N, NODEOPT_PROPERTY);
-    define_native_func_a(n, locale_get_json, 0, 0, NULL);
+    n = define_identifier(m, cls, "data_langtag", NODE_FUNC_N, NODEOPT_PROPERTY);
+    define_native_func_a(n, locale_data_langtag, 0, 0, NULL);
+    n = define_identifier(m, cls, "data_bidi", NODE_FUNC_N, NODEOPT_PROPERTY);
+    define_native_func_a(n, locale_data_bidi, 0, 0, NULL);
+    n = define_identifier(m, cls, "data_json", NODE_FUNC_N, NODEOPT_PROPERTY);
+    define_native_func_a(n, locale_data_json, 0, 0, NULL);
 
-    n = define_identifier(m, cls, "NEUTRAL", NODE_CONST, 0);
-    n->u.k.val = Value_cp(vp_Value(fs->loc_neutral));
-
-    cls->u.c.n_memb = 1;
     extends_method(cls, fs->cls_obj);
-
 
     // Resource
     cls = define_identifier(m, m, "Resource", NODE_CLASS, 0);
     fs->cls_resource = cls;
+
     n = define_identifier_p(m, cls, fs->str_new, NODE_NEW_N, 0);
-    define_native_func_a(n, resource_new, 2, 2, NULL, fs->cls_str, NULL);
+    define_native_func_a(n, resource_new, 1, 2, NULL, fs->cls_str, fs->cls_locale);
     n = define_identifier_p(m, cls, fs->str_dispose, NODE_FUNC_N, 0);
     define_native_func_a(n, resource_dispose, 0, 0, NULL);
 
@@ -1372,42 +1248,8 @@ static void define_locale_class(RefNode *m)
     define_native_func_a(n, resource_getstr, 1, 1, NULL, fs->cls_str);
     n = define_identifier(m, cls, "locale", NODE_FUNC_N, NODEOPT_PROPERTY);
     define_native_func_a(n, resource_locale, 0, 0, NULL);
-    n = define_identifier(m, cls, "add", NODE_FUNC_N, 0);
-    define_native_func_a(n, resource_add, 1, 1, NULL, fs->cls_resource);
 
     extends_method(cls, fs->cls_obj);
-
-#if 0
-
-    // Locale2
-    cls_locale2 = define_identifier(m, m, "Locale2", NODE_CLASS, 0);
-    cls = cls_locale2;
-    n = define_identifier_p(m, cls, fs->str_new, NODE_NEW_N, 0);
-    define_native_func_a(n, locale2_new, 1, 1, NULL, fs->cls_str);
-    n = define_identifier(m, cls, "best", NODE_NEW_N, 0);
-    define_native_func_a(n, locale2_best, 1, 1, NULL, NULL);
-
-    n = define_identifier_p(m, cls, fs->str_tostr, NODE_FUNC_N, 0);
-    define_native_func_a(n, locale2_tostr, 0, 2, NULL, fs->cls_str, fs->cls_locale);
-    n = define_identifier_p(m, cls, fs->symbol_stock[T_EQ], NODE_FUNC_N, 0);
-    define_native_func_a(n, locale2_eq, 1, 1, NULL, fs->cls_locale);
-    n = define_identifier(m, cls, "tag", NODE_FUNC_N, NODEOPT_PROPERTY);
-    define_native_func_a(n, locale2_get_param, 0, 0, (void*)INDEX_LOCALE_TAG);
-    n = define_identifier(m, cls, "language", NODE_FUNC_N, NODEOPT_PROPERTY);
-    define_native_func_a(n, locale2_get_param, 0, 0, (void*)INDEX_LOCALE_LANGUAGE);
-    n = define_identifier(m, cls, "extended", NODE_FUNC_N, NODEOPT_PROPERTY);
-    define_native_func_a(n, locale2_get_param, 0, 0, (void*)INDEX_LOCALE_EXTENDED);
-    n = define_identifier(m, cls, "script", NODE_FUNC_N, NODEOPT_PROPERTY);
-    define_native_func_a(n, locale2_get_param, 0, 0, (void*)INDEX_LOCALE_SCRIPT);
-    n = define_identifier(m, cls, "territory", NODE_FUNC_N, NODEOPT_PROPERTY);
-    define_native_func_a(n, locale2_get_param, 0, 0, (void*)INDEX_LOCALE_TERRITORY);
-    n = define_identifier(m, cls, "extentions", NODE_FUNC_N, NODEOPT_PROPERTY);
-    define_native_func_a(n, locale2_get_param, 0, 0, (void*)INDEX_LOCALE_EXTENTIONS);
-
-    cls->u.c.n_memb = INDEX_LOCALE_NUM;
-    extends_method(cls, fs->cls_obj);
-
-#endif
 
 
     cls = define_identifier(m, m, "ResourceError", NODE_CLASS, 0);
@@ -1420,6 +1262,7 @@ void init_locale_module_1()
 
     define_locale_class(m);
     define_locale_func(m);
+    define_locale_const(m);
     m->u.m.loaded = TRUE;
     fs->mod_locale = m;
 }

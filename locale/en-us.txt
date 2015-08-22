@@ -1,4 +1,0 @@
-langtag:en_US
-language:en
-territory:US
-bidi:ltr

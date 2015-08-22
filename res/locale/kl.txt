@@ -1,3 +1,10 @@
-locale=kl
-kl:kalaallisut
-GL:Kalaallit Nunaat
+langtag = "kl"
+month_w = "januari", "februari", "martsi", "aprili", "maji", "juni", "juli", "augustusi", "septemberi", "oktoberi", "novemberi", "decemberi"
+month = "jan", "feb", "mar", "apr", "maj", "jun", "jul", "aug", "sep", "okt", "nov", "dec"
+days_w = "ataasinngorneq", "marlunngorneq", "pingasunngorneq", "sisamanngorneq", "tallimanngorneq", "arfininngorneq", "sabaat"
+days = "ata", "mar", "pin", "sis", "tal", "arf", "sab"
+am_pm = "u.t.", "u.k."
+date = "yyyy-MM-dd", "MMM dd, y", "dd MMMM y", "dddd dd MMMM y"
+time = "h:mm a", "h:mm:ss a", "h:mm:ss a z", "h:mm:ss a Z"
+decimal = ","
+group = "."

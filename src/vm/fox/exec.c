@@ -156,7 +156,7 @@ static int call_dispose(Value v, RefNode *type)
 
             if (!call_function(dispose, 0)) {
                 // デストラクタで例外を吐くことはできないので、即終了
-                fatal_errorf(dispose, "Cannot raise error in destructor (%n)", Value_type(fg->error));
+                fatal_errorf("Cannot throw in %n:_dispose (%n)", type, Value_type(fg->error));
             }
 
             // 戻り値を破棄
@@ -581,7 +581,7 @@ NORMAL:
             *fg->stk_top++ = Value_cp(p->op[0]);
             pc += 2;
             break;
-        case OP_LITERAL_P: { // リテラル
+        case OP_LITERAL_P: { // 定数
             RefNode *node = Value_vp(p->op[1]);
             if (node->type != NODE_CONST) {
                 *fg->stk_top++ = VALUE_NULL;
@@ -591,6 +591,13 @@ NORMAL:
                 fg->stk_top--;
                 node->type = NODE_CONST;
                 node->u.k.val = *fg->stk_top;
+                if (Value_isref(node->u.k.val)) {
+                    RefHeader *rh = Value_vp(node->u.k.val);
+                    // メンバ変数かデストラクタを持っているオブジェクトだけを追加
+                    if (rh->n_memb > 0 || Hash_get_p(&rh->type->u.c.h, fs->str_dispose) != NULL) {
+                        PtrList_add_p(&fv->const_refs, rh, &fg->st_mem);
+                    }
+                }
             }
             *fg->stk_top++ = Value_cp(node->u.k.val);
             pc += 3;
@@ -812,7 +819,7 @@ NORMAL:
             break;
         OP_CALL_FAULT:
             // 関数呼び出しメソッド'op_call'を呼び出す
-            if (!call_member_func(fs->symbol_stock[T_LP_C], p->s, TRUE)) {
+            if (!call_member_func(fs->symbol_stock[T_LP], p->s, TRUE)) {
                 goto THROW;
             }
             if (p->type == OP_CALL_POP) {
@@ -1079,7 +1086,7 @@ NORMAL:
 
         default: {
             RefNode *defm = func->defined_module;
-            fatal_errorf(func, "%n (pc=%d:type=%d) : unknown opcode", defm, pc, p->type);
+            fatal_errorf("%n (pc=%d:type=%d) : unknown opcode", defm, pc, p->type);
             break;
         }
         }
@@ -1250,7 +1257,7 @@ int call_function(RefNode *node, int argc)
     } else if ((node->type & NODEMASK_FUNC_N) != 0) {
         ret = invoke_native(node);
     } else {
-        fatal_errorf(node, "invoke_function : unknown node type : %d", node->type);
+        fatal_errorf("invoke_function : unknown node type : %d (%n)", node->type, node);
         return FALSE;
     }
 
@@ -1299,7 +1306,7 @@ int call_function_obj(int argc)
             Value_dec(vp_Value(r));
             ret = invoke_native(node);
         } else {
-            fatal_errorf(node, "invoke_function_obj : unknown node type : %d", node->type);
+            fatal_errorf("invoke_function_obj : unknown node type : %d (%n)", node->type, node);
             return FALSE;
         }
 
@@ -1322,7 +1329,7 @@ static void dispose_all_modules()
                 *fg->stk_top++ = VALUE_NULL;
                 if (!call_function(fn, 0)) {
                     // デストラクタで例外を吐くことはできないので、即終了
-                    fatal_errorf(fn, "Cannot raise error in destructor (%n)", m);
+                    fatal_errorf("Cannot throw in _dispose (%n)", m);
                 }
                 // 戻り値を除去
                 Value_pop();
@@ -1336,6 +1343,8 @@ int fox_run(RefNode *mod)
 
     if (node != NULL && node->type == NODE_FUNC) {
         int result;
+        PtrList *p;
+
         fg->stk_base = fg->stk;
         fg->stk[0] = VALUE_NULL;
         fg->stk_top = fg->stk + 1;
@@ -1345,6 +1354,11 @@ int fox_run(RefNode *mod)
         // 戻り値を除去
         fg->stk_base = fg->stk;
         Value_dec(*fg->stk_base);
+
+        // 定数オブジェクトを削除
+        for (p = fv->const_refs; p != NULL; p = p->next) {
+            Value_dec(vp_Value(p->u.p));
+        }
 
         dispose_all_modules();
         return result;

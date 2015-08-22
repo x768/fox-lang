@@ -1,0 +1,3 @@
+langtag = "es_CO"
+date = "d/MM/yy", "d/MM/yyyy", "", ""
+time = "H:mm", "H:mm:ss", "H:mm:ss z", ""

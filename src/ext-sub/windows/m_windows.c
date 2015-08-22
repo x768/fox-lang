@@ -4,6 +4,7 @@
 #define WINVER 0x500
 
 #include "fox.h"
+#include "m_number.h"
 #include <string.h>
 #include <limits.h>
 

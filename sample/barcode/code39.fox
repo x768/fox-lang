@@ -1,0 +1,11 @@
+import barcode.code39
+import image
+
+var src = "3.1415926"
+var c39 = Code39(src)
+
+var img = c39.to_image()
+var img2 = Image(img.width * 4 + 32, 96 + 32, "rgb")
+img2.fill_rect Color.WHITE
+img2.copy_resized img, Rect(16, 16, img.width * 4, 96)
+img2.save "code39.png"

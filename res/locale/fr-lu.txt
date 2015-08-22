@@ -1,0 +1,2 @@
+langtag = "fr_LU"
+group = "."

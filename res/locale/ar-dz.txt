@@ -1,0 +1,2 @@
+langtag = "ar_DZ"
+date = "yyyy/M/d", "yyyy/MM/dd", "", ""

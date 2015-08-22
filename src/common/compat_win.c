@@ -4,7 +4,7 @@
 #include <ctype.h>
 
 
-/*
+#if 0
 int utf8_to_utf16(wchar_t *dst_p, const char *src, int len)
 {
     const wchar_t *dst = dst_p;
@@ -16,31 +16,31 @@ int utf8_to_utf16(wchar_t *dst_p, const char *src, int len)
     }
     end = p + len;
 
-    while (p < end) {
-        int c = *p;
-        int code;
+    if (dst_p != NULL) {
+        while (p < end) {
+            int c = *p;
+            int code;
 
-        if ((c & 0x80) == 0) {
-            code = c & 0x7F;
-            p += 1;
-        } else if ((c & 0xE0) == 0xC0) {
-            code = ((c & 0x1F) << 6) | (p[1] & 0x3F);
-            p += 2;
-        } else if ((c & 0xF0) == 0xE0) {
-            code = ((c & 0x0F) << 12) | ((p[1] & 0x3F) << 6) | (p[2] & 0x3F);
-            p += 3;
-        } else if ((c & 0xF8) == 0xF0) {
-            code = ((c & 0x07) << 18) | ((p[1] & 0x3F) << 12)  | ((p[2] & 0x3F) << 6) | (p[3] & 0x3F);
-            p += 4;
-        } else {
-            p++;
-            while (p < end && (*p & 0xC0) == 0x80) {
+            if ((c & 0x80) == 0) {
+                code = c & 0x7F;
+                p += 1;
+            } else if ((c & 0xE0) == 0xC0 && p + 1 < end) {
+                code = ((c & 0x1F) << 6) | (p[1] & 0x3F);
+                p += 2;
+            } else if ((c & 0xF0) == 0xE0 && p + 2 < end) {
+                code = ((c & 0x0F) << 12) | ((p[1] & 0x3F) << 6) | (p[2] & 0x3F);
+                p += 3;
+            } else if ((c & 0xF8) == 0xF0 && p + 3 < end) {
+                code = ((c & 0x07) << 18) | ((p[1] & 0x3F) << 12)  | ((p[2] & 0x3F) << 6) | (p[3] & 0x3F);
+                p += 4;
+            } else {
                 p++;
+                while (p < end && (*p & 0xC0) == 0x80) {
+                    p++;
+                }
+                code = 0xFFFD;
             }
-            code = 0xFFFD;
-        }
 
-        if (dst_p != NULL) {
             if (code >= 0x10000) {
                 code -= 0x10000;
                 *dst++ = code / 0x400 + SURROGATE_U_BEGIN;
@@ -48,17 +48,34 @@ int utf8_to_utf16(wchar_t *dst_p, const char *src, int len)
             } else {
                 *dst++ = code;
             }
-        } else {
-            if (code >= 0x10000) {
-                dst += 2;
+        }
+    } else {
+        while (p < end) {
+            int c = *p;
+
+            dst++;
+            if ((c & 0x80) == 0) {
+                p += 1;
+            } else if ((c & 0xE0) == 0xC0 && p + 1 < end) {
+                p += 2;
+            } else if ((c & 0xF0) == 0xE0 && p + 2 < end) {
+                p += 3;
+            } else if ((c & 0xF8) == 0xF0 && p + 3 < end) {
+                p += 4;
+                if (((c & 0x07) << 18) | ((p[1] & 0x3F) << 12) >= 0x10000) {
+                    dst++;
+                }
             } else {
-                dst++;
+                p++;
+                while (p < end && (*p & 0xC0) == 0x80) {
+                    p++;
+                }
             }
         }
     }
     return dst - dst_p;
 }
-*/
+#endif
 
 char *utf16to8(const wchar_t *src)
 {
@@ -102,6 +119,8 @@ wchar_t *filename_to_utf16(const char *src, const wchar_t *opt)
     }
     return dst;
 }
+
+/////////////////////////////////////////////////////////////////////////////////////
 
 FileHandle open_fox(const char *fname, int mode, int dummy)
 {
@@ -167,3 +186,50 @@ int64_t seek_fox(FileHandle fd, int64_t offset, int whence)
     return i64.QuadPart;
 }
 
+/////////////////////////////////////////////////////////////////////////////////////
+
+DIR *opendir_fox(const char *dname)
+{
+    DIR *d = malloc(sizeof(DIR) + sizeof(WIN32_FIND_DATAW));
+    wchar_t *wtmp = filename_to_utf16(dname, L"\\*");
+    d->hDir = FindFirstFileW(wtmp, (WIN32_FIND_DATAW*)d->wfd);
+    free(wtmp);
+
+    if (d->hDir != INVALID_HANDLE_VALUE) {
+        WIN32_FIND_DATAW *p = (WIN32_FIND_DATAW*)d->wfd;
+        d->first = TRUE;
+        WideCharToMultiByte(CP_UTF8, 0, p->cFileName, -1, d->ent.d_name, sizeof(d->ent.d_name), NULL, NULL);
+        if ((p->dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0) {
+            d->ent.d_type = DT_DIR;
+        } else {
+            d->ent.d_type = DT_REG;
+        }
+        return d;
+    } else {
+        free(d);
+        return NULL;
+    }
+}
+struct dirent *readdir_fox(DIR *d)
+{
+    if (d->first) {
+        d->first = FALSE;
+        return &d->ent;
+    } else if (FindNextFileW(d->hDir, (WIN32_FIND_DATAW*)d->wfd)) {
+        WIN32_FIND_DATAW *p = (WIN32_FIND_DATAW*) &d->wfd;
+        WideCharToMultiByte(CP_UTF8, 0, p->cFileName, -1, d->ent.d_name, sizeof(d->ent.d_name), NULL, NULL);
+        if ((p->dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0) {
+            d->ent.d_type = DT_DIR;
+        } else {
+            d->ent.d_type = DT_REG;
+        }
+        return &d->ent;
+    } else {
+        return NULL;
+    }
+}
+void closedir_fox(DIR *d)
+{
+    FindClose((HANDLE)d->hDir);
+    free(d);
+}

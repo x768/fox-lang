@@ -289,9 +289,9 @@ static void StrBuf_add_i32(StrBuf *s, uint32_t i)
 {
     uint32_t *dst;
 
-    if (s->max <= s->size + 4) {
-        s->max *= 2;
-        s->p = realloc(s->p, s->max);
+    if (s->alloc_size <= s->size + 4) {
+        s->alloc_size *= 2;
+        s->p = realloc(s->p, s->alloc_size);
     }
     dst = (uint32_t*)&s->p[s->size];
     *dst = i;

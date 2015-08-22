@@ -1,4 +1,5 @@
 #include "fox_parse.h"
+#include <pcre.h>
 
 #ifndef WIN32
 #include <dlfcn.h>
@@ -22,15 +23,15 @@ typedef struct OpBuf
 
 
 static const char *token_name[] = {
-    "[EOF]", "T_ERR", "(", ")", "{", "}", "[", "]", "]=", ",", ";", ".", "[\\n]", "(", "[",
-    "(Pragma)", "(Int)", "(Int)", "(Float)", "(Rational)", "(Str)", "(Bytes)", "(Regex)", "(Class)", "(var)", "(const)",
-    "(Str)", "(Str)", "(Str)", "(Str)",
-
-    "==", "!=", "<=>", "<", "<=", ">", ">=", ":", "?",
+    "[EOF]", "T_ERR", "[\\n]", "(", "[", "]=", "==", "!=", "<=>", "<", "<=", ">", ">=", ":", "?",
     "+", "-", "*", "/", "%", "<<", ">>", "&", "|", "^",
     "&&", "||", "..", "...", "=>", "~X", "!X", "+X", "-X",
-
     "=", "+=", "-=", "*=", "/=", "%=", "<<=", ">>=", "&=", "|=", "^=", "++", "--", "in",
+
+    ")", "{", "}", "]", "(", "[", ",", ";", ".X",
+
+    "(Pragma)", "(Int)", "(Int)", "(Float)", "(Rational)", "(Str)", "(Bytes)", "(Regex)", "(Class)", "(var)", "(const)",
+    "(Str)", "(Str)", "(Str)", "(Str)",
 
     "abstract", "break", "case", "catch", "class", "continue", "def", "default", "else", "elif", "false",
     "for", "if", "import", "in", "let", "null", "return", "super", "switch", "this", "throw",
@@ -50,7 +51,7 @@ static void unexpected_token_error(Tok *tk)
         add_stack_trace(tk->module, NULL, tk->v.line);
     }
 }
-static void already_defined_name_error(Tok *tk, RefNode *node)
+static void throw_already_defined_name_error(Tok *tk, RefNode *node)
 {
     if (node->defined_module != NULL) {
         throw_errorf(fs->mod_lang, "DefineError", "Already defined name %n at line %d", node, node->defined_line);
@@ -59,12 +60,12 @@ static void already_defined_name_error(Tok *tk, RefNode *node)
     }
     add_stack_trace(tk->module, NULL, tk->v.line);
 }
-static void module_not_exist_error(Tok *tk, Str name)
+static void throw_module_not_exist_error(Tok *tk, Str name)
 {
     throw_errorf(fs->mod_lang, "NameError", "Module %S is not exist", name);
     add_stack_trace(tk->module, NULL, tk->v.line);
 }
-static void syntax_error(Tok *tk, const char *fmt, ...)
+static void throw_syntax_error(Tok *tk, const char *fmt, ...)
 {
     va_list va;
     va_start(va, fmt);
@@ -73,7 +74,7 @@ static void syntax_error(Tok *tk, const char *fmt, ...)
 
     add_stack_trace(tk->module, NULL, tk->v.line);
 }
-static void define_error(Tok *tk, const char *fmt, ...)
+static void throw_define_error(Tok *tk, const char *fmt, ...)
 {
     va_list va;
     va_start(va, fmt);
@@ -107,7 +108,7 @@ static OpCode *OpBuf_fix(OpBuf *buf, Mem *mem)
 static OpCode *OpBuf_prev(OpBuf *buf)
 {
     if (buf->prev < 0) {
-        fatal_errorf(NULL, "OpBuf_prev:cannot rewind");
+        fatal_errorf("OpBuf_prev:cannot rewind");
     }
     return buf->p + buf->prev;
 }
@@ -301,7 +302,7 @@ static RefNode *Node_define_tk(RefNode *root, Tok *tk, RefStr *name, int type)
     if (entry->p != NULL) {
         node = entry->p;
         if (node->type != NODE_UNRESOLVED) {
-            already_defined_name_error(tk, node);
+            throw_already_defined_name_error(tk, node);
             return NULL;
         }
     } else {
@@ -511,7 +512,7 @@ static RefNode *Block_add_var(Block *bk, Tok *tk, RefStr *name, int opt)
     RefNode *node = Block_get_var(bk, name);
 
     if (node != NULL) {
-        already_defined_name_error(tk, node);
+        throw_already_defined_name_error(tk, node);
         return NULL;
     }
 
@@ -572,7 +573,7 @@ static int parse_import(RefNode *module, Tok *tk)
             // aliasが既に登録されいないか調べる
             node = Hash_get_p(&module->u.m.h, alias);
             if (node != NULL) {
-                already_defined_name_error(tk, node);
+                throw_already_defined_name_error(tk, node);
                 return FALSE;
             }
         } else {
@@ -607,7 +608,7 @@ static int parse_import(RefNode *module, Tok *tk)
         PtrList *pl;
         for (pl = module->u.m.usng; pl != NULL; pl = pl->next) {
             if (pl->u.p == mod) {
-                throw_errorf(fs->mod_lang, "ImportError", "Duplcate import %S", Str_new(name, name_ptr - name));
+                throw_errorf(fs->mod_lang, "ImportError", "Duplcate import '%S'", Str_new(name, name_ptr - name));
                 add_stack_trace(tk->module, NULL, tk->v.line);
                 return FALSE;
             }
@@ -662,7 +663,7 @@ static int parse_closure(OpBuf *buf, Block *bk, Tok *tk)
         if (tk->parse_cls != NULL) {
             var = Hash_get_p(&tk->m_var, name);
             if (var != NULL) {
-                already_defined_name_error(tk, var);
+                throw_already_defined_name_error(tk, var);
                 return FALSE;
             }
         }
@@ -745,7 +746,7 @@ static int parse_elem(OpBuf *buf, Block *bk, Tok *tk)
     switch (tk->v.type) {
     case TT_THIS:
         if (tk->parse_cls == NULL) {
-            syntax_error(tk, "'this' is not allowed here.");
+            throw_syntax_error(tk, "'this' is not allowed here.");
             return FALSE;
         }
         OpBuf_add_op1(buf, OP_GET_LOCAL, 0);
@@ -764,7 +765,7 @@ static int parse_elem(OpBuf *buf, Block *bk, Tok *tk)
         Tok_next(tk);
         break;
     }
-    case TL_FRACTION: {
+    case TL_FRAC: {
         RefFrac *md = buf_new(fs->cls_frac, sizeof(RefFrac));
         Value v = vp_Value(md);
         md->md[0] = tk->mp_val[0];
@@ -782,13 +783,23 @@ static int parse_elem(OpBuf *buf, Block *bk, Tok *tk)
         break;
     }
     case TL_REGEX: {
-        Ref *r = ref_new(fs->cls_regex);
-        Value v = vp_Value(r);
-        r->v[INDEX_REGEX_PTR] = ptr_Value(tk->re_val);
-        r->v[INDEX_REGEX_SRC] = cstr_Value(fs->cls_str, tk->str_val.p, tk->str_val.size);
-        r->v[INDEX_REGEX_OPT] = int32_Value(tk->int_val);
-        OpBuf_add_op2(buf, OP_LITERAL, 0, v);
-        Tok_next(tk);
+        const char *errptr;
+        int erroffset;
+        pcre *re_val = pcre_compile(tk->str_val.p, tk->int_val, &errptr, &erroffset, NULL);
+
+        if (re_val != NULL) {
+            Ref *r = ref_new(fs->cls_regex);
+            Value v = vp_Value(r);
+            r->v[INDEX_REGEX_PTR] = ptr_Value(re_val);
+            r->v[INDEX_REGEX_SRC] = cstr_Value(fs->cls_str, tk->str_val.p, tk->str_val.size);
+            r->v[INDEX_REGEX_FLAGS] = int32_Value(tk->int_val);
+            OpBuf_add_op2(buf, OP_LITERAL, 0, v);
+            Tok_next(tk);
+        } else {
+            throw_errorf(fs->mod_lang, "RegexError", "%s", errptr);
+            add_stack_trace(tk->module, NULL, tk->v.line);
+            return FALSE;
+        }
         break;
     }
     case TL_STR:
@@ -1121,12 +1132,8 @@ static int parse_post_op(OpBuf *buf, Block *bk, Tok *tk)
                 case OP_CLASS:
                     // 直前のOPコードがClassの場合
                     switch (tk->v.type) {
-                    case TL_CLASS: {
-                        const RefNode *type = Value_vp(op->op[0]);
-                        define_error(tk, "%n has no member named %r", type, name);
-                        return FALSE;
-                    }
                     case TL_VAR:
+                    case TL_CLASS:
                         op->type = OP_FUNC;
                         break;
                     case TL_CONST:
@@ -1141,7 +1148,7 @@ static int parse_post_op(OpBuf *buf, Block *bk, Tok *tk)
                     if (op->type != OP_GET_LOCAL || op->s != 0) {
                         // 直前のOPがthisでない場合
                         if (name->c[0] == '_') {
-                            define_error(tk, "%r is private", name);
+                            throw_define_error(tk, "%r is private", name);
                             return FALSE;
                         }
                     }
@@ -1574,7 +1581,7 @@ static int parse_expr_statement(OpBuf *buf, Block *bk, Tok *tk)
             }
             break;
         default:
-            syntax_error(tk, "Invalid lvalue");
+            throw_syntax_error(tk, "Invalid lvalue");
             return FALSE;
         }
         break;
@@ -1638,12 +1645,12 @@ static int parse_expr_statement(OpBuf *buf, Block *bk, Tok *tk)
                 OpBuf_add_op3(buf, OP_CALL_M, 1, u.lop.op[0], vp_Value(fs->symbol_stock[type]));
                 OpBuf_add_op3(buf, OP_CALL_M_POP, 2, u.lop.op[0], vp_Value(fs->symbol_stock[T_LET_B]));
             } else {
-                syntax_error(tk, "Invalid lvalue");
+                throw_syntax_error(tk, "Invalid lvalue");
                 return FALSE;
             }
             break;
         default:
-            syntax_error(tk, "Invalid lvalue");
+            throw_syntax_error(tk, "Invalid lvalue");
             return FALSE;
         }
         break;
@@ -1696,12 +1703,12 @@ static int parse_expr_statement(OpBuf *buf, Block *bk, Tok *tk)
                 OpBuf_add_op3(buf, OP_CALL_M_POP, 2, u.lop.op[0], vp_Value(fs->symbol_stock[T_LET_B]));
             } else {
                 // a.hoge()++
-                syntax_error(tk, "Invalid lvalue");
+                throw_syntax_error(tk, "Invalid lvalue");
                 return FALSE;
             }
             break;
         default:
-            syntax_error(tk, "Invalid lvalue");
+            throw_syntax_error(tk, "Invalid lvalue");
             return FALSE;
         }
         break;
@@ -1783,7 +1790,7 @@ static int parse_local_var(OpBuf *buf, Block *bk, Tok *tk, int is_var)
     if (tk->parse_cls != NULL) {
         var = Hash_get_p(&tk->m_var, name);
         if (var != NULL) {
-            already_defined_name_error(tk, var);
+            throw_already_defined_name_error(tk, var);
             return FALSE;
         }
     }
@@ -2187,7 +2194,7 @@ static int parse_switch(OpBuf *buf, Block *bk, Tok *tk)
             if (tk->v.type == TT_DEFAULT) {
                 // default節
                 if (jmp_else > -1) {
-                    syntax_error(tk, "Multiple 'default' in switch");
+                    throw_syntax_error(tk, "Multiple 'default' in switch");
                     return FALSE;
                 }
                 Tok_next(tk);
@@ -2365,7 +2372,7 @@ static int parse_try(OpBuf *buf, Block *bk, Tok *tk)
                 Str m_name = tk->str_val;
                 resolve_module = Hash_get_p(bk->import, intern(m_name.p, m_name.size));
                 if (resolve_module == NULL) {
-                    module_not_exist_error(tk, m_name);
+                    throw_module_not_exist_error(tk, m_name);
                     return FALSE;
                 }
                 Tok_next(tk);
@@ -2448,7 +2455,7 @@ static int parse_break(OpBuf *buf, Block *bk, Tok *tk)
             break;
         }
         if (bk->parent == NULL) {
-            syntax_error(tk, "break without loop");
+            throw_syntax_error(tk, "break without loop");
             return FALSE;
         }
         // 除去するスタックの数を数える
@@ -2476,7 +2483,7 @@ static int parse_continue(OpBuf *buf, Block *bk, Tok *tk)
             break;
         }
         if (bk->parent == NULL) {
-            syntax_error(tk, "continue without loop");
+            throw_syntax_error(tk, "continue without loop");
             return FALSE;
         }
         // 除去するスタックの数を数える
@@ -2618,7 +2625,7 @@ static int parse_statements(OpBuf *buf, Block *bk, Tok *tk, RefNode *klass)
             }
             break;
         case TT_SUPER:
-            syntax_error(tk, "'super' cannot use here");
+            throw_syntax_error(tk, "'super' cannot use here");
             return FALSE;
         case T_NL:
         case T_SEMICL:
@@ -2679,7 +2686,7 @@ static int parse_args(RefNode *node, Tok *tk, Block *bk)
         if (tk->parse_cls != NULL) {
             var = Hash_get_p(&tk->m_var, name);
             if (var != NULL) {
-                already_defined_name_error(tk, var);
+                throw_already_defined_name_error(tk, var);
                 return FALSE;
             }
         }
@@ -2699,7 +2706,7 @@ static int parse_args(RefNode *node, Tok *tk, Block *bk)
                 // モジュール名が付く場合
                 resolve_module = Hash_get_p(bk->import, Tok_intern(tk));
                 if (resolve_module == NULL) {
-                    module_not_exist_error(tk, tk->str_val);
+                    throw_module_not_exist_error(tk, tk->str_val);
                     return FALSE;
                 }
                 Tok_next(tk);
@@ -2726,7 +2733,7 @@ static int parse_args(RefNode *node, Tok *tk, Block *bk)
             // def fn(a, b, c..)
             if (abbr != -1) {
                 // a = nullとa..を併用できない
-                syntax_error(tk, "Cannot use 'arg = null' and 'arg..'");
+                throw_syntax_error(tk, "Cannot use 'arg = null' and 'arg..'");
                 return FALSE;
             }
             Tok_next_skip(tk);
@@ -2750,13 +2757,13 @@ static int parse_args(RefNode *node, Tok *tk, Block *bk)
             }
         } else {
             if (abbr != -1) {
-                syntax_error(tk, "'= null' arguments must be right side");
+                throw_syntax_error(tk, "'= null' arguments must be right side");
                 return FALSE;
             }
         }
         num++;
         if (num > 127) {
-            syntax_error(tk, "Too many arguments (> 127)");
+            throw_syntax_error(tk, "Too many arguments (> 127)");
             return FALSE;
         }
 
@@ -2865,7 +2872,7 @@ static int parse_function(RefNode *node, Tok *tk, RefNode *construct)
 
     if (node->name == fs->str_dispose) {
         if (node->u.f.arg_max > 0) {
-            syntax_error(tk, "'_dispose' not allowed any arguments");
+            throw_syntax_error(tk, "'_dispose' not allowed any arguments");
             return FALSE;
         }
     }
@@ -2983,60 +2990,6 @@ static int parse_def_statement(RefNode *node, Tok *tk)
     return TRUE;
 }
 
-static void define_default_eq(RefNode *klass, NativeFunc func)
-{
-    Hash *h = &klass->u.c.h;
-    RefNode *m = klass->defined_module;
-    RefNode *n;
-
-    if (Hash_get_p(h, fs->symbol_stock[T_EQ]) == NULL) {
-        n = define_identifier_p(m, klass, fs->symbol_stock[T_EQ], NODE_FUNC_N, 0);
-        define_native_func_a(n, func, 1, 1, NULL, klass);
-    }
-}
-static void define_default_hash(RefNode *klass, RefNode *func)
-{
-    HashEntry *he = Hash_get_add_entry(&klass->u.c.h, &fg->st_mem, fs->str_hash);
-    he->p = func;
-}
-// baseクラスのメンバ関数をklassにコピーする
-// 重複した場合継承先を優先する
-// ただし、_disposeは継承しない
-void extends_method(RefNode *klass, RefNode *base)
-{
-    Hash *src = &base->u.c.h;
-    Hash *dst = &klass->u.c.h;
-    int n = src->entry_num;
-    int i;
-
-    klass->u.c.super = base;
-
-    for (i = 0; i < n; i++) {
-        HashEntry *p;
-
-        for (p = src->entry[i]; p != NULL; p = p->next) {
-            RefNode *node = p->p;
-
-            if ((node->type == NODE_FUNC || node->type == NODE_FUNC_N) && node->name != fs->str_dispose) {
-                HashEntry *he = Hash_get_add_entry(dst, &fg->st_mem, p->key);
-                if (he->p == NULL) {
-                    he->p = node;
-                }
-            }
-        }
-    }
-
-    if ((klass->opt & NODEOPT_INTEGRAL) != 0) {
-        // integral互換の場合、op_eqを設定
-        if (klass != fs->cls_int) {
-            define_default_eq(klass, object_eq);
-        }
-    } else if ((klass->opt & NODEOPT_STRCLASS) != 0) {
-        // str互換の場合、hash, op_eqを設定
-        define_default_eq(klass, sequence_eq);
-        define_default_hash(klass, fv->refnode_sequence_hash);
-    }
-}
 static int parse_class_statement(RefNode *module, Tok *tk, int abst)
 {
     RefStr *name;
@@ -3072,7 +3025,7 @@ static int parse_class_statement(RefNode *module, Tok *tk, int abst)
             Str m_name = tk->str_val;
             resolve_module = Hash_get(&module->u.m.import, m_name.p, m_name.size);
             if (resolve_module == NULL) {
-                module_not_exist_error(tk, m_name);
+                throw_module_not_exist_error(tk, m_name);
                 return FALSE;
             }
             Tok_next(tk);
@@ -3188,7 +3141,7 @@ static int parse_class_statement(RefNode *module, Tok *tk, int abst)
             name = Tok_intern(tk);
             he = Hash_get_add_entry(&tk->m_var, &fv->cmp_mem, name);
             if (he->p != NULL) {
-                already_defined_name_error(tk, he->p);
+                throw_already_defined_name_error(tk, he->p);
                 return FALSE;
             }
             var = Mem_get(&fv->cmp_mem, sizeof(RefNode));
@@ -3386,10 +3339,10 @@ static int load_error_dst(void)
 }
 void load_env_settings(int *defs)
 {
-    if (parse_path_env(&fv->import_path, "FOX_IMPORT") && defs != NULL) {
+    if (parse_path_env(&fs->import_path, "FOX_IMPORT") && defs != NULL) {
         defs[ENVSET_IMPORT] = TRUE;
     }
-    if (parse_path_env(&fv->resource_path, "FOX_RESOURCE") && defs != NULL) {
+    if (parse_path_env(&fs->resource_path, "FOX_RESOURCE") && defs != NULL) {
         defs[ENVSET_RESOURCE] = TRUE;
     }
     if (load_max_alloc() && defs != NULL) {
@@ -3410,40 +3363,26 @@ static void add_default_path(PtrList **proot, const char *key)
 
 static int parse_pragma(RefNode *module, Tok *tk, Str line)
 {
-    Str key, val;
+    Str key;
     const char *p = line.p;
     const char *end = p + line.size;
 
     key = line;
-    val.p = NULL;
-    val.size = 0;
 
     while (p < end) {
-        if (module == fv->startup) {
-            if (*p == '=') {
-                // =が出たら環境変数の設定(上書き)
-                set_env_value(line.p, p, end);
-                return TRUE;
-            } else if (p + 1 < end && p[0] == '+' && p[1] == '=') {
-                // +=が出たら環境変数の追加
-                append_env_value(line.p, p, end);
-                return TRUE;
-            }
-        }
-        // スペースで2つに分ける
-        if (isspace_fox(*p)) {
-            key = Str_new(line.p, p - line.p);
-            while (p < end && isspace_fox(*p)) {
-                p++;
-            }
-            val.p = p;
-            val.size = end - p;
-            break;
+        if (*p == '=') {
+            // =が出たら環境変数の設定(上書き)
+            set_env_value(line.p, p, end);
+            return TRUE;
+        } else if (p + 1 < end && p[0] == '+' && p[1] == '=') {
+            // +=が出たら環境変数の追加
+            append_env_value(line.p, p, end);
+            return TRUE;
         }
         p++;
     }
     if (key.size == 0) {
-        syntax_error(tk, "Pragma error");
+        throw_syntax_error(tk, "Pragma error");
         return FALSE;
     }
 
@@ -3467,31 +3406,10 @@ static int parse_pragma(RefNode *module, Tok *tk, Str line)
             }
         }
         break;
-    case 'n':
-        if (Str_eq_p(key, "native")) {
-            int result = FALSE;
-            if (val.size >= 1) {
-                switch (val.p[0]) {
-                case 'm':
-                    if (Str_eq_p(val, "marshal")) {
-                        define_marshal_module(module);
-                        result = TRUE;
-                    }
-                    break;
-                }
-            }
-            if (result) {
-                return TRUE;
-            } else {
-                syntax_error(tk, "Unknown native %Q", val);
-                return FALSE;
-            }
-        }
-        break;
     default:
         break;
     }
-    syntax_error(tk, "Unknown pragma %S", key);
+    throw_syntax_error(tk, "Unknown pragma %S", key);
     return FALSE;
 }
 
@@ -3542,7 +3460,8 @@ static int parse_source(RefNode *module, Tok *tk, RefNode *top, Block *bk)
 BREAK1:
     if (module == fv->startup) {
         load_env_settings(NULL);
-        add_default_path(&fv->resource_path, "res");
+        add_default_path(&fs->resource_path, "res");
+        set_neutral_locale();
     }
 
     // import宣言
@@ -3656,10 +3575,10 @@ BREAK2:
             }
             break;
         case TT_THIS:
-            syntax_error(tk, "'this' cannot use here");
+            throw_syntax_error(tk, "'this' cannot use here");
             return FALSE;
         case TT_SUPER:
-            syntax_error(tk, "'super' cannot use here");
+            throw_syntax_error(tk, "'super' cannot use here");
             return FALSE;
         case TL_INT:
         case TL_MPINT:
@@ -3935,16 +3854,17 @@ RefNode *get_module_by_name(const char *name_ptr, int name_size, int syslib, int
     name_p = str_dup_p(name_ptr, name_size, NULL);
 
     for (i = 0; name_p[i] != '\0'; i++) {
-        if (name_p[i] == '.') {
+        int ch = name_p[i];
+        if (ch == '.') {
             name_p[i] = SEP_C;
-        } else if (!isalnum(name_p[i]) && name_p[i] != '_') {
+        } else if (!islower_fox(ch) && !isdigit_fox(ch) && ch != '_') {
             goto FINALLY;
         }
     }
 
     if (!syslib) {
         PtrList *lst;
-        for (lst = fv->import_path; lst != NULL; lst = lst->next) {
+        for (lst = fs->import_path; lst != NULL; lst = lst->next) {
             int ret;
             char *path = str_printf("%s" SEP_S "%s.fox", lst->u.c, name_p);
             ret = module_load_sub(&mod, name, path, initialize, FALSE);
@@ -4023,31 +3943,4 @@ RefNode *get_module_by_file(const char *path_p)
     Tok_close(&tk);
 
     return module;
-}
-RefNode *get_node_member(RefNode *node, ...)
-{
-    va_list va;
-    va_start(va, node);
-
-    for (;;) {
-        RefNode *n;
-        RefStr *rs = va_arg(va, RefStr*);
-
-        if (rs == NULL) {
-            break;
-        }
-        if (node->type != NODE_MODULE && node->type != NODE_CLASS) {
-            throw_errorf(fs->mod_lang, "NameError", "%r is not defined.", rs);
-            return NULL;
-        }
-        n = Hash_get_p(&node->u.c.h, rs);
-        if (n == NULL) {
-            throw_errorf(fs->mod_lang, "NameError", "%r is not defined.", rs);
-            return NULL;
-        }
-        node = n;
-    }
-
-    va_end(va);
-    return node;
 }

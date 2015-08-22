@@ -1,0 +1,3 @@
+langtag = "es_HN"
+decimal = "."
+group = ","

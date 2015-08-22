@@ -1,4 +1,0 @@
-langtag:th_TH
-language:th
-territory:TH
-bidi:ltr

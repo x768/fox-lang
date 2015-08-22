@@ -1,5 +1,2 @@
-locale=ru_UA
-apa:апачский
-den:слэйви
-mh:маршальский
-tlh:клингон
+langtag = "ru_UA"
+time = "HH:mm", "HH:mm:ss", "HH:mm:ss z", "HH:mm:ss Z"

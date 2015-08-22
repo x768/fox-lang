@@ -1,4 +1,0 @@
-langtag:ky
-language:ky
-decimal:,
-bidi:ltr

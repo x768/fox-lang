@@ -6,13 +6,40 @@
 #include "compat.h"
 #include "compat_vm.h"
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <stdarg.h>
-#include <pcre.h>
 
 
 enum {
-    TT_ABSTRACT = T_INDEX_NUM,
+    T_RP = T_INDEX_NUM, // )
+    T_LC,    // {
+    T_RC,    // }
+    T_RB,    // ]
+    T_LP_C,  // f (
+    T_LB_C,  // a [
+    T_COMMA,
+    T_SEMICL,
+    T_MEMB,
+
+    TL_PRAGMA,
+    TL_INT,
+    TL_MPINT,
+    TL_FLOAT,
+    TL_FRAC,
+    TL_STR,
+    TL_BIN,
+    TL_REGEX,
+    TL_CLASS,
+    TL_VAR,
+    TL_CONST,
+
+    TL_STRCAT_BEGIN,
+    TL_STRCAT_MID,
+    TL_STRCAT_END,
+    TL_FORMAT,
+
+    TT_ABSTRACT,
     TT_BREAK,
     TT_CASE,
     TT_CATCH,
@@ -86,7 +113,7 @@ enum {
 // class Locale
 enum {
     INDEX_LOCALE_LOCALE,
-    INDEX_LOCALE_TAG,
+    INDEX_LOCALE_LANGTAG,
     INDEX_LOCALE_LANGUAGE,
     INDEX_LOCALE_EXTENDED,
     INDEX_LOCALE_SCRIPT,
@@ -154,35 +181,11 @@ typedef struct {
     Str val;
 } IniTok;
 
-struct PtrList {
-    struct PtrList *next;
-    union {
-        void *p;
-        char c[1];
-    } u;
-};
 
 typedef struct {
-    RefHeader rh;
-
     Mem mem;
-    RefLocale *locale;
-    Hash h;
-} RefResource;
 
-typedef struct {
-    int type;
-    Str val;  // RESTYPE_FILEの場合はファイルパスが入る
-} ResEntry;
-
-struct RefLocale {
-    RefHeader rh;
-    Value locale_name;  // Resource
-
-    RefStr *tag;   // ja_JP
-    RefStr *name;  // ja-jp
-    RefStr *param[LOCALE_NUM];
-
+    RefStr *langtag;
     const char *month[13];
     const char *month_w[13];
     const char *week[7];
@@ -194,8 +197,8 @@ struct RefLocale {
     int group_n;
     const char *group;
     const char *decimal;
-    int rtl;
-};
+    char bidi;   // 'L':ltr, 'R':rtl
+} LocaleData;
 
 typedef struct
 {
@@ -203,8 +206,6 @@ typedef struct
     const char **argv;
     RefStr *cur_dir;
 
-    PtrList *import_path;    // FOX_IMPORTを分解したもの
-    PtrList *resource_path;  // FOX_RESOURCEを分解したもの
     const char *path_info;   // CGI modeのみ
     int headers_sent;        // CGI modeのみ
 
@@ -223,6 +224,7 @@ typedef struct
 
     RefHeader *ref_textio_utf8;
     RefNode *refnode_sequence_hash;
+    LocaleData *loc_neutral;
 
     uint32_t hash_seed;
     int heap_count;
@@ -234,6 +236,8 @@ typedef struct
 
     RefNode *startup;
     const char *err_dst;
+    
+    PtrList *const_refs;
 
 #ifdef WIN32
     int console_read;  // 標準入力がコンソール
@@ -252,6 +256,7 @@ typedef struct
 /////////////////////////////////////////////////////////////////////////////////////
 
 #define int32_hash(v) (((v) * 31) & INT32_MAX)
+#define Value_bytesio(val) ((RefBytesIO*)(uintptr_t)(Value_ref((val))->v[INDEX_TEXTIO_STREAM]))
 
 #ifdef DEFINE_GLOBALS
 #define extern
@@ -378,26 +383,26 @@ RefNode *Module_new_sys(const char *name_p);
 int Value_hash(Value v, int32_t *phash);
 int Value_eq(Value v1, Value v2, int *ret);
 
-
 int is_subclass(RefNode *klass, RefNode *super);
+RefNode *get_node_member(RefNode *node, ...);
 int get_loader_function(RefNode **fn, const char *type_p, int type_size, const char *prefix, Hash *hash);
 int load_aliases_file(Hash *ret, const char *filename);
-char *resource_to_path(Str name_s, const char *ext_p);
 
 
 // vm.c
+void extends_method(RefNode *klass, RefNode *base);
 void init_fox_vm(void);
 void init_fox_stack(void);
 void fox_init_compile(int dynamic);
 int fox_link(void);
-void fox_error_dump(StrBuf *sb, FileHandle fh, int log_style);
+void fox_error_dump(StrBuf *sb, int log_style);
+FileHandle open_errorlog_file();
 void fox_close(void);
 
 
 // parse.c
 RefNode *Node_define(RefNode *root, RefNode *module, RefStr *name, int type, RefNode *node);
 void init_so_func(void);
-void extends_method(RefNode *klass, RefNode *base);
 void add_unresolved_module_p(RefNode *mod_src, const char *name, RefNode *module, RefNode *node);
 void add_unresolved_args(RefNode *cur_mod, RefNode *mod, const char *name, RefNode *func, int argn);
 void add_unresolved_ptr(RefNode *cur_mod, RefNode *mod, const char *name, RefNode **ptr);
@@ -406,7 +411,6 @@ int load_htfox(void);
 RefNode *get_module_from_src(const char *src_p, int src_size);
 RefNode *get_module_by_name(const char *name_p, int name_size, int syslib, int initialize);
 RefNode *get_module_by_file(const char *path_p);
-RefNode *get_node_member(RefNode *node, ...);
 
 
 // exec.c
@@ -422,7 +426,7 @@ int invoke_code(RefNode *func, int pc);
 
 
 // throw.c
-void fatal_errorf(RefNode *fn, const char *msg, ...);
+void fatal_errorf(const char *msg, ...);
 void throw_errorf(RefNode *err_m, const char *err_name, const char *fmt, ...);
 void throw_error_select(int err_type, ...);
 void throw_stopiter(void);
@@ -500,25 +504,34 @@ void init_file_module_1(void);
 // m_io.c
 char *file_value_to_path(Str *ret, Value v, int argn);
 int value_to_streamio(Value *stream, Value v, int writemode, int argn);
+
+RefBytesIO *bytesio_new_sub(const char *src, int size);
+int bytesio_gets_sub(Str *result, Value v);
 StrBuf *bytesio_get_strbuf(Value v);
-int stream_gets_sub(StrBuf *sb, Value v, int sep);
 
 void init_stream_ref(Ref *r, int mode);
-int stream_read_data(Value v, StrBuf *sb, char *p, int *psize, int keep, int read_all);
-int stream_read_uint8(uint8_t *val, Value r);
-int stream_read_uint16(uint16_t *val, Value r);
-int stream_read_uint32(uint32_t *val, Value r);
-int stream_write_data(Value v, const char *p, int size);
-int stream_write_uint8(uint8_t val, Value w);
-int stream_write_uint16(uint16_t val, Value w);
-int stream_write_uint32(uint32_t val, Value w);
+
+int stream_read_data(Value r, StrBuf *sb, char *p, int *psize, int keep, int read_all);
+int stream_read_uint8(Value r, uint8_t *val);
+int stream_read_uint16(Value r, uint16_t *val);
+int stream_read_uint32(Value r, uint32_t *val);
+
+int stream_write_data(Value w, const char *p, int size);
+int stream_write_uint8(Value w, uint8_t val);
+int stream_write_uint16(Value w, uint16_t val);
+int stream_write_uint32(Value w, uint32_t val);
+
 int stream_flush_sub(Value v);
-RefBytesIO *bytesio_new_sub(const char *src, int size);
+int stream_gets_sub(StrBuf *sb, Value v, int sep);
 int stream_gets_limit(Value v, char *p, int *psize);
 int stream_seek(Value v, int64_t offset);
 
 void init_io_module_stubs(void);
 void init_io_module_1(void);
+
+
+// m_io_text.c
+void init_io_text_module_1(void);
 
 
 // m_lang.c
@@ -540,15 +553,16 @@ void init_lang_module_1(void);
 
 
 // m_locale.c
-int load_resource(RefResource *res, int *pfound, Str path, Str locale, int no_default);
-int Resource_get(Str *ret, RefResource *res, Str name);
-void Resource_close(RefResource *res);
+LocaleData *Value_locale_data(Value v);
+void set_neutral_locale(void);
+char *resource_to_path(Str name_s, const char *ext_p);
 RefStr **get_best_locale_list(void);
 void init_locale_module_1(void);
 
 
 // m_marshal.c
-void define_marshal_module(RefNode *m);
+RefNode *init_marshal_module_stubs(void);
+void init_marshal_module_1(RefNode *m);
 
 
 // m_mime.c
@@ -579,6 +593,8 @@ int string_format_sub(Value *v, Str src, const char *fmt_p, int fmt_size, int ut
 int sequence_eq(Value *vret, Value *v, RefNode *node);
 int sequence_cmp(Value *vret, Value *v, RefNode *node);
 int sequence_hash(Value *vret, Value *v, RefNode *node);
+int sequence_marshal_read(Value *vret, Value *v, RefNode *node);
+int sequence_marshal_write(Value *vret, Value *v, RefNode *node);
 void string_substr_position(int *pbegin, int *pend, Str src, Value *v);
 void calc_splice_position(int *pstart, int *plen, int size, Value *v);
 int strclass_tostr(Value *vret, Value *v, RefNode *node);

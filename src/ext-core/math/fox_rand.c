@@ -219,7 +219,7 @@ static int math_rand_seed(Value *vret, Value *v, RefNode *node)
  * 引数で指定したサイズのBytesを返す
  * 内容はランダムビット
  */
-static int math_rand_bin(Value *vret, Value *v, RefNode *node)
+static int math_rand_bytes(Value *vret, Value *v, RefNode *node)
 {
     int n, i;
     RefStr *rs;
@@ -366,8 +366,8 @@ void define_rand_func(RefNode *m)
     n = fs->define_identifier(m, m, "rand_seed", NODE_FUNC_N, 0);
     fs->define_native_func_a(n, math_rand_seed, 0, 1, NULL, NULL);
 
-    n = fs->define_identifier(m, m, "rand_bin", NODE_FUNC_N, 0);
-    fs->define_native_func_a(n, math_rand_bin, 1, 1, NULL, fs->cls_int);
+    n = fs->define_identifier(m, m, "rand_bytes", NODE_FUNC_N, 0);
+    fs->define_native_func_a(n, math_rand_bytes, 1, 1, NULL, fs->cls_int);
 
     n = fs->define_identifier(m, m, "rand_int", NODE_FUNC_N, 0);
     fs->define_native_func_a(n, math_rand_int, 1, 1, NULL, fs->cls_int);

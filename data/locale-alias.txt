@@ -1,39 +1,39 @@
-az-arab-ir:az-ir
-az-latn-az:az-az
-fil:tl
-fil-ph:tl-ph
-ha-arab-sd:ha-sd
-ha-latn-gh:ha-gh
-ha-latn-ne:ha-ne
-ha-latn-ng:ha-ng
-he:iw
-id:in
-kk-cyrl-kz:kk-kz
-ku-arab-iq:ku-iq
-ku-arab-ir:ku-ir
-ku-latn-sy:ku-sy
-ku-latn-tr:ku-tr
-mn-cyrl-mn:mn-mn
-mn-mong-cn:mn-cn
-nb:no
-pa-arab-pk:pa-pk
-pa-guru-in:pa-in
-ro-md:mo
-shi-latn-ma:shi-ma
-sr-cyrl-ba:sr-ba
-sr-cyrl-rs:sr-cyrl-cs	sr-cs	sr-cyrl-yu	sr-yu	sr-rs
-sr-latn:sh
-sr-latn-ba:sh-ba
-sr-latn-me:sr-me
-sr-latn-rs:sr-latn-yu	sh-cs	sh-yu	sr-latn-cs
-tg-cyrl-tj:tg-tj
-tzm-latn-ma:tzm-ma
-ug-arab-cn:ug-cn
-uz-arab-af:uz-af
-uz-cyrl-uz:uz-uz
-wo-latn-sn:wo-sn
-zh-hans-cn:zh-cn
-zh-hans-sg:zh-sg
-zh-hant-hk:zh-hk
-zh-hant-mo:zh-mo
-zh-hant-tw:zh-tw
+"az-arab-ir" = "az-ir"
+"az-latn-az" = "az-az"
+"fil" = "tl"
+"fil-ph" = "tl-ph"
+"ha-arab-sd" = "ha-sd"
+"ha-latn-gh" = "ha-gh"
+"ha-latn-ne" = "ha-ne"
+"ha-latn-ng" = "ha-ng"
+"he" = "iw"
+"id" = "in"
+"kk-cyrl-kz" = "kk-kz"
+"ku-arab-iq" = "ku-iq"
+"ku-arab-ir" = "ku-ir"
+"ku-latn-sy" = "ku-sy"
+"ku-latn-tr" = "ku-tr"
+"mn-cyrl-mn" = "mn-mn"
+"mn-mong-cn" = "mn-cn"
+"nb" = "no"
+"pa-arab-pk" = "pa-pk"
+"pa-guru-in" = "pa-in"
+"ro-md" = "mo"
+"shi-latn-ma" = "shi-ma"
+"sr-cyrl-ba" = "sr-ba"
+"sr-cyrl-rs" = "sr-cyrl-cs", "sr-cs", "sr-cyrl-yu", "sr-yu", "sr-rs"
+"sr-latn" = "sh"
+"sr-latn-ba" = "sh-ba"
+"sr-latn-me" = "sr-me"
+"sr-latn-rs" = "sr-latn-yu", "sh-cs", "sh-yu", "sr-latn-cs"
+"tg-cyrl-tj" = "tg-tj"
+"tzm-latn-ma" = "tzm-ma"
+"ug-arab-cn" = "ug-cn"
+"uz-arab-af" = "uz-af"
+"uz-cyrl-uz" = "uz-uz"
+"wo-latn-sn" = "wo-sn"
+"zh-hans-cn" = "zh-cn"
+"zh-hans-sg" = "zh-sg"
+"zh-hant-hk" = "zh-hk"
+"zh-hant-mo" = "zh-mo"
+"zh-hant-tw" = "zh-tw"

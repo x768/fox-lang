@@ -1,4 +1,0 @@
-langtag:zu_ZA
-language:zu
-territory:ZA
-bidi:ltr

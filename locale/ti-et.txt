@@ -1,4 +1,0 @@
-langtag:ti_ET
-language:ti
-territory:ET
-bidi:ltr

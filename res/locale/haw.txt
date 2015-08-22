@@ -1,49 +1,7 @@
-locale=haw
-ar:ʻAlapia
-cy:Wale
-da:Kenemaka
-de:Kelemānia
-el:Helene
-en:Pelekānia
-es:Paniolo
-fj:Pīkī
-fr:Palani
-ga:ʻAiliki
-gsw:Kuikilani Kelemānia
-haw:ʻōlelo Hawaiʻi
-he:Hebera
-it:ʻĪkālia
-ja:Kepanī
-ko:Kōlea
-la:Lākina
-mi:Māori
-nl:Hōlani
-pt:Pukikī
-ru:Lūkia
-sm:Kāmoa
-sv:Kuekene
-to:Tonga
-ty:Polapola
-und:ʻIke ʻole ‘ia a kūpono ʻole paha ka ʻōlelo
-vi:Wiekanama
-zh:Pākē
-AU:Nūhōlani
-CA:Kanakā
-CN:Kina
-DE:Kelemānia
-DK:Kenemaka
-ES:Kepania
-FR:Palani
-GB:Aupuni Mōʻī Hui Pū ʻIa
-GR:Helene
-IE:ʻIlelani
-IL:ʻIseraʻela
-IN:ʻĪnia
-IT:ʻĪkālia
-JP:Iāpana
-MX:Mekiko
-NL:Hōlani
-NZ:Aotearoa
-PH:ʻĀina Pilipino
-RU:Lūkia
-US:ʻAmelika Hui Pū ʻIa
+langtag = "haw"
+month_w = "Ianuali", "Pepeluali", "Malaki", "ʻApelila", "Mei", "Iune", "Iulai", "ʻAukake", "Kepakemapa", "ʻOkakopa", "Nowemapa", "Kekemapa"
+month = "Ian.", "Pep.", "Mal.", "ʻAp.", "Mei", "Iun.", "Iul.", "ʻAu.", "Kep.", "ʻOk.", "Now.", "Kek."
+days_w = "Poʻakahi", "Poʻalua", "Poʻakolu", "Poʻahā", "Poʻalima", "Poʻaono", "Lāpule"
+days = "P1", "P2", "P3", "P4", "P5", "P6", "LP"
+date = "d/M/yy", "d MMM y", "d MMMM y", "dddd, d MMMM y"
+time = "h:mm a", "h:mm:ss a", "h:mm:ss a z", "h:mm:ss a Z"

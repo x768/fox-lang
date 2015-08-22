@@ -1,4 +1,0 @@
-langtag:kcg_NG
-language:kcg
-territory:NG
-bidi:ltr

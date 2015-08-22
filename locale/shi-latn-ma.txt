@@ -1,5 +1,0 @@
-langtag:shi_Latn_MA
-language:shi
-script:Latn
-territory:MA
-bidi:ltr

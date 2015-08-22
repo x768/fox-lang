@@ -1,10 +1,11 @@
 import util.assert
 
+let path = ENV.has_key("TEST_BATCH") ? "charset" : "."
 
-assert_equal readfile("sjis.txt", Charset("shift_jis")), "プログラミング言語"
+assert_equal readfile("${path}/sjis.txt", Charset("shift_jis")), "プログラミング言語"
 assert_equal "プログラミング言語".to_bytes(Charset("ascii"), true), b"?????????"
 assert_error () => "プログラミング言語".to_bytes(Charset("ascii")), CharsetError
 
-let sjis_bytes = readfile("sjis.txt")
+let sjis_bytes = readfile("${path}/sjis.txt")
 assert_equal Str(sjis_bytes, Charset("shift_jis")), "プログラミング言語"
 

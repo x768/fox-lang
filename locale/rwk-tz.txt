@@ -1,4 +1,0 @@
-langtag:rwk_TZ
-language:rwk
-territory:TZ
-bidi:ltr

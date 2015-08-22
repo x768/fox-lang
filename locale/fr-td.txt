@@ -1,4 +1,0 @@
-langtag:fr_TD
-language:fr
-territory:TD
-bidi:ltr

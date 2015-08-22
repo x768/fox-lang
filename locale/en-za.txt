@@ -1,6 +1,0 @@
-langtag:en_ZA
-language:en
-territory:ZA
-date:yyyy/MM/dd	dd MMM y	dd MMMM y	dddd dd MMMM y
-decimal:,
-bidi:ltr

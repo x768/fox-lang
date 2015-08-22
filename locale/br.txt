@@ -1,3 +1,0 @@
-langtag:br
-language:br
-bidi:ltr

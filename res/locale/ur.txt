@@ -1,4 +1,9 @@
-locale=ur
-ur:اردو
-IN:بھارت
-PK:پاکستان
+langtag = "ur"
+month_w = "جنوری", "فروری", "مار چ", "اپريل", "مئ", "جون", "جولائ", "اگست", "ستمبر", "اکتوبر", "نومبر", "دسمبر"
+days_w = "پير", "منگل", "بده", "جمعرات", "جمعہ", "ہفتہ", "اتوار"
+am_pm = "قبل دوپہر", "بعد دوپہر"
+date = "d/M/yy", "d, MMM y", "d, MMMM y", "dddd, d, MMMM y"
+time = "h:mm a", "h:mm:ss a", "h:mm:ss a z", "h:mm:ss a Z"
+decimal = "."
+group = ","
+bidi = rtl

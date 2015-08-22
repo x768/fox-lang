@@ -1,4 +1,4 @@
-#include "fox_vm.h"
+#include "fox_parse.h"
 #include <string.h>
 #include <stdio.h>
 
@@ -16,7 +16,7 @@ RefNode *Value_type(Value v)
         return fv->integral[idx];
     }
     default:
-        fatal_errorf(NULL, "Value_type:not a value type");
+        fatal_errorf("Value_type:not a value type");
         break;
     }
     return fs->cls_null;
@@ -287,7 +287,7 @@ void Value_push(const char *fmt, ...)
             break;
         }
         default:
-            fatal_errorf(NULL, "Value_push:unknown format %c", *p);
+            fatal_errorf("Value_push:unknown format %c", *p);
             break;
         }
         fg->stk_top++;
@@ -625,6 +625,33 @@ int is_subclass(RefNode *klass, RefNode *type)
     return FALSE;
 }
 
+RefNode *get_node_member(RefNode *node, ...)
+{
+    va_list va;
+    va_start(va, node);
+
+    for (;;) {
+        RefNode *n;
+        RefStr *rs = va_arg(va, RefStr*);
+
+        if (rs == NULL) {
+            break;
+        }
+        if (node->type != NODE_MODULE && node->type != NODE_CLASS) {
+            throw_errorf(fs->mod_lang, "NameError", "%r is not defined.", rs);
+            return NULL;
+        }
+        n = Hash_get_p(&node->u.c.h, rs);
+        if (n == NULL) {
+            throw_errorf(fs->mod_lang, "NameError", "%r is not defined.", rs);
+            return NULL;
+        }
+        node = n;
+    }
+
+    va_end(va);
+    return node;
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////
 
@@ -635,36 +662,59 @@ int is_subclass(RefNode *klass, RefNode *type)
  */
 int load_aliases_file(Hash *ret, const char *filename)
 {
+    Tok tk;
     char *path = path_normalize(NULL, fs->fox_home, filename, -1, NULL);
-    IniTok tk;
+    char *buf = read_from_file(NULL, path, NULL);
 
-    if (!IniTok_load(&tk, path)) {
-        fatal_errorf(NULL, "Cannot load file %q", path);
+    if (buf == NULL) {
+        fatal_errorf("Cannot load file %q", path);
     }
-    free(path);
 
-    while (IniTok_next(&tk)) {
-        if (tk.type == INITYPE_STRING) {
-            const char *p = tk.val.p;
-            const char *end = p + tk.val.size;
-            RefStr *name = intern(tk.key.p, tk.key.size);
+    Tok_simple_init(&tk, buf);
+    Tok_simple_next(&tk);
 
-            while (p < end) {
-                // tk.valを\tで分割する
-                const char *top = p;
-                while (p < end && *p != '\t') {
-                    p++;
-                }
-                Hash_add_p(ret, &fg->st_mem, intern(top, p - top), name);
-                if (p < end) {
-                    p++;
-                }
+    for (;;) {
+        switch (tk.v.type) {
+        case TL_STR: {
+            RefStr *name = intern(tk.str_val.p, tk.str_val.size);
+            Tok_simple_next(&tk);
+            if (tk.v.type != T_LET) {
+                goto ERROR_END;
             }
+            Tok_simple_next(&tk);
+            for (;;) {
+                if (tk.v.type != TL_STR) {
+                    goto ERROR_END;
+                }
+                Hash_add_p(ret, &fg->st_mem, intern(tk.str_val.p, tk.str_val.size), name);
+
+                Tok_simple_next(&tk);
+                if (tk.v.type != T_COMMA) {
+                    break;
+                }
+                Tok_simple_next(&tk);
+            }
+            if (tk.v.type != T_NL && tk.v.type != T_EOF) {
+                goto ERROR_END;
+            }
+            break;
+        }
+        case T_NL:
+            Tok_simple_next(&tk);
+            break;
+        case T_EOF:
+            free(buf);
+            free(path);
+            return TRUE;
+        default:
+            goto ERROR_END;
         }
     }
-    IniTok_close(&tk);
 
-    return TRUE;
+ERROR_END:
+    fatal_errorf("Error at line %d (%s)", tk.v.line, path);
+    free(path);
+    return FALSE;
 }
 int get_loader_function(RefNode **fn, const char *type_p, int type_size, const char *prefix, Hash *hash)
 {
@@ -713,38 +763,4 @@ int get_loader_function(RefNode **fn, const char *type_p, int type_size, const c
     free(buf);
 
     return TRUE;
-}
-char *resource_to_path(Str name_s, const char *ext_p)
-{
-    char *name_p = str_dup_p(name_s.p, name_s.size, NULL);
-    PtrList *lst;
-    int i;
-
-    if (ext_p == NULL) {
-        ext_p = "";
-    }
-
-    // 識別子文字以外はエラー
-    for (i = 0; i < name_s.size; i++) {
-        if (name_p[i] == '.') {
-            name_p[i] = SEP_C;
-        } else if (!isalnumu_fox(name_p[i])) {
-            goto ERROR_END;
-        }
-    }
-
-    for (lst = fv->resource_path; lst != NULL; lst = lst->next) {
-        char *path = str_printf("%s" SEP_S "%s%s", lst->u.c, name_p, ext_p);
-        if (exists_file(path) == EXISTS_FILE) {
-            free(name_p);
-            return path;
-        }
-        free(path);
-        path = NULL;
-    }
-
-ERROR_END:
-    throw_errorf(fs->mod_file, "FileOpenError", "Cannot find file for %S", name_s);
-    free(name_p);
-    return NULL;
 }

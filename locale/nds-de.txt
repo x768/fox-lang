@@ -1,4 +1,0 @@
-langtag:nds_DE
-language:nds
-territory:DE
-bidi:ltr

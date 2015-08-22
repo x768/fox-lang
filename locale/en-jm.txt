@@ -1,5 +1,0 @@
-langtag:en_JM
-language:en
-territory:JM
-date:d/M/yy			
-bidi:ltr

@@ -1,4 +1,0 @@
-langtag:mk_MK
-language:mk
-territory:MK
-bidi:ltr

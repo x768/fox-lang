@@ -1,3 +1,28 @@
+#FOX_IMPORT+=.
+#FOX_IMPORT+=lang/lib
+#FOX_RESOURCE+=locale/res
+#TEST_BATCH=yes
 import util.assert
+import lang.reflect
 
+var succeeded = 0
+var failed = 0
 
+for d in get_module_dirs("").sort() {
+    for m in get_module_list(d) {
+        print get_name(m), "..."
+        STDIO.flush()
+        try {
+            m()
+            puts "OK"
+            succeeded++
+        } catch e:Error {
+            puts "Failed ", e.stack_trace[1]
+            failed++
+        }
+        STDIO.flush()
+    }
+}
+
+printf "OK..... %{0:3}\n", succeeded
+printf "Failed. %{0:3}\n", failed

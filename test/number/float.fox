@@ -7,7 +7,8 @@ assert_equal 7.0 / 2.0, 3.5
 
 assert_equal 1_000.0 * 1_000.0, 1_000_000.0
 
-assert_error () => 1.0 / 0.0, ZeroDivisionError
+assert_equal 1.0 / 0.0, Float.INF
+assert_equal (-1.0) / 0.0, -Float.INF
 
 assert_equal Float(10), 10.0
 assert_equal Float(10.0d), 10.0

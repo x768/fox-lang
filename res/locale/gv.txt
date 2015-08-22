@@ -1,3 +1,8 @@
-locale=gv
-gv:Gaelg
-GB:Rywvaneth Unys
+langtag = "gv"
+month_w = "Jerrey-geuree", "Toshiaght-arree", "Mayrnt", "Averil", "Boaldyn", "Mean-souree", "Jerrey-souree", "Luanistyn", "Mean-fouyir", "Jerrey-fouyir", "Mee Houney", "Mee ny Nollick"
+month = "J-guer", "T-arree", "Mayrnt", "Avrril", "Boaldyn", "M-souree", "J-souree", "Luanistyn", "M-fouyir", "J-fouyir", "M.Houney", "M.Nollick"
+days_w = "Jelhein", "Jemayrt", "Jercean", "Jerdein", "Jeheiney", "Jesarn", "Jedoonee"
+days = "Jel", "Jem", "Jerc", "Jerd", "Jeh", "Jes", "Jed"
+am_pm = "a.m.", "p.m."
+date = "dd/MM/yy", "MMM dd, y", "dd MMMM y", "dddd dd MMMM y"
+time = "HH:mm", "HH:mm:ss", "HH:mm:ss z", "HH:mm:ss Z"

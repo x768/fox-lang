@@ -1,4 +1,0 @@
-langtag:cy_GB
-language:cy
-territory:GB
-bidi:ltr

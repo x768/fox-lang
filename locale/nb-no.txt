@@ -1,4 +1,0 @@
-langtag:nb_NO
-language:nb
-territory:NO
-bidi:ltr

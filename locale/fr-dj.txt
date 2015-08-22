@@ -1,4 +1,0 @@
-langtag:fr_DJ
-language:fr
-territory:DJ
-bidi:ltr

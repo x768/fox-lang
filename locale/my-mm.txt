@@ -1,4 +1,0 @@
-langtag:my_MM
-language:my
-territory:MM
-bidi:ltr

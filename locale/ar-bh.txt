@@ -1,4 +1,0 @@
-langtag:ar_BH
-language:ar
-territory:BH
-bidi:ltr

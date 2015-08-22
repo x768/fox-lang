@@ -1,4 +1,0 @@
-langtag:rm_CH
-language:rm
-territory:CH
-bidi:ltr

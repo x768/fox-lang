@@ -1,4 +1,0 @@
-langtag:es_BO
-language:es
-territory:BO
-bidi:ltr

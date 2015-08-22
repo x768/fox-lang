@@ -1,8 +1,7 @@
 #define DEFINE_GLOBALS
 #include "fox_vm.h"
 #include "datetime.h"
-#include <stdio.h>
-#include <string.h>
+#include <pcre.h>
 
 #ifndef WIN32
 #include <dlfcn.h>
@@ -298,8 +297,8 @@ static void show_configure(void)
     }
     stream_write_data(fg->v_cio, ctmp, -1);
 
-    show_configure_path(fv->import_path, "\nFOX_IMPORT: ");
-    show_configure_path(fv->resource_path, "\nFOX_RESOURCE: ");
+    show_configure_path(fs->import_path, "\nFOX_IMPORT: ");
+    show_configure_path(fs->resource_path, "\nFOX_RESOURCE: ");
 
     stream_write_data(fg->v_cio, "\nFOX_TZ: ", -1);
     if (default_timezone) {
@@ -444,32 +443,41 @@ FINALLY:
 
 void print_last_error()
 {
+    if (fv->err_dst == NULL) {
+        fv->err_dst = "stderr";
+    }
     if (fg->error != VALUE_NULL && strcmp(fv->err_dst, "null") != 0) {
+        StrBuf sb;
+        StrBuf_init(&sb, 0);
+
         if (strcmp(fv->err_dst, "stdout") == 0) {
-            StrBuf sb;
-            StrBuf_init(&sb, 0);
-            fox_error_dump(&sb, -1, FALSE);
-            stream_write_data(fg->v_cio, sb.p, sb.size);
-            StrBuf_close(&sb);
+            fox_error_dump(&sb, FALSE);
+            if (fg->v_cio != VALUE_NULL) {
+                stream_write_data(fg->v_cio, sb.p, sb.size);
+            }
         } else if (strcmp(fv->err_dst, "stderr") == 0) {
-            stream_flush_sub(fg->v_cio);
+            if (fg->v_cio != VALUE_NULL) {
+                stream_flush_sub(fg->v_cio);
+            }
 #ifdef WIN32
             if (fv->console_error) {
                 // UTF-16で出力
-                StrBuf sb;
-                StrBuf_init(&sb, 0);
-                fox_error_dump(&sb, -1, FALSE);
+                fox_error_dump(&sb, FALSE);
                 win_write_console(STDERR_FILENO, sb.p, sb.size);
-                StrBuf_close(&sb);
             } else {
-                fox_error_dump(NULL, STDERR_FILENO, FALSE);
+                fox_error_dump(&sb, FALSE);
+                write_fox(STDERR_FILENO, sb.p, sb.size);
             }
 #else
-            fox_error_dump(NULL, STDERR_FILENO, FALSE);
+            fox_error_dump(&sb, FALSE);
+            write_fox(STDERR_FILENO, sb.p, sb.size);
 #endif
         } else {
-            fox_error_dump(NULL, -1, TRUE);
+            FileHandle fh = open_errorlog_file();
+            fox_error_dump(&sb, TRUE);
+            close_fox(fh);
         }
+        StrBuf_close(&sb);
     }
 }
 

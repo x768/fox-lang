@@ -1,9 +1,0 @@
-langtag:pa
-language:pa
-month_w:ਜਨਵਰੀ	ਫ਼ਰਵਰੀ	ਮਾਰਚ	ਅਪ੍ਰੈਲ	ਮਈ	ਜੂਨ	ਜੁਲਾਈ	ਅਗਸਤ	ਸਤੰਬਰ	ਅਕਤੂਬਰ	ਨਵੰਬਰ	ਦਸੰਬਰ
-days_w:ਸੋਮਵਾਰ	ਮੰਗਲਵਾਰ	ਬੁਧਵਾਰ	ਵੀਰਵਾਰ	ਸ਼ੁੱਕਰਵਾਰ	ਸ਼ਨੀਚਰਵਾਰ	ਐਤਵਾਰ
-days:ਸੋਮ.	ਮੰਗਲ.	ਬੁਧ.	ਵੀਰ.	ਸ਼ੁਕਰ.	ਸ਼ਨੀ.	ਐਤ.
-am_pm:ਸਵੇਰੇ	ਸ਼ਾਮ
-date:dd/MM/yyyy	d MMM y	d MMMM y	dddd, dd MMMM y
-time:h:mm a	h:mm:ss a	h:mm:ss a z	h:mm:ss a Z
-bidi:ltr

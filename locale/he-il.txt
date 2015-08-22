@@ -1,4 +1,0 @@
-langtag:he_IL
-language:he
-territory:IL
-bidi:ltr

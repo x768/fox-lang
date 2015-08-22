@@ -1,4 +1,0 @@
-langtag:ro_RO
-language:ro
-territory:RO
-bidi:ltr

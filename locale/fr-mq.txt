@@ -1,4 +1,0 @@
-langtag:fr_MQ
-language:fr
-territory:MQ
-bidi:ltr

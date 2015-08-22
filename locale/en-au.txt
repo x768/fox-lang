@@ -1,5 +1,0 @@
-langtag:en_AU
-language:en
-territory:AU
-date:d/MM/yy	dd/MM/yyyy	d MMMM y	dddd, d MMMM y
-bidi:ltr

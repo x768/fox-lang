@@ -1,4 +1,0 @@
-langtag:ebu_KE
-language:ebu
-territory:KE
-bidi:ltr

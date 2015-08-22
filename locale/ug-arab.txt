@@ -1,4 +1,0 @@
-langtag:ug_Arab
-language:ug
-script:Arab
-bidi:ltr

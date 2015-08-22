@@ -1,4 +1,0 @@
-langtag:ksb_TZ
-language:ksb
-territory:TZ
-bidi:ltr

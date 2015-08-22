@@ -1,6 +1,0 @@
-langtag:es_DO
-language:es
-territory:DO
-decimal:.
-group:,
-bidi:ltr

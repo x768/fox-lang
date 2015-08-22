@@ -1,9 +1,0 @@
-langtag:kn
-language:kn
-month_w:ಜನವರೀ	ಫೆಬ್ರವರೀ	ಮಾರ್ಚ್	ಎಪ್ರಿಲ್	ಮೆ	ಜೂನ್	ಜುಲೈ	ಆಗಸ್ಟ್	ಸಪ್ಟೆಂಬರ್	ಅಕ್ಟೋಬರ್	ನವೆಂಬರ್	ಡಿಸೆಂಬರ್
-days_w:ಸೋಮವಾರ	ಮಂಗಳವಾರ	ಬುಧವಾರ	ಗುರುವಾರ	ಶುಕ್ರವಾರ	ಶನಿವಾರ	ರವಿವಾರ
-days:ಸೋ.	ಮಂ.	ಬು.	ಗು.	ಶು.	ಶನಿ.	ರ.
-am_pm:am	pm
-date:d-M-yy	d MMM y	d MMMM y	dddd d MMMM y
-time:hh:mm a	hh:mm:ss a	hh:mm:ss a z	hh:mm:ss a Z
-bidi:ltr

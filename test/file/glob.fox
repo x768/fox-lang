@@ -1,7 +1,9 @@
 import util.assert
 
-assert_equal glob('dir/*').map(f => f.filename).to_set(), Set("a.txt", "b.js", "c", "d")
-assert_equal glob('dir/*/').map(f => f.filename).to_set(), Set("c", "d")
-assert_equal glob('dir/*/*.txt').map(f => f.filename).to_set(), Set("a.txt", "e.txt")
-assert_equal glob('dir/?/?.js').map(f => f.filename).to_set(), Set("b.js", "f.js")
+let dir_path = ENV.has_key("TEST_BATCH") ? "file/dir" : "dir"
+
+assert_equal glob("${dir_path}/*").map(f => f.filename).to_set(), Set("a.txt", "b.js", "c", "d")
+assert_equal glob("${dir_path}/*/").map(f => f.filename).to_set(), Set("c", "d")
+assert_equal glob("${dir_path}/*/*.txt").map(f => f.filename).to_set(), Set("a.txt", "e.txt")
+assert_equal glob("${dir_path}/?/?.js").map(f => f.filename).to_set(), Set("b.js", "f.js")
 

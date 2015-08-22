@@ -1,4 +1,0 @@
-langtag:kaj_NG
-language:kaj
-territory:NG
-bidi:ltr

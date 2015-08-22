@@ -1,9 +1,0 @@
-langtag:te
-language:te
-month_w:జనవరి	ఫిబ్రవరి	మార్చి	ఏప్రిల్	మే	జూన్	జూలై	ఆగస్టు	సెప్టెంబర్	అక్టోబర్	నవంబర్	డిసెంబర్
-days_w:సోమవారం	మంగళవారం	బుధవారం	గురువారం	శుక్రవారం	శనివారం	ఆదివారం
-days:సోమ	మంగళ	బుధ	గురు	శుక్ర	శని	ఆది
-am_pm:ఉ	సా
-date:dd-MM-yy	d MMM y	d MMMM y	dddd d MMMM y
-time:h:mm a	h:mm:ss a	h:mm:ss a z	h:mm:ss a Z
-bidi:ltr

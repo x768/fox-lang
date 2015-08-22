@@ -1,9 +1,0 @@
-langtag:cgg
-language:cgg
-month_w:Okwokubanza	Okwakabiri	Okwakashatu	Okwakana	Okwakataana	Okwamukaaga	Okwamushanju	Okwamunaana	Okwamwenda	Okwaikumi	Okwaikumi na kumwe	Okwaikumi na ibiri
-month:KBZ	KBR	KST	KKN	KTN	KMK	KMS	KMN	KMN	KKM	KNK	KNB
-days_w:Orwokubanza	Orwakabiri	Orwakashatu	Orwakana	Orwakataano	Orwamukaaga	Sande
-days:ORK	OKB	OKS	OKN	OKT	OMK	SAN
-date:dd/MM/yyyy	d MMM y	d MMMM y	dddd, d MMMM y
-time:h:mm a	h:mm:ss a	h:mm:ss a z	h:mm:ss a Z
-bidi:ltr

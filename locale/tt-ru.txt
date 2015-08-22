@@ -1,4 +1,0 @@
-langtag:tt_RU
-language:tt
-territory:RU
-bidi:ltr

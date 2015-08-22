@@ -1,4 +1,0 @@
-langtag:en_MP
-language:en
-territory:MP
-bidi:ltr

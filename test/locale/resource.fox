@@ -1,0 +1,13 @@
+#FOX_RESOURCE+=res
+import util.assert
+
+
+let ja = Resource("test", Locale("ja-JP"))
+assert_equal ja.hello, "こんにちは"
+assert_equal ja.ok, "OK"
+assert_equal ja.locale, Locale("ja")
+
+let xx = Resource("test", Locale("xx"))
+assert_equal xx.hello, "Hello"
+assert_equal xx.ok, "OK"
+assert_equal xx.locale, Locale.NEUTRAL

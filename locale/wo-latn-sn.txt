@@ -1,5 +1,0 @@
-langtag:wo_Latn_SN
-language:wo
-script:Latn
-territory:SN
-bidi:ltr

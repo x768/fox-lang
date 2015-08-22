@@ -1,4 +1,0 @@
-langtag:fil_PH
-language:fil
-territory:PH
-bidi:ltr

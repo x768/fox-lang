@@ -1,5 +1,0 @@
-langtag:zh_Hant_TW
-language:zh
-script:Hant
-territory:TW
-bidi:ltr

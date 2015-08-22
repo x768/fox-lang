@@ -1,5 +1,0 @@
-langtag:pa_Arab_PK
-language:pa
-script:Arab
-territory:PK
-bidi:ltr

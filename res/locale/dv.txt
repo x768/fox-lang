@@ -1,0 +1,4 @@
+langtag = "dv"
+date = "d-M-yy", "dd-MM-yyyy", "d MMMM y", "dddd d MMMM y"
+time = "hh:mm a", "hh:mm:ss a", "hh:mm:ss a z", "hh:mm:ss a Z"
+bidi = rtl

@@ -1,4 +1,0 @@
-langtag:el_CY
-language:el
-territory:CY
-bidi:ltr

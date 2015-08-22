@@ -1,6 +1,0 @@
-langtag:de_AT
-language:de
-territory:AT
-month_w:Jänner											
-month:Jän											
-bidi:ltr

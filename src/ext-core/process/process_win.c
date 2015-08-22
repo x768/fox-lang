@@ -18,7 +18,7 @@ static HANDLE dup_handle(HANDLE h)
 
     return ret;
 }
-static void init_pipe(STARTUPINFO *si, int flags, HANDLE *p_in, HANDLE *p_out, HANDLE *p_err, HANDLE *p_cin, HANDLE *p_cout, HANDLE *p_cerr)
+static void init_pipe(STARTUPINFOW *si, int flags, HANDLE *p_in, HANDLE *p_out, HANDLE *p_err, HANDLE *p_cin, HANDLE *p_cout, HANDLE *p_cerr)
 {
     SECURITY_ATTRIBUTES sa;
     HANDLE hIn, hOut, hErr;
@@ -106,7 +106,7 @@ int process_new_sub(RefProcessHandle *ph, int create_pipe, const char *path, cha
     HANDLE pipe_cin = INVALID_HANDLE_VALUE;
     HANDLE pipe_cout = INVALID_HANDLE_VALUE;
     HANDLE pipe_cerr = INVALID_HANDLE_VALUE;
-    STARTUPINFO si;
+    STARTUPINFOW si;
     PROCESS_INFORMATION pi;
 
     memset(&si, 0, sizeof(si));

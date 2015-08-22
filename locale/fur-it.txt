@@ -1,4 +1,0 @@
-langtag:fur_IT
-language:fur
-territory:IT
-bidi:ltr

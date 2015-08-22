@@ -1,29 +1,29 @@
-application/javascript:text/javascript
-application/mathml+xml:text/mathml
-application/msword:application/vnd.ms-word	application/x-msword
-application/ogg:application/x-ogg
-application/pdf:application/acrobat	application/x-pdf	image/pdf
-application/rtf:text/rtf
-application/vnd.ms-excel:application/msexcel	application/x-msexcel
-application/vnd.ms-powerpoint:application/mspowerpoint	application/powerpoint	application/x-mspowerpoint
-application/x-cd-image:application/x-iso9660-image
-application/x-rar:application/x-rar-compressed
-application/x-shockwave-flash:application/futuresplash
-application/x-tar:application/x-gtar
-application/x-yaml:text/yaml
-application/xml:text/xml
-application/zip:application/x-zip-compressed
-audio/flac:audio/x-flac
-audio/midi:audio/x-midi
-audio/mpeg:audio/mp3	audio/x-mp3	audio/x-mpeg
-audio/ogg:audio/x-ogg
-audio/x-aiff:audio/aiff
-audio/x-ms-wma:audio/wma
-audio/x-vorbis+ogg:audio/vorbis
-audio/x-wav:audio/vnd.wave	audio/wav
-image/bmp:image/x-ms-bmp	image/x-bmp
-image/vnd.microsoft.icon:application/ico	image/ico	image/icon
-text/csv:text/x-csv
-video/ogg:video/x-ogg
-video/x-flv:application/x-flash-video	video/flv	flv-application/octet-stream
-video/x-msvideo:video/x-avi
+"application/javascript" = "text/javascript"
+"application/mathml+xml" = "text/mathml"
+"application/msword" = "application/vnd.ms-word", "application/x-msword"
+"application/ogg" = "application/x-ogg"
+"application/pdf" = "application/acrobat", "application/x-pdf", "image/pdf"
+"application/rtf" = "text/rtf"
+"application/vnd.ms-excel" = "application/msexcel", "application/x-msexcel"
+"application/vnd.ms-powerpoint" = "application/mspowerpoint", "application/powerpoint", "application/x-mspowerpoint"
+"application/x-cd-image" = "application/x-iso9660-image"
+"application/x-rar" = "application/x-rar-compressed"
+"application/x-shockwave-flash" = "application/futuresplash"
+"application/x-tar" = "application/x-gtar"
+"application/x-yaml" = "text/yaml"
+"application/xml" = "text/xml"
+"application/zip" = "application/x-zip-compressed"
+"audio/flac" = "audio/x-flac"
+"audio/midi" = "audio/x-midi"
+"audio/mpeg" = "audio/mp3", "audio/x-mp3", "audio/x-mpeg"
+"audio/ogg" = "audio/x-ogg"
+"audio/x-aiff" = "audio/aiff"
+"audio/x-ms-wma" = "audio/wma"
+"audio/x-vorbis+ogg" = "audio/vorbis"
+"audio/x-wav" = "audio/vnd.wave", "audio/wav"
+"image/bmp" = "image/x-ms-bmp", "image/x-bmp"
+"image/vnd.microsoft.icon" = "application/ico", "image/ico", "image/icon"
+"text/csv" = "text/x-csv"
+"video/ogg" = "video/x-ogg"
+"video/x-flv" = "application/x-flash-video", "video/flv", "flv-application/octet-stream"
+"video/x-msvideo" = "video/x-avi"

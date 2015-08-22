@@ -1,4 +1,0 @@
-langtag:sw_TZ
-language:sw
-territory:TZ
-bidi:ltr

@@ -217,6 +217,7 @@ static LRESULT CALLBACK WndProcBase(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
             return CallWindowProc(proc, hWnd, msg, wParam, lParam);
         }
     }
+    return 0;
 }
 
 /**

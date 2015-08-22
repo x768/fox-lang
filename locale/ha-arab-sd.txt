@@ -1,5 +1,0 @@
-langtag:ha_Arab_SD
-language:ha
-script:Arab
-territory:SD
-bidi:ltr

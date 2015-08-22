@@ -11,6 +11,19 @@ typedef struct {
 
 typedef struct {
     RefHeader rh;
+    union {
+        int64_t i;
+        uint64_t u;
+    } u;
+} RefInt64;
+
+typedef struct {
+    RefHeader rh;
+    double d;
+} RefFloat;
+
+typedef struct {
+    RefHeader rh;
     mp_int md[2];
 } RefFrac;
 
@@ -34,5 +47,6 @@ typedef struct {
     double d[0];
 } RefMatrix;
 
+#define Value_float2(v)      (((RefFloat*)Value_vp(v))->d)
 
 #endif /* _M_MATH_H_ */

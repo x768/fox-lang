@@ -1,4 +1,0 @@
-langtag:kl_GL
-language:kl
-territory:GL
-bidi:ltr

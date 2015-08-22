@@ -1,8 +1,0 @@
-langtag:nr
-language:nr
-month_w:Janabari	uFeberbari	uMatjhi	u-Apreli	Meyi	Juni	Julayi	Arhostosi	Septemba	Oktoba	Usinyikhaba	Disemba
-month:Jan	Feb	Mat	Apr	Mey	Jun	Jul	Arh	Sep	Okt	Usi	Dis
-days_w:uMvulo	uLesibili	Lesithathu	uLesine	ngoLesihlanu	umGqibelo	uSonto
-days:Mvu	Bil	Tha	Ne	Hla	Gqi	Son
-decimal:,
-bidi:ltr

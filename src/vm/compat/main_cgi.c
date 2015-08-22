@@ -1,6 +1,7 @@
 #define DEFINE_GLOBALS
 #include "fox_vm.h"
 #include "datetime.h"
+#include <pcre.h>
 
 #ifndef WIN32
 #include <dlfcn.h>
@@ -383,8 +384,8 @@ static void show_configure(void)
     stream_write_data(fg->v_cio, ctmp, -1);
     stream_write_data(fg->v_cio, tlend, -1);
 
-    show_configure_path(fv->import_path, "FOX_IMPORT</th><td>");
-    show_configure_path(fv->resource_path, "FOX_RESOURCE</th><td>");
+    show_configure_path(fs->import_path, "FOX_IMPORT</th><td>");
+    show_configure_path(fs->resource_path, "FOX_RESOURCE</th><td>");
 
     stream_write_data(fg->v_cio, "FOX_TZ</th><td>", -1);
     if (default_timezone) {
@@ -505,29 +506,37 @@ static void cin_flush(void)
 
 void print_last_error()
 {
+    if (fv->err_dst == NULL) {
+        fv->err_dst = "stdout";
+    }
     if (fg->error != VALUE_NULL && strcmp(fv->err_dst, "null") != 0) {
-        if (strcmp(fv->err_dst, "stdout") == 0) {
-            StrBuf sb;
-            StrBuf sb2;
+        StrBuf sb;
+        StrBuf_init(&sb, 0);
 
-            StrBuf_init(&sb, 0);
+        if (strcmp(fv->err_dst, "stdout") == 0) {
+            StrBuf sb2;
             StrBuf_init(&sb2, 0);
 
             if (is_content_type_html()) {
-                fox_error_dump(&sb, -1, FALSE);
+                fox_error_dump(&sb, FALSE);
                 convert_html_entity(&sb2, sb.p, sb.size, TRUE);
             } else {
-                fox_error_dump(&sb2, -1, FALSE);
+                fox_error_dump(&sb2, FALSE);
             }
             send_headers();
-            stream_write_data(fg->v_cio, sb2.p, sb2.size);
+            if (fg->v_cio != VALUE_NULL) {
+                stream_write_data(fg->v_cio, sb2.p, sb2.size);
+            }
             StrBuf_close(&sb2);
-            StrBuf_close(&sb);
         } else if (strcmp(fv->err_dst, "stderr") == 0) {
-            fox_error_dump(NULL, STDERR_FILENO, TRUE);
+            fox_error_dump(&sb, TRUE);
+            write_fox(STDERR_FILENO, sb.p, sb.size);
         } else {
-            fox_error_dump(NULL, -1, TRUE);
+            FileHandle fh = open_errorlog_file();
+            fox_error_dump(&sb, TRUE);
+            close_fox(fh);
         }
+        StrBuf_close(&sb);
     }
 }
 /**

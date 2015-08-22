@@ -1,6 +1,0 @@
-langtag:es_CO
-language:es
-territory:CO
-date:d/MM/yy	d/MM/yyyy		
-time:H:mm	H:mm:ss	H:mm:ss z	
-bidi:ltr

@@ -1,5 +1,0 @@
-langtag:zh_Hans_CN
-language:zh
-script:Hans
-territory:CN
-bidi:ltr

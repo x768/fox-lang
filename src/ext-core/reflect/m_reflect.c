@@ -1,5 +1,8 @@
 #define DEFINE_GLOBALS
 #include "fox.h"
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
 
 
 static const FoxStatic *fs;
@@ -139,6 +142,19 @@ static int ref_get_this(Value *vret, Value *v, RefNode *node)
     }
     return TRUE;
 }
+static int ref_get_name(Value *vret, Value *v, RefNode *node)
+{
+    Value v1 = v[1];
+    RefNode *type = fs->Value_type(v1);
+
+    if (type == fs->cls_module || type == fs->cls_class || type == fs->cls_fn) {
+        RefNode *n = Value_vp(v1);
+        *vret = fs->Value_cp(vp_Value(n->name));
+    } else {
+        fs->throw_errorf(fs->mod_lang, "TypeError", "Module, Class or Function required but %n (argument #1)", type);
+    }
+    return TRUE;
+}
 static int get_module_path(Value *vret, Value *v, RefNode *node)
 {
     RefNode *module = Value_vp(v[1]);
@@ -146,6 +162,159 @@ static int get_module_path(Value *vret, Value *v, RefNode *node)
     if (module->u.m.src_path != NULL) {
         *vret = fs->cstr_Value_conv(module->u.m.src_path, -1, NULL);
     }
+    return TRUE;
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////
+
+static char *convert_module_name(RefStr *rs)
+{
+    char *p = fs->str_dup_p(rs->c, rs->size, NULL);
+    int i;
+    int dot = TRUE;
+
+    if (rs->size == 0) {
+        return p;
+    }
+
+    for (i = 0; p[i] != '\0'; i++) {
+        if (p[i] == '.') {
+            if (dot) {
+                goto ERROR_END;
+            }
+            p[i] = SEP_C;
+            dot = TRUE;
+        } else {
+            if (!islower_fox(p[i]) && !isdigit_fox(p[i]) && p[i] != '_') {
+                goto ERROR_END;
+            }
+            p[i] = tolower_fox(p[i]);
+            dot = FALSE;
+        }
+    }
+    if (dot) {
+        goto ERROR_END;
+    }
+    return p;
+
+ERROR_END:
+    free(p);
+    return NULL;
+}
+static int is_valid_module_name(const char *p)
+{
+    int i;
+
+    for (i = 0; p[i] != '\0'; i++) {
+        if (!islower_fox(p[i]) && !isdigit_fox(p[i]) && p[i] != '_') {
+            return FALSE;
+        }
+    }
+    return TRUE;
+}
+static int file_name_to_module_name(char *p)
+{
+    int i;
+
+    for (i = 0; p[i] != '\0'; i++) {
+        if (p[i] == '.') {
+            if (i > 0) {
+                break;
+            } else {
+                return FALSE;
+            }
+        }
+        if (!islower_fox(p[i]) && p[i] != '_') {
+            return FALSE;
+        }
+    }
+    if (strcmp(&p[i], ".fox") == 0 || strcmp(&p[i], ".so") == 0) {
+        p[i] = '\0';
+        return TRUE;
+    }
+    return FALSE;
+}
+static char *concat_module_path(const char *base, const char *name, int sep)
+{
+    if (base[0] == '\0') {
+        int length = strlen(name);
+        char *p = malloc(length + 1);
+        strcpy(p, name);
+        return p;
+    } else if (name[0] == '\0') {
+        int length = strlen(base);
+        char *p = malloc(length + 1);
+        strcpy(p, base);
+        return p;
+    } else {
+        int length = strlen(base) + strlen(name);
+        char *p = malloc(length + 2);
+        sprintf(p, "%s%c%s", base, sep, name);
+        return p;
+    }
+}
+static int get_module_list(Value *vret, Value *v, RefNode *node)
+{
+    RefStr *rs = Value_vp(v[1]);
+    char *name = convert_module_name(rs);
+    RefArray *ra = fs->refarray_new(0);
+    int find_dirs = FUNC_INT(node);
+
+    PtrList *imp_path;
+    
+    *vret = vp_Value(ra);
+
+    if (name == NULL) {
+        fs->throw_errorf(fs->mod_lang, "ImportError", "Cannot find directories for '%r'", Value_vp(v[1]));
+        return FALSE;
+    }
+
+    for (imp_path = fs->import_path; imp_path != NULL; imp_path = imp_path->next) {
+        char *path = concat_module_path(imp_path->u.c, name, SEP_C);
+        DIR *d = opendir_fox(path);
+        if (d != NULL) {
+            struct dirent *de;
+            while ((de = readdir_fox(d)) != NULL) {
+                if (find_dirs) {
+                    if ((de->d_type & DT_DIR) != 0 && is_valid_module_name(de->d_name)) {
+                        Value *vp = fs->refarray_push(ra);
+                        if (rs->size > 0) {
+                            int length = rs->size + strlen(de->d_name) + 1;
+                            RefStr *rs2 = fs->refstr_new_n(fs->cls_str, length);
+                            sprintf(rs2->c, "%s.%s", rs->c, de->d_name);
+                            *vp = vp_Value(rs2);
+                        } else {
+                            *vp = fs->cstr_Value(fs->cls_str, de->d_name, -1);
+                        }
+                    }
+                } else {
+                    if ((de->d_type & DT_REG) != 0 && file_name_to_module_name(de->d_name)) {
+                        Value *vp = fs->refarray_push(ra);
+                        RefNode *mod = NULL;
+                        if (rs->size > 0) {
+                            char *mod_name = concat_module_path(rs->c, de->d_name, '.');
+                            mod = fs->get_module_by_name(mod_name, -1, FALSE, TRUE);
+                            free(mod_name);
+                        } else {
+                            mod = fs->get_module_by_name(de->d_name, -1, FALSE, TRUE);
+                        }
+                        if (mod != NULL) {
+                            *vp = vp_Value(mod);
+                        } else {
+                            *vp = VALUE_NULL;
+                            closedir_fox(d);
+                            free(path);
+                            return FALSE;
+                        }
+                    }
+                }
+            }
+            closedir_fox(d);
+        }
+        free(path);
+    }
+
+    free(name);
     return TRUE;
 }
 
@@ -174,8 +343,17 @@ static void define_func(RefNode *m)
     n = fs->define_identifier(m, m, "get_this", NODE_FUNC_N, 0);
     fs->define_native_func_a(n, ref_get_this, 1, 1, NULL, fs->cls_fn);
 
+    n = fs->define_identifier(m, m, "get_name", NODE_FUNC_N, 0);
+    fs->define_native_func_a(n, ref_get_name, 1, 1, NULL, NULL);
+
     n = fs->define_identifier(m, m, "get_module_path", NODE_FUNC_N, 0);
     fs->define_native_func_a(n, get_module_path, 1, 1, NULL, fs->cls_module);
+
+    n = fs->define_identifier(m, m, "get_module_dirs", NODE_FUNC_N, 0);
+    fs->define_native_func_a(n, get_module_list, 1, 1, (void*)TRUE, fs->cls_str);
+
+    n = fs->define_identifier(m, m, "get_module_list", NODE_FUNC_N, 0);
+    fs->define_native_func_a(n, get_module_list, 1, 1, (void*)FALSE, fs->cls_str);
 }
 static void define_class(RefNode *m)
 {

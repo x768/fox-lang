@@ -1,4 +1,0 @@
-langtag:mn_Cyrl
-language:mn
-script:Cyrl
-bidi:ltr

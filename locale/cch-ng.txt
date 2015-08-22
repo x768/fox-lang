@@ -1,4 +1,0 @@
-langtag:cch_NG
-language:cch
-territory:NG
-bidi:ltr

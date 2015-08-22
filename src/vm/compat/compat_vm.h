@@ -12,8 +12,6 @@ enum {
 
 #ifdef WIN32
 
-#define DT_REG 1
-#define DT_DIR 4
 #define RTLD_LAZY   0x00001
 
 
@@ -32,21 +30,6 @@ extern FileHandle STDOUT_FILENO;
 extern FileHandle STDERR_FILENO;
 
 
-struct dirent {
-    unsigned int d_type;
-    char d_name[1024];
-};
-typedef struct {
-    void *hDir;
-    int first;
-    struct dirent ent;
-    char wfd[0];
-} DIR;
-
-DIR *opendir_fox(const char *dname);
-struct dirent *readdir_fox(DIR *d);
-void closedir_fox(DIR *d);
-
 int mkdir_fox(const char *dname, int dummy);
 int remove_fox(const char *fname);
 int rename_fox(const char *fname, const char *tname);
@@ -59,10 +42,6 @@ int win_read_console(FileHandle fd, char *dst, int dst_size);
 int win_write_console(FileHandle fd, const char *str, int size);
 
 #else
-
-#define opendir_fox opendir
-#define readdir_fox readdir
-#define closedir_fox closedir
 
 #define mkdir_fox mkdir
 #define remove_fox remove

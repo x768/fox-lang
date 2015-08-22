@@ -1,0 +1,9 @@
+import util.assert
+
+
+let zz = Locale("aa-bbb-cccc-dd")
+assert_equal zz.langtag, "aa_bbb_Cccc_DD"
+assert_equal zz.language, "aa"
+assert_equal zz.extended, "bbb"
+assert_equal zz.script, "Cccc"
+assert_equal zz.territory, "DD"

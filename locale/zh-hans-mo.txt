@@ -1,5 +1,0 @@
-langtag:zh_Hans_MO
-language:zh
-script:Hans
-territory:MO
-bidi:ltr

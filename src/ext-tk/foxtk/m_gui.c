@@ -50,7 +50,7 @@ Value *get_event_handler(Ref *r, RefStr *name)
 int invoke_event_handler(int *result, Value eh, Value evt)
 {
     fs->Value_push("vv", eh, evt);
-    if (!fs->call_member_func(fs->symbol_stock[T_LP_C], 1, TRUE)) {
+    if (!fs->call_member_func(fs->symbol_stock[T_LP], 1, TRUE)) {
         return FALSE;
     }
     if (result != NULL) {
@@ -1219,7 +1219,7 @@ static void define_class(RefNode *m)
 
     n = fs->define_identifier_p(m, cls, fs->str_dispose, NODE_FUNC_N, 0);
     fs->define_native_func_a(n, get_function_ptr(fs->cls_list, fs->str_dispose), 0, 0, NULL);
-    n = fs->define_identifier_p(m, cls, fs->symbol_stock[T_LP_C], NODE_FUNC_N, 0);
+    n = fs->define_identifier_p(m, cls, fs->symbol_stock[T_LP], NODE_FUNC_N, 0);
     fs->define_native_func_a(n, evthandler_call, 0, -1, NULL);
     n = fs->define_identifier(m, cls, "del", NODE_FUNC_N, 0);
     fs->define_native_func_a(n, evthandler_del, 1, 1, NULL, fs->cls_fn);

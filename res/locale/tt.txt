@@ -1,0 +1,4 @@
+langtag = "tt"
+date = "dd.MM.yyyy", "dd.MM.yyyy", "d MMMM y", "d MMMM y"
+time = "H:mm", "H:mm:ss", "H:mm:ss z", "h:mm:ss a Z"
+decimal = ","

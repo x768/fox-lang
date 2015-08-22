@@ -1,5 +1,0 @@
-langtag:nl_BE
-language:nl
-territory:BE
-date:d/MM/yy	d-MMM-y		
-bidi:ltr

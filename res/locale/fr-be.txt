@@ -1,0 +1,3 @@
+langtag = "fr_BE"
+date = "d/MM/yy", "", "", ""
+group = "."

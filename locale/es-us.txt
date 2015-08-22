@@ -1,8 +1,0 @@
-langtag:es_US
-language:es
-territory:US
-date:M/d/yy	MMM d, y		
-time:h:mm a	h:mm:ss a	h:mm:ss a z	h:mm:ss a Z
-decimal:.
-group:,
-bidi:ltr

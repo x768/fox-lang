@@ -1,7 +1,5 @@
 #define DEFINE_GLOBALS
 #include "fox_vm.h"
-#include <string.h>
-#include <stdio.h>
 
 
 typedef struct {
@@ -74,16 +72,22 @@ static int parse_args(ArgumentInfo *ai, int argc, const char **argv)
 }
 void print_last_error()
 {
+    if (fv->err_dst == NULL) {
+        fv->err_dst = "alert";
+    }
     if (fg->error != VALUE_NULL && strcmp(fv->err_dst, "null") != 0) {
+        StrBuf sb;
+        StrBuf_init(&sb, 0);
+
         if (strcmp(fv->err_dst, "alert") == 0) {
-            StrBuf sb;
-            StrBuf_init(&sb, 0);
-            fox_error_dump(&sb, -1, FALSE);
+            fox_error_dump(&sb, FALSE);
             show_error_message(sb.p, sb.size, FALSE);
-            StrBuf_close(&sb);
         } else {
-            fox_error_dump(NULL, -1, TRUE);
+            FileHandle fh = open_errorlog_file();
+            fox_error_dump(&sb, TRUE);
+            close_fox(fh);
         }
+        StrBuf_close(&sb);
     }
 }
 

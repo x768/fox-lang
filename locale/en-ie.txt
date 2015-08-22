@@ -1,7 +1,0 @@
-langtag:en_IE
-language:en
-territory:IE
-am_pm:a.m.	p.m.
-date:dd/MM/yyyy	d MMM y	d MMMM y	dddd d MMMM y
-time:HH:mm	HH:mm:ss	HH:mm:ss z	HH:mm:ss Z
-bidi:ltr

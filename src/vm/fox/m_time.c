@@ -863,7 +863,7 @@ static int timestamp_iso8601(Value *vret, Value *v, RefNode *node);
 /**
  * .NETのフォーマットに近い
  */
-static void parse_time_format(StrBuf *buf, const char *fmt_p, int fmt_size, const Calendar *cal, const TimeOffset *off, const RefLocale *loc)
+static void parse_time_format(StrBuf *buf, const char *fmt_p, int fmt_size, const Calendar *cal, const TimeOffset *off, const LocaleData *loc)
 {
     int i = 0;
     int end;
@@ -872,6 +872,9 @@ static void parse_time_format(StrBuf *buf, const char *fmt_p, int fmt_size, cons
     int isoweek_year = 0;
     int isoweek = -1;
 
+    if (fmt_p == NULL) {
+        return;
+    }
     if (fmt_size < 0) {
         fmt_size = strlen(fmt_p);
     }
@@ -1618,7 +1621,7 @@ static RefTimeZone *timezone_marshal_read_sub(Value r)
     int rd_size;
     char cbuf[64];
 
-    if (!stream_read_uint32(&size, r)) {
+    if (!stream_read_uint32(r, &size)) {
         return NULL;
     }
     if (size > 63) {
@@ -1658,7 +1661,7 @@ static int timezone_marshal_write(Value *vret, Value *v, RefNode *node)
     const char *name = tz->name;
     int name_size = strlen(name);
 
-    if (!stream_write_uint32(name_size, w)) {
+    if (!stream_write_uint32(w, name_size)) {
         return FALSE;
     }
     if (!stream_write_data(w, name, name_size)) {
@@ -1819,11 +1822,11 @@ static int date_marshal_read(Value *vret, Value *v, RefNode *node)
     RefTime *dt = buf_new(fs->cls_time, sizeof(RefTime));
     *vret = vp_Value(dt);
 
-    if (!stream_read_uint32(&uval, r)) {
+    if (!stream_read_uint32(r, &uval)) {
         return FALSE;
     }
     dt->tm = ((uint64_t)uval) << 32;
-    if (!stream_read_uint32(&uval, r)) {
+    if (!stream_read_uint32(r, &uval)) {
         return FALSE;
     }
     dt->tm |= uval;
@@ -1844,14 +1847,14 @@ static int date_marshal_write(Value *vret, Value *v, RefNode *node)
     const char *name = dt->tz->name;
     int name_size = strlen(name);
 
-    if (!stream_write_uint32((uint32_t)(dt->tm >> 32), w)) {
+    if (!stream_write_uint32(w, (uint32_t)(dt->tm >> 32))) {
         return FALSE;
     }
-    if (!stream_write_uint32((uint32_t)(dt->tm & 0xFFFFffff), w)) {
+    if (!stream_write_uint32(w, (uint32_t)(dt->tm & 0xFFFFffff))) {
         return FALSE;
     }
 
-    if (!stream_write_uint32(name_size, w)) {
+    if (!stream_write_uint32(w, name_size)) {
         return FALSE;
     }
     if (!stream_write_data(w, name, name_size)) {
@@ -1981,7 +1984,7 @@ static int date_offset(Value *vret, Value *v, RefNode *node)
 static int date_tostr(Value *vret, Value *v, RefNode *node)
 {
     RefTime *dt = Value_vp(*v);
-    const RefLocale *loc = fs->loc_neutral;
+    const LocaleData *loc = fv->loc_neutral;
     const char *fmt_p;
     int fmt_size;
     StrBuf buf;
@@ -1991,7 +1994,7 @@ static int date_tostr(Value *vret, Value *v, RefNode *node)
         fmt_p = rs->c;
         fmt_size = rs->size;
         if (fg->stk_top > v + 2) {
-            loc = Value_vp(v[2]);
+            loc = Value_locale_data(v[2]);
         }
     } else {
         fmt_p = "yyyy-MM-ddTHH:mm:ss.SSSz";

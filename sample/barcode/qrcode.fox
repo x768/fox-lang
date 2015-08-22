@@ -1,0 +1,13 @@
+import barcode.qrcode
+import image
+
+
+let src = "A QUICK BROWN FOX JUMPS OVER THE LAZY DOG"
+let q = QRCode(src, "auto", "H")
+
+let img = q.to_image()
+let img2 = Image(img.width * 8 + 32, img.height * 8 + 32, "rgb")
+img2.fill_rect Color.WHITE
+img2.copy_resized img, Rect(16, 16, img.width * 8, img.height * 8)
+
+img2.save "qrcode.png"

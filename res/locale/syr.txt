@@ -1,0 +1,5 @@
+langtag = "syr"
+month_w = "܏ܟܢ ܏ܒ", "ܫܒܛ", "ܐܕܪ", "ܢܝܣܢ", "ܐܝܪ", "ܚܙܝܪܢ", "ܬܡܘܙ", "ܐܒ", "ܐܝܠܘܠ", "܏ܬܫ ܏ܐ", "܏ܬܫ ܏ܒ", "܏ܟܢ ܏ܐ"
+date = "dd/MM/yyyy", "dd/MM/yyyy", "dd MMMM, y", "dd MMMM, y"
+time = "h:mm a", "h:mm:ss a", "h:mm:ss a z", "h:mm:ss a Z"
+bidi = rtl

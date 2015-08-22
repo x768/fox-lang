@@ -1,9 +1,0 @@
-langtag:kcg
-language:kcg
-month_w:Zwat Juwung	Zwat Swiyang	Zwat Tsat	Zwat Nyai	Zwat Tswon	Zwat Ataah	Zwat Anatat	Zwat Arinai	Zwat Akubunyung	Zwat Swag	Zwat Mangjuwang	Zwat Swag-Ma-Suyang
-month:Juw	Swi	Tsa	Nya	Tsw	Ata	Ana	Ari	Aku	Swa	Man	Mas
-days_w:Tanii	Talata	Larba	Lamit	Juma	Asabat	Ladi
-days:Tan	Tal	Lar	Lam	Jum	Asa	Lad
-date:yy/MM/dd	y MMM d	y MMMM d	dddd, y MMMM dd
-time:HH:mm	HH:mm:ss	HH:mm:ss z	HH:mm:ss Z
-bidi:ltr

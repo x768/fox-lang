@@ -1,4 +1,0 @@
-langtag:oc_FR
-language:oc
-territory:FR
-bidi:ltr

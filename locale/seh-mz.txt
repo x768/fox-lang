@@ -1,4 +1,0 @@
-langtag:seh_MZ
-language:seh
-territory:MZ
-bidi:ltr

@@ -22,8 +22,9 @@ def assert(line_num:Int, a:List, n1:Int, n2:Int, mode:Str)
 }
 
 var line_num = 0
+let path = ENV.has_key("TEST_BATCH") ? "unicode" : "."
 
-for line in fopen("NormalizationTest.txt") {
+for line in fopen("${path}/NormalizationTest.txt") {
     line_num++
 
     let a = line.replace(/#.*$/, "").split(";")

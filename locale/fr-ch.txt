@@ -1,7 +1,0 @@
-langtag:fr_CH
-language:fr
-territory:CH
-date:dd.MM.yy			dddd, d MMMM y
-decimal:.
-group:'
-bidi:ltr

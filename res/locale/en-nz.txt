@@ -1,0 +1,2 @@
+langtag = "en_NZ"
+date = "d/MM/yy", "d/MM/yyyy", "d MMMM y", "dddd, d MMMM y"

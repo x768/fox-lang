@@ -1,7 +1,4 @@
-#include "fox_vm.h"
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+#include "fox_parse.h"
 #include <iconv.h>
 #include <errno.h>
 
@@ -17,94 +14,159 @@ static Hash charset_entries;
 
 static void load_charset_alias_file(const char *filename)
 {
+    Tok tk;
     char *path = path_normalize(NULL, fs->fox_home, filename, -1, NULL);
-    IniTok tk;
+    char *buf = read_from_file(NULL, path, NULL);
 
-    if (!IniTok_load(&tk, path)) {
-        fatal_errorf(NULL, "Cannot load file %q", path);
+    if (buf == NULL) {
+        fatal_errorf("Cannot load file %q", path);
     }
-    free(path);
 
-    while (IniTok_next(&tk)) {
-        if (tk.type == INITYPE_STRING) {
-            const char *p = tk.val.p;
-            const char *end = p + tk.val.size;
-            RefCharset *cs = Mem_get(&fg->st_mem, sizeof(RefCharset));
-            RefStr *name_r = intern(tk.key.p, tk.key.size);
+    Tok_simple_init(&tk, buf);
+    Tok_simple_next(&tk);
 
+    for (;;) {
+        switch (tk.v.type) {
+        case TL_STR: {
+            RefCharset *cs;
+            RefStr *name_r = intern(tk.str_val.p, tk.str_val.size);
+            Tok_simple_next(&tk);
+            if (tk.v.type != T_LET) {
+                goto ERROR_END;
+            }
+            Tok_simple_next(&tk);
+
+            cs = Mem_get(&fg->st_mem, sizeof(RefCharset));
             cs->rh.type = fs->cls_charset;
             cs->rh.nref = -1;
             cs->rh.n_memb = 0;
             cs->rh.weak_ref = NULL;
-
             cs->utf8 = FALSE;
             cs->ascii = TRUE;
             cs->name = name_r;
             cs->iana = name_r;
             cs->ic_name = name_r;
 
-            while (p < end) {
-                // tk.valを\tで分割する
-                const char *top = p;
-                while (p < end && *p != '\t') {
-                    p++;
+            for (;;) {
+                if (tk.v.type != TL_STR) {
+                    goto ERROR_END;
                 }
-                Hash_add_p(&charset_entries, &fg->st_mem, intern(top, p - top), cs);
-                if (p < end) {
-                    p++;
+                Hash_add_p(&charset_entries, &fg->st_mem, intern(tk.str_val.p, tk.str_val.size), cs);
+
+                Tok_simple_next(&tk);
+                if (tk.v.type != T_COMMA) {
+                    break;
                 }
+                Tok_simple_next(&tk);
             }
+            if (tk.v.type != T_NL && tk.v.type != T_EOF) {
+                goto ERROR_END;
+            }
+            break;
+        }
+        case T_NL:
+            Tok_simple_next(&tk);
+            break;
+        case T_EOF:
+            free(buf);
+            free(path);
+            return;
+        default:
+            goto ERROR_END;
         }
     }
-    IniTok_close(&tk);
+
+ERROR_END:
+    fatal_errorf("Error at line %d (%s)", tk.v.line, path);
+    free(path);
 }
 static void load_charset_info_file(const char *filename)
 {
+    Tok tk;
     char *path = path_normalize(NULL, fs->fox_home, filename, -1, NULL);
-    IniTok tk;
+    char *buf = read_from_file(NULL, path, NULL);
 
-    if (!IniTok_load(&tk, path)) {
-        fatal_errorf(NULL, "Cannot load file %q", path);
+    if (buf == NULL) {
+        fatal_errorf("Cannot load file %q", path);
     }
-    free(path);
 
-    while (IniTok_next(&tk)) {
-        if (tk.type == INITYPE_STRING) {
-            const char *p = tk.val.p;
-            const char *end = p + tk.val.size;
-            RefCharset *cs = get_charset_from_name(tk.key.p, tk.key.size);
+    Tok_simple_init(&tk, buf);
+    Tok_simple_next(&tk);
 
-            if (cs != NULL) {
-                while (p < end) {
-                    // tk.valを "=", "\t" で分割する
-                    const char *key_p = p;
-                    while (p < end && *p != '=' && *p != '\t') {
-                        p++;
-                    }
-                    if (*p == '=') {
-                        const char *key_end = p;
-                        const char *val_p = p + 1;
-                        p++;
-
-                        while (p < end && *p != '\t') {
-                            p++;
-                        }
-                        if (str_eq(key_p, key_end - key_p, "iana", -1)) {
-                            cs->iana = intern(val_p, p - val_p);
-                        } else if (str_eq(key_p, key_end - key_p, "iconv", -1)) {
-                            cs->ic_name = intern(val_p, p - val_p);
-                        } else if (str_eq(key_p, key_end - key_p, "compat", -1)) {
-                            cs->ascii = str_eqi(val_p, p - val_p, "true", -1);
-                        }
-                    }
-                    if (p < end) {
-                        p++;
-                    }
-                }
+    for (;;) {
+    LINE_BEGIN:
+        switch (tk.v.type) {
+        case TL_STR: {
+            RefCharset *cs = get_charset_from_name(tk.str_val.p, tk.str_val.size);
+            if (cs == NULL) {
+                fatal_errorf("Unknown charset %Q at line %d (%s)", tk.str_val, tk.v.line, path);
             }
+            Tok_simple_next(&tk);
+            if (tk.v.type != T_COLON) {
+                goto ERROR_END;
+            }
+            Tok_simple_next(&tk);
+            for (;;) {
+                Str key;
+                if (tk.v.type != TL_VAR) {
+                    goto ERROR_END;
+                }
+                key = tk.str_val;
+                Tok_simple_next(&tk);
+                if (tk.v.type != T_LET) {
+                    goto ERROR_END;
+                }
+                Tok_simple_next(&tk);
+                if (Str_eq_p(key, "iana")) {
+                    if (tk.v.type != TL_STR) {
+                        goto ERROR_END;
+                    }
+                    cs->iana = intern(tk.str_val.p, tk.str_val.size);
+                } else if (Str_eq_p(key, "iconv")) {
+                    if (tk.v.type != TL_STR) {
+                        goto ERROR_END;
+                    }
+                    cs->ic_name = intern(tk.str_val.p, tk.str_val.size);
+                } else if (Str_eq_p(key, "ascii_compat")) {
+                    if (tk.v.type == TL_VAR) {
+                        if (Str_eq_p(tk.str_val, "true")) {
+                            cs->ascii = TRUE;
+                        } else if (Str_eq_p(tk.str_val, "false")) {
+                            cs->ascii = FALSE;
+                        } else {
+                            goto ERROR_END;
+                        }
+                    } else {
+                        goto ERROR_END;
+                    }
+                } else {
+                    fatal_errorf("Unknown key %Q at line %d (%s)", key, tk.v.line, path);
+                }
+                Tok_simple_next(&tk);
+                if (tk.v.type != T_COMMA) {
+                    break;
+                }
+                Tok_simple_next(&tk);
+            }
+            break;
+        }
+        case T_NL:
+            Tok_simple_next(&tk);
+            goto LINE_BEGIN;
+        case T_EOF:
+            free(path);
+            return;
+        default:
+            goto ERROR_END;
+        }
+        if (tk.v.type != T_NL && tk.v.type != T_EOF) {
+            goto ERROR_END;
         }
     }
-    IniTok_close(&tk);
+
+ERROR_END:
+    fatal_errorf("Error at line %d (%s)", tk.v.line, path);
+    free(path);
 }
 
 RefCharset *get_charset_from_name(const char *src_p, int src_size)
@@ -336,7 +398,7 @@ static int charset_marshal_read(Value *vret, Value *v, RefNode *node)
     int rd_size;
     char cbuf[64];
 
-    if (!stream_read_uint32(&size, r)) {
+    if (!stream_read_uint32(r, &size)) {
         goto ERROR_END;
     }
     if (size > 63) {
@@ -367,7 +429,7 @@ static int charset_marshal_write(Value *vret, Value *v, RefNode *node)
     RefStr *name = cs->name;
     Value w = Value_ref(v[1])->v[INDEX_MARSHALDUMPER_SRC];
 
-    if (!stream_write_uint32(name->size, w)) {
+    if (!stream_write_uint32(w, name->size)) {
         return FALSE;
     }
     if (!stream_write_data(w, name->c, name->size)) {

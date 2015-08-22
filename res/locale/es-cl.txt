@@ -1,4 +1,3 @@
-locale=es_CL
-Bali:balinés
-005:Sudamérica
-EH:Sahara Occidental
+langtag = "es_CL"
+date = "dd-MM-yy", "dd-MM-yyyy", "", ""
+time = "H:mm", "H:mm:ss", "H:mm:ss z", ""

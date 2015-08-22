@@ -1,5 +1,0 @@
-langtag:en_Dsrt_US
-language:en
-script:Dsrt
-territory:US
-bidi:ltr

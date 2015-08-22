@@ -1,4 +1,0 @@
-langtag:fr_GA
-language:fr
-territory:GA
-bidi:ltr

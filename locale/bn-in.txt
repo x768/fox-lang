@@ -1,4 +1,0 @@
-langtag:bn_IN
-language:bn
-territory:IN
-bidi:ltr

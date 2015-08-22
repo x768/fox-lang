@@ -1,5 +1,0 @@
-langtag:en_ZW
-language:en
-territory:ZW
-date:d/M/yyyy	dd MMM,y	dd MMMM y	dddd dd MMMM y
-bidi:ltr

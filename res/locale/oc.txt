@@ -1,0 +1,3 @@
+langtag = "oc"
+month_w = "genièr", "febrièr", "març", "abril", "mai", "junh", "julhet", "agost", "setembre", "octòbre", "novembre", "dezembre"
+days_w = "diluns", "dimarç", "dimècres", "dijòus", "divèndres", "dissabte", "Dimenge"

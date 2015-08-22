@@ -1,4 +1,0 @@
-langtag:vun_TZ
-language:vun
-territory:TZ
-bidi:ltr

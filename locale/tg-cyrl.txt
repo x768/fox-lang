@@ -1,4 +1,0 @@
-langtag:tg_Cyrl
-language:tg
-script:Cyrl
-bidi:ltr

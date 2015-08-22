@@ -1,4 +1,5 @@
 #include "fox_vm.h"
+#include <pcre.h>
 
 
 enum {
@@ -33,23 +34,6 @@ typedef struct MapReplace {
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-static int lang_strcat(Value *vret, Value *v, RefNode *node)
-{
-    Value *vtop = fg->stk_top;
-    Value *vp;
-    StrBuf buf;
-
-    StrBuf_init_refstr(&buf, 0);
-
-    // 引数をstrに変換
-    for (vp = fg->stk_base + 1; vp < vtop; vp++) {
-        StrBuf_add_v(&buf, *vp);
-    }
-    *vret = StrBuf_str_Value(&buf, fs->cls_str);
-
-    return TRUE;
-}
-
 /*
  * hexエンコード
  * dstにはsrcの2倍のサイズが必要
@@ -72,8 +56,6 @@ void encode_hex_sub(char *dst, const char *src, int len, int upper)
         }
     }
 }
-
-///////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 static int StrBuf_add_codepoint(StrBuf *sb, int ch)
 {
@@ -237,7 +219,7 @@ int strclass_tostr(Value *vret, Value *v, RefNode *node)
     }
     return TRUE;
 }
-static int sequence_from_iterator(Value *vret, Value *v, int is_str)
+static int sequence_from_iterator(Value *vret, Value v, int is_str)
 {
     StrBuf sb;
     StrBuf_init(&sb, 0);
@@ -252,7 +234,7 @@ static int sequence_from_iterator(Value *vret, Value *v, int is_str)
         int64_t val;
         int err;
 
-        Value_push("v", &fg->stk_top[-1]);
+        Value_push("v", fg->stk_top[-1]);
         if (!call_member_func(fs->str_next, 0, TRUE)) {
             if (Value_type(fg->error) == fs->cls_stopiter) {
                 Value_dec(fg->error);
@@ -320,7 +302,7 @@ int sequence_cmp(Value *vret, Value *v, RefNode *node)
 int sequence_hash(Value *vret, Value *v, RefNode *node)
 {
     const RefStr *rs = Value_vp(*v);
-    uint32_t hash = str_hash(rs->c, rs->size);
+    int32_t hash = str_hash(rs->c, rs->size);
     *vret = int32_Value(hash);
     return TRUE;
 }
@@ -344,7 +326,7 @@ int sequence_iter(Value *vret, Value *v, RefNode *node)
 
     return TRUE;
 }
-static int sequence_marshal_read(Value *vret, Value *v, RefNode *node)
+int sequence_marshal_read(Value *vret, Value *v, RefNode *node)
 {
     int is_str = FUNC_INT(node);
     Value r = Value_ref(v[1])->v[INDEX_MARSHALDUMPER_SRC];
@@ -352,7 +334,7 @@ static int sequence_marshal_read(Value *vret, Value *v, RefNode *node)
     int rd_size;
     RefStr *rs;
 
-    if (!stream_read_uint32(&size, r)) {
+    if (!stream_read_uint32(r, &size)) {
         return FALSE;
     }
     if (size > 0xffffff) {
@@ -380,12 +362,12 @@ static int sequence_marshal_read(Value *vret, Value *v, RefNode *node)
 
     return TRUE;
 }
-static int sequence_marshal_write(Value *vret, Value *v, RefNode *node)
+int sequence_marshal_write(Value *vret, Value *v, RefNode *node)
 {
     Value w = Value_ref(v[1])->v[INDEX_MARSHALDUMPER_SRC];
     RefStr *rs = Value_vp(*v);
 
-    if (!stream_write_uint32(rs->size, w)) {
+    if (!stream_write_uint32(w, rs->size)) {
         return FALSE;
     }
     if (!stream_write_data(w, rs->c, rs->size)) {
@@ -1202,15 +1184,15 @@ static int string_new(Value *vret, Value *v, RefNode *node)
             return FALSE;
         }
     } else if (fg->stk_top > v + 1) {
-        Value *v1 = v + 1;
+        Value v1 = v[1];
 
-        RefNode *type = Value_type(*v1);
+        RefNode *type = Value_type(v1);
         if (type == fs->cls_str) {
             // そのまま使う
-            *vret = *v1;
-            *v1 = VALUE_NULL;
+            *vret = v1;
+            v[1] = VALUE_NULL;
         } else if (type == fs->cls_bytes) {
-            Str src = Value_str(*v1);
+            Str src = Value_str(v1);
             *vret = cstr_Value_conv(src.p, src.size, NULL);
         } else {
             // 引数に積んだ値をthisとして、to_strを呼び出す
@@ -1243,7 +1225,7 @@ static int string_new_seq(Value *vret, Value *v, RefNode *node)
             v1 = ra->p;
             top = v1 + ra->size;
         } else if (v1_type != fs->cls_int) {
-            if (!sequence_from_iterator(vret, v1, TRUE)) {
+            if (!sequence_from_iterator(vret, *v1, TRUE)) {
                 return FALSE;
             }
             return TRUE;
@@ -1268,6 +1250,22 @@ static int string_new_seq(Value *vret, Value *v, RefNode *node)
     }
     *vret = cstr_Value(fs->cls_str, buf.p, buf.size);
     StrBuf_close(&buf);
+
+    return TRUE;
+}
+static int string_strcat(Value *vret, Value *v, RefNode *node)
+{
+    Value *vtop = fg->stk_top;
+    Value *vp;
+    StrBuf buf;
+
+    StrBuf_init_refstr(&buf, 0);
+
+    // 引数をstrに変換
+    for (vp = fg->stk_base + 1; vp < vtop; vp++) {
+        StrBuf_add_v(&buf, *vp);
+    }
+    *vret = StrBuf_str_Value(&buf, fs->cls_str);
 
     return TRUE;
 }
@@ -1396,6 +1394,38 @@ static int string_tobytes(Value *vret, Value *v, RefNode *node)
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////
 
+static int bytes_new(Value *vret, Value *v, RefNode *node)
+{
+    if (fg->stk_top > v + 1) {
+        Value v1 = v[1];
+
+        RefNode *type = Value_type(v1);
+        if (type == fs->cls_str) {
+            RefStr *rs = Value_vp(v1);
+            *vret = cstr_Value(fs->cls_bytes, rs->c, rs->size);
+            return TRUE;
+        } else if (type == fs->cls_bytes) {
+            *vret = v1;
+            v[1] = VALUE_NULL;
+            return TRUE;
+        } else {
+            // 引数に積んだ値をthisとして、to_strを呼び出す
+            Value vr;
+            if (!call_member_func(fs->str_tostr, 0, TRUE)) {
+                return FALSE;
+            }
+            vr = fg->stk_top[-1];
+            if (Value_type(vr) == fs->cls_str) {
+                RefStr *rs = Value_vp(vr);
+                *vret = cstr_Value(fs->cls_bytes, rs->c, rs->size);
+                return TRUE;
+            }
+        }
+    }
+
+    *vret = cstr_Value(fs->cls_bytes, NULL, 0);
+    return TRUE;
+}
 /**
  * バイト値の列から文字列を生成
  */
@@ -1413,7 +1443,7 @@ static int bytes_new_seq(Value *vret, Value *v, RefNode *node)
             v1 = ra->p;
             top = v1 + ra->size;
         } else if (v1_type != fs->cls_int) {
-            if (!sequence_from_iterator(vret, v1, FALSE)) {
+            if (!sequence_from_iterator(vret, *v1, FALSE)) {
                 return FALSE;
             }
             return TRUE;
@@ -1441,6 +1471,30 @@ static int bytes_new_seq(Value *vret, Value *v, RefNode *node)
         *dst++ = ch;
         v1++;
     }
+
+    return TRUE;
+}
+static int bytes_strcat(Value *vret, Value *v, RefNode *node)
+{
+    Value *vtop = fg->stk_top;
+    Value *vp;
+    StrBuf buf;
+
+    StrBuf_init_refstr(&buf, 0);
+
+    // 引数をstrに変換
+    for (vp = fg->stk_base + 1; vp < vtop; vp++) {
+        RefNode *type = Value_type(*vp);
+        if (type == fs->cls_bytes) {
+            StrBuf_add_r(&buf, Value_vp(*vp));
+        } else if (type == fs->cls_bytesio) {
+            RefBytesIO *mb = Value_vp(*vp);
+            StrBuf_add(&buf, mb->buf.p, mb->buf.size);
+        } else {
+            StrBuf_add_v(&buf, *vp);
+        }
+    }
+    *vret = StrBuf_str_Value(&buf, fs->cls_bytes);
 
     return TRUE;
 }
@@ -1585,7 +1639,7 @@ static int regex_new(Value *vret, Value *v, RefNode *node)
         r->v[INDEX_REGEX_PTR] = ptr_Value(re);
         r->v[INDEX_REGEX_SRC] = v1;
         v[1] = VALUE_NULL;
-        r->v[INDEX_REGEX_OPT] = int32_Value(options);
+        r->v[INDEX_REGEX_FLAGS] = int32_Value(options);
     } else {
         throw_errorf(fs->mod_lang, "RegexError", "%s", errptr);
         return FALSE;
@@ -1622,7 +1676,7 @@ static int regex_marshal_read(Value *vret, Value *v, RefNode *node)
     if (!stream_read_data(rd, NULL, &is_str, &rd_size, FALSE, TRUE)) {
         return FALSE;
     }
-    if (!stream_read_uint32(&size, rd)) {
+    if (!stream_read_uint32(rd, &size)) {
         return FALSE;
     }
     if (size > 0xffffff) {
@@ -1640,14 +1694,14 @@ static int regex_marshal_read(Value *vret, Value *v, RefNode *node)
         return FALSE;
     }
     rs->c[size] = '\0';
-    if (!stream_read_uint32(&options, rd)) {
+    if (!stream_read_uint32(rd, &options)) {
         return FALSE;
     }
     re = pcre_compile(rs->c, options, &errptr, &erroffset, NULL);
 
     if (re != NULL) {
         r->v[INDEX_REGEX_PTR] = ptr_Value(re);
-        r->v[INDEX_REGEX_OPT] = int32_Value(options);
+        r->v[INDEX_REGEX_FLAGS] = int32_Value(options);
     } else {
         throw_errorf(fs->mod_lang, "RegexError", "%s", errptr);
         return FALSE;
@@ -1667,19 +1721,19 @@ static int regex_marshal_write(Value *vret, Value *v, RefNode *node)
     Value w = Value_ref(v[1])->v[INDEX_MARSHALDUMPER_SRC];
     Value src = r->v[INDEX_REGEX_SRC];
     RefStr *src_s = Value_vp(src);
-    int opt = Value_integral(r->v[INDEX_REGEX_OPT]);
+    int flags = Value_integral(r->v[INDEX_REGEX_FLAGS]);
     char is_str = (Value_type(src) == fs->cls_str) ? 1 : 0;
 
     if (!stream_write_data(w, &is_str, 1)) {
         return FALSE;
     }
-    if (!stream_write_uint32(src_s->size, w)) {
+    if (!stream_write_uint32(w, src_s->size)) {
         return FALSE;
     }
     if (!stream_write_data(w, src_s->c, src_s->size)) {
         return FALSE;
     }
-    if (!stream_write_uint32(opt, w)) {
+    if (!stream_write_uint32(w, flags)) {
         return FALSE;
     }
     return TRUE;
@@ -1690,31 +1744,45 @@ static int regex_source(Value *vret, Value *v, RefNode *node)
     *vret = Value_cp(r->v[INDEX_REGEX_SRC]);
     return TRUE;
 }
+static void regex_flags_to_strbuf(StrBuf *sb, int flags)
+{
+    if ((flags & PCRE_CASELESS) != 0) {
+        StrBuf_add_c(sb, 'i');
+    }
+    if ((flags & PCRE_DOTALL) != 0) {
+        StrBuf_add_c(sb, 's');
+    }
+    if ((flags & PCRE_MULTILINE) != 0) {
+        StrBuf_add_c(sb, 'm');
+    }
+    if ((flags & PCRE_UTF8) != 0) {
+        StrBuf_add_c(sb, 'u');
+    }
+}
 static int regex_tostr(Value *vret, Value *v, RefNode *node)
 {
     Ref *r = Value_ref(*v);
     RefStr *source = Value_vp(r->v[INDEX_REGEX_SRC]);
-    int flags = Value_integral(r->v[INDEX_REGEX_OPT]);
-    StrBuf buf;
+    StrBuf sb;
 
-    StrBuf_init_refstr(&buf, source->size + 2);
-    StrBuf_add_c(&buf, '/');
-    add_backslashes_bin(&buf, source->c, source->size);
-    StrBuf_add_c(&buf, '/');
+    StrBuf_init_refstr(&sb, source->size + 2);
+    StrBuf_add_c(&sb, '/');
+    add_backslashes_bin(&sb, source->c, source->size);
+    StrBuf_add_c(&sb, '/');
+    regex_flags_to_strbuf(&sb, Value_integral(r->v[INDEX_REGEX_FLAGS]));
+    *vret = StrBuf_str_Value(&sb, fs->cls_str);
 
-    if ((flags & PCRE_CASELESS) != 0) {
-        StrBuf_add_c(&buf, 'i');
-    }
-    if ((flags & PCRE_DOTALL) != 0) {
-        StrBuf_add_c(&buf, 's');
-    }
-    if ((flags & PCRE_MULTILINE) != 0) {
-        StrBuf_add_c(&buf, 'm');
-    }
-    if ((flags & PCRE_UTF8) != 0) {
-        StrBuf_add_c(&buf, 'u');
-    }
-    *vret = StrBuf_str_Value(&buf, fs->cls_str);
+    return TRUE;
+}
+static int regex_flags(Value *vret, Value *v, RefNode *node)
+{
+    Ref *r = Value_ref(*v);
+    RefStr *source = Value_vp(r->v[INDEX_REGEX_SRC]);
+    StrBuf sb;
+
+    StrBuf_init_refstr(&sb, source->size + 2);
+    regex_flags_to_strbuf(&sb, Value_integral(r->v[INDEX_REGEX_FLAGS]));
+    *vret = StrBuf_str_Value(&sb, fs->cls_str);
 
     return TRUE;
 }
@@ -1722,7 +1790,7 @@ static int regex_hash(Value *vret, Value *v, RefNode *node)
 {
     Ref *r = Value_ref(*v);
     RefStr *source = Value_vp(r->v[INDEX_REGEX_SRC]);
-    int flags = Value_integral(r->v[INDEX_REGEX_OPT]);
+    int flags = Value_integral(r->v[INDEX_REGEX_FLAGS]);
 
     uint32_t hash = str_hash(source->c, source->size) ^ flags;
     hash &= INT32_MAX;
@@ -1734,11 +1802,11 @@ static int regex_eq(Value *vret, Value *v, RefNode *node)
 {
     Ref *r1 = Value_ref(*v);
     RefStr *source1 = Value_vp(r1->v[INDEX_REGEX_SRC]);
-    int flags1 = Value_integral(r1->v[INDEX_REGEX_OPT]);
+    int flags1 = Value_integral(r1->v[INDEX_REGEX_FLAGS]);
 
     Ref *r2 = Value_ref(v[1]);
     RefStr *source2 = Value_vp(r2->v[INDEX_REGEX_SRC]);
-    int flags2 = Value_integral(r2->v[INDEX_REGEX_OPT]);
+    int flags2 = Value_integral(r2->v[INDEX_REGEX_FLAGS]);
 
     if (refstr_cmp(source1, source2) == 0 && flags1 == flags2) {
         *vret = VALUE_TRUE;
@@ -1813,7 +1881,7 @@ static int matches_size(Value *vret, Value *v, RefNode *node)
 static int matches_index(Value *vret, Value *v, RefNode *node)
 {
     RefMatches *r = Value_vp(*v);
-    int32_t idx = -1;
+    int32_t idx = 0;
 
     if (fg->stk_top > v + 1) {
         RefNode *v1_type = Value_type(v[1]);
@@ -2037,11 +2105,6 @@ void define_lang_str_func(RefNode *m)
 {
     RefNode *n;
 
-    n = define_identifier(m, m, "strcat", NODE_FUNC_N, 0);
-    define_native_func_a(n, lang_strcat, 0, -1, NULL);
-    fv->func_strcat = n;
-
-
     n = define_identifier(m, m, "hexencode", NODE_FUNC_N, 0);
     define_native_func_a(n, str_hexencode, 1, 3, NULL, NULL, fs->cls_charset, fs->cls_bool);
 
@@ -2115,8 +2178,12 @@ void define_lang_str_class(RefNode *m)
 
     // Bytes
     cls = fs->cls_bytes;
+    n = define_identifier_p(m, cls, fs->str_new, NODE_NEW_N, 0);
+    define_native_func_a(n, bytes_new, 0, 1, NULL, NULL);
     n = define_identifier(m, cls, "chr", NODE_NEW_N, 0);
     define_native_func_a(n, bytes_new_seq, 0, -1, NULL);
+    n = define_identifier(m, cls, "cat", NODE_NEW_N, 0);
+    define_native_func_a(n, bytes_strcat, 0, -1, NULL);
     n = define_identifier_p(m, cls, fs->str_marshal_read, NODE_NEW_N, 0);
     define_native_func_a(n, sequence_marshal_read, 1, 1, (void*) FALSE, fs->cls_marshaldumper);
 
@@ -2143,6 +2210,9 @@ void define_lang_str_class(RefNode *m)
     define_native_func_a(n, string_new_seq, 0, -1, NULL);
     n = define_identifier_p(m, cls, fs->str_marshal_read, NODE_NEW_N, 0);
     define_native_func_a(n, sequence_marshal_read, 1, 1, (void*) TRUE, fs->cls_marshaldumper);
+    n = define_identifier(m, cls, "cat", NODE_NEW_N, 0);
+    define_native_func_a(n, string_strcat, 0, -1, NULL);
+    fv->func_strcat = n;
 
     n = define_identifier_p(m, cls, fs->str_tostr, NODE_FUNC_N, 0);
     define_native_func_a(n, string_tostr, 0, 2, NULL, fs->cls_str, fs->cls_locale);
@@ -2188,6 +2258,8 @@ void define_lang_str_class(RefNode *m)
     define_native_func_a(n, regex_marshal_write, 1, 1, NULL, fs->cls_marshaldumper);
     n = define_identifier(m, cls, "source", NODE_FUNC_N, NODEOPT_PROPERTY);
     define_native_func_a(n, regex_source, 0, 0, NULL);
+    n = define_identifier(m, cls, "flags", NODE_FUNC_N, NODEOPT_PROPERTY);
+    define_native_func_a(n, regex_flags, 0, 0, NULL);
     n = define_identifier(m, cls, "capture_count", NODE_FUNC_N, NODEOPT_PROPERTY);
     define_native_func_a(n, regex_capture_count, 0, 0, NULL);
     n = define_identifier(m, cls, "capture_index", NODE_FUNC_N, 0);

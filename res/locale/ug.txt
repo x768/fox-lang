@@ -1,0 +1,2 @@
+langtag = "ug"
+bidi = rtl

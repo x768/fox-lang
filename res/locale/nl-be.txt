@@ -1,5 +1,2 @@
-locale=nl_BE
-lv:Lets
-oc:Occitaans (na 1500); Provençaals
-sh:Servo-Kroatisch
-IM:Het Eiland Man
+langtag = "nl_BE"
+date = "d/MM/yy", "d-MMM-y", "", ""

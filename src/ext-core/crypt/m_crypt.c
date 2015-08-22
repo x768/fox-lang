@@ -1,7 +1,6 @@
 #define DEFINE_GLOBALS
 #include "fox_io.h"
-#include <stdio.h>
-#include <string.h>
+#include "m_number.h"
 
 #ifdef WIN32
 #include <winsock2.h>

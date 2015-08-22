@@ -1,5 +1,6 @@
 #define DEFINE_GLOBALS
 #include "zipfile.h"
+#include "m_number.h"
 #include <string.h>
 #include <stdlib.h>
 
@@ -214,7 +215,7 @@ static int deflateio_write(Value *vret, Value *v, RefNode *node)
         if (zs->avail_in == 0 || ret == Z_BUF_ERROR || ret == Z_STREAM_END) {   // 出力してバッファを空にする
             int size = out_len - zs->avail_out;
 
-            if (!fs->stream_write_data(r->v[INDEX_Z_STREAM], mb_buf, size)) {
+            if (size > 0 && !fs->stream_write_data(r->v[INDEX_Z_STREAM], mb_buf, size)) {
                 goto ERROR_END;
             }
             if (zs->avail_in == 0 || ret == Z_STREAM_END) {
@@ -229,6 +230,7 @@ static int deflateio_write(Value *vret, Value *v, RefNode *node)
     }
 
     free(mb_buf);
+    *vret = int32_Value(data.size - zs->avail_in);
     return TRUE;
 
 ERROR_END:
@@ -664,7 +666,7 @@ static int zipentry_finish_sub(CentralDir *cd)
     cd->z.next_in = NULL;
     cd->z.avail_in = 0;
     cd->z.next_out = (Bytef*)&cd->data.p[size_prev];
-    cd->z.avail_out = cd->data.max - size_prev;
+    cd->z.avail_out = cd->data.alloc_size - size_prev;
 
     if (cd->z_init != Z_STREAM_DEFLATE) {
         int ret = deflateInit2(&cd->z, cd->level, Z_DEFLATED, MAX_WBITS, MAX_MEM_LEVEL, 0);
@@ -687,7 +689,7 @@ static int zipentry_finish_sub(CentralDir *cd)
             fs->StrBuf_alloc(&cd->data, size_prev + BUFFER_SIZE);
             cd->data.size = size_prev;
 
-            cd->z.avail_out = cd->data.max - size_prev;
+            cd->z.avail_out = cd->data.alloc_size - size_prev;
             cd->z.next_out = (Bytef*)&cd->data.p[size_prev];
         } else if (ret != Z_OK) {
             fs->throw_errorf(mod_zip, "DeflateError", "%s", cd->z.msg);
@@ -872,16 +874,16 @@ static int zipentry_read(Value *vret, Value *v, RefNode *node)
     }
     return TRUE;
 }
-static int zipentry_write_deflate(CentralDir *cd, Str s)
+static int zipentry_write_deflate(CentralDir *cd, const char *s_p, int s_size)
 {
     int size_prev = cd->data.size;
     fs->StrBuf_alloc(&cd->data, size_prev + BUFFER_SIZE);
     cd->data.size = size_prev;
 
-    cd->z.next_in = (Bytef*)s.p;
-    cd->z.avail_in = s.size;
+    cd->z.next_in = (Bytef*)s_p;
+    cd->z.avail_in = s_size;
     cd->z.next_out = (Bytef*)&cd->data.p[size_prev];
-    cd->z.avail_out = cd->data.max - size_prev;
+    cd->z.avail_out = cd->data.alloc_size - size_prev;
 
     if (cd->z_init != Z_STREAM_DEFLATE) {
         // deflateヘッダを出力しない
@@ -904,7 +906,7 @@ static int zipentry_write_deflate(CentralDir *cd, Str s)
             size_prev = cd->data.size;
             fs->StrBuf_alloc(&cd->data, size_prev + BUFFER_SIZE);
 
-            cd->z.avail_out = cd->data.max - size_prev;
+            cd->z.avail_out = cd->data.alloc_size - size_prev;
             cd->z.next_out = (Bytef*)&cd->data.p[size_prev];
         } else if (ret != Z_OK) {
             fs->throw_errorf(mod_zip, "DeflateError", "%s", cd->z.msg);
@@ -922,7 +924,7 @@ static int zipentry_write_sub(CentralDir *cd, const char *p, int size)
         }
         break;
     case ZIP_CM_DEFLATE:
-        if (!zipentry_write_deflate(cd, Str_new(p, size))) {
+        if (!zipentry_write_deflate(cd, p, size)) {
             return FALSE;
         }
         break;
@@ -956,6 +958,7 @@ static int zipentry_write(Value *vret, Value *v, RefNode *node)
     if (!zipentry_write_sub(cd, mb->buf.p, mb->buf.size)) {
         return FALSE;
     }
+    *vret = int32_Value(mb->buf.size);
 
     return TRUE;
 }

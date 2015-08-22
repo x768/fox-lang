@@ -1,0 +1,6 @@
+langtag = "gez"
+month_w = "ጠሐረ", "ከተተ", "መገበ", "አኀዘ", "ግንባት", "ሠንየ", "ሐመለ", "ነሐሰ", "ከረመ", "ጠቀመ", "ኀደረ", "ኀሠሠ"
+days_w = "ሰኑይ", "ሠሉስ", "ራብዕ", "ሐሙስ", "ዓርበ", "ቀዳሚት", "እኁድ"
+am_pm = "ጽባሕ", "ምሴት"
+date = "dd/MM/yy", "dd-MMM-y", "dd MMMM y", "dddd፥ dd MMMM መዓልት y "
+time = "h:mm a", "h:mm:ss a", "h:mm:ss a z", "h:mm:ss a Z"

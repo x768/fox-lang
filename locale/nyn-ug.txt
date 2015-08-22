@@ -1,4 +1,0 @@
-langtag:nyn_UG
-language:nyn
-territory:UG
-bidi:ltr

@@ -1,5 +1,0 @@
-langtag:uz_Arab_AF
-language:uz
-script:Arab
-territory:AF
-bidi:ltr

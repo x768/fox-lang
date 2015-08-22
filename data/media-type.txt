@@ -1,2 +1,2 @@
-image.webimage:image/gif	image/png
-media.webm:audio/ogg	video/webm
+"image.webimage" = "image/gif", "image/png"
+"media.webm" = "audio/ogg", "video/webm"

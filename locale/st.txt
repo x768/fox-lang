@@ -1,8 +1,0 @@
-langtag:st
-language:st
-month_w:Phesekgong	Hlakola	Hlakubele	Mmese	Motsheanong	Phupjane	Phupu	Phata	Leotshe	Mphalane	Pundungwane	Tshitwe
-month:Phe	Kol	Ube	Mme	Mot	Jan	Upu	Pha	Leo	Mph	Pun	Tsh
-days_w:Mmantaha	Labobedi	Laboraru	Labone	Labohlane	Moqebelo	Sontaha
-days:Mma	Bed	Rar	Ne	Hla	Moq	Son
-decimal:,
-bidi:ltr

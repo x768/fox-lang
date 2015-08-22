@@ -1,4 +1,0 @@
-langtag:chr_US
-language:chr
-territory:US
-bidi:ltr

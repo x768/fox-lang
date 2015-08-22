@@ -1,4 +1,0 @@
-langtag:cs_CZ
-language:cs
-territory:CZ
-bidi:ltr

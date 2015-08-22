@@ -1,0 +1,4 @@
+langtag = "fr_CH"
+date = "dd.MM.yy", "", "", "dddd, d MMMM y"
+decimal = "."
+group = "'"

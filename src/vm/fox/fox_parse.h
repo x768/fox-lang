@@ -107,7 +107,6 @@ typedef struct Tok
     int32_t int_val;
     double real_val;
     Str str_val;
-    pcre *re_val;
     mp_int mp_val[2];   // intの場合は0のみ使う、rationalの場合は0,1を使う
 
     int simple_mode;   // 設定ファイル等の解析で使用する

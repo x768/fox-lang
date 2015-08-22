@@ -1,97 +1,97 @@
-application/atom+xml:atom
-application/epub+zip:epub
-application/font-woff:woff
-application/java-archive:jar
-application/java-vm:class
-application/javascript:js
-application/json:json
-application/m3g:m3g
-application/msword:doc	dot
-application/ogg:ogx
-application/pdf:pdf
-application/postscript:ps
-application/rdf+xml:rdf
-application/rss+xml:rss
-application/rtf:rtf
-application/vnd.ms-excel:xls	xlb	xlt
-application/vnd.ms-powerpoint:ppt	pps
-application/vnd.oasis.opendocument.chart:odc
-application/vnd.oasis.opendocument.database:odb
-application/vnd.oasis.opendocument.formula:odf
-application/vnd.oasis.opendocument.graphics:odg
-application/vnd.oasis.opendocument.image:odi
-application/vnd.oasis.opendocument.presentation:odp
-application/vnd.oasis.opendocument.spreadsheet:ods
-application/vnd.oasis.opendocument.text:odt
-application/vnd.openxmlformats-officedocument.wordprocessingml.document:docx	docm
-application/vnd.openxmlformats-officedocument.presentationml.presentation:pptx	pptm
-application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:xlsx	xlsm
-application/x-7z-compressed:7z
-application/x-apple-diskimage:dmg
-application/x-bzip:bz	bz2
-application/x-cab:cab
-application/x-cd-image:iso
-application/x-deb:deb
-application/x-ms-dos-executable:exe	dll
-application/x-font-ttf:ttf
-application/x-gtar:gtar	tgz	taz
-application/x-gzip:gz
-application/x-iso9660-image:iso
-application/x-lha:lha	lzh
-application/x-perl:pl	pm
-application/x-rar:rar
-application/x-ruby:rb
-application/x-shellscript:sh
-application/x-shockwave-flash:swf
-application/x-tar:tar
-application/x-xz:xz
-application/xhtml+xml:xht	xhtml
-application/xml:xml
-application/xml-dtd:dtd
-application/zip:zip
-audio/basic:au	snd
-audio/flac:flac
-audio/midi:mid	midi
-audio/mpeg:mpga	mpega	mp3
-audio/ogg:oga	ogg	spx
-audio/x-aiff:aiff	aif	aifc
-audio/x-matroska:mka
-audio/x-ms-wma:wma
-audio/x-wav:wav
-image/bmp:bmp
-image/gif:gif
-image/jpeg:jpeg	jpg	jpe
-image/png:png
-image/svg+xml:svg
-image/svg+xml-compressed:svgz
-image/tiff:tiff	tif
-image/vnd.microsoft.icon:ico
-image/x-eps:eps
-image/x-portable-anymap:pnm
-image/x-portable-bitmap:pbm
-image/x-portable-graymap:pgm
-image/x-portable-pixmap:ppm
-image/x-quicktime:qif	qtif
-image/x-webp:webp
-image/x-xpixmap:xpm
-message/rfc822:eml
-text/x-chdr:h
-text/x-csrc:c
-text/x-c++src:cpp
-text/css:css
-text/csv:csv
-text/html:htm	html
-text/x-fox:fox
-text/x-markdown:md	markdown
-text/x-objcsrc:m
-text/x-python:py
-text/plain:txt	text	ini
-video/mp4:mp4
-video/mpeg:mpeg	mpg	mpe
-video/x-flv:flv
-video/x-matroska:mkv
-video/ogg:ogv
-video/quicktime:qt	mov
-video/webm:webm
-video/x-msvideo:avi
-video/x-ms-wmv:wmv
+"application/atom+xml" = "atom"
+"application/epub+zip" = "epub"
+"application/font-woff" = "woff"
+"application/java-archive" = "jar"
+"application/java-vm" = "class"
+"application/javascript" = "js"
+"application/json" = "json"
+"application/m3g" = "m3g"
+"application/msword" = "doc", "dot"
+"application/ogg" = "ogx"
+"application/pdf" = "pdf"
+"application/postscript" = "ps"
+"application/rdf+xml" = "rdf"
+"application/rss+xml" = "rss"
+"application/rtf" = "rtf"
+"application/vnd.ms-excel" = "xls", "xlb", "xlt"
+"application/vnd.ms-powerpoint" = "ppt", "pps"
+"application/vnd.oasis.opendocument.chart" = "odc"
+"application/vnd.oasis.opendocument.database" = "odb"
+"application/vnd.oasis.opendocument.formula" = "odf"
+"application/vnd.oasis.opendocument.graphics" = "odg"
+"application/vnd.oasis.opendocument.image" = "odi"
+"application/vnd.oasis.opendocument.presentation" = "odp"
+"application/vnd.oasis.opendocument.spreadsheet" = "ods"
+"application/vnd.oasis.opendocument.text" = "odt"
+"application/vnd.openxmlformats-officedocument.wordprocessingml.document" = "docx", "docm"
+"application/vnd.openxmlformats-officedocument.presentationml.presentation" = "pptx", "pptm"
+"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" = "xlsx", "xlsm"
+"application/x-7z-compressed" = "7z"
+"application/x-apple-diskimage" = "dmg"
+"application/x-bzip" = "bz", "bz2"
+"application/x-cab" = "cab"
+"application/x-cd-image" = "iso"
+"application/x-deb" = "deb"
+"application/x-ms-dos-executable" = "exe", "dll"
+"application/x-font-ttf" = "ttf"
+"application/x-gtar" = "gtar", "tgz", "taz"
+"application/x-gzip" = "gz"
+"application/x-iso9660-image" = "iso"
+"application/x-lha" = "lha", "lzh"
+"application/x-perl" = "pl", "pm"
+"application/x-rar" = "rar"
+"application/x-ruby" = "rb"
+"application/x-shellscript" = "sh"
+"application/x-shockwave-flash" = "swf"
+"application/x-tar" = "tar"
+"application/x-xz" = "xz"
+"application/xhtml+xml" = "xht", "xhtml"
+"application/xml" = "xml"
+"application/xml-dtd" = "dtd"
+"application/zip" = "zip"
+"audio/basic" = "au", "snd"
+"audio/flac" = "flac"
+"audio/midi" = "mid", "midi"
+"audio/mpeg" = "mpga", "mpega", "mp3"
+"audio/ogg" = "oga", "ogg", "spx"
+"audio/x-aiff" = "aiff", "aif", "aifc"
+"audio/x-matroska" = "mka"
+"audio/x-ms-wma" = "wma"
+"audio/x-wav" = "wav"
+"image/bmp" = "bmp"
+"image/gif" = "gif"
+"image/jpeg" = "jpeg", "jpg", "jpe"
+"image/png" = "png"
+"image/svg+xml" = "svg"
+"image/svg+xml-compressed" = "svgz"
+"image/tiff" = "tiff", "tif"
+"image/vnd.microsoft.icon" = "ico"
+"image/x-eps" = "eps"
+"image/x-portable-anymap" = "pnm"
+"image/x-portable-bitmap" = "pbm"
+"image/x-portable-graymap" = "pgm"
+"image/x-portable-pixmap" = "ppm"
+"image/x-quicktime" = "qif", "qtif"
+"image/x-webp" = "webp"
+"image/x-xpixmap" = "xpm"
+"message/rfc822" = "eml"
+"text/x-chdr" = "h"
+"text/x-csrc" = "c"
+"text/x-c++src" = "cpp"
+"text/css" = "css"
+"text/csv" = "csv"
+"text/html" = "htm", "html"
+"text/x-fox" = "fox"
+"text/x-markdown" = "md", "markdown"
+"text/x-objcsrc" = "m"
+"text/x-python" = "py"
+"text/plain" = "txt", "text", "ini"
+"video/mp4" = "mp4"
+"video/mpeg" = "mpeg", "mpg", "mpe"
+"video/x-flv" = "flv"
+"video/x-matroska" = "mkv"
+"video/ogg" = "ogv"
+"video/quicktime" = "qt", "mov"
+"video/webm" = "webm"
+"video/x-msvideo" = "avi"
+"video/x-ms-wmv" = "wmv"

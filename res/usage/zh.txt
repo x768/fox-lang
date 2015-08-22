@@ -1,10 +1,11 @@
-locale=zh
-usage=用法
-options=选项
-source=源码文件名称
-arg=参数
-immediate=即刻执行"srccode"
-validate=验证文法错误
-show_help=显示此帮助信息
-show_version=显示版本信息
-show_version_more=显示模块版本和设置信息
+locale = "zh"
+message = <<<EOS
+用法: fox [选项...] 源码名称 [参数...]
+选项
+  -e srccode: 即刻执行"srccode"
+  -c srccode: 验证文法错误
+  --help: 显示此帮助信息
+  -v: 显示版本信息
+  --version: 显示模块版本和设置信息
+
+EOS

@@ -1,0 +1,3 @@
+langtag = "zh_Hans_SG"
+date = "dd/MM/yy", "", "", ""
+time = "ahh:mm", "", "ahh:mm:ssz", ""

@@ -1,4 +1,0 @@
-langtag:wal_ET
-language:wal
-territory:ET
-bidi:ltr

@@ -1,6 +1,7 @@
 #define DEFINE_GLOBALS
 #include "fox_io.h"
 #include "m_image.h"
+#include "m_number.h"
 
 #include <ft2build.h>
 #include FT_FREETYPE_H

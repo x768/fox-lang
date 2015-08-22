@@ -1,5 +1,0 @@
-langtag:az_Latn_AZ
-language:az
-script:Latn
-territory:AZ
-bidi:ltr

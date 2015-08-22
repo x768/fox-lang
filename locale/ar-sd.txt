@@ -1,4 +1,0 @@
-langtag:ar_SD
-language:ar
-territory:SD
-bidi:ltr

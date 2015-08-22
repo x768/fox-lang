@@ -1,4 +1,0 @@
-langtag:xog_UG
-language:xog
-territory:UG
-bidi:ltr

@@ -1,0 +1,2 @@
+langtag = "en_BW"
+date = "dd/MM/yy", "", "dd MMMM y", "dddd dd MMMM y"

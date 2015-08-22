@@ -1,0 +1,3 @@
+langtag = "en_GB"
+date = "dd/MM/yyyy", "d MMM y", "d MMMM y", "dddd, d MMMM y"
+time = "HH:mm", "HH:mm:ss", "HH:mm:ss z", "HH:mm:ss Z"

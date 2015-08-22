@@ -1,8 +1,0 @@
-langtag:ps
-language:ps
-month_w:جنوري	فبروري	مارچ	اپریل	می	جون	جولای	اګست	سپتمبر	اکتوبر	نومبر	دسمبر
-days_w:دوشنبه	سه‌شنبه	چهارشنبه	پنجشنبه	جمعه	شنبه	یکشنبه
-am_pm:غ.م.	غ.و.
-date:yyyy/M/d	d MMM y	د y د MMMM d	dddd د y د MMMM d
-time:H:mm	H:mm:ss	H:mm:ss (z)	H:mm:ss (Z)
-bidi:rtl

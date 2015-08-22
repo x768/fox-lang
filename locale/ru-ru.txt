@@ -1,4 +1,0 @@
-langtag:ru_RU
-language:ru
-territory:RU
-bidi:ltr

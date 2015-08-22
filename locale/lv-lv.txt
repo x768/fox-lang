@@ -1,4 +1,0 @@
-langtag:lv_LV
-language:lv
-territory:LV
-bidi:ltr

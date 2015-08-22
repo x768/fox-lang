@@ -1,4 +1,0 @@
-langtag:khq_ML
-language:khq
-territory:ML
-bidi:ltr

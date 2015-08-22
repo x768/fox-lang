@@ -1,5 +1,0 @@
-langtag:shi_Tfng_MA
-language:shi
-script:Tfng
-territory:MA
-bidi:ltr

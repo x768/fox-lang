@@ -1,4 +1,0 @@
-langtag:be_BY
-language:be
-territory:BY
-bidi:ltr

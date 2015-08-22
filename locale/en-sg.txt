@@ -1,5 +1,0 @@
-langtag:en_SG
-language:en
-territory:SG
-date:d/M/yy			
-bidi:ltr

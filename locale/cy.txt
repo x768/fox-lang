@@ -1,9 +1,0 @@
-langtag:cy
-language:cy
-month_w:Ionawr	Chwefror	Mawrth	Ebrill	Mai	Mehefin	Gorffenaf	Awst	Medi	Hydref	Tachwedd	Rhagfyr
-month:Ion	Chwef	Mawrth	Ebrill	Mai	Meh	Gorff	Awst	Medi	Hyd	Tach	Rhag
-days_w:Dydd Llun	Dydd Mawrth	Dydd Mercher	Dydd Iau	Dydd Gwener	Dydd Sadwrn	Dydd Sul
-days:Llun	Maw	Mer	Iau	Gwen	Sad	Sul
-date:dd/MM/yyyy	d MMM y	d MMMM y	dddd, d MMMM y
-time:HH:mm	HH:mm:ss	HH:mm:ss z	HH:mm:ss Z
-bidi:ltr

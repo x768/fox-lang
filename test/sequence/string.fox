@@ -10,7 +10,7 @@ assert_equal "\x61\x62\x63", "abc"
 assert_equal "abcあいうえお\x{29E3D}".size, 9
 
 assert_equal "\t\x5A\x{29E3D}", "	Z𩸽"
-assert_equal '\t	\', "\\t\t\\"
+assert_equal '\	\t', "\\\t\\t"
 assert_equal %(abc\t), "abc\t"
 assert_equal %Q(abc\t), "abc\t"
 assert_equal %q(abc\t), "abc\\t"

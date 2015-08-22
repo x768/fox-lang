@@ -1,53 +1,8 @@
-locale=ig
-ak:Akan
-am:Amariikị
-ar:Arabiikị
-be:Belaruusu
-bg:Bọlụgarịa
-bn:Bengali
-cs:Cheekị
-de:Jamaan
-el:Giriikị
-en:Oyibo
-es:Panya
-fa:Peshan
-fr:Fụrench
-ha:Awụsa
-hi:Hindi
-hu:Magịya
-id:Indonisia
-ig:Igbo
-it:Italo
-ja:Japanese
-jv:Java
-km:Keme, Etiti
-ko:Koria
-ms:Maleyi
-my:Mịanma
-ne:Nepali
-nl:Dọọch
-pa:Punjabi
-pl:Poliishi
-pt:Potoki
-ro:Rumenia
-ru:Rọshan
-rw:Rụwanda
-so:Somali
-sv:Sụwidiishi
-ta:Tamụlụ
-th:Taị
-tr:Tọkiishi
-uk:Ukureenị
-ur:Urudu
-vi:Viyetịnaamụ
-yo:Yoruba
-zh:Mandarịịnị
-zu:Zulu
-BJ:Binin
-BM:Bemuda
-CN:Chaina
-HT:Hati
-KM:Comorosu
-LY:Libyia
-MV:Maldivesa
-NG:Nigeria
+langtag = "ig"
+month_w = "Jenụwarị", "Febrụwarị", "Maachị", "Eprel", "Mee", "Juun", "Julaị", "Ọgọọst", "Septemba", "Ọktoba", "Novemba", "Disemba"
+month = "Jen", "Feb", "Maa", "Epr", "Mee", "Juu", "Jul", "Ọgọ", "Sep", "Ọkt", "Nov", "Dis"
+days_w = "Mọnde", "Tiuzdee", "Wenezdee", "Tọọzdee", "Fraịdee", "Satọdee", "Mbọsị Ụka"
+days = "Mọn", "Tiu", "Wen", "Tọọ", "Fraị", "Sat", "Ụka"
+am_pm = "A.M.", "P.M."
+date = "dd/MM/yyyy", "d MMM y", "d MMMM y", "dddd, d MMMM y"
+time = "h:mm a", "h:mm:ss a", "h:mm:ss a z", "h:mm:ss a Z"

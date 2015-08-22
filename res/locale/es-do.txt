@@ -1,0 +1,3 @@
+langtag = "es_DO"
+decimal = "."
+group = ","

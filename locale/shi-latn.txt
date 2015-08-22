@@ -1,4 +1,0 @@
-langtag:shi_Latn
-language:shi
-script:Latn
-bidi:ltr

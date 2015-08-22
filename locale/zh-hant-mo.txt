@@ -1,6 +1,0 @@
-langtag:zh_Hant_MO
-language:zh
-script:Hant
-territory:MO
-date:yy年M月d日	y年M月d日	y年MM月dd日	y年MM月dd日dddd
-bidi:ltr

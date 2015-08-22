@@ -1,4 +1,0 @@
-langtag:ja_JP
-language:ja
-territory:JP
-bidi:ltr

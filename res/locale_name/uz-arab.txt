@@ -1,0 +1,5 @@
+locale=uz_Arab
+fa:دری
+ps:پشتو
+uz:اۉزبېک
+AF:افغانستان

@@ -1,6 +1,7 @@
 #include "fox_parse.h"
 #include <string.h>
 #include <errno.h>
+#include <pcre.h>
 
 
 static void Tok_parse_digit(TokValue *v, Tok *tk)
@@ -62,7 +63,11 @@ static void Tok_parse_digit(TokValue *v, Tok *tk)
 
     if (*tk->p == 'd' || *tk->p == 'D') {
         tk->p++;
-        v->type = TL_FRACTION;
+        if (tk->simple_mode) {
+            v->type = T_ERR;
+        } else {
+            v->type = TL_FRAC;
+        }
     }
     return;
 
@@ -185,6 +190,9 @@ static void Tok_parse_ident(TokValue *v, Tok *tk)
 
     if (name.size == 0) {
         name.p = NULL;
+    }
+    if (tk->simple_mode) {
+        return;
     }
 
     switch (*v->p) {
@@ -1407,7 +1415,7 @@ START:
             v->p = tk->p;
             v->u.end = tk->p + 1;
             tk->p += 2;
-            v->type = TL_FRACTION;
+            v->type = TL_FRAC;
             break;
         default:
             Tok_parse_digit(v, tk);
@@ -1483,22 +1491,11 @@ void Tok_next(Tok *tk)
         tk->str_val.p = tk->v.p;
         tk->str_val.size = tk->v.u.end - tk->v.p;
         break;
-    case TL_REGEX: {
-        const char *errptr;
-        int erroffset;
-
-        tk->str_val = Str_new(tk->v.p, -1);
-        tk->re_val = pcre_compile(tk->v.p, tk->v.u.flag, &errptr, &erroffset, NULL);
+    case TL_REGEX:
+        tk->str_val.p = tk->v.p;
+        tk->str_val.size = tk->v.u.end - tk->v.p;
         tk->int_val = tk->v.u.flag;
-        if (tk->re_val != NULL) {
-            tk->v.type = TL_REGEX;
-        } else {
-            throw_errorf(fs->mod_lang, "RegexError", "%s", errptr);
-            add_stack_trace(tk->module, NULL, tk->v.line);
-            tk->v.type = T_ERR;
-        }
         break;
-    }
     case TL_INT: {
         char c = *tk->v.u.end;
         long val;
@@ -1517,7 +1514,7 @@ void Tok_next(Tok *tk)
         *tk->v.u.end = c;
         break;
     }
-    case TL_FRACTION: {
+    case TL_FRAC: {
         char c = *tk->v.u.end;
         *tk->v.u.end = '\0';
 
@@ -1645,6 +1642,7 @@ void Tok_simple_init(Tok *tk, char *buf)
     tk->p = buf;
     tk->top = buf;
     tk->head_line = 1;
+    tk->p_nest_n = -1;
     tk->simple_mode = TRUE;
 }
 void Tok_simple_next(Tok *tk)
@@ -1661,22 +1659,11 @@ void Tok_simple_next(Tok *tk)
         tk->str_val.p = tk->v.p;
         tk->str_val.size = tk->v.u.end - tk->v.p;
         break;
-    case TL_REGEX: {
-        const char *errptr;
-        int erroffset;
-
-        tk->str_val = Str_new(tk->v.p, -1);
-        tk->re_val = pcre_compile(tk->v.p, tk->v.u.flag, &errptr, &erroffset, NULL);
+    case TL_REGEX:
+        tk->str_val.p = tk->v.p;
+        tk->str_val.size = tk->v.u.end - tk->v.p;
         tk->int_val = tk->v.u.flag;
-        if (tk->re_val != NULL) {
-            tk->v.type = TL_REGEX;
-        } else {
-            throw_errorf(fs->mod_lang, "RegexError", "%s", errptr);
-            add_stack_trace(tk->module, NULL, tk->v.line);
-            tk->v.type = T_ERR;
-        }
         break;
-    }
     case TL_INT: {
         char c = *tk->v.u.end;
         long val;

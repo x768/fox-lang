@@ -1,0 +1,23 @@
+locale=si
+si:සිංහල
+Arab:අරාබි
+Armn:ආර්මේනියානු
+Deva:දේවනාගරී
+Grek:ග්‍රීක
+Gujr:ගුජරාටි
+Hebr:හීබෲ
+Hira:හිරඟනා
+Jpan:ජපන්
+Knda:කණ්ණඩ
+Kore:කොරියානු
+Latn:ලතින්
+Mlym:මලයාලම්
+Mong:මොන්ගෝලියානු
+Sinh:සිංහල
+Taml:දෙමල
+Telu:තෙළිඟු
+Thai:තායි
+Tibt:ටි‍බෙට්
+BT:භූතානය
+CA:කැනඩාව
+LK:ශ්‍රී ලංකාව

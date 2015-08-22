@@ -1,0 +1,6 @@
+langtag = "xh"
+month_w = "Janyuwari", "Februwari", "Matshi", "Epreli", "Meyi", "Juni", "Julayi", "Agasti", "Septemba", "Okthoba", "Novemba", "Disemba"
+month = "Jan", "Feb", "Mat", "Epr", "Mey", "Jun", "Jul", "Aga", "Sep", "Okt", "Nov", "Dis"
+days_w = "Mvulo", "Lwesibini", "Lwesithathu", "Lwesine", "Lwesihlanu", "Mgqibelo", "Cawe"
+days = "Mvu", "Bin", "Tha", "Sin", "Hla", "Mgq", "Caw"
+decimal = ","

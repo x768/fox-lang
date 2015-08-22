@@ -9,13 +9,13 @@ assert_equal Complex(2.0, 4.0) / Complex(1.0, 2.0), Complex(2.0, 0.0)
 let c = Complex(3.0, 4.0)
 assert_equal c.real, 3.0
 assert_equal c.imag, 4.0
-assert_equal c.r, 5.0
-assert_equal c.phi, atan2(4.0, 3.0)
+assert_equal c.rho, 5.0
+assert_equal c.theta, atan2(4.0, 3.0)
+assert_equal abs(c), 5.0
 
 assert_equal Complex(), Complex(0.0, 0.0)
 assert_equal Complex(2), Complex(2.0, 0.0)
 assert_equal Complex(2.0), Complex(2.0, 0.0)
 assert_equal Complex(2d), Complex(2.0, 0.0)
 
-assert_equal abs(c), 5.0
-
+assert_equal Complex.polar(2.0, 0.0), Complex(2.0, 0.0)

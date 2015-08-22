@@ -1246,8 +1246,8 @@ static int mimeheader_index_set_sub(StrBuf *sb, Value v)
         StrBuf_add(sb, c_buf, -1);
         StrBuf_add_c(sb, '"');
     } else if (type == fs->cls_locale) {
-        RefLocale *loc = Value_vp(v);
-        StrBuf_add_r(sb, loc->tag);
+        Ref *r = Value_vp(v);
+        StrBuf_add_r(sb, Value_vp(r->v[INDEX_LOCALE_LANGTAG]));
     } else if (type == fs->cls_charset) {
         RefCharset *cs = Value_vp(v);
         StrBuf_add_r(sb, cs->iana);
@@ -1653,13 +1653,13 @@ static int mimedata_data(Value *vret, Value *v, RefNode *node)
 
 /////////////////////////////////////////////////////////////////////////////////////
 
-static int is_valid_uri(Str s)
+static int is_valid_uri(const char *s_p, int s_size)
 {
     int i;
 
     // scheme
-    for (i = 0; i < s.size; i++) {
-        int c = s.p[i];
+    for (i = 0; i < s_size; i++) {
+        int c = s_p[i];
         if (c == ':') {
             break;
         }
@@ -1667,13 +1667,13 @@ static int is_valid_uri(Str s)
             return FALSE;
         }
     }
-    if (i >= s.size) {
+    if (i >= s_size) {
         return FALSE;
     }
     i++;
 
-    for (; i < s.size; i++) {
-        int c = s.p[i];
+    for (; i < s_size; i++) {
+        int c = s_p[i];
         if (!isalnum(c) && strchr("-_.!~*'();/?#:@&=+$,%[]", c) == NULL) {
             return FALSE;
         }
@@ -1831,13 +1831,45 @@ static int scheme_default_port(const char *p, int size)
 
 static int uri_new(Value *vret, Value *v, RefNode *node)
 {
-    Str src = Value_str(v[1]);
+    RefStr *rs = Value_vp(v[1]);
 
-    if (!is_valid_uri(src)) {
+    if (!is_valid_uri(rs->c, rs->size)) {
         throw_errorf(fs->mod_lang, "ParseError", "Invalid URI string format");
         return FALSE;
     }
-    *vret = cstr_Value(fs->cls_uri, src.p, src.size);
+    *vret = cstr_Value(fs->cls_uri, rs->c, rs->size);
+    return TRUE;
+}
+static int uri_marshal_read(Value *vret, Value *v, RefNode *node)
+{
+    Value r = Value_ref(v[1])->v[INDEX_MARSHALDUMPER_SRC];
+    uint32_t size;
+    int rd_size;
+    RefStr *rs;
+
+    if (!stream_read_uint32(r, &size)) {
+        return FALSE;
+    }
+    if (size > 0xffffff) {
+        throw_errorf(fs->mod_lang, "ValueError", "Invalid size number");
+        return FALSE;
+    }
+    if (size > fs->max_alloc) {
+        throw_error_select(THROW_MAX_ALLOC_OVER__INT, fs->max_alloc);
+        return FALSE;
+    }
+
+    rs = refstr_new_n(fs->cls_uri, size);
+    *vret = vp_Value(rs);
+    rd_size = size;
+    if (!stream_read_data(r, NULL, rs->c, &rd_size, FALSE, TRUE)) {
+        return FALSE;
+    }
+    rs->c[size] = '\0';
+    if (!is_valid_uri(rs->c, rs->size)) {
+        throw_errorf(fs->mod_lang, "ParseError", "Invalid URI string format");
+        return FALSE;
+    }
     return TRUE;
 }
 static int uri_get_part(Value *vret, Value *v, RefNode *node)
@@ -2133,6 +2165,8 @@ static void define_mime_class(RefNode *m)
     cls = fs->cls_uri;
     n = define_identifier_p(m, cls, fs->str_new, NODE_NEW_N, 0);
     define_native_func_a(n, uri_new, 1, 1, NULL, fs->cls_str);
+    n = define_identifier_p(m, cls, fs->str_marshal_read, NODE_NEW_N, 0);
+    define_native_func_a(n, uri_marshal_read, 1, 1, (void*) TRUE, fs->cls_marshaldumper);
 
     n = define_identifier_p(m, cls, fs->str_tostr, NODE_FUNC_N, 0);
     define_native_func_a(n, strclass_tostr, 0, 2, (void*)FALSE, fs->cls_str, fs->cls_locale);

@@ -1,0 +1,12 @@
+import util.assert
+
+var list = []
+let ref = WeakRef(list)
+
+assert_equal ref.alive, true
+assert_equal ref.value, []
+
+list = null
+
+assert_equal ref.alive, false
+assert_error ()=>ref.value, WeakRefError

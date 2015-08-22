@@ -514,14 +514,17 @@ RefArray *refarray_new(int size)
     RefArray *r = buf_new(fs->cls_list, sizeof(RefArray));
 
     if (size > 0) {
-        int max = align_pow2(size, 32);
-        Value *va = malloc(sizeof(Value) * max);
-
-        memset(va, 0, sizeof(Value) * max);
+        int alloc_size = align_pow2(size, 32);
+        Value *va = malloc(sizeof(Value) * alloc_size);
+        memset(va, 0, sizeof(Value) * alloc_size);
 
         r->size = size;
-        r->max = max;
+        r->alloc_size = alloc_size;
         r->p = va;
+    } else {
+        r->size = 0;
+        r->alloc_size = 0;
+        r->p = NULL;
     }
     return r;
 }
@@ -531,12 +534,12 @@ RefArray *refarray_new(int size)
 Value *refarray_push(RefArray *ra)
 {
     int size = ra->size + 1;
-    int max = ra->max;
+    int alloc_size = ra->alloc_size;
 
-    if (size > max) {
-        max = align_pow2(size, 32);
-        ra->p = realloc(ra->p, sizeof(Value) * max);
-        ra->max = max;
+    if (size > alloc_size) {
+        alloc_size = align_pow2(size, 32);
+        ra->p = realloc(ra->p, sizeof(Value) * alloc_size);
+        ra->alloc_size = alloc_size;
     }
     ra->size = size;
     return &ra->p[size - 1];
@@ -556,11 +559,11 @@ int refarray_set_size(RefArray *ra, int size)
         }
         ra->size = size;
     } else if (size > ra->size) {
-        if (size > ra->max) {
-            ra->max = align_pow2(size, 32);
-            ra->p = realloc(ra->p, sizeof(Value) * ra->max);
+        if (size > ra->alloc_size) {
+            ra->alloc_size = align_pow2(size, 32);
+            ra->p = realloc(ra->p, sizeof(Value) * ra->alloc_size);
         }
-        memset(ra->p + ra->size, 0, sizeof(Value) * (ra->max - ra->size));
+        memset(ra->p + ra->size, 0, sizeof(Value) * (ra->alloc_size - ra->size));
         ra->size = size;
     }
     return TRUE;
@@ -582,12 +585,12 @@ static void array_grow_size(RefArray *r, int grow)
 {
     int prev_size = r->size;
     int size = prev_size + grow;
-    int max = r->max;
+    int alloc_size = r->alloc_size;
 
-    if (size > max) {
-        max = align_pow2(size, 32);
-        r->p = realloc(r->p, sizeof(Value) * max);
-        r->max = max;
+    if (size > alloc_size) {
+        alloc_size = align_pow2(size, 32);
+        r->p = realloc(r->p, sizeof(Value) * alloc_size);
+        r->alloc_size = alloc_size;
     }
     memset(r->p + prev_size, 0, (size - prev_size) * sizeof(Value));
     r->size = size;
@@ -676,11 +679,12 @@ static int array_dispose(Value *vret, Value *v, RefNode *node)
 static int array_marshal_read(Value *vret, Value *v, RefNode *node)
 {
     Value d = v[1];
+    Value r = Value_ref(v[1])->v[INDEX_MARSHALDUMPER_SRC];
     RefArray *ra;
     uint32_t size;
     int i;
 
-    if (!stream_read_uint32(&size, Value_ref(d)->v[INDEX_MARSHALDUMPER_SRC])) {
+    if (!stream_read_uint32(r, &size)) {
         return FALSE;
     }
     if (size > 0xffffff) {
@@ -712,11 +716,12 @@ static int array_marshal_read(Value *vret, Value *v, RefNode *node)
 static int array_marshal_write(Value *vret, Value *v, RefNode *node)
 {
     Value d = v[1];
+    Value w = Value_ref(d)->v[INDEX_MARSHALDUMPER_SRC];
     RefArray *ra = Value_vp(*v);
     int i;
 
     ra->lock_count++;
-    if (!stream_write_uint32(ra->size, Value_ref(d)->v[INDEX_MARSHALDUMPER_SRC])) {
+    if (!stream_write_uint32(w, ra->size)) {
         goto ERROR_END;
     }
     for (i = 0; i < ra->size; i++) {

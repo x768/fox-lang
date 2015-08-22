@@ -1,5 +1,0 @@
-langtag:nds
-language:nds
-decimal:,
-group:.
-bidi:ltr

@@ -1,4 +1,0 @@
-langtag:fo_FO
-language:fo
-territory:FO
-bidi:ltr

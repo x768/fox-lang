@@ -351,6 +351,7 @@ static int lzmaio_write(Value *vret, Value *v, RefNode *node)
     }
 
     free(mb_buf);
+    *vret = int32_Value(data.size - zs->avail_in);
     return TRUE;
 
 ERROR_END:

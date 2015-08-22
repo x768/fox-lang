@@ -1,4 +1,0 @@
-langtag:bm_ML
-language:bm
-territory:ML
-bidi:ltr

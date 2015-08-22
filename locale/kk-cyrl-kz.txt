@@ -1,5 +1,0 @@
-langtag:kk_Cyrl_KZ
-language:kk
-script:Cyrl
-territory:KZ
-bidi:ltr

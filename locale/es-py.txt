@@ -1,4 +1,0 @@
-langtag:es_PY
-language:es
-territory:PY
-bidi:ltr

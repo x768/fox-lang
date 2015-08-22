@@ -6,10 +6,9 @@
 
 
 enum {
-    ERROR_STACKTRACE,
-    ERROR_MESSAGE,
-    ERROR_NEXT,
-    ERROR_NUM,
+    INDEX_ERROR_STACKTRACE,
+    INDEX_ERROR_MESSAGE,
+    INDEX_ERROR_NUM,
 };
 
 // class WeakRef
@@ -503,9 +502,9 @@ static int error_new(Value *vret, Value *v, RefNode *node)
     }
 
     if (fg->stk_top > v + 1) {
-        r->v[ERROR_MESSAGE] = Value_cp(v[1]);
+        r->v[INDEX_ERROR_MESSAGE] = Value_cp(v[1]);
     } else {
-        r->v[ERROR_MESSAGE] = vp_Value(fs->str_0);
+        r->v[INDEX_ERROR_MESSAGE] = vp_Value(fs->str_0);
     }
 
     return TRUE;
@@ -514,7 +513,7 @@ static int error_tostr(Value *vret, Value *v, RefNode *node)
 {
     Ref *r = Value_ref(*v);
     RefNode *type = r->rh.type;
-    Str msg = Value_str(r->v[ERROR_MESSAGE]);
+    Str msg = Value_str(r->v[INDEX_ERROR_MESSAGE]);
 
     if (msg.size > 0) {
         *vret = printf_Value("%n:%S", type, msg);
@@ -526,17 +525,47 @@ static int error_tostr(Value *vret, Value *v, RefNode *node)
 static int error_dispose(Value *vret, Value *v, RefNode *node)
 {
     Ref *r = Value_ref(*v);
-    PtrList *pl = Value_ptr(r->v[ERROR_STACKTRACE]);
+    PtrList *pl = Value_ptr(r->v[INDEX_ERROR_STACKTRACE]);
     PtrList_close(pl);
-    r->v[ERROR_STACKTRACE] = VALUE_NULL;
+    r->v[INDEX_ERROR_STACKTRACE] = VALUE_NULL;
 
     return TRUE;
+}
+static void stacktrace_str_line(StrBuf *buf, StackTrace *t)
+{
+    if (t->module != NULL) {
+        StrBuf_add(buf, t->module->u.m.src_path, -1);
+    } else {
+        StrBuf_add(buf, "[system]", -1);
+    }
+    if (t->func != NULL) {
+        RefNode *klass = t->func->u.f.klass;
+        RefStr *name = t->func->name;
+        StrBuf_add_c(buf, ':');
+
+        if (klass != NULL && klass->type == NODE_CLASS) {
+            StrBuf_add_r(buf, klass->name);
+            if (t->func->type == NODE_NEW || t->func->type == NODE_NEW_N) {
+                StrBuf_add_c(buf, '.');
+            } else {
+                StrBuf_add_c(buf, '#');
+            }
+            StrBuf_add_r(buf, name);
+        } else {
+            StrBuf_add_r(buf, name);
+        }
+    }
+    if (t->line > 0) {
+        char cbuf[16];
+        sprintf(cbuf, "(%d)", t->line);
+        StrBuf_add(buf, cbuf, -1);
+    }
 }
 void stacktrace_to_str(StrBuf *buf, Value v, char sep)
 {
     Ref *r = Value_ref(v);
     RefNode *type = r->rh.type;
-    PtrList *p = Value_ptr(r->v[ERROR_STACKTRACE]);
+    PtrList *p = Value_ptr(r->v[INDEX_ERROR_STACKTRACE]);
 
     /*
      * stacktrace処理中は、エラー処理の最中なので、
@@ -545,67 +574,46 @@ void stacktrace_to_str(StrBuf *buf, Value v, char sep)
     StrBuf_add_r(buf, type->name);
     StrBuf_add_c(buf, ':');
     {
-        RefStr *rs = Value_vp(r->v[ERROR_MESSAGE]);
+        RefStr *rs = Value_vp(r->v[INDEX_ERROR_MESSAGE]);
         if (rs != NULL) {
             StrBuf_add_r(buf, rs);
         }
     }
     StrBuf_add_c(buf, sep);
 
-    while (p != NULL) {
-        StackTrace *t = (StackTrace*)p->u.c;
-
-        if (t->module != NULL) {
-            StrBuf_add(buf, t->module->u.m.src_path, -1);
-        } else {
-            StrBuf_add(buf, "[system]", -1);
-        }
-        if (t->func != NULL) {
-            RefNode *klass = t->func->u.f.klass;
-            RefStr *name = t->func->name;
-            StrBuf_add_c(buf, ':');
-
-            if (klass != NULL && klass->type == NODE_CLASS) {
-                StrBuf_add_r(buf, klass->name);
-                if (t->func->type == NODE_NEW || t->func->type == NODE_NEW_N) {
-                    StrBuf_add_c(buf, '.');
-                } else {
-                    StrBuf_add_c(buf, '#');
-                }
-                StrBuf_add_r(buf, name);
-            } else {
-                StrBuf_add_r(buf, name);
-            }
-        }
-        if (p->next == NULL) {
-            sep = '\n';
-        }
-        if (t->line > 0) {
-            char cbuf[32];
-            sprintf(cbuf, "(%d)%c", t->line, sep);
-            StrBuf_add(buf, cbuf, -1);
-        } else {
+    for (; p != NULL; p = p->next) {
+        stacktrace_str_line(buf, (StackTrace*)p->u.c);
+        if (p->next != NULL) {
             StrBuf_add_c(buf, sep);
         }
+    }
+    StrBuf_add_c(buf, '\n');
+}
+static void stacktrace_to_array(RefArray *ra, Value v)
+{
+    Ref *r = Value_ref(v);
+    PtrList *p = Value_ptr(r->v[INDEX_ERROR_STACKTRACE]);
 
-        p = p->next;
+    for (; p != NULL; p = p->next) {
+        Value *vp = refarray_push(ra);
+        StrBuf sb;
+        StrBuf_init_refstr(&sb, 16);
+        stacktrace_str_line(&sb, (StackTrace*)p->u.c);
+        *vp = StrBuf_str_Value(&sb, fs->cls_str);
     }
 }
 static int error_stacktrace(Value *vret, Value *v, RefNode *node)
 {
-    StrBuf buf;
-    StrBuf_init(&buf, 0);
-
-    stacktrace_to_str(&buf, *v, '\n');
-    *vret = cstr_Value(fs->cls_str, buf.p, buf.size);
-    StrBuf_close(&buf);
+    RefArray *ra = refarray_new(0);
+    *vret = vp_Value(ra);
+    stacktrace_to_array(ra, *v);
 
     return TRUE;
 }
 static int error_message(Value *vret, Value *v, RefNode *node)
 {
     Ref *r = Value_ref(*v);
-    *vret = Value_cp(r->v[ERROR_MESSAGE]);
+    *vret = Value_cp(r->v[INDEX_ERROR_MESSAGE]);
     return TRUE;
 }
 /**
@@ -616,14 +624,14 @@ void add_stack_trace(RefNode *module, RefNode *func, int line)
     StackTrace *t;
 
     if (fg->error == VALUE_NULL) {
-        fatal_errorf(NULL, "add_stack_trace while throwing no errors at %n", func);
+        fatal_errorf("add_stack_trace while throwing no errors at %n", func);
         return;
     } else {
         Ref *r = Value_ref(fg->error);
-        PtrList *p = Value_ptr(r->v[ERROR_STACKTRACE]);
+        PtrList *p = Value_ptr(r->v[INDEX_ERROR_STACKTRACE]);
         PtrList *pl = PtrList_push(&p, sizeof(StackTrace), NULL);
 
-        r->v[ERROR_STACKTRACE] = ptr_Value(p);
+        r->v[INDEX_ERROR_STACKTRACE] = ptr_Value(p);
         t = (StackTrace*)pl->u.c;
     }
 
@@ -677,13 +685,13 @@ void define_error_class(RefNode *cls, RefNode *base, RefNode *m)
 {
     RefNode *n = define_identifier_p(m, cls, fs->str_new, NODE_NEW_N, 0);
     define_native_func_a(n, error_new, 0, 1, cls, fs->cls_str);
-    cls->u.c.n_memb = ERROR_NUM;
+    cls->u.c.n_memb = INDEX_ERROR_NUM;
     cls->u.c.super = base;
     extends_method(cls, base);
 }
 void define_uncaught_class(RefNode *cls, RefNode *base, RefNode *m)
 {
-    cls->u.c.n_memb = ERROR_NUM;
+    cls->u.c.n_memb = INDEX_ERROR_NUM;
     extends_method(cls, base);
 }
 static void define_lang_func(RefNode *m)
@@ -793,7 +801,7 @@ static void define_lang_class(RefNode *m)
 
     n = define_identifier_p(m, cls, fs->str_tostr, NODE_FUNC_N, 0);
     define_native_func_a(n, function_tostr, 0, 2, NULL, fs->cls_str, fs->cls_locale);
-    n = define_identifier_p(m, cls, fs->symbol_stock[T_LP_C], NODE_FUNC_N, 0);
+    n = define_identifier_p(m, cls, fs->symbol_stock[T_LP], NODE_FUNC_N, 0);
     define_native_func_a(n, function_call, 0, -1, NULL);
     n = define_identifier(m, cls, "call", NODE_FUNC_N, 0);
     define_native_func_a(n, function_call_list, 1, 1, NULL, fs->cls_list);
@@ -830,11 +838,13 @@ static void define_lang_class(RefNode *m)
     define_native_func_a(n, weakref_alive, 0, 0, (void*)FALSE);
     n = define_identifier(m, cls, "value", NODE_FUNC_N, NODEOPT_PROPERTY);
     define_native_func_a(n, weakref_value, 0, 0, NULL);
+    // GC対象外とするため、0を設定
     cls->u.c.n_memb = 0;
     extends_method(cls, fs->cls_obj);
 
     // Error
     cls = fs->cls_error;
+    cls->u.c.n_memb = INDEX_ERROR_NUM;
     n = define_identifier_p(m, cls, fs->str_new, NODE_NEW_N, 0);
     define_native_func_a(n, error_new, 0, 1, cls, fs->cls_str);
     n = define_identifier_p(m, cls, fs->str_tostr, NODE_FUNC_N, 0);
@@ -842,11 +852,10 @@ static void define_lang_class(RefNode *m)
     n = define_identifier_p(m, cls, fs->str_dispose, NODE_FUNC_N, 0);
     define_native_func_a(n, error_dispose, 0, 0, NULL);
 
-    n = define_identifier(m, cls, "stack_trace", NODE_FUNC_N, 0);
+    n = define_identifier(m, cls, "stack_trace", NODE_FUNC_N, NODEOPT_PROPERTY);
     define_native_func_a(n, error_stacktrace, 0, 0, NULL);
     n = define_identifier(m, cls, "message", NODE_FUNC_N, NODEOPT_PROPERTY);
     define_native_func_a(n, error_message, 0, 0, NULL);
-    cls->u.c.n_memb = 2;
     extends_method(cls, fs->cls_obj);
 
 
@@ -913,9 +922,6 @@ static void define_lang_class(RefNode *m)
     define_error_class(cls, cls2, m);
 
 
-    cls = define_identifier(m, m, "FatalError", NODE_CLASS, NODEOPT_ABSTRACT);
-    define_uncaught_class(cls, fs->cls_uncaught, m);
-
     cls = define_identifier(m, m, "OutOfMemoryError", NODE_CLASS, NODEOPT_ABSTRACT);
     define_uncaught_class(cls, fs->cls_uncaught, m);
 
@@ -971,7 +977,6 @@ void init_lang_module_stubs()
     fs->cls_iterable = define_identifier(m, m, "Iterable", NODE_CLASS, NODEOPT_ABSTRACT);
     fs->cls_iterator = define_identifier(m, m, "Iterator", NODE_CLASS, NODEOPT_ABSTRACT);
     fv->cls_generator = define_identifier(m, m, "Generator", NODE_CLASS, 0);
-    fs->cls_marshaldumper = define_identifier(m, m, "MarshalDumper", NODE_CLASS, 0);
 
     fs->cls_error = define_identifier(m, m, "Error", NODE_CLASS, NODEOPT_ABSTRACT);
     fs->cls_uncaught = define_identifier(m, m, "UncaughtError", NODE_CLASS, NODEOPT_ABSTRACT);

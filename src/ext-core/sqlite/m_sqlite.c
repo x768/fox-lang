@@ -1,6 +1,6 @@
 #include "fox.h"
+#include "m_number.h"
 #include <stdio.h>
-#include <string.h>
 #include <stdlib.h>
 #include <sqlite3.h>
 
@@ -48,17 +48,11 @@ static int sqlite_bind(sqlite3_stmt *stmt, int num, Value v)
         double dval = Value_float2(v);
         ret = sqlite3_bind_double(stmt, num, dval);
     } else if (type == fs->cls_str) {
-        Str s = fs->Value_str(v);
-        if (s.size == 0) {
-            s.p = "";
-        }
-        ret = sqlite3_bind_text(stmt, num, s.p, s.size, SQLITE_TRANSIENT);
+        RefStr *rs = Value_vp(v);
+        ret = sqlite3_bind_text(stmt, num, rs->c, rs->size, SQLITE_TRANSIENT);
     } else if (type == fs->cls_bytes) {
-        Str s = fs->Value_str(v);
-        if (s.size == 0) {
-            s.p = "";
-        }
-        ret = sqlite3_bind_blob(stmt, num, s.p, s.size, SQLITE_TRANSIENT);
+        RefStr *rs = Value_vp(v);
+        ret = sqlite3_bind_blob(stmt, num, rs->c, rs->size, SQLITE_TRANSIENT);
     } else if (type == fs->cls_null) {
         ret = sqlite3_bind_null(stmt, num);
     } else {

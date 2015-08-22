@@ -1,4 +1,0 @@
-langtag:gez_ER
-language:gez
-territory:ER
-bidi:ltr

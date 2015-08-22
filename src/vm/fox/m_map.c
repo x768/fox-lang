@@ -293,7 +293,7 @@ static int map_marshal_read(Value *vret, Value *v, RefNode *node)
     uint32_t size;
     int i;
 
-    if (!stream_read_uint32(&size, r)) {
+    if (!stream_read_uint32(r, &size)) {
         return FALSE;
     }
     if (size > 0xffffff) {
@@ -362,7 +362,7 @@ static int map_marshal_write(Value *vret, Value *v, RefNode *node)
     int i;
 
     rm->lock_count++;
-    if (!stream_write_uint32(rm->count, w)) {
+    if (!stream_write_uint32(w, rm->count)) {
         goto ERROR_END;
     }
     for (i = 0; i < rm->entry_num; i++) {

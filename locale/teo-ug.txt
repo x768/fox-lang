@@ -1,4 +1,0 @@
-langtag:teo_UG
-language:teo
-territory:UG
-bidi:ltr

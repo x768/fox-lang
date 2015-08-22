@@ -1,2 +1,2 @@
-var help = Resource('usage', 'best')
-printf help, 'message'
+var help = Resource('usage')
+print help.message

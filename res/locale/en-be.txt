@@ -1,0 +1,5 @@
+langtag = "en_BE"
+date = "dd/MM/yy", "dd MMM y", "d MMM y", "dddd d MMMM y"
+time = "HH:mm", "HH:mm:ss", "HH:mm:ss z", "HH 'h' mm 'min' ss 's' Z"
+decimal = ","
+group = "."

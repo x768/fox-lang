@@ -15,7 +15,7 @@ void throw_error_vprintf(RefNode *err_m, const char *err_name, const char *fmt, 
 
     if (err == NULL) {
         const RefStr *m = err_m->name;
-        fatal_errorf(NULL, "ClassNotFound:%r.%s", m, err_name);
+        fatal_errorf("ClassNotFound:%r.%s", m, err_name);
     }
 
     if (fg->error != VALUE_NULL) {
@@ -26,23 +26,21 @@ void throw_error_vprintf(RefNode *err_m, const char *err_name, const char *fmt, 
 
     if (fmt != NULL) {
         StrBuf msg;
-        StrBuf_init(&msg, 0);
+        StrBuf_init_refstr(&msg, 0);
         StrBuf_vprintf(&msg, fmt, va);
-        r->v[1] = cstr_Value(fs->cls_str, msg.p, msg.size);
-        StrBuf_close(&msg);
+        r->v[1] = StrBuf_str_Value(&msg, fs->cls_str);
     }
 }
-void fatal_errorf(RefNode *fn, const char *fmt, ...)
+void fatal_errorf(const char *fmt, ...)
 {
-    if (fs->mod_lang != NULL && fs->mod_lang->u.m.loaded) {
+    if (fmt != NULL) {
         va_list va;
         va_start(va, fmt);
-        throw_error_vprintf(fs->mod_lang, "FatalError", fmt, va);
+        StrBuf msg;
+        StrBuf_init_refstr(&msg, 0);
+        StrBuf_vprintf(&msg, fmt, va);
         va_end(va);
-
-        if (fn != NULL) {
-            add_stack_trace(NULL, fn, -1);
-        }
+        fg->error = StrBuf_str_Value(&msg, fs->cls_str);
     }
     print_last_error();
     fox_close();
@@ -102,10 +100,10 @@ void throw_error_select(int err_type, ...)
         err_name = "FileOpenError";
         fmt = "Cannot open file %Q";
         break;
-    case THROW_FLOAT_VALUE_OVERFLOW:
+    case THROW_FLOAT_DOMAIN_ERROR:
         err_m = fs->mod_lang;
         err_name = "FloatError";
-        fmt = "Float value overflow";
+        fmt = "Float domain error";
         break;
     case THROW_NOT_OPENED_FOR_READ:
         err_m = fs->mod_io;
@@ -133,7 +131,7 @@ void throw_error_select(int err_type, ...)
         fmt = "Invalid index number (%v of %d)";
         break;
     default:
-        fatal_errorf(NULL, "Unknown error code %d (throw_error_select)", err_type);
+        fatal_errorf("Unknown error code %d (throw_error_select)", err_type);
         break;
     }
 

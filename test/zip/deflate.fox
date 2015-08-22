@@ -1,0 +1,11 @@
+import util.assert
+import archive.zip
+
+let data = b"0123456789abcdef" * 256
+let zdata = BytesIO()
+
+DeflateIO(zdata).write data
+assert_true data.size > zdata.size
+
+let data2 = DeflateIO(zdata).read()
+assert_equal data, data2

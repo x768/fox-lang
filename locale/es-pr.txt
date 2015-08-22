@@ -1,7 +1,0 @@
-langtag:es_PR
-language:es
-territory:PR
-date:MM/dd/yy	MM/dd/yyyy		
-decimal:.
-group:,
-bidi:ltr

@@ -1,4 +1,0 @@
-langtag:kpe_GN
-language:kpe
-territory:GN
-bidi:ltr

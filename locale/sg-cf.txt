@@ -1,4 +1,0 @@
-langtag:sg_CF
-language:sg
-territory:CF
-bidi:ltr

@@ -1,6 +1,0 @@
-langtag:de_LI
-language:de
-territory:LI
-decimal:.
-group:'
-bidi:ltr

@@ -1,4 +1,0 @@
-langtag:cgg_UG
-language:cgg
-territory:UG
-bidi:ltr

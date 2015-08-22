@@ -46,13 +46,15 @@ static void ptr_write_uint32_le(char *p, uint32_t val)
 }
 
 #ifdef FOX_BIG_ENDIAN
-static void reverse_endian(int16_t *p, int length)
+static void reverse_endian(int16_t *p16, int length)
 {
     int i;
 
     for (i = 0; i < length; i++) {
-        int n = p[i];
-        p[i] = (n & 0xFF) | ((n >> 8) & 0xFF);
+        uint8_t *p = (uint8_t*)&p16[i];
+        int tmp = p[0];
+        p[0] = p[1];
+        p[1] = tmp;
     }
 }
 #endif

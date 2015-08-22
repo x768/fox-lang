@@ -128,6 +128,166 @@ static int math_abs(Value *vret, Value *v, RefNode *node)
 
     return TRUE;
 }
+static int math_pow_int(Value *vret, Value v, int n)
+{
+    if (n == 0) {
+        *vret = int32_Value(1);
+    } else if (n == 1) {
+        *vret = fs->Value_cp(v);
+    } else {
+        mp_int mp1;
+        int result;
+        RefInt *ri = fs->buf_new(fs->cls_int, sizeof(RefInt));
+        *vret = vp_Value(ri);
+
+        if (Value_isref(v)) {
+            RefInt *ri2 = Value_vp(v);
+            mp1 = ri2->mp;
+        } else {
+            mp_init(&mp1);
+            mp_set(&mp1, Value_integral(v));
+        }
+        
+        mp_init(&ri->mp);
+        result = mp_expt_d(&mp1, n, &ri->mp);
+
+        if (!Value_isref(v)) {
+            mp_clear(&mp1);
+        }
+        if (result != MP_OKAY) {
+            fs->throw_errorf(fs->mod_lang, "MemoryError", "Memory overflow");
+            return FALSE;
+        }
+        fs->fix_bigint(vret, &ri->mp);
+    }
+    return TRUE;
+}
+static int math_pow_frac(Value *vret, Value v, int n)
+{
+    if (n == 1) {
+        *vret = fs->Value_cp(v);
+    } else {
+        RefFrac *rf1 = Value_vp(v);
+        RefFrac *rf = fs->buf_new(fs->cls_frac, sizeof(RefFrac));
+        *vret = vp_Value(rf);
+
+        mp_init(&rf->md[0]);
+        mp_init(&rf->md[1]);
+
+        if (n == 0) {
+            mp_set(&rf->md[0], 1);
+            mp_set(&rf->md[1], 1);
+        } else if (n == -1) {
+            mp_copy(&rf1->md[0], &rf->md[1]);
+            mp_copy(&rf1->md[1], &rf->md[0]);
+        } else if (n < 0) {
+            if (mp_cmp_z(&rf1->md[0]) == 0) {
+                fs->throw_errorf(fs->mod_lang, "ZeroDivisionError", "pow(0d, -n)");
+                return FALSE;
+            }
+            if (mp_expt_d(&rf1->md[0], n, &rf->md[1]) != MP_OKAY) {
+                goto MEMORY_ERROR;
+            }
+            if (mp_expt_d(&rf1->md[1], n, &rf->md[0]) != MP_OKAY) {
+                goto MEMORY_ERROR;
+            }
+        } else {
+            if (mp_expt_d(&rf1->md[0], n, &rf->md[0]) != MP_OKAY) {
+                goto MEMORY_ERROR;
+            }
+            if (mp_expt_d(&rf1->md[1], n, &rf->md[1]) != MP_OKAY) {
+                goto MEMORY_ERROR;
+            }
+        }
+    }
+    return TRUE;
+MEMORY_ERROR:
+    fs->throw_errorf(fs->mod_lang, "MemoryError", "Memory overflow");
+    return FALSE;
+}
+/**
+ * pow(x, y) => x ** y
+ */
+static int math_pow(Value *vret, Value *v, RefNode *node)
+{
+    Value v1 = v[1];
+    Value v2 = v[2];
+    RefNode *v1_type = fs->Value_type(v1);
+    RefNode *v2_type = fs->Value_type(v2);
+
+    if (v1_type == fs->cls_int) {
+        if (v2_type != fs->cls_int) {
+            fs->throw_error_select(THROW_ARGMENT_TYPE__NODE_NODE_INT, fs->cls_int, v2_type, 2);
+            return FALSE;
+        } else {
+            int i2 = Value_integral(v2);
+            if (Value_isref(v2) || i2 < 0 || i2 > 32767) {
+                fs->throw_errorf(fs->mod_lang, "ValueError", "Illigal argument#2 value (0 - 32767)");
+                return FALSE;
+            }
+            if (!math_pow_int(vret, v1, i2)) {
+                return FALSE;
+            }
+        }
+    } else if (v1_type == fs->cls_float) {
+        if (v2_type != fs->cls_float) {
+            fs->throw_error_select(THROW_ARGMENT_TYPE__NODE_NODE_INT, fs->cls_float, v2_type, 2);
+            return FALSE;
+        } else {
+            double d1 = Value_float2(v1);
+            double d2 = Value_float2(v2);
+            double d = pow(d1, d2);
+            if (isnan(d)) {
+                fs->throw_errorf(fs->mod_lang, "ValueError", "Illigal argument value");
+                return FALSE;
+            }
+            *vret = fs->float_Value(d);
+        }
+    } else if (v1_type == fs->cls_frac) {
+        if (v2_type != fs->cls_int) {
+            fs->throw_error_select(THROW_ARGMENT_TYPE__NODE_NODE_INT, fs->cls_int, v2_type, 2);
+            return FALSE;
+        } else {
+            int i2 = Value_integral(v2);
+            if (Value_isref(v2) || i2 < -32767 || i2 > 32767) {
+                fs->throw_errorf(fs->mod_lang, "ValueError", "Illigal argument#2 value (-32767 - 32767)");
+                return FALSE;
+            }
+            if (!math_pow_frac(vret, v1, i2)) {
+                return FALSE;
+            }
+        }
+    } else if (v1_type == cls_complex) {
+        if (v2_type != cls_complex) {
+            fs->throw_error_select(THROW_ARGMENT_TYPE__NODE_NODE_INT, cls_complex, v2_type, 2);
+            return FALSE;
+        } else {
+            RefComplex *c1 = Value_vp(v1);
+            RefComplex *c2 = Value_vp(v2);
+            RefComplex *c = fs->buf_new(cls_complex, sizeof(RefComplex));
+            *vret = vp_Value(c);
+
+            if (c2->im == 0.0) {
+                double re = sqrt(c1->re * c1->re + c1->im * c1->im);
+                double re_2 = pow(re, c2->re);
+                double arg = atan2(c1->im, c1->re) * c2->re;
+                c->re = re_2 * cos(arg);
+                c->im = re_2 * sin(arg);
+            } else {
+                double re1 = log(sqrt(c1->re * c1->re + c1->im * c1->im));
+                double im1 = atan2(c1->im, c1->re);
+                double re2 = exp(re1 * c2->re - im1 * c2->im);
+                double im2 = im1 * c2->re + re1 * c2->im;
+                c->re = re2 * cos(im2);
+                c->im = re2 * sin(im2);
+            }
+        }
+    } else {
+        fs->throw_errorf(fs->mod_lang, "TypeError", "Int, Float, Frac or Complex required but %n (argument #1)", v1);
+        return FALSE;
+    }
+    return TRUE;
+}
 /**
  * 最大公約数を返す
  */
@@ -308,12 +468,8 @@ static int math_round(Value *vret, Value *v, RefNode *node)
 
 static int complex_isvalid(const RefComplex *rc)
 {
-    if (isinf(rc->re) || isinf(rc->im)) {
-        fs->throw_error_select(THROW_FLOAT_VALUE_OVERFLOW);
-        return FALSE;
-    }
     if (isnan(rc->re) || isnan(rc->im)) {
-        fs->throw_errorf(fs->mod_lang, "ValueError", "Illigal value");
+        fs->throw_error_select(THROW_FLOAT_DOMAIN_ERROR);
         return FALSE;
     }
     return TRUE;
@@ -388,6 +544,18 @@ static int complex_new(Value *vret, Value *v, RefNode *node)
 
     return TRUE;
 }
+static int complex_polar(Value *vret, Value *v, RefNode *node)
+{
+    double r = Value_float2(v[1]);
+    double theta = Value_float2(v[2]);
+    RefComplex *rc = fs->buf_new(cls_complex, sizeof(RefComplex));
+    *vret = vp_Value(rc);
+
+    rc->re = r * cos(theta);
+    rc->im = r * sin(theta);
+
+    return TRUE;
+}
 static int complex_tostr(Value *vret, Value *v, RefNode *node)
 {
     const RefComplex *rc = Value_vp(*v);
@@ -445,8 +613,7 @@ static int complex_marshal_read(Value *vret, Value *v, RefNode *node)
     rc->re = bytes_to_double(data + 0);
     rc->im = bytes_to_double(data + 8);
 
-    if (isinf(rc->re) || isnan(rc->re) || isinf(rc->im) || isnan(rc->im)) {
-        fs->throw_error_select(THROW_FLOAT_VALUE_OVERFLOW);
+    if (!complex_isvalid(rc)) {
         return FALSE;
     }
     return TRUE;
@@ -477,14 +644,14 @@ static int complex_part(Value *vret, Value *v, RefNode *node)
     }
     return TRUE;
 }
-static int complex_r(Value *vret, Value *v, RefNode *node)
+static int complex_rho(Value *vret, Value *v, RefNode *node)
 {
     const RefComplex *rc = Value_vp(*v);
     double r = sqrt(rc->re * rc->re + rc->im * rc->im);
     *vret = fs->float_Value(r);
     return TRUE;
 }
-static int complex_phi(Value *vret, Value *v, RefNode *node)
+static int complex_theta(Value *vret, Value *v, RefNode *node)
 {
     const RefComplex *rc = Value_vp(*v);
     double phi = atan2(rc->im, rc->re);
@@ -536,12 +703,15 @@ static int complex_mul(Value *vret, Value *v, RefNode *node)
     RefComplex *rc = fs->buf_new(cls_complex, sizeof(RefComplex));
     *vret = vp_Value(rc);
 
-    if (rc2->im != 0.0) {
-        rc->re = rc1->re * rc2->re - rc1->im * rc2->im;
-        rc->im = rc1->im * rc2->re + rc1->re * rc2->im;
-    } else {
+    if (rc1->im == 0.0) {
+        rc->re = rc1->re * rc2->re;
+        rc->im = rc1->re * rc2->im;
+    } else if (rc2->im == 0.0) {
         rc->re = rc1->re * rc2->re;
         rc->im = rc1->im * rc2->re;
+    } else {
+        rc->re = rc1->re * rc2->re - rc1->im * rc2->im;
+        rc->im = rc1->im * rc2->re + rc1->re * rc2->im;
     }
 
     return complex_isvalid(rc);
@@ -557,9 +727,13 @@ static int complex_div(Value *vret, Value *v, RefNode *node)
         double norm2 = rc2->re * rc2->re + rc2->im * rc2->im;
         rc->re = (rc1->re * rc2->re + rc1->im * rc2->im) / norm2;
         rc->im = (rc1->im * rc2->re - rc1->re * rc2->im) / norm2;
-    } else {
+    } else if (rc2->re != 0.0) {
         rc->re = rc1->re / rc2->re;
         rc->im = rc1->im / rc2->re;
+    } else {
+        // 0除算
+        rc->re = rc1->re / 0.0;
+        rc->im = rc1->im / 0.0;
     }
 
     return complex_isvalid(rc);
@@ -571,21 +745,20 @@ static int math_cfunc1(Value *vret, Value *v, RefNode *node)
 {
     Value v1 = v[1];
     RefNode *v1_type = fs->Value_type(v1);
+    const MathCFunc1 *f = FUNC_VP(node);
 
     if (v1_type == fs->cls_float) {
-        double (*fn)(double) = FUNC_VP(node);
         double arg = Value_float2(v1);
         double ret;
 
         errno = 0;
-        ret = fn(arg);
+        ret = f->real(arg);
         if (isnan(ret) || isinf(ret)) {
             fs->throw_errorf(fs->mod_lang, "ValueError", "Illigal argument value");
             return FALSE;
         }
         *vret = fs->float_Value(ret);
     } else if (v1_type == cls_complex) {
-        MathCFunc1 *f = FUNC_VP(node);
         RefComplex *ret = fs->buf_new(cls_complex, sizeof(RefComplex));
         *vret = vp_Value(ret);
 
@@ -825,7 +998,7 @@ static void define_func(RefNode *m)
     fs->define_native_func_a(n, math_func2, 2, 2, atan2, fs->cls_float, fs->cls_float);
 
     n = fs->define_identifier(m, m, "pow", NODE_FUNC_N, 0);
-    fs->define_native_func_a(n, math_func2, 2, 2, pow, fs->cls_float, fs->cls_float);
+    fs->define_native_func_a(n, math_pow, 2, 2, pow, NULL, NULL);
 
     n = fs->define_identifier(m, m, "abs", NODE_FUNC_N, 0);
     fs->define_native_func_a(n, math_abs, 1, 1, NULL, NULL);
@@ -863,6 +1036,8 @@ static void define_class(RefNode *m)
     cls_complex = cls;
     n = fs->define_identifier_p(m, cls, fs->str_new, NODE_NEW_N, 0);
     fs->define_native_func_a(n, complex_new, 0, 2, NULL, NULL, fs->cls_float);
+    n = fs->define_identifier(m, cls, "polar", NODE_NEW_N, 0);
+    fs->define_native_func_a(n, complex_polar, 0, 2, NULL, NULL, fs->cls_float);
     n = fs->define_identifier_p(m, cls, fs->str_marshal_read, NODE_NEW_N, 0);
     fs->define_native_func_a(n, complex_marshal_read, 1, 1, NULL, fs->cls_marshaldumper);
 
@@ -881,10 +1056,10 @@ static void define_class(RefNode *m)
     fs->define_native_func_a(n, complex_part, 0, 0, (void*)FALSE);
     n = fs->define_identifier(m, cls, "imag", NODE_FUNC_N, NODEOPT_PROPERTY);
     fs->define_native_func_a(n, complex_part, 0, 0, (void*)TRUE);
-    n = fs->define_identifier(m, cls, "r", NODE_FUNC_N, NODEOPT_PROPERTY);
-    fs->define_native_func_a(n, complex_r, 0, 0, NULL);
-    n = fs->define_identifier(m, cls, "phi", NODE_FUNC_N, NODEOPT_PROPERTY);
-    fs->define_native_func_a(n, complex_phi, 0, 0, NULL);
+    n = fs->define_identifier(m, cls, "rho", NODE_FUNC_N, NODEOPT_PROPERTY);
+    fs->define_native_func_a(n, complex_rho, 0, 0, NULL);
+    n = fs->define_identifier(m, cls, "theta", NODE_FUNC_N, NODEOPT_PROPERTY);
+    fs->define_native_func_a(n, complex_theta, 0, 0, NULL);
     n = fs->define_identifier(m, cls, "conj", NODE_FUNC_N, NODEOPT_PROPERTY);
     fs->define_native_func_a(n, complex_conj, 0, 0, NULL);
     n = fs->define_identifier_p(m, cls, fs->symbol_stock[T_PLUS], NODE_FUNC_N, 0);

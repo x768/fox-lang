@@ -1,4 +1,0 @@
-langtag:kea_CV
-language:kea
-territory:CV
-bidi:ltr

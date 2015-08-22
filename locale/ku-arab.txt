@@ -1,4 +1,0 @@
-langtag:ku_Arab
-language:ku
-script:Arab
-bidi:ltr

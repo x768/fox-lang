@@ -1,3 +1,7 @@
-locale=se
-003:dávvi-Amerihkká ja gaska-Amerihkká
-021:dávvi-Amerihkká
+langtag = "se"
+month_w = "ođđajagemánnu", "guovvamánnu", "njukčamánnu", "cuoŋománnu", "miessemánnu", "geassemánnu", "suoidnemánnu", "borgemánnu", "čakčamánnu", "golggotmánnu", "skábmamánnu", "juovlamánnu"
+month = "ođđj", "guov", "njuk", "cuo", "mies", "geas", "suoi", "borg", "čakč", "golg", "skáb", "juov"
+days_w = "vuossárga", "maŋŋebárga", "gaskavahkku", "duorasdat", "bearjadat", "lávvardat", "sotnabeaivi"
+days = "vuos", "maŋ", "gask", "duor", "bear", "láv", "sotn"
+am_pm = "i.b.", "e.b."
+decimal = ","

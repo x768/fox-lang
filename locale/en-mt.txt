@@ -1,6 +1,0 @@
-langtag:en_MT
-language:en
-territory:MT
-date:dd/MM/yyyy	dd MMM y	dd MMMM y	dddd, d MMMM y
-time:HH:mm	HH:mm:ss	HH:mm:ss z	HH:mm:ss Z
-bidi:ltr

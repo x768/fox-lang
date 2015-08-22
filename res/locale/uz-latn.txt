@@ -1,27 +1,7 @@
-locale=uz_Latn
-ar:arabcha
-de:olmoncha
-en:inglizcha
-es:ispancha
-fr:fransuzcha
-hi:hindcha
-it:italyancha
-ja:yaponcha
-pt:portugalcha
-ru:ruscha
-uz:o'zbekcha
-zh:xitoycha
-Cyrl:Kiril
-Latn:Lotin
-AF:Afgʿoniston
-BR:Braziliya
-CN:Xitoy
-DE:Olmoniya
-FR:Fransiya
-GB:Birlashgan Qirollik
-IN:Hindiston
-IT:Italiya
-JP:Yaponiya
-RU:Rossiya
-US:Qo'shma Shtatlar
-UZ:Oʿzbekiston
+langtag = "uz_Latn"
+month = "Yanv", "Fev", "Mar", "Apr", "May", "Iyun", "Iyul", "Avg", "Sen", "Okt", "Noya", "Dek"
+days_w = "dushanba", "seshanba", "chorshanba", "payshanba", "juma", "shanba", "yakshanba"
+days = "Dush", "Sesh", "Chor", "Pay", "Jum", "Shan", "Yaksh"
+date = "yy/MM/dd", "y MMM d", "y MMMM d", "dddd, y MMMM dd"
+time = "HH:mm", "HH:mm:ss", "HH:mm:ss z", "HH:mm:ss Z"
+decimal = ","

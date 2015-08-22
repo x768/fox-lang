@@ -1,4 +1,0 @@
-langtag:gsw_CH
-language:gsw
-territory:CH
-bidi:ltr

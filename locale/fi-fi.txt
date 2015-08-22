@@ -1,4 +1,0 @@
-langtag:fi_FI
-language:fi
-territory:FI
-bidi:ltr

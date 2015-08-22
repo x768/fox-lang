@@ -1,4 +1,0 @@
-langtag:ky_KG
-language:ky
-territory:KG
-bidi:ltr

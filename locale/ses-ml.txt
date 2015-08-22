@@ -1,4 +1,0 @@
-langtag:ses_ML
-language:ses
-territory:ML
-bidi:ltr

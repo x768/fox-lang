@@ -1,4 +1,0 @@
-langtag:trv_TW
-language:trv
-territory:TW
-bidi:ltr

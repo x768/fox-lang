@@ -1,4 +1,0 @@
-langtag:tn_ZA
-language:tn
-territory:ZA
-bidi:ltr

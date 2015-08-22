@@ -1,10 +1,11 @@
-message=%usage: fox [%options...] %source [%arg...]\n%options\n  -e srccode: %immediate\n  --help: %show_help\n  -v: %show_version\n  --version: %show_version_more\n
-usage=Usage
-options=Options
-source=source-code-filename
-arg=Arguments
-immediate=Execute "srccode" immediately.
-validate=Validate syntax only.
-show_help=Show help.
-show_version=Show version information.
-show_version_more=Show modules version and settings.
+locale = "!"
+message = <<<EOS
+Usage: fox [options...] source-file-name [arguments...]
+Options
+  -e srccode: Execute "srccode" immediately.
+  -c srccode: Validate syntax only.
+  --help: Show help.
+  -v: Show version information.
+  --version: Show modules version and settings.
+
+EOS

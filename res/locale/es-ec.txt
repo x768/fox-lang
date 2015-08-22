@@ -1,0 +1,2 @@
+langtag = "es_EC"
+time = "H:mm", "H:mm:ss", "H:mm:ss z", ""

@@ -1,9 +1,0 @@
-langtag:ar
-language:ar
-month_w:يناير	فبراير	مارس	أبريل	مايو	يونيو	يوليو	أغسطس	سبتمبر	أكتوبر	نوفمبر	ديسمبر
-days_w:الإثنين	الثلاثاء	الأربعاء	الخميس	الجمعة	السبت	الأحد
-days:إثنين	ثلاثاء	أربعاء	خميس	جمعة	سبت	أحد
-am_pm:ص	م
-date:d‏/M‏/yyyy	dd‏/MM‏/yyyy	d MMMM، y	dddd، d MMMM، y
-time:h:mm a	h:mm:ss a	z h:mm:ss a	Z h:mm:ss a
-bidi:rtl

@@ -1,5 +1,0 @@
-langtag:ku_Arab_IR
-language:ku
-script:Arab
-territory:IR
-bidi:ltr

@@ -1,5 +1,0 @@
-langtag:ar_MA
-language:ar
-territory:MA
-date:yyyy/M/d	yyyy/MM/dd		
-bidi:ltr

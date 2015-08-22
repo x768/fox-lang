@@ -1,4 +1,0 @@
-langtag:asa_TZ
-language:asa
-territory:TZ
-bidi:ltr

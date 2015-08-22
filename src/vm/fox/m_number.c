@@ -4,6 +4,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <math.h>
+#include <float.h>
 #include <stddef.h>
 
 
@@ -78,15 +79,17 @@ static int integer_new(Value *vret, Value *v, RefNode *node)
 
         if (type == fs->cls_float) {
             // Real -> Int
-            double real = Value_float2(v1);
+            double d = Value_float2(v1);
 
-            if (real <= (double)INT32_MAX && real >= -(double)(INT32_MAX)) {
-                *vret = int32_Value((int32_t)real);
+            if (isinf(d)) {
+                *vret = int32_Value(0);
+            } else if (d <= (double)INT32_MAX && d >= -(double)INT32_MAX) {
+                *vret = int32_Value((int32_t)d);
             } else {
                 RefInt *m1 = buf_new(fs->cls_int, sizeof(RefInt));
                 *vret = vp_Value(m1);
                 mp_init(&m1->mp);
-                mp2_set_double(&m1->mp, real);
+                mp2_set_double(&m1->mp, d);
             }
         } else if (type == fs->cls_str || type == fs->cls_bytes) {
             RefStr *rs = Value_vp(v1);
@@ -213,7 +216,7 @@ static int integer_marshal_read(Value *vret, Value *v, RefNode *node)
     if (!stream_read_data(r, NULL, &minus, &rd_size, FALSE, TRUE)) {
         return FALSE;
     }
-    if (!stream_read_uint32(&digits, r)) {
+    if (!stream_read_uint32(r, &digits)) {
         return FALSE;
     }
     if (digits > 0xffff) {
@@ -273,7 +276,7 @@ static int int32_to_dp(uint16_t *dp, uint32_t ival)
 /**
  * BigEndianで書き出す
  */
-static int write_int16_array(uint16_t *data, int n, Value w)
+static int write_int16_array(Value w, uint16_t *data, int n)
 {
     int i;
     for (i = 0; i < n; i++) {
@@ -315,10 +318,10 @@ static int integer_marshal_write(Value *vret, Value *v, RefNode *node)
     if (!stream_write_data(w, &minus, 1)) {
         return FALSE;
     }
-    if (!stream_write_uint32(digits, w)) {
+    if (!stream_write_uint32(w, digits)) {
         return FALSE;
     }
-    if (!write_int16_array(data, digits, w)) {
+    if (!write_int16_array(w, data, digits)) {
         return FALSE;
     }
 
@@ -785,6 +788,27 @@ ERROR_END:
     throw_errorf(fs->mod_lang, "ValueError", "Negative value is not supported");
     return FALSE;
 }
+static int integer_sign(Value *vret, Value *v, RefNode *node)
+{
+    if (Value_isref(*v)) {
+        RefInt *mp = Value_vp(*v);
+        if (mp->mp.sign == MP_NEG) {
+            *vret = int32_Value(-1);
+        } else {
+            *vret = int32_Value(1);
+        }
+    } else {
+        int i = Value_integral(*v);
+        if (i > 0) {
+            *vret = int32_Value(1);
+        } else if (i < 0) {
+            *vret = int32_Value(-1);
+        } else {
+            *vret = int32_Value(0);
+        }
+    }
+    return TRUE;
+}
 static int integer_tofloat(Value *vret, Value *v, RefNode *node)
 {
     RefFloat *rd = buf_new(fs->cls_float, sizeof(RefFloat));
@@ -795,10 +819,6 @@ static int integer_tofloat(Value *vret, Value *v, RefNode *node)
     } else {
         RefInt *mp = Value_vp(*v);
         rd->d = mp2_todouble(&mp->mp);
-        if (isinf(rd->d)) {
-            throw_error_select(THROW_FLOAT_VALUE_OVERFLOW);
-            return FALSE;
-        }
     }
 
     return TRUE;
@@ -997,7 +1017,7 @@ static int parse_format_str(NumberFormat *nf, Str fmt)
 /**
  * 数値をフォーマットしたときの長さを下回らない値を返します
  */
-static int number_format_maxlength(const char *src, NumberFormat *nf, const RefLocale *loc)
+static int number_format_maxlength(const char *src, NumberFormat *nf, const LocaleData *loc)
 {
     int len = 8;  // 符号
     int n, i;
@@ -1032,7 +1052,7 @@ static int number_format_maxlength(const char *src, NumberFormat *nf, const RefL
  * 入力 12345.67
  * 出力 +12,345.6700
  */
-static void number_format_str(char *dst, int *plen, const char *src, NumberFormat *nf, const RefLocale *loc)
+static void number_format_str(char *dst, int *plen, const char *src, NumberFormat *nf, const LocaleData *loc)
 {
     char *p = dst;
     int n, i;
@@ -1123,7 +1143,7 @@ static void number_format_str(char *dst, int *plen, const char *src, NumberForma
 
     *plen = (p - dst);
 }
-static Value mp2_number_format(mp_int *mp, NumberFormat *nf, const RefLocale *loc)
+static Value mp2_number_format(mp_int *mp, NumberFormat *nf, const LocaleData *loc)
 {
     int len;
     char *ptr = malloc(mp_radix_size(mp, nf->base) + 2);
@@ -1143,7 +1163,7 @@ static Value mp2_number_format(mp_int *mp, NumberFormat *nf, const RefLocale *lo
  * 1000 -> 1.0K
  * 小数点以下を含む場合はdeimal=TRUE
  */
-static Value number_to_si_unit(double val, NumberFormat *nf, const RefLocale *loc, int decimal)
+static Value number_to_si_unit(double val, NumberFormat *nf, const LocaleData *loc, int decimal)
 {
     char buf[34];
     char *ptr = buf;
@@ -1247,7 +1267,7 @@ FINISH:
  * 入力:v (Int)
  * 出力:v (Str)
  */
-static int integer_tostr_sub(Value *vret, Value v, Str fmt, const RefLocale *loc)
+static int integer_tostr_sub(Value *vret, Value v, Str fmt, const LocaleData *loc)
 {
     NumberFormat nf;
 
@@ -1317,13 +1337,13 @@ static int integer_tostr_sub(Value *vret, Value v, Str fmt, const RefLocale *loc
 }
 static int integer_tostr(Value *vret, Value *v, RefNode *node)
 {
-    RefLocale *loc;
+    LocaleData *loc;
 
     if (fg->stk_top > v + 1) {
         if (fg->stk_top > v + 2) {
-            loc = Value_vp(v[2]);
+            loc = Value_locale_data(v[2]);
         } else {
-            loc = fs->loc_neutral;
+            loc = fv->loc_neutral;
         }
         if (!integer_tostr_sub(vret, *v, Value_str(v[1]), loc)) {
             return FALSE;
@@ -1353,9 +1373,11 @@ static int integer_tostr(Value *vret, Value *v, RefNode *node)
  */
 static int frac_new(Value *vret, Value *v, RefNode *node)
 {
+    RefFrac *md = buf_new(fs->cls_frac, sizeof(RefFrac));
+    *vret = vp_Value(md);
+
     if (fg->stk_top > v + 2) {
         // Frac(1,2) -> 0.5d
-        RefFrac *md;
         Value v1 = v[1];
         Value v2 = v[2];
         const RefNode *v1_type = Value_type(v1);
@@ -1365,9 +1387,6 @@ static int frac_new(Value *vret, Value *v, RefNode *node)
             throw_error_select(THROW_ARGMENT_TYPE__NODE_NODE_INT, fs->cls_int, v1_type, 1);
             return FALSE;
         }
-
-        md = buf_new(fs->cls_frac, sizeof(RefFrac));
-        *vret = vp_Value(md);
 
         mp_init(&md->md[0]);
         mp_init(&md->md[1]);
@@ -1390,7 +1409,6 @@ static int frac_new(Value *vret, Value *v, RefNode *node)
         }
         mp2_fix_rational(&md->md[0], &md->md[1]);
     } else if (fg->stk_top > v + 1) {
-        RefFrac *md;
         Value v1 = v[1];
         const RefNode *type = Value_type(v1);
 
@@ -1401,11 +1419,9 @@ static int frac_new(Value *vret, Value *v, RefNode *node)
             return TRUE;
         }
 
-        md = buf_new(fs->cls_frac, sizeof(RefFrac));
-        *vret = vp_Value(md);
-        mp_init(&md->md[0]);
-        mp_init(&md->md[1]);
         if (type == fs->cls_int) {
+            mp_init(&md->md[0]);
+            mp_init(&md->md[1]);
             if (Value_isint(v1)) {
                 mp_set_int(&md->md[0], Value_integral(v1));
             } else {
@@ -1416,15 +1432,24 @@ static int frac_new(Value *vret, Value *v, RefNode *node)
         } else if (type == fs->cls_str || type == fs->cls_bytes) {
             RefStr *rs = Value_vp(v1);
 
+            mp_init(&md->md[0]);
+            mp_init(&md->md[1]);
             if (mp2_read_rational(md->md, rs->c, NULL) != MP_OKAY) {
                 // 読み込みエラー時は0とする
-                mp_zero(&md->md[0]);
-                mp_set(&md->md[1], 1);
+                goto SET_ZERO;
             }
         } else if (type == fs->cls_float) {
-            RefFloat *rd = Value_vp(v1);
-            mp2_double_to_rational(md->md, rd->d);
+            double d = Value_float2(v1);
+            if (isinf(d)) {
+                goto SET_ZERO;
+            } else {
+                mp_init(&md->md[0]);
+                mp_init(&md->md[1]);
+                mp2_double_to_rational(md->md, d);
+            }
         } else if (type == fs->cls_bool) {
+            mp_init(&md->md[0]);
+            mp_init(&md->md[1]);
             if (Value_bool(v1)) {
                 mp_set(&md->md[0], 1);
             }
@@ -1433,13 +1458,14 @@ static int frac_new(Value *vret, Value *v, RefNode *node)
         // 未知の型の場合、0とする
     } else {
         // ゼロ初期化 (0 / 1)
-        RefFrac *md = buf_new(fs->cls_frac, sizeof(RefFrac));
-        *vret = vp_Value(md);
-        mp_init(&md->md[0]);
-        mp_init(&md->md[1]);
-        mp_set(&md->md[1], 1);
+        goto SET_ZERO;
     }
+    return TRUE;
 
+SET_ZERO:
+    mp_init(&md->md[0]);
+    mp_init(&md->md[1]);
+    mp_set(&md->md[1], 1);
     return TRUE;
 }
 static int frac_parse(Value *vret, Value *v, RefNode *node)
@@ -1476,7 +1502,7 @@ static int frac_marshal_read(Value *vret, Value *v, RefNode *node)
         return FALSE;
     }
 
-    if (!stream_read_uint32(&digits, r)) {
+    if (!stream_read_uint32(r, &digits)) {
         return FALSE;
     }
     if (digits > 0xffff) {
@@ -1489,7 +1515,7 @@ static int frac_marshal_read(Value *vret, Value *v, RefNode *node)
     }
     md->md[0].used = digits;
 
-    if (!stream_read_uint32(&digits, r)) {
+    if (!stream_read_uint32(r, &digits)) {
         return FALSE;
     }
     if (digits > 0xffff) {
@@ -1521,17 +1547,17 @@ static int frac_marshal_write(Value *vret, Value *v, RefNode *node)
         return FALSE;
     }
 
-    if (!stream_write_uint32(md->md[0].used, w)) {
+    if (!stream_write_uint32(w, md->md[0].used)) {
         return FALSE;
     }
-    if (!write_int16_array(md->md[0].dp, md->md[0].used, w)) {
+    if (!write_int16_array(w, md->md[0].dp, md->md[0].used)) {
         return FALSE;
     }
 
-    if (!stream_write_uint32(md->md[1].used, w)) {
+    if (!stream_write_uint32(w, md->md[1].used)) {
         return FALSE;
     }
-    if (!write_int16_array(md->md[1].dp, md->md[1].used, w)) {
+    if (!write_int16_array(w, md->md[1].dp, md->md[1].used)) {
         return FALSE;
     }
 
@@ -1703,6 +1729,19 @@ static int frac_get_part(Value *vret, Value *v, RefNode *node)
 
     return TRUE;
 }
+static int frac_sign(Value *vret, Value *v, RefNode *node)
+{
+    RefFrac *md = Value_vp(*v);
+
+    if (mp_cmp_z(&md->md[0])) {
+        *vret = int32_Value(0);
+    } else if (md->md[1].sign == MP_NEG) {
+        *vret = int32_Value(-1);
+    } else {
+        *vret = int32_Value(1);
+    }
+    return TRUE;
+}
 // 有理数を0方向に切り捨てて整数型に変換する
 static int frac_toint(Value *vret, Value *v, RefNode *node)
 {
@@ -1732,8 +1771,8 @@ static int frac_tofloat(Value *vret, Value *v, RefNode *node)
     *vret = vp_Value(rd);
 
     rd->d = d1 / d2;
-    if (isinf(rd->d) || isnan(rd->d)) {
-        throw_error_select(THROW_FLOAT_VALUE_OVERFLOW);
+    if (isnan(rd->d)) {
+        throw_error_select(THROW_FLOAT_DOMAIN_ERROR);
         return FALSE;
     }
 
@@ -1843,7 +1882,7 @@ static int frac_tostr(Value *vret, Value *v, RefNode *node)
 {
     RefFrac *md = Value_vp(*v);
     NumberFormat nf;
-    RefLocale *loc = fs->loc_neutral;
+    LocaleData *loc = fv->loc_neutral;
 
     if (fg->stk_top > v + 1) {
         Str fmt = Value_str(v[1]);
@@ -1853,7 +1892,7 @@ static int frac_tostr(Value *vret, Value *v, RefNode *node)
         }
 
         if (fg->stk_top > v + 2) {
-            loc = Value_vp(v[2]);
+            loc = Value_locale_data(v[2]);
         }
     } else {
         nf.sign = '\0';
@@ -2038,14 +2077,14 @@ static int float_new(Value *vret, Value *v, RefNode *node)
 
             *vret = vp_Value(rd);
             rd->d = d1 / d2;
-            if (isinf(rd->d) || isnan(rd->d)) {
+            if (isnan(rd->d)) {
                 rd->d = 0.0;
             }
             return TRUE;
         } else if (type == fs->cls_bool) {
             RefFloat *rd = buf_new(fs->cls_float, sizeof(RefFloat));
             *vret = vp_Value(rd);
-            rd->d = (Value_bool(v1) ? 1.0 : 0.0);
+            rd->d = Value_bool(v1) ? 1.0 : 0.0;
         }
     }
 
@@ -2095,8 +2134,8 @@ static int float_marshal_read(Value *vret, Value *v, RefNode *node)
     for (i = 0; i < 8; i++) {
         u.i |= ((uint64_t)data[i]) << ((7 - i) * 8);
     }
-    if (isinf(u.d) || isnan(u.d)) {
-        throw_error_select(THROW_FLOAT_VALUE_OVERFLOW);
+    if (isnan(u.d)) {
+        throw_error_select(THROW_FLOAT_DOMAIN_ERROR);
         return FALSE;
     }
     rd->d = u.d;
@@ -2195,7 +2234,7 @@ static int adjust_float_str(char *dst, const char *src, int ex)
 static int float_tostr(Value *vret, Value *v, RefNode *node)
 {
     RefFloat *rd = Value_vp(*v);
-    RefLocale *loc = fs->loc_neutral;
+    LocaleData *loc = fv->loc_neutral;
     NumberFormat nf;
     char c_buf[32];
     int i, ex = 0;
@@ -2212,7 +2251,7 @@ static int float_tostr(Value *vret, Value *v, RefNode *node)
         }
 
         if (fg->stk_top > v + 2) {
-            loc = Value_vp(v[2]);
+            loc = Value_locale_data(v[2]);
         }
     } else {
         nf.sign = '\0';
@@ -2224,6 +2263,20 @@ static int float_tostr(Value *vret, Value *v, RefNode *node)
         nf.width = 0;
         nf.width_f = -1;
     }
+
+    if (isinf(rd->d)) {
+        if (rd->d > 0) {
+            if (nf.sign == '+') {
+                *vret = cstr_Value(fs->cls_str, "+Inf", -1);
+            } else {
+                *vret = cstr_Value(fs->cls_str, "Inf", -1);
+            }
+        } else {
+            *vret = cstr_Value(fs->cls_str, "-Inf", -1);
+        }
+        return TRUE;
+    }
+
     if (nf.other == 'a' || nf.other == 'A') {
         sprintf(c_buf, nf.other == 'a' ? "%a" : "%A", rd->d);
         *vret = cstr_Value(fs->cls_str, c_buf, -1);
@@ -2381,10 +2434,6 @@ static int float_addsubmul(Value *vret, Value *v, RefNode *node)
         rd->d = d1->d * d2->d;
         break;
     }
-    if (isinf(rd->d)) {
-        throw_error_select(THROW_FLOAT_VALUE_OVERFLOW);
-        return FALSE;
-    }
 
     return TRUE;
 }
@@ -2395,42 +2444,64 @@ static int float_div(Value *vret, Value *v, RefNode *node)
     RefFloat *d2 = Value_vp(v[1]);
 
     *vret = vp_Value(rd);
-
-    if (d2->d == 0.0) {
-        throw_errorf(fs->mod_lang, "ZeroDivisionError", "Real / 0.0");
-        return FALSE;
-    }
     rd->d = d1->d / d2->d;
-    if (isinf(rd->d)) {
-        throw_error_select(THROW_FLOAT_VALUE_OVERFLOW);
+
+    if (isnan(rd->d)) {
+        throw_error_select(THROW_FLOAT_DOMAIN_ERROR);
         return FALSE;
     }
 
     return TRUE;
 }
+static int float_sign(Value *vret, Value *v, RefNode *node)
+{
+    double d = Value_float2(*v);
+    if (d > 0.0) {
+        *vret = int32_Value(1);
+    } else if (d < 0.0) {
+        *vret = int32_Value(-1);
+    } else {
+        *vret = int32_Value(0);
+    }
+    return TRUE;
+}
+static int float_isinf(Value *vret, Value *v, RefNode *node)
+{
+    double d = Value_float2(*v);
+    *vret = bool_Value(isinf(d));
+    return TRUE;
+}
 static int float_toint(Value *vret, Value *v, RefNode *node)
 {
-    double real = Value_float2(*v);
+    double d = Value_float2(*v);
 
-    if (real <= (double)INT32_MAX && real >= -(double)(INT32_MAX)) {
-        *vret = int32_Value((int32_t)real);
+    if (isinf(d)) {
+        throw_error_select(THROW_FLOAT_DOMAIN_ERROR);
+        return FALSE;
+    } else if (d <= (double)INT32_MAX && d >= -(double)INT32_MAX) {
+        *vret = int32_Value((int32_t)d);
     } else {
         RefInt *mp = buf_new(fs->cls_int, sizeof(RefInt));
         *vret = vp_Value(mp);
         mp_init(&mp->mp);
-        mp2_set_double(&mp->mp, real);
+        mp2_set_double(&mp->mp, d);
     }
     return TRUE;
 }
 static int float_tofrac(Value *vret, Value *v, RefNode *node)
 {
-    double real = Value_float2(*v);
+    double d = Value_float2(*v);
     RefFrac *md = buf_new(fs->cls_frac, sizeof(RefFrac));
 
-    *vret = vp_Value(md);
-    mp_init(&md->md[0]);
-    mp_init(&md->md[1]);
-    mp2_double_to_rational(md->md, real);
+    if (isinf(d)) {
+        throw_error_select(THROW_FLOAT_DOMAIN_ERROR);
+        return FALSE;
+    } else {
+        *vret = vp_Value(md);
+        mp_init(&md->md[0]);
+        mp_init(&md->md[1]);
+        mp2_double_to_rational(md->md, d);
+    }
 
     return TRUE;
 }
@@ -2710,7 +2781,7 @@ void define_lang_number_func(RefNode *m)
     define_native_func_a(n, number_minmax, 1, -1, (void*)TRUE, NULL);
 
     n = define_identifier(m, m, "clamp", NODE_FUNC_N, 0);
-    define_native_func_a(n, number_clamp, 3, 3, NULL, fs->cls_number, NULL, NULL);
+    define_native_func_a(n, number_clamp, 3, 3, NULL, NULL, NULL, NULL);
 
     n = define_identifier(m, m, "b58encode", NODE_FUNC_N, 0);
     define_native_func_a(n, base58encode, 1, 2, NULL, fs->cls_int, fs->cls_str);
@@ -2783,6 +2854,8 @@ void define_lang_number_class(RefNode *m)
     define_native_func_a(n, integer_shift, 1, 1, (void*)FALSE, fs->cls_int);
     n = define_identifier_p(m, cls, fs->symbol_stock[T_RSH], NODE_FUNC_N, 0);
     define_native_func_a(n, integer_shift, 1, 1, (void*)TRUE, fs->cls_int);
+    n = define_identifier(m, cls, "sign", NODE_FUNC_N, NODEOPT_PROPERTY);
+    define_native_func_a(n, integer_sign, 0, 0, NULL);
     n = define_identifier_p(m, cls, toint, NODE_FUNC_N, 0);
     define_native_func_a(n, native_return_this, 0, 0, NULL);
     n = define_identifier_p(m, cls, tofloat, NODE_FUNC_N, 0);
@@ -2831,6 +2904,8 @@ void define_lang_number_class(RefNode *m)
     define_native_func_a(n, frac_get_part, 0, 0, (void*)0);
     n = define_identifier(m, cls, "denominator", NODE_FUNC_N, NODEOPT_PROPERTY);
     define_native_func_a(n, frac_get_part, 0, 0, (void*)1);
+    n = define_identifier(m, cls, "sign", NODE_FUNC_N, NODEOPT_PROPERTY);
+    define_native_func_a(n, frac_sign, 0, 0, NULL);
     n = define_identifier_p(m, cls, toint, NODE_FUNC_N, 0);
     define_native_func_a(n, frac_toint, 0, 0, NULL);
     n = define_identifier_p(m, cls, tofloat, NODE_FUNC_N, 0);
@@ -2873,11 +2948,22 @@ void define_lang_number_class(RefNode *m)
     define_native_func_a(n, float_addsubmul, 1, 1, (void*)T_MUL, fs->cls_float);
     n = define_identifier_p(m, cls, fs->symbol_stock[T_DIV], NODE_FUNC_N, 0);
     define_native_func_a(n, float_div, 1, 1, NULL, fs->cls_float);
+    n = define_identifier(m, cls, "isinf", NODE_FUNC_N, NODEOPT_PROPERTY);
+    define_native_func_a(n, float_isinf, 0, 0, NULL);
+    n = define_identifier(m, cls, "sign", NODE_FUNC_N, NODEOPT_PROPERTY);
+    define_native_func_a(n, float_sign, 0, 0, NULL);
     n = define_identifier_p(m, cls, toint, NODE_FUNC_N, 0);
     define_native_func_a(n, float_toint, 0, 0, NULL);
     n = define_identifier_p(m, cls, tofloat, NODE_FUNC_N, 0);
     define_native_func_a(n, native_return_this, 0, 0, NULL);
     n = define_identifier_p(m, cls, tofrac, NODE_FUNC_N, 0);
     define_native_func_a(n, float_tofrac, 0, 0, NULL);
+
+    n = define_identifier(m, cls, "INF", NODE_CONST, 0);
+    n->u.k.val = float_Value(1.0 / 0.0);
+    extends_method(cls, fs->cls_number);
+    n = define_identifier(m, cls, "EPSILON", NODE_CONST, 0);
+    n->u.k.val = float_Value(DBL_EPSILON);
+
     extends_method(cls, fs->cls_number);
 }

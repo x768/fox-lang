@@ -1,4 +1,0 @@
-langtag:si_LK
-language:si
-territory:LK
-bidi:ltr

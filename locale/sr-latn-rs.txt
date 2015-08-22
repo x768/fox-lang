@@ -1,5 +1,0 @@
-langtag:sr_Latn_RS
-language:sr
-script:Latn
-territory:RS
-bidi:ltr

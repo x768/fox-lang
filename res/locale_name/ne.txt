@@ -1,0 +1,2 @@
+locale=ne
+ne:नेपाली

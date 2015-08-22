@@ -1,4 +1,0 @@
-langtag:lg_UG
-language:lg
-territory:UG
-bidi:ltr

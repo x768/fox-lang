@@ -71,7 +71,7 @@ enum {
     THROW_CANNOT_OPEN_FILE__STR,
     THROW_NOT_OPENED_FOR_READ,
     THROW_NOT_OPENED_FOR_WRITE,
-    THROW_FLOAT_VALUE_OVERFLOW,
+    THROW_FLOAT_DOMAIN_ERROR,
     THROW_NO_MEMBER_EXISTS__NODE_REFSTR,
     THROW_CANNOT_MODIFY_ON_ITERATION,
     THROW_INVALID_INDEX__VAL_INT,
@@ -80,37 +80,11 @@ enum {
 enum {
     T_EOF,
     T_ERR,
-    T_LP,
-    T_RP,
-    T_LC,
-    T_RC,
-    T_LB,
-    T_RB,
-    T_LET_B,   // ]=
-    T_COMMA,
-    T_SEMICL,
-    T_MEMB,
     T_NL,
 
-    T_LP_C,  // f (
-    T_LB_C,  // a [
-
-    TL_PRAGMA,
-    TL_INT,
-    TL_MPINT,
-    TL_FLOAT,
-    TL_FRACTION,
-    TL_STR,
-    TL_BIN,
-    TL_REGEX,
-    TL_CLASS,
-    TL_VAR,
-    TL_CONST,
-
-    TL_STRCAT_BEGIN,
-    TL_STRCAT_MID,
-    TL_STRCAT_END,
-    TL_FORMAT,
+    T_LP,     // (   // op_call
+    T_LB,     // [   // op_index
+    T_LET_B,  // ]=  // op_index=
 
     T_EQ,     // ==
     T_NEQ,    // !=
@@ -157,7 +131,7 @@ enum {
     T_INC,    // ++
     T_DEC,    // --
     T_IN,     // in
-    
+
     T_INDEX_NUM,
 };
 
@@ -174,7 +148,7 @@ enum {
 enum {
     INDEX_REGEX_PTR,
     INDEX_REGEX_SRC,
-    INDEX_REGEX_OPT,
+    INDEX_REGEX_FLAGS,
     INDEX_REGEX_NUM,
 };
 
@@ -209,12 +183,12 @@ typedef struct {
 
 typedef struct {
     char *p;
-    int32_t size, max;
+    int32_t size;
+    int32_t alloc_size;
 } StrBuf;
 
 ////////////////////////////////////////////////////////////////////////////////
 
-typedef struct PtrList PtrList;
 typedef struct HashValueEntry HashValueEntry;
 typedef struct Ref Ref;
 typedef struct RefNode RefNode;
@@ -227,8 +201,6 @@ typedef struct UnresolvedMemb UnresolvedMemb;
 typedef struct FoxStatic FoxStatic;
 typedef struct FoxGlobal FoxGlobal;
 
-typedef struct RefCharset RefCharset;
-typedef struct RefLocale RefLocale;
 typedef struct RefTimeZone RefTimeZone;
 typedef struct TimeOffset TimeOffset;
 
@@ -269,19 +241,6 @@ struct Ref {
 
 typedef struct {
     RefHeader rh;
-    union {
-        int64_t i;
-        uint64_t u;
-    } u;
-} RefInt64;
-
-typedef struct {
-    RefHeader rh;
-    double d;
-} RefFloat;
-
-typedef struct {
-    RefHeader rh;
 
     int32_t size;
     char c[0];
@@ -296,7 +255,7 @@ typedef struct {
     TimeOffset *off;
 } RefTime;
 
-struct RefCharset {
+typedef struct {
     RefHeader rh;
 
     RefStr *name;    // 文字コード名
@@ -304,13 +263,13 @@ struct RefCharset {
     RefStr *ic_name; // iconvで使う名前
     int utf8;        // UTF-8ならTRUE
     int ascii;       // G1がUS-ASCIIと互換性があればTRUE
-};
+} RefCharset;
 
 typedef struct {
     RefHeader rh;
 
     int32_t lock_count;
-    int32_t size, max;
+    int32_t size, alloc_size;
     Value *p;
 } RefArray;
 
@@ -338,6 +297,14 @@ typedef struct Hash
     int32_t count;
 } Hash;
 
+typedef struct PtrList
+{
+    struct PtrList *next;
+    union {
+        void *p;
+        char c[1];
+    } u;
+} PtrList;
 
 /**
  * Module
@@ -408,6 +375,9 @@ struct FoxStatic
     int max_stack;
     int max_alloc;
 
+    PtrList *import_path;    // FOX_IMPORTを分解したもの
+    PtrList *resource_path;  // FOX_RESOURCEを分解したもの
+
     Str Str_EMPTY;
 
     RefNode *mod_lang;
@@ -416,7 +386,6 @@ struct FoxStatic
     RefNode *mod_mime;
     RefNode *mod_locale;
     RefCharset *cs_utf8;
-    RefLocale *loc_neutral;
     RefTimeZone *tz_utc;
 
     RefStr *symbol_stock[T_INDEX_NUM];
@@ -550,7 +519,7 @@ struct FoxStatic
 
     void (*throw_errorf)(RefNode *err_m, const char *err_name, const char *fmt, ...);
     void (*throw_error_select)(int err_type, ...);
-    void (*fatal_errorf)(RefNode *fn, const char *msg, ...);
+    void (*fatal_errorf)(const char *msg, ...);
     void (*throw_stopiter)(void);
     char *(*file_value_to_path)(Str *ret, Value v, int argn);
     int (*value_to_streamio)(Value *stream, Value v, int writemode, int argn);
@@ -565,13 +534,13 @@ struct FoxStatic
     void (*init_stream_ref)(Ref *r, int mode);
     StrBuf *(*bytesio_get_strbuf)(Value v);
     int (*stream_read_data)(Value v, StrBuf *sb, char *p, int *psize, int keep, int read_all);
-    int (*stream_read_uint8)(uint8_t *val, Value r);
-    int (*stream_read_uint16)(uint16_t *val, Value r);
-    int (*stream_read_uint32)(uint32_t *val, Value r);
+    int (*stream_read_uint8)(Value r, uint8_t *val);
+    int (*stream_read_uint16)(Value r, uint16_t *val);
+    int (*stream_read_uint32)(Value r, uint32_t *val);
     int (*stream_write_data)(Value v, const char *p, int size);
-    int (*stream_write_uint8)(uint8_t val, Value w);
-    int (*stream_write_uint16)(uint16_t val, Value w);
-    int (*stream_write_uint32)(uint32_t val, Value w);
+    int (*stream_write_uint8)(Value w, uint8_t val);
+    int (*stream_write_uint16)(Value w, uint16_t val);
+    int (*stream_write_uint32)(Value w, uint32_t val);
     int (*stream_seek_sub)(Value v, int64_t pos);
     int (*stream_flush_sub)(Value v);
 
@@ -622,7 +591,7 @@ struct FoxGlobal
 ////////////////////////////////////////////////////////////////////////////////
 
 #define FOX_VERSION_MAJOR    0
-#define FOX_VERSION_MINOR    11
+#define FOX_VERSION_MINOR    12
 #define FOX_VERSION_REVISION 0
 
 
@@ -657,7 +626,6 @@ extern const char *fox_ctype_flags;
 #define Value_bool(v)        ((v) != VALUE_NULL && (v) != VALUE_FALSE)
 #define Value_integral(v)    ((int32_t)((v) >> 32))
 #define Value_uint62(v)      ((v) >> 2)
-#define Value_float2(v)      (((RefFloat*)Value_vp(v))->d)
 #define Value_ref_header(v)  ((RefHeader*)Value_vp(v))
 #define Value_ref(v)         ((Ref*)Value_vp(v))
 #define Value_cstr(v)        (((RefStr*)Value_vp(v))->c)

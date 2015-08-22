@@ -1,0 +1,3 @@
+langtag = "de_BE"
+days = "Mon", "Die", "Mit", "Don", "Fre", "Sam", "Son"
+date = "d/MM/yy", "", "d MMMM y", "dddd d MMMM y"

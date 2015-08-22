@@ -26,6 +26,9 @@
 #define O_TRUNC	  01000	/* not fcntl */
 #define O_APPEND	  02000
 
+#define DT_REG 1
+#define DT_DIR 4
+
 #ifndef SEP_C
 #define SEP_C '\\'
 #endif
@@ -33,6 +36,17 @@
 #ifndef SEP_S
 #define SEP_S "\\"
 #endif
+
+struct dirent {
+    unsigned int d_type;
+    char d_name[1024];
+};
+typedef struct {
+    void *hDir;
+    int first;
+    struct dirent ent;
+    char wfd[0];
+} DIR;
 
 typedef intptr_t FileHandle;
 
@@ -45,6 +59,10 @@ int64_t seek_fox(FileHandle fd, int64_t offset, int whence);
 char *utf16to8(const wchar_t *src);
 wchar_t *cstr_to_utf16(const char *src, int src_size);
 wchar_t *filename_to_utf16(const char *src, const wchar_t *opt);
+
+DIR *opendir_fox(const char *dname);
+struct dirent *readdir_fox(DIR *d);
+void closedir_fox(DIR *d);
 
 #else
 
@@ -68,6 +86,10 @@ typedef int FileHandle;
 #define read_fox read
 #define write_fox write
 #define seek_fox lseek
+
+#define opendir_fox opendir
+#define readdir_fox readdir
+#define closedir_fox closedir
 
 #endif
 

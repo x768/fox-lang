@@ -1,2 +1,2 @@
-locale=zh_Hant_HK
-Hang:韓文字母
+langtag = "zh_Hant_HK"
+date = "yy年M月d日", "y年M月d日", "y年M月d日", "y年M月d日dddd"

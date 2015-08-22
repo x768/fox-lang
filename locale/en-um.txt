@@ -1,4 +1,0 @@
-langtag:en_UM
-language:en
-territory:UM
-bidi:ltr

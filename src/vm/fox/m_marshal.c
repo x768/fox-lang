@@ -88,6 +88,27 @@ static int marshal_save(Value *vret, Value *v, RefNode *node)
 
     return TRUE;
 }
+static int marshal_bytes(Value *vret, Value *v, RefNode *node)
+{
+    RefBytesIO *mb = bytesio_new_sub(NULL, 256);
+    Value writer = vp_Value(mb);
+    stream_write_data(writer, FOX_OBJECT_MAGIC, FOX_OBJECT_MAGIC_SIZE);
+
+    // writerの所有権がMarshalWriterに移る
+    init_marshaldumper(fg->stk_top, &writer);
+    Value_inc(writer);
+    fg->stk_top++;
+    Value_push("v", v[1]);
+    if (!call_member_func(fs->str_write, 1, TRUE)) {
+        Value_dec(writer);
+        return FALSE;
+    }
+    Value_pop();
+
+    *vret = cstr_Value(fs->cls_bytes, mb->buf.p, mb->buf.size);
+    Value_dec(writer);
+    return TRUE;
+}
 
 static char *read_str(Str *val, Value r)
 {
@@ -487,6 +508,9 @@ static void define_marshal_func(RefNode *m)
     n = define_identifier(m, m, "marshal_save", NODE_FUNC_N, 0);
     define_native_func_a(n, marshal_save, 2, 2, NULL, NULL, NULL);
 
+    n = define_identifier(m, m, "marshal_bytes", NODE_FUNC_N, 0);
+    define_native_func_a(n, marshal_bytes, 1, 1, NULL, NULL);
+
 
     // 循環参照しているか調べる
     n = define_identifier(m, m, "validate_loop_ref", NODE_FUNC_N, 0);
@@ -531,7 +555,13 @@ void define_marshal_class(RefNode *m)
     define_error_class(cls, cls2, m);
 }
 
-void define_marshal_module(RefNode *m)
+RefNode *init_marshal_module_stubs()
+{
+    RefNode *m = Module_new_sys("marshal");
+    fs->cls_marshaldumper = define_identifier(m, m, "MarshalDumper", NODE_CLASS, 0);
+    return m;
+}
+void init_marshal_module_1(RefNode *m)
 {
     define_marshal_class(m);
     define_marshal_func(m);

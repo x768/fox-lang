@@ -1,4 +1,0 @@
-langtag:nd_ZW
-language:nd
-territory:ZW
-bidi:ltr

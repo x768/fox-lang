@@ -1,9 +1,0 @@
-langtag:sn
-language:sn
-month_w:Ndira	Kukadzi	Kurume	Kubvumbi	Chivabvu	Chikumi	Chikunguru	Nyamavhuvhu	Gunyana	Gumiguru	Mbudzi	Zvita
-month:Ndi	Kuk	Kur	Kub	Chi	Chi	Chi	Nya	Gun	Gum	Mb	Zvi
-days_w:Muvhuro	Chipiri	Chitatu	China	Chishanu	Mugovera	Svondo
-days:Muv	Chip	Chit	Chin	Chis	Mug	Svo
-date:dd/MM/yyyy	d MMM y	d MMMM y	dddd, d MMMM y
-time:h:mm a	h:mm:ss a	h:mm:ss a z	h:mm:ss a Z
-bidi:ltr

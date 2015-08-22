@@ -1,3 +1,8 @@
-locale=kw
-kw:kernewek
-GB:Rywvaneth Unys
+langtag = "kw"
+month_w = "Mis Genver", "Mis Hwevrel", "Mis Meurth", "Mis Ebrel", "Mis Me", "Mis Efen", "Mis Gortheren", "Mis Est", "Mis Gwynngala", "Mis Hedra", "Mis Du", "Mis Kevardhu"
+month = "Gen", "Hwe", "Meu", "Ebr", "Me", "Efe", "Gor", "Est", "Gwy", "Hed", "Du", "Kev"
+days_w = "De Lun", "De Meurth", "De Merher", "De Yow", "De Gwener", "De Sadorn", "De Sul"
+days = "Lun", "Meu", "Mer", "Yow", "Gwe", "Sad", "Sul"
+am_pm = "a.m.", "p.m."
+date = "dd/MM/yyyy", "d MMM y", "d MMMM y", "dddd d MMMM y"
+time = "HH:mm", "HH:mm:ss", "HH:mm:ss z", "HH:mm:ss Z"

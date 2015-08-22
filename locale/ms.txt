@@ -1,9 +1,0 @@
-langtag:ms
-language:ms
-month_w:Januari	Februari	Mac	April	Mei	Jun	Julai	Ogos	September	Oktober	November	Disember
-month:Jan	Feb	Mac	Apr	Mei	Jun	Jul	Ogos	Sep	Okt	Nov	Dis
-days_w:Isnin	Selasa	Rabu	Khamis	Jumaat	Sabtu	Ahad
-days:Isn	Sel	Rab	Kha	Jum	Sab	Ahd
-date:d/MM/yy	dd/MM/yyyy	d MMMM y	dddd, d MMMM y
-time:h:mm a	h:mm:ss a	h:mm:ss a z	h:mm:ss a Z
-bidi:ltr

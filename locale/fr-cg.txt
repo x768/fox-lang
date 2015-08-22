@@ -1,4 +1,0 @@
-langtag:fr_CG
-language:fr
-territory:CG
-bidi:ltr

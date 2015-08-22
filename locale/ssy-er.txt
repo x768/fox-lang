@@ -1,4 +1,0 @@
-langtag:ssy_ER
-language:ssy
-territory:ER
-bidi:ltr

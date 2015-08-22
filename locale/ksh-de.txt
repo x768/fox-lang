@@ -1,4 +1,0 @@
-langtag:ksh_DE
-language:ksh
-territory:DE
-bidi:ltr

@@ -139,13 +139,13 @@ void *Mem_get(Mem *mem, int size)
 void Mem_close(Mem *mem)
 {
     MemChunk *p = mem->p;
+    mem->p = NULL;
 
     while (p != NULL) {
         MemChunk *pre = p;
         p = p->next;
         free(pre);
     }
-    mem->p = NULL;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -224,28 +224,28 @@ Str Str_trim(Str src)
 
 void StrBuf_init(StrBuf *s, int size)
 {
-    int max = 32;
-    while (max <= size) {
-        max *= 2;
+    int alloc_size = 32;
+    while (alloc_size <= size) {
+        alloc_size *= 2;
     }
 
-    s->max = max;
+    s->alloc_size = alloc_size;
     s->size = 0;
-    s->p = malloc(max);
+    s->p = malloc(alloc_size);
 }
 void StrBuf_init_refstr(StrBuf *s, int size)
 {
     RefStr *rs;
-    int max = 32;
+    int alloc_size = 32;
     size += offsetof(RefStr, c);
 
-    while (max <= size) {
-        max *= 2;
+    while (alloc_size <= size) {
+        alloc_size *= 2;
     }
 
-    s->max = max;
+    s->alloc_size = alloc_size;
     s->size = offsetof(RefStr, c);
-    rs = malloc(max);
+    rs = malloc(alloc_size);
 
     rs->rh.n_memb = 0;
     rs->rh.nref = 1;
@@ -255,14 +255,14 @@ void StrBuf_init_refstr(StrBuf *s, int size)
 }
 void StrBuf_alloc(StrBuf *s, int size)
 {
-    if (size >= s->max) {
-        int max = 32;
-        while (max <= size) {
-            max *= 2;
+    if (size >= s->alloc_size) {
+        int alloc_size = 32;
+        while (alloc_size <= size) {
+            alloc_size *= 2;
         }
 
-        s->max = max;
-        s->p = realloc(s->p, max);
+        s->alloc_size = alloc_size;
+        s->p = realloc(s->p, alloc_size);
     }
     s->size = size;
 }
@@ -279,15 +279,15 @@ int StrBuf_add(StrBuf *s, const char *p, int size)
     if (size < 0) {
         size = strlen(p);
     }
-    if (s->max <= s->size + size) {
-        while (s->max <= s->size + size) {
-            s->max *= 2;
+    if (s->alloc_size <= s->size + size) {
+        while (s->alloc_size <= s->size + size) {
+            s->alloc_size *= 2;
         }
-        if (s->max > fs->max_alloc) {
+        if (s->alloc_size > fs->max_alloc) {
             throw_error_select(THROW_MAX_ALLOC_OVER__INT, fs->max_alloc);
             return FALSE;
         }
-        s->p = realloc(s->p, s->max);
+        s->p = realloc(s->p, s->alloc_size);
     }
     memcpy(s->p + s->size, p, size);
     s->size += size;
@@ -296,15 +296,15 @@ int StrBuf_add(StrBuf *s, const char *p, int size)
 }
 int StrBuf_add_r(StrBuf *s, RefStr *r)
 {
-    if (s->max <= s->size + r->size) {
-        while (s->max <= s->size + r->size) {
-            s->max *= 2;
+    if (s->alloc_size <= s->size + r->size) {
+        while (s->alloc_size <= s->size + r->size) {
+            s->alloc_size *= 2;
         }
-        if (s->max > fs->max_alloc) {
+        if (s->alloc_size > fs->max_alloc) {
             throw_error_select(THROW_MAX_ALLOC_OVER__INT, fs->max_alloc);
             return FALSE;
         }
-        s->p = realloc(s->p, s->max);
+        s->p = realloc(s->p, s->alloc_size);
     }
     memcpy(s->p + s->size, r->c, r->size);
     s->size += r->size;
@@ -313,13 +313,13 @@ int StrBuf_add_r(StrBuf *s, RefStr *r)
 }
 int StrBuf_add_c(StrBuf *s, char c)
 {
-    if (s->max <= s->size + 1) {
-        s->max *= 2;
-        if (s->max > fs->max_alloc) {
+    if (s->alloc_size <= s->size + 1) {
+        s->alloc_size *= 2;
+        if (s->alloc_size > fs->max_alloc) {
             throw_error_select(THROW_MAX_ALLOC_OVER__INT, fs->max_alloc);
             return FALSE;
         }
-        s->p = realloc(s->p, s->max);
+        s->p = realloc(s->p, s->alloc_size);
     }
     s->p[s->size++] = c;
 

@@ -563,7 +563,7 @@ static int color_marshal_read(Value *vret, Value *v, RefNode *node)
     Value r = Value_ref(v[1])->v[INDEX_MARSHALDUMPER_SRC];
     uint32_t ival;
 
-    if (!fs->stream_read_uint32(&ival, r)) {
+    if (!fs->stream_read_uint32(r, &ival)) {
         return FALSE;
     }
     *vret = integral_Value(cls_color, ival);
@@ -575,7 +575,7 @@ static int color_marshal_write(Value *vret, Value *v, RefNode *node)
     Value w = Value_ref(v[1])->v[INDEX_MARSHALDUMPER_SRC];
     uint32_t ival = Value_integral(*v);
 
-    if (!fs->stream_write_uint32(ival, w)) {
+    if (!fs->stream_write_uint32(w, ival)) {
         return FALSE;
     }
     return TRUE;
@@ -683,11 +683,67 @@ static int rect_new(Value *vret, Value *v, RefNode *node)
 
     return TRUE;
 }
+static int rect_marshal_read(Value *vret, Value *v, RefNode *node)
+{
+    int i;
+    RefNode *cls = FUNC_VP(node);
+    Value r = Value_ref(v[1])->v[INDEX_MARSHALDUMPER_SRC];
+    RefRect *rc = fs->buf_new(cls, sizeof(RefRect));
+
+    *vret = vp_Value(rc);
+    for (i = 0; i < INDEX_RECT_NUM; i++) {
+        uint32_t ival;
+        if (!fs->stream_read_uint32(r, &ival)) {
+            return FALSE;
+        }
+        rc->i[i] = (int32_t)ival;
+    }
+
+    return TRUE;
+}
+static int rect_marshal_write(Value *vret, Value *v, RefNode *node)
+{
+    Value w = Value_ref(v[1])->v[INDEX_MARSHALDUMPER_SRC];
+    const RefRect *rc = Value_vp(*v);
+    int i;
+
+    for (i = 0; i < INDEX_RECT_NUM; i++) {
+        if (!fs->stream_write_uint32(w, (uint32_t)rc->i[i])) {
+            return FALSE;
+        }
+    }
+    return TRUE;
+}
 static int rect_get(Value *vret, Value *v, RefNode *node)
 {
     const RefRect *rc = Value_vp(*v);
     int i = FUNC_INT(node);
     *vret = integral_Value(fs->cls_int, rc->i[i]);
+    return TRUE;
+}
+static int rect_eq(Value *vret, Value *v, RefNode *node)
+{
+    const RefRect *rc1 = Value_vp(*v);
+    const RefRect *rc2 = Value_vp(v[1]);
+    int i;
+    for (i = 0; i < 4; i++) {
+        if (rc1->i[i] != rc2->i[i]) {
+            *vret = VALUE_FALSE;
+            return TRUE;
+        }
+    }
+    *vret = VALUE_TRUE;
+    return TRUE;
+}
+static int rect_hash(Value *vret, Value *v, RefNode *node)
+{
+    const RefRect *rc = Value_vp(*v);
+    uint32_t hash = 0;
+    int i;
+    for (i = 0; i < 4; i++) {
+        hash = hash * 31 + rc->i[i];
+    }
+    *vret = int32_Value(hash & INT32_MAX);
     return TRUE;
 }
 static int rect_tostr(Value *vret, Value *v, RefNode *node)
@@ -764,7 +820,7 @@ static int palette_marshal_read(Value *vret, Value *v, RefNode *node)
     ra->rh.type = cls_palette;
     for (i = 0; i < PALETTE_NUM; i++) {
         uint32_t ival;
-        if (!fs->stream_read_uint32(&ival, r)) {
+        if (!fs->stream_read_uint32(r, &ival)) {
             return FALSE;
         }
         ra->p[i] = integral_Value(cls_color, ival);
@@ -780,7 +836,7 @@ static int palette_marshal_write(Value *vret, Value *v, RefNode *node)
 
     for (i = 0; i < PALETTE_NUM; i++) {
         uint32_t ival = Value_integral(ra->p[i]);
-        if (!fs->stream_write_uint32(ival, w)) {
+        if (!fs->stream_write_uint32(w, ival)) {
             return FALSE;
         }
     }
@@ -1201,7 +1257,7 @@ static int image_marshal_read(Value *vret, Value *v, RefNode *node)
     }
     image->bands = bands;
 
-    if (!fs->stream_read_uint32(&ival, r)) {
+    if (!fs->stream_read_uint32(r, &ival)) {
         return FALSE;
     }
     if (ival > MAX_IMAGE_SIZE) {
@@ -1211,7 +1267,7 @@ static int image_marshal_read(Value *vret, Value *v, RefNode *node)
     image->width = ival;
     image->pitch = ival * bands_to_channels(image->bands);
 
-    if (!fs->stream_read_uint32(&ival, r)) {
+    if (!fs->stream_read_uint32(r, &ival)) {
         return FALSE;
     }
     if (ival > MAX_IMAGE_SIZE) {
@@ -1223,14 +1279,14 @@ static int image_marshal_read(Value *vret, Value *v, RefNode *node)
         int i;
         image->palette = malloc(sizeof(uint32_t) * PALETTE_NUM);
         for (i = 0; i < PALETTE_NUM; i++) {
-            if (!fs->stream_read_uint32(&image->palette[i], r)) {
+            if (!fs->stream_read_uint32(r, &image->palette[i])) {
                 return FALSE;
             }
         }
     }
 
     image->height = ival;
-    if (!fs->stream_read_uint32(&ival, r)) {
+    if (!fs->stream_read_uint32(r, &ival)) {
         return FALSE;
     }
     if (ival > 0) {
@@ -1256,16 +1312,16 @@ static int image_marshal_write(Value *vret, Value *v, RefNode *node)
     if (!fs->stream_write_data(w, &bands, 1)) {
         return FALSE;
     }
-    if (!fs->stream_write_uint32(image->width, w)) {
+    if (!fs->stream_write_uint32(w, image->width)) {
         return FALSE;
     }
-    if (!fs->stream_write_uint32(image->height, w)) {
+    if (!fs->stream_write_uint32(w, image->height)) {
         return FALSE;
     }
     if (image->bands == BAND_P) {
         int i;
         for (i = 0; i < PALETTE_NUM; i++) {
-            if (!fs->stream_write_uint32(image->palette[i], w)) {
+            if (!fs->stream_write_uint32(w, image->palette[i])) {
                 return FALSE;
             }
         }
@@ -1275,7 +1331,7 @@ static int image_marshal_write(Value *vret, Value *v, RefNode *node)
         int width = image->width * bands_to_channels(image->bands);
         int y;
 
-        if (!fs->stream_write_uint32(width * image->height, w)) {
+        if (!fs->stream_write_uint32(w, width * image->height)) {
             return FALSE;
         }
         for (y = 0; y < image->height; y++) {
@@ -1284,7 +1340,7 @@ static int image_marshal_write(Value *vret, Value *v, RefNode *node)
             }
         }
     } else {
-        if (!fs->stream_write_uint32(0, w)) {
+        if (!fs->stream_write_uint32(w, 0)) {
             return FALSE;
         }
     }
@@ -1368,7 +1424,7 @@ static int image_index(Value *vret, Value *v, RefNode *node)
         }
         break;
     default:
-        fs->fatal_errorf(node, "Unknown image->bands (%d)", image->bands);
+        fs->fatal_errorf("Unknown image->bands (%d)", image->bands);
         return FALSE;
     }
     *vret = integral_Value(cls_color, color);
@@ -1941,10 +1997,19 @@ static void define_class(RefNode *m, RefNode *mod_math)
 
     cls = cls_rect;
     n = fs->define_identifier_p(m, cls, fs->str_new, NODE_NEW_N, 0);
-    fs->define_native_func_a(n, rect_new, 4, 4, cls, fs->cls_int, fs->cls_int, fs->cls_int);
+    fs->define_native_func_a(n, rect_new, 4, 4, cls, fs->cls_int, fs->cls_int, fs->cls_int, fs->cls_int);
+    n = fs->define_identifier_p(m, cls, fs->str_marshal_read, NODE_NEW_N, 0);
+    fs->define_native_func_a(n, rect_marshal_read, 1, 1, cls, fs->cls_marshaldumper);
 
     n = fs->define_identifier_p(m, cls, fs->str_tostr, NODE_FUNC_N, 0);
     fs->define_native_func_a(n, rect_tostr, 0, 2, NULL, fs->cls_str, fs->cls_locale);
+    n = fs->define_identifier_p(m, cls, fs->str_marshal_write, NODE_FUNC_N, 0);
+    fs->define_native_func_a(n, rect_marshal_write, 1, 1, NULL, fs->cls_marshaldumper);
+    n = fs->define_identifier_p(m, cls, fs->str_hash, NODE_FUNC_N, NODEOPT_PROPERTY);
+    fs->define_native_func_a(n, rect_hash, 0, 0, NULL);
+
+    n = fs->define_identifier_p(m, cls, fs->symbol_stock[T_EQ], NODE_FUNC_N, 0);
+    fs->define_native_func_a(n, rect_eq, 1, 1, NULL, cls_image);
     n = fs->define_identifier(m, cls, "x", NODE_FUNC_N, NODEOPT_PROPERTY);
     fs->define_native_func_a(n, rect_get, 0, 0, (void*) INDEX_RECT_X);
     n = fs->define_identifier(m, cls, "y", NODE_FUNC_N, NODEOPT_PROPERTY);
@@ -1968,7 +2033,7 @@ static void define_class(RefNode *m, RefNode *mod_math)
     fs->define_native_func_a(n, palette_marshal_write, 1, 1, NULL, fs->cls_marshaldumper);
     n = fs->define_identifier_p(m, cls, fs->symbol_stock[T_EQ], NODE_FUNC_N, 0);
     fs->define_native_func_a(n, palette_eq, 1, 1, NULL, cls_palette);
-    n = fs->define_identifier_p(m, cls, fs->symbol_stock[T_LP], NODE_FUNC_N, 0);
+    n = fs->define_identifier_p(m, cls, fs->symbol_stock[T_LB], NODE_FUNC_N, 0);
     fs->define_native_func_a(n, get_function_ptr(fs->cls_list, fs->symbol_stock[T_LB]), 1, 1, NULL, fs->cls_int);
     n = fs->define_identifier_p(m, cls, fs->symbol_stock[T_LET_B], NODE_FUNC_N, 0);
     fs->define_native_func_a(n, get_function_ptr(fs->cls_list, fs->symbol_stock[T_LET_B]), 2, 2, NULL, fs->cls_int, cls_color);

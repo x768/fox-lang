@@ -1,0 +1,3 @@
+locale = "!"
+hello = "Hello"
+ok = "OK"

@@ -1,0 +1,2 @@
+langtag = "es_AR"
+am_pm = "a.m.", "p.m."

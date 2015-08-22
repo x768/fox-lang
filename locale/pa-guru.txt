@@ -1,4 +1,0 @@
-langtag:pa_Guru
-language:pa
-script:Guru
-bidi:ltr

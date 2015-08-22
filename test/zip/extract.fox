@@ -1,8 +1,9 @@
 import util.assert
 import archive.zip
 
+let path = ENV.has_key("TEST_BATCH") ? "zip" : "."
 
-let zip = ZipRandomReader("test.zip")
+let zip = ZipRandomReader("${path}/test.zip")
 let entry1 = zip[0]
 
 assert_equal entry1.filename, "test"

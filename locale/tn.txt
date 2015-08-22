@@ -1,8 +1,0 @@
-langtag:tn
-language:tn
-month_w:Ferikgong	Tlhakole	Mopitlo	Moranang	Motsheganang	Seetebosigo	Phukwi	Phatwe	Lwetse	Diphalane	Ngwanatsele	Sedimonthole
-month:Fer	Tlh	Mop	Mor	Mot	See	Phu	Pha	Lwe	Dip	Ngw	Sed
-days_w:Mosopulogo	Labobedi	Laboraro	Labone	Labotlhano	Matlhatso	Tshipi
-days:Mos	Bed	Rar	Ne	Tla	Mat	Tsh
-decimal:,
-bidi:ltr

@@ -1,4 +1,0 @@
-langtag:sw_KE
-language:sw
-territory:KE
-bidi:ltr

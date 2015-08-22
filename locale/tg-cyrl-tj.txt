@@ -1,5 +1,0 @@
-langtag:tg_Cyrl_TJ
-language:tg
-script:Cyrl
-territory:TJ
-bidi:ltr
