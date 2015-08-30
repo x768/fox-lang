@@ -162,6 +162,26 @@ static void Tok_parse_hex_digit(TokValue *v, Tok *tk)
     v->type = TL_INT;
     v->base = 16;
 }
+/**
+ * 最初の1文字は飛ばす
+ */
+static int Keyword_eq(Str s, const char *key)
+{
+    const char *p = s.p;
+    const char *end = p + s.size;
+
+    p++;
+    key++;
+
+    while (p < end) {
+        if (*p != *key) {
+            return FALSE;
+        }
+        p++;
+        key++;
+    }
+    return *key == '\0';
+}
 static void Tok_parse_ident(TokValue *v, Tok *tk)
 {
     Str name;
@@ -197,116 +217,116 @@ static void Tok_parse_ident(TokValue *v, Tok *tk)
 
     switch (*v->p) {
     case 'a':
-        if (Str_eq_p(name, "abstract")) {
+        if (Keyword_eq(name, "abstract")) {
             v->type = TT_ABSTRACT;
         }
         break;
     case 'b':
-        if (Str_eq_p(name, "break")) {
+        if (Keyword_eq(name, "break")) {
             v->type = TT_BREAK;
             tk->prev_id = FALSE;
         }
         break;
     case 'c':
-        if (Str_eq_p(name, "class")) {
+        if (Keyword_eq(name, "class")) {
             v->type = TT_CLASS;
-        } else if (Str_eq_p(name, "continue")) {
+        } else if (Keyword_eq(name, "continue")) {
             v->type = TT_CONTINUE;
             tk->prev_id = FALSE;
-        } else if (Str_eq_p(name, "case")) {
+        } else if (Keyword_eq(name, "case")) {
             v->type = TT_CASE;
             tk->prev_id = FALSE;
-        } else if (Str_eq_p(name, "catch")) {
+        } else if (Keyword_eq(name, "catch")) {
             v->type = TT_CATCH;
             tk->prev_id = FALSE;
         }
         break;
     case 'd':
-        if (Str_eq_p(name, "def")) {
+        if (Keyword_eq(name, "def")) {
             v->type = TT_DEF;
-        } else if (Str_eq_p(name, "default")) {
+        } else if (Keyword_eq(name, "default")) {
             v->type = TT_DEFAULT;
             tk->prev_id = FALSE;
         }
         break;
     case 'e':
-        if (Str_eq_p(name, "else")) {
+        if (Keyword_eq(name, "else")) {
             v->type = TT_ELSE;
             tk->prev_id = FALSE;
-        } else if (Str_eq_p(name, "elif")) {
+        } else if (Keyword_eq(name, "elif")) {
             v->type = TT_ELIF;
             tk->prev_id = FALSE;
         }
         break;
     case 'f':
-        if (Str_eq_p(name, "false")) {
+        if (Keyword_eq(name, "false")) {
             v->type = TT_FALSE;
-        } else if (Str_eq_p(name, "for")) {
+        } else if (Keyword_eq(name, "for")) {
             v->type = TT_FOR;
             tk->prev_id = FALSE;
         }
         break;
     case 'i':
-        if (Str_eq_p(name, "if")) {
+        if (Keyword_eq(name, "if")) {
             v->type = TT_IF;
             tk->prev_id = FALSE;
-        } else if (Str_eq_p(name, "in")) {
+        } else if (Keyword_eq(name, "in")) {
             v->type = TT_IN;
             tk->prev_id = FALSE;
-        } else if (Str_eq_p(name, "import")) {
+        } else if (Keyword_eq(name, "import")) {
             v->type = TT_IMPORT;
             tk->prev_id = FALSE;
         }
         break;
     case 'l':
-        if (Str_eq_p(name, "let")) {
+        if (Keyword_eq(name, "let")) {
             v->type = TT_LET;
         }
         break;
     case 'n':
-        if (Str_eq_p(name, "null")) {
+        if (Keyword_eq(name, "null")) {
             v->type = TT_NULL;
         }
         break;
     case 'r':
-        if (Str_eq_p(name, "return")) {
+        if (Keyword_eq(name, "return")) {
             v->type = TT_RETURN;
             tk->prev_id = FALSE;
         }
         break;
     case 's':
-        if (Str_eq_p(name, "switch")) {
+        if (Keyword_eq(name, "switch")) {
             v->type = TT_SWITCH;
             tk->prev_id = FALSE;
-        } else if (Str_eq_p(name, "super")) {
+        } else if (Keyword_eq(name, "super")) {
             v->type = TT_SUPER;
         }
         break;
     case 't':
-        if (Str_eq_p(name, "this")) {
+        if (Keyword_eq(name, "this")) {
             v->type = TT_THIS;
-        } else if (Str_eq_p(name, "true")) {
+        } else if (Keyword_eq(name, "true")) {
             v->type = TT_TRUE;
-        } else if (Str_eq_p(name, "try")) {
+        } else if (Keyword_eq(name, "try")) {
             v->type = TT_TRY;
-        } else if (Str_eq_p(name, "throw")) {
+        } else if (Keyword_eq(name, "throw")) {
             v->type = TT_THROW;
             tk->prev_id = FALSE;
         }
         break;
     case 'v':
-        if (Str_eq_p(name, "var")) {
+        if (Keyword_eq(name, "var")) {
             v->type = TT_VAR;
         }
         break;
     case 'w':
-        if (Str_eq_p(name, "while")) {
+        if (Keyword_eq(name, "while")) {
             v->type = TT_WHILE;
             tk->prev_id = FALSE;
         }
         break;
     case 'y':
-        if (Str_eq_p(name, "yield")) {
+        if (Keyword_eq(name, "yield")) {
             v->type = TT_YIELD;
             tk->prev_id = FALSE;
         }
@@ -575,7 +595,7 @@ static void Tok_parse_double_str(TokValue *v, Tok *tk, int cat, int term)
                 v->type = T_ERR;
                 return;
             case '\n': // ignore
-                tk->p++;
+                tk->head_line++;
                 break;
             default:
                 if (isalnum(ch)) {
@@ -669,6 +689,12 @@ static void Tok_parse_double_bin(TokValue *v, Tok *tk, int term)
                 break;
             case 't':
                 *dst++ = '\t';
+                break;
+            case '\r':
+                throw_errorf(fs->mod_lang, "TokenError", "Illigal character '\\r'");
+                v->type = T_ERR;
+                return;
+            case '\n':
                 break;
             case '\0':
                 throw_errorf(fs->mod_lang, "TokenError", "Unterminated string");
@@ -1504,9 +1530,9 @@ void Tok_next(Tok *tk)
         val = strtol(tk->v.p, NULL, tk->v.base);
 
         if (errno != 0 || val <= INT32_MIN || val > INT32_MAX) {
-            mp_init(&tk->mp_val[0]);
-            mp_read_radix(&tk->mp_val[0], (unsigned char*)tk->v.p, tk->v.base);
-            tk->v.type = TL_MPINT;
+            BigInt_init(&tk->bi_val[0]);
+            cstr_BigInt(&tk->bi_val[0], tk->v.base, tk->v.p, -1);
+            tk->v.type = TL_BIGINT;
         } else {
             tk->v.type = TL_INT;
             tk->int_val = (int32_t)val;
@@ -1518,9 +1544,9 @@ void Tok_next(Tok *tk)
         char c = *tk->v.u.end;
         *tk->v.u.end = '\0';
 
-        mp_init(&tk->mp_val[0]);
-        mp_init(&tk->mp_val[1]);
-        if (mp2_read_rational(tk->mp_val, tk->v.p, NULL) != MP_OKAY) {
+        BigInt_init(&tk->bi_val[0]);
+        BigInt_init(&tk->bi_val[1]);
+        if (!cstr_BigRat(tk->bi_val, tk->v.p, NULL)) {
             throw_errorf(fs->mod_lang, "TokenError", "Decimal riteral out of range");
             add_stack_trace(tk->module, NULL, tk->v.line);
             tk->v.type = T_ERR;

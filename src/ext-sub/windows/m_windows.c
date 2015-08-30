@@ -55,20 +55,20 @@ static RefNode *cls_regkey;
 static RefTimeZone *default_tz;
 
 
-static BSTR Str_to_BSTR(Str src)
+static BSTR cstr_to_BSTR(const char *src_p, int src_size)
 {
-    int wlen = MultiByteToWideChar(CP_UTF8, 0, src.p, src.size, NULL, 0);
+    int wlen = MultiByteToWideChar(CP_UTF8, 0, src_p, src_size, NULL, 0);
     BSTR bstr = SysAllocStringLen(NULL, wlen + 1);
-    MultiByteToWideChar(CP_UTF8, 0, src.p, src.size, bstr, wlen + 1);
+    MultiByteToWideChar(CP_UTF8, 0, src_p, src_size, bstr, wlen + 1);
     bstr[wlen] = L'\0';
 
     return bstr;
 }
-static wchar_t *Str_to_wstr(Str src)
+static wchar_t *cstr_to_wstr(const char *src_p, int src_size)
 {
-    int wlen = MultiByteToWideChar(CP_UTF8, 0, src.p, src.size, NULL, 0);
+    int wlen = MultiByteToWideChar(CP_UTF8, 0, src_p, src_size, NULL, 0);
     wchar_t *wstr = malloc((wlen + 1) * sizeof(wchar_t));
-    MultiByteToWideChar(CP_UTF8, 0, src.p, src.size, wstr, wlen + 1);
+    MultiByteToWideChar(CP_UTF8, 0, src_p, src_size, wstr, wlen + 1);
     wstr[wlen] = L'\0';
 
     return wstr;
@@ -194,8 +194,8 @@ static int ole_new(Value *vret, Value *v, RefNode *node)
 {
     CLSID clsid;
     IDispatch *pdisp;
-    Str name = fs->Value_str(v[1]);
-    BSTR bname = Str_to_BSTR(name);
+    RefStr *name = Value_vp(v[1]);
+    BSTR bname = cstr_to_BSTR(name->c, name->size);
     HRESULT hr = CLSIDFromProgID(bname, &clsid);
 
     RefOleObject *ole = fs->buf_new(cls_oleobject, sizeof(RefOleObject));
@@ -282,12 +282,12 @@ static int fox_value_to_variant(VARIANT *va, Value v, Mem *mem, Hash *hash)
     RefNode *type = fs->Value_type(v);
 
     if (type == fs->cls_str) {
+        RefStr *rs = Value_vp(v);
         va->vt = VT_BSTR;
-        va->bstrVal = Str_to_BSTR(fs->Value_str(v));
+        va->bstrVal = cstr_to_BSTR(rs->c, rs->size);
     } else if (type == fs->cls_int) {
-        int err = FALSE;
-        int64_t i64 = fs->Value_int64(v, &err);
-        if (err || i64 < INT32_MIN || i64 > INT32_MAX) {
+        int32_t i64 = fs->Value_int64(v, NULL);
+        if (i64 < INT32_MIN || i64 > INT32_MAX) {
             fs->throw_errorf(fs->mod_lang, "ValueError", "Integer out of range");
             return FALSE;
         } else {
@@ -359,7 +359,7 @@ static int variant_to_fox_value(Value *v, VARIANT *va)
         } else {
             d = va->fltVal;
         }
-        *v = fs->float_Value(d);
+        *v = fs->float_Value(fs->cls_float, d);
         break;
     }
     case VT_R8: {
@@ -369,7 +369,7 @@ static int variant_to_fox_value(Value *v, VARIANT *va)
         } else {
             d = va->dblVal;
         }
-        *v = fs->float_Value(d);
+        *v = fs->float_Value(fs->cls_float, d);
         break;
     }
     case VT_CY: {
@@ -451,7 +451,7 @@ static int variant_to_fox_value(Value *v, VARIANT *va)
 /**
  * 第1引数はメソッド名
  */
-static int invoke_method_sub(IDispatch *pdisp, VARIANT *result, Str name, int offset, int flags)
+static int invoke_method_sub(IDispatch *pdisp, VARIANT *result, RefStr *name, int offset, int flags)
 {
     Value *v = fg->stk_base;
     int argc = fg->stk_top - v - offset;
@@ -462,7 +462,7 @@ static int invoke_method_sub(IDispatch *pdisp, VARIANT *result, Str name, int of
     UINT arg_err = 0;
     int ret = TRUE;
 
-    BSTR bname = Str_to_BSTR(name);
+    BSTR bname = cstr_to_BSTR(name->c, name->size);
 
     memset(&excep, 0, sizeof(excep));
     hr = pdisp->lpVtbl->GetIDsOfNames(pdisp, &IID_NULL, &bname, 1, GetUserDefaultLCID(), &dispid);
@@ -528,7 +528,7 @@ static int ole_invoke_method(Value *vret, Value *v, RefNode *node)
     }
     memset(&result, 0, sizeof(result));
     VariantInit(&result);
-    if (!invoke_method_sub(ole->pdisp, &result, fs->Value_str(v[1]), 2, flags)) {
+    if (!invoke_method_sub(ole->pdisp, &result, Value_vp(v[1]), 2, flags)) {
         return FALSE;
     }
     variant_to_fox_value(vret, &result);
@@ -628,21 +628,21 @@ static int oleenum_close(Value *vret, Value *v, RefNode *node)
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////
 
-static int head_equals(Str s, const char *head, Str *path)
+static int head_equals(RefStr *s, const char *head, Str *path)
 {
     int head_size = strlen(head);
 
-    if (s.size == head_size) {
-        if (memcmp(s.p, head, head_size) == 0) {
+    if (s->size == head_size) {
+        if (memcmp(s->c, head, head_size) == 0) {
             path->p = NULL;
             path->size = 0;
             return TRUE;
         }
-    } else if (s.size > head_size) {
-        if (memcmp(s.p, head, head_size) == 0) {
-            if (s.p[head_size] == '\\') {
-                path->p = s.p + head_size + 1;
-                path->size = s.size - head_size - 1;
+    } else if (s->size > head_size) {
+        if (memcmp(s->c, head, head_size) == 0) {
+            if (s->c[head_size] == SEP_C) {
+                path->p = s->c + head_size + 1;
+                path->size = s->size - head_size - 1;
                 return TRUE;
             }
         }
@@ -655,7 +655,7 @@ static int head_equals(Str s, const char *head, Str *path)
  * out : HKEY <= HKEY_CURRENT_USER
  * out : path <= 'Software\Microsoft'
  */
-static int regpath_split(HKEY *hkey, Str *path, Str src)
+static int regpath_split(HKEY *hkey, Str *path, RefStr *src)
 {
     if (head_equals(src, "HKEY_CLASSES_ROOT", path)) {
         *hkey = HKEY_CLASSES_ROOT;
@@ -702,22 +702,22 @@ static int regkey_new(Value *vret, Value *v, RefNode *node)
     RefRegKey *r = fs->buf_new(cls_regkey, sizeof(RefRegKey));
     *vret = vp_Value(r);
 
-    if (!regpath_split(&hroot, &path, fs->Value_str(v[1]))) {
+    if (!regpath_split(&hroot, &path, Value_vp(v[1]))) {
         fs->throw_errorf(fs->mod_lang, "ValueError", "Unknown registory key");
         return FALSE;
     }
     if (fg->stk_top > v + 2) {
-        Str mode = fs->Value_str(v[2]);
-        if (Str_eq_p(mode, "w")) {
+        RefStr *mode = Value_vp(v[2]);
+        if (str_eq(mode->c, mode->size, "w", -1)) {
             write_mode = TRUE;
-        } else if (Str_eq_p(mode, "r")) {
+        } else if (str_eq(mode->c, mode->size, "r", -1)) {
         } else {
             fs->throw_errorf(fs->mod_lang, "ValueError", "Unknown mode");
             return FALSE;
         }
     }
 
-    path_p = Str_to_wstr(path);
+    path_p = cstr_to_wstr(path.p, path.size);
     if (write_mode) {
         ret = RegCreateKeyExW(hroot, path_p, 0, NULL, REG_OPTION_NON_VOLATILE, KEY_WRITE, NULL, &hkey, NULL);
     } else {
@@ -769,7 +769,8 @@ static int regkey_close(Value *vret, Value *v, RefNode *node)
 static int regkey_getvalue(Value *vret, Value *v, RefNode *node)
 {
     RefRegKey *r = Value_vp(*v);
-    wchar_t *value_name = Str_to_wstr(fs->Value_str(v[1]));
+    RefStr *name = Value_vp(v[1]);
+    wchar_t *value_name = cstr_to_wstr(name->c, name->size);
     DWORD type;
     DWORD data_size;
     uint8_t *buf;
@@ -837,9 +838,9 @@ ERROR_END:
     throw_windows_error("RegistoryError", ret);
     return FALSE;
 }
-static int regkey_setvalue_sub(HKEY hkey, Str s_value, DWORD type, const void *buf, int size)
+static int regkey_setvalue_sub(HKEY hkey, RefStr *r_value, DWORD type, const void *buf, int size)
 {
-    wchar_t *value_name = Str_to_wstr(s_value);
+    wchar_t *value_name = cstr_to_wstr(r_value->c, r_value->size);
     int ret = RegSetValueEx(hkey, value_name, 0, type, (const BYTE*)buf, size);
 
     free(value_name);
@@ -868,7 +869,7 @@ static int regkey_setint(Value *vret, Value *v, RefNode *node)
     } else {
         size = 8;
     }
-    if (!regkey_setvalue_sub(r->hkey, fs->Value_str(v[1]), type, &i64, size)) {
+    if (!regkey_setvalue_sub(r->hkey, Value_vp(v[1]), type, &i64, size)) {
         return FALSE;
     }
     return TRUE;
@@ -881,9 +882,10 @@ static int regkey_setstr(Value *vret, Value *v, RefNode *node)
 {
     RefRegKey *r = Value_vp(*v);
     DWORD type = FUNC_INT(node);
-    wchar_t *buf = Str_to_wstr(fs->Value_str(v[2]));
+    RefStr *r_value = Value_vp(v[2]);
+    wchar_t *buf = cstr_to_wstr(r_value->c, r_value->size);
 
-    if (!regkey_setvalue_sub(r->hkey, fs->Value_str(v[1]), type, buf, (wcslen(buf) + 1) * sizeof(wchar_t*))) {
+    if (!regkey_setvalue_sub(r->hkey, Value_vp(v[1]), type, buf, (wcslen(buf) + 1) * sizeof(wchar_t*))) {
         free(buf);
         return FALSE;
     }
@@ -917,7 +919,7 @@ static int regiter_next(Value *vret, Value *v, RefNode *node)
             int write_mode = r_p->write_mode;
             HKEY hKey2;
             int ret;
-            Str path_s = fs->Value_str(r_p->path);
+            RefStr *path_r = Value_vp(r_p->path);
 
             if (write_mode) {
                 ret = RegCreateKeyExW(hKey, wbuf, 0, NULL, REG_OPTION_NON_VOLATILE, KEY_WRITE, NULL, &hKey2, NULL);
@@ -939,7 +941,7 @@ static int regiter_next(Value *vret, Value *v, RefNode *node)
                 r2->write_mode = write_mode;
 
                 cbuf = wstr_to_cstr(wbuf);
-                r2->path = fs->printf_Value("%S\\%s", path_s, cbuf);
+                r2->path = fs->printf_Value("%r\\%s", path_r, cbuf);
                 free(cbuf);
                 r->v[INDEX_REGITER_CUR] = int32_Value(cur);
                 return TRUE;

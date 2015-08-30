@@ -1,10 +1,3 @@
-/*
- * form.c
- *
- *  Created on: 2012/01/14
- *      Author: frog
- */
-
 #define NOT_DEFINE_BOOL
 #include "gui_compat.h"
 #include "m_gui.h"

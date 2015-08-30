@@ -117,21 +117,21 @@ static void load_charset_info_file(const char *filename)
                     goto ERROR_END;
                 }
                 Tok_simple_next(&tk);
-                if (Str_eq_p(key, "iana")) {
+                if (str_eq(key.p, key.size, "iana", -1)) {
                     if (tk.v.type != TL_STR) {
                         goto ERROR_END;
                     }
                     cs->iana = intern(tk.str_val.p, tk.str_val.size);
-                } else if (Str_eq_p(key, "iconv")) {
+                } else if (str_eq(key.p, key.size, "iconv", -1)) {
                     if (tk.v.type != TL_STR) {
                         goto ERROR_END;
                     }
                     cs->ic_name = intern(tk.str_val.p, tk.str_val.size);
-                } else if (Str_eq_p(key, "ascii_compat")) {
+                } else if (str_eq(key.p, key.size, "ascii_compat", -1)) {
                     if (tk.v.type == TL_VAR) {
-                        if (Str_eq_p(tk.str_val, "true")) {
+                        if (str_eq(tk.str_val.p, tk.str_val.size, "true", -1)) {
                             cs->ascii = TRUE;
-                        } else if (Str_eq_p(tk.str_val, "false")) {
+                        } else if (str_eq(tk.str_val.p, tk.str_val.size, "false", -1)) {
                             cs->ascii = FALSE;
                         } else {
                             goto ERROR_END;
@@ -189,12 +189,6 @@ RefCharset *get_charset_from_name(const char *src_p, int src_size)
     }
     buf[j] = '\0';
     return Hash_get(&charset_entries, buf, j);
-}
-RefCharset *get_charset_from_cp(int cp)
-{
-    char buf[32];
-    sprintf(buf, "CP%d", cp);
-    return get_charset_from_name(buf, -1);
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

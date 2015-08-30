@@ -1,4 +1,0 @@
-locale=es_CL
-Bali:balinés
-005:Sudamérica
-EH:Sahara Occidental

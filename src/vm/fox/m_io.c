@@ -573,10 +573,10 @@ static int stream_gets(Value *vret, Value *v, RefNode *node)
 }
 static int stream_fetch(Value *vret, Value *v, RefNode *node)
 {
-    int size = Value_int64(v[1], NULL);
+    int size = Value_int32(v[1]);
     RefStr *rs;
     if (size < 0 || size > MAGIC_MAX) {
-        throw_error_select(THROW_MAX_ALLOC_OVER__INT, fs->max_alloc);
+        throw_errorf(fs->mod_lang, "ValueError", "Illigal range (0 - %d)", MAGIC_MAX);
         return FALSE;
     }
 
@@ -919,29 +919,29 @@ static int stream_pack_int(Value *vret, StrBuf *sb, Value v, int size, int le)
     if (Value_isref(v)) {
         RefInt *mpt = Value_vp(v);
 
-        mp_int mp;
-        mp_init(&mp);
-        mp_copy(&mpt->mp, &mp);
+        BigInt mp;
+        BigInt_init(&mp);
+        BigInt_copy(&mp, &mpt->bi);
 
-        if (mp.sign == MP_NEG) {
+        if (mp.sign < 0) {
             // ビット反転して+1
-            mp.sign = MP_ZPOS;
+            mp.sign = 1;
             for (i = 0; i < size; i++) {
-                mp.dp[i] = ~mp.dp[i];
+                mp.d[i] = ~mp.d[i];
             }
-            mp_add_d(&mp, 1, &mp);
+            BigInt_add_d(&mp, 1);
         }
 
         for (i = 0; i < size; i++) {
             int n = i / 2;
             uint8_t val;
 
-            if (n < mp.used) {
+            if (n < mp.size) {
                 int d = i % 2;
                 if (d == 0) {
-                    val = mp.dp[n] & 0xFF;
+                    val = mp.d[n] & 0xFF;
                 } else {
-                    val = mp.dp[n] >> 8;
+                    val = mp.d[n] >> 8;
                 }
             } else {
                 val = 0;
@@ -952,7 +952,7 @@ static int stream_pack_int(Value *vret, StrBuf *sb, Value v, int size, int le)
                 buf[size - i - 1] = val;
             }
         }
-        mp_clear(&mp);
+        BigInt_close(&mp);
     } else {
         uint32_t iv = Value_integral(v);
         for (i = 0; i < size; i++) {
@@ -2013,7 +2013,9 @@ static int bytesio_splice(Value *vret, Value *v, RefNode *node)
     if (fg->stk_top > v + 3) {
         RefNode *v3_type = Value_type(v[3]);
         if (v3_type == fs->cls_bytes) {
-            append = Value_str(v[3]);
+            RefStr *rs = Value_vp(v[3]);
+            append.p = rs->c;
+            append.size = rs->size;
         } else if (v3_type == fs->cls_int) {
             int64_t n = Value_int64(v[3], NULL);
             if (n < 0 || n > 255) {

@@ -117,6 +117,15 @@ static Str Str_trim(Str src)
     s.size = j - i;
     return s;
 }
+static Str Value_str(Value v)
+{
+    RefStr *rs = Value_vp(v);
+    if (rs != NULL) {
+        return Str_new(rs->c, rs->size);
+    } else {
+        return fs->Str_EMPTY;
+    }
+}
 
 static NativeFunc get_function_ptr(RefNode *node, RefStr *name)
 {
@@ -619,7 +628,7 @@ static int node_tostr_xml(StrBuf *buf, Value dst, Value v, XMLOutputFormat *xof,
     RefNode *v_type = fs->Value_type(v);
 
     if (v_type == cls_text) {
-        Str s = fs->Value_str(v);
+        Str s = Value_str(v);
         if (level >= 0 && !xof->pretty && !xof->keep_space) {
             s = Str_trim(s);
             if (s.size == 0) {
@@ -634,7 +643,7 @@ static int node_tostr_xml(StrBuf *buf, Value dst, Value v, XMLOutputFormat *xof,
             return FALSE;
         }
     } else if (v_type == cls_comment) {
-        Str s = fs->Value_str(v);
+        Str s = Value_str(v);
         if (level >= 0 && !xof->pretty && !xof->keep_space) {
             s = Str_trim(s);
             if (s.size == 0) {
@@ -686,7 +695,7 @@ static int node_tostr_xml(StrBuf *buf, Value dst, Value v, XMLOutputFormat *xof,
             for (i = 0; i < rm->entry_num; i++) {
                 HashValueEntry *h = rm->entry[i];
                 for (; h != NULL; h = h->next) {
-                    Str key = fs->Value_str(h->key);
+                    Str key = Value_str(h->key);
                     if (xof->html && html_attr_no_value(key)) {
                         if (!fs->StrBuf_add_c(buf, ' ') ||
                             !fs->StrBuf_add(buf, key.p, key.size)) {
@@ -698,7 +707,7 @@ static int node_tostr_xml(StrBuf *buf, Value dst, Value v, XMLOutputFormat *xof,
                             !fs->StrBuf_add(buf, "=\"", 2)) {
                             return FALSE;
                         }
-                        if (!text_convert_html(buf, fs->Value_str(h->val), TRUE, xof)) {
+                        if (!text_convert_html(buf, Value_str(h->val), TRUE, xof)) {
                             return FALSE;
                         }
                         if (!fs->StrBuf_add_c(buf, '"')) {
@@ -881,25 +890,25 @@ static int xml_parse_format(XMLOutputFormat *xof, const char *fmt_p, int fmt_siz
         if (fm.size > 0) {
             switch (fm.p[0]) {
             case 'a':
-                if (fm.size == 1 || Str_eq_p(fm, "ascii")) {
+                if (fm.size == 1 || str_eq(fm.p, fm.size, "ascii", -1)) {
                     xof->ascii = TRUE;
                     found = TRUE;
                 }
                 break;
             case 'h':
-                if (fm.size == 1 || Str_eq_p(fm, "html")) {
+                if (fm.size == 1 || str_eq(fm.p, fm.size, "html", -1)) {
                     xof->html = TRUE;
                     found = TRUE;
                 }
                 break;
             case 'x':
-                if (fm.size == 1 || Str_eq_p(fm, "xml")) {
+                if (fm.size == 1 || str_eq(fm.p, fm.size, "xml", -1)) {
                     xof->html = FALSE;
                     found = TRUE;
                 }
                 break;
             case 'p':
-                if (fm.size == 1 || Str_eq_p(fm, "pretty")) {
+                if (fm.size == 1 || str_eq(fm.p, fm.size, "pretty", -1)) {
                     xof->pretty = TRUE;
                     found = TRUE;
                 }
@@ -1510,7 +1519,7 @@ static int xml_node_text(Value *vret, Value *v, RefNode *node)
  */
 static int xml_elem_css(Value *vret, Value *v, RefNode *node)
 {
-    if (!select_css(vret, v, 1, fs->Value_str(v[1]))) {
+    if (!select_css(vret, v, 1, Value_str(v[1]))) {
         return FALSE;
     }
 
@@ -1590,7 +1599,7 @@ static int xml_node_list_css(Value *vret, Value *v, RefNode *node)
 {
     RefArray *ra = Value_vp(*v);
 
-    if (!select_css(vret, ra->p, ra->size, fs->Value_str(v[1]))) {
+    if (!select_css(vret, ra->p, ra->size, Value_str(v[1]))) {
         return FALSE;
     }
     return TRUE;
@@ -1602,7 +1611,7 @@ static int xml_node_remove_css(Value *vret, Value *v, RefNode *node)
     int result = FALSE;
 
     if (v1_type == fs->cls_str) {
-        result = delete_css(vret, ra->p, ra->size, fs->Value_str(v[1]));
+        result = delete_css(vret, ra->p, ra->size, Value_str(v[1]));
     } else if (v1_type == cls_nodelist) {
         result = delete_nodelist(vret, ra->p, ra->size, Value_vp(v[1]));
     } else if (v1_type == cls_elem) {
@@ -1707,7 +1716,8 @@ static int xml_document_new(Value *vret, Value *v, RefNode *node)
         fs->throw_errorf(mod_xml, "XMLParseError", "Illigal DOCTYPE");
         return FALSE;
     }
-    if (tk.type != TK_TAG_END) {
+    if (tk.type != TK_EOS) {
+        fs->throw_errorf(mod_xml, "XMLParseError", "Illigal DOCTYPE");
         return FALSE;
     }
     {
@@ -1820,7 +1830,7 @@ static int xml_document_print_header(StrBuf *buf, Ref *r, XMLOutputFormat *xof)
                 if (!fs->StrBuf_add(buf, " \"", -1)) {
                     return FALSE;
                 }
-                if (!text_convert_html(buf, fs->Value_str(r->v[INDEX_DOCUMENT_FPI]), TRUE, xof)) {
+                if (!text_convert_html(buf, Value_str(r->v[INDEX_DOCUMENT_FPI]), TRUE, xof)) {
                     return FALSE;
                 }
                 if (!fs->StrBuf_add_c(buf, '"')) {
@@ -1831,7 +1841,7 @@ static int xml_document_print_header(StrBuf *buf, Ref *r, XMLOutputFormat *xof)
                 if (!fs->StrBuf_add(buf, " \"", -1)) {
                     return FALSE;
                 }
-                if (!text_convert_html(buf, fs->Value_str(r->v[INDEX_DOCUMENT_DTD_URI]), TRUE, xof)) {
+                if (!text_convert_html(buf, Value_str(r->v[INDEX_DOCUMENT_DTD_URI]), TRUE, xof)) {
                     return FALSE;
                 }
                 if (!fs->StrBuf_add_c(buf, '"')) {

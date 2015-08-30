@@ -1,14 +1,7 @@
 project(m_math)
 
-set(MPI_COMMON
-  ../../common/mpi.c
-  ../../common/mpi2.c
-  ../../common/mplogic.c
-)
-
 add_library(m_math SHARED
   ${SRC_COMMON}
-  ${MPI_COMMON}
   m_math.c
   fox_rand.c
   fox_vector.c

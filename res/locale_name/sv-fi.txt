@@ -1,2 +1,0 @@
-locale=sv_FI
-UM:USA:s yttre öar

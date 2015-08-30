@@ -80,23 +80,23 @@ static int ssl_ctx_new(Value *vret, Value *v, RefNode *node)
 {
     const SSL_METHOD *method = NULL;
     RefNode *cls_ssl_ctx = FUNC_VP(node);
-    Str mode = fs->Value_str(v[1]);
+    RefStr *mode = Value_vp(v[1]);
     RefSSLContext *ctx = fs->buf_new(cls_ssl_ctx, sizeof(RefSSLContext));
     *vret = vp_Value(ctx);
 
     init_openssl();
 
-    if (Str_eq_p(mode, "TLSv1")) {
+    if (str_eq(mode->c, mode->size, "TLSv1", -1)) {
         method = TLSv1_client_method();
 #if 0
-    } else if (Str_eq_p(mode, "TLSv1.1")) {
+    } else if (str_eq(mode->c, mode->size, "TLSv1.1", -1)) {
         method = TLSv1_1_client_method();
-    } else if (Str_eq_p(mode, "TLSv1.2")) {
+    } else if (str_eq(mode->c, mode->size, "TLSv1.2", -1)) {
         method = TLSv1_2_client_method();
 #endif
-    } else if (Str_eq_p(mode, "DTLSv1")) {
+    } else if (str_eq(mode->c, mode->size, "DTLSv1", -1)) {
         method = DTLSv1_client_method();
-    } else if (Str_eq_p(mode, "SSLv2/3")) {
+    } else if (str_eq(mode->c, mode->size, "SSLv2/3", -1)) {
         method = SSLv23_client_method();
     } else {
         fs->throw_errorf(mod_crypt, "SSLError", "Must be 'TLSv1.0', 'TLSv1.1', 'TLSv1.2', 'DTLSv1' or 'SSLv2/3'");
@@ -158,9 +158,13 @@ static int sslsocket_read(Value *vret, Value *v, RefNode *node)
     Ref *r = Value_ref(*v);
     SSL *ssl = Value_ptr(r->v[INDEX_SSL_SSL]);
     RefBytesIO *mb = Value_vp(v[1]);
-    int size = fs->Value_int64(v[2], NULL);
+    int size = fs->Value_int32(v[2]);
     int rd;
 
+    if (size == INT32_MIN) {
+        fs->throw_errorf(fs->mod_lang, "ValueError", "Illigal range (argument #2)");
+        return FALSE;
+    }
     if (ssl == NULL) {
         fs->throw_errorf(fs->mod_io, "ReadError", "Not opened for read");
         return FALSE;
@@ -365,7 +369,7 @@ static int get_hash_type(const char *src_p, int src_size)
 }
 static int ssl_get_hash(Value *vret, Value *v, RefNode *node)
 {
-    Str src = fs->Value_str(v[1]);
+    RefStr *src = Value_vp(v[1]);
     RefStr *type_r = Value_vp(v[2]);
     int type = get_hash_type(type_r->c, type_r->size);
 
@@ -373,21 +377,21 @@ static int ssl_get_hash(Value *vret, Value *v, RefNode *node)
     case HASH_MD5: {
         RefStr *rs = fs->refstr_new_n(fs->cls_bytes, MD5_DIGEST_LENGTH);
         *vret = vp_Value(rs);
-        MD5((unsigned char *)src.p, src.size, (unsigned char *)rs->c);
+        MD5((unsigned char *)src->c, src->size, (unsigned char *)rs->c);
         rs->c[rs->size] = '\0';
         break;
     }
     case HASH_SHA1: {
         RefStr *rs = fs->refstr_new_n(fs->cls_bytes, SHA_DIGEST_LENGTH);
         *vret = vp_Value(rs);
-        SHA1((unsigned char *)src.p, src.size, (unsigned char *)rs->c);
+        SHA1((unsigned char *)src->c, src->size, (unsigned char *)rs->c);
         rs->c[rs->size] = '\0';
         break;
     }
     case HASH_SHA256: {
         RefStr *rs = fs->refstr_new_n(fs->cls_bytes, SHA256_DIGEST_LENGTH);
         *vret = vp_Value(rs);
-        SHA256((unsigned char *)src.p, src.size, (unsigned char *)rs->c);
+        SHA256((unsigned char *)src->c, src->size, (unsigned char *)rs->c);
         rs->c[rs->size] = '\0';
         break;
     }

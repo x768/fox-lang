@@ -1306,16 +1306,16 @@ static int parse_html_sub(Value *v, RefArray *v_ra, HTMLDoc *html, XMLTok *tk, S
             html->html_node_done = TRUE;
         }
 
-        if (Str_eq_p(tag_name, "html")) {
+        if (str_eq(tag_name.p, tag_name.size, "html", -1)) {
             vm = html->html_vm;
             ra = html->html_ra;
-        } else if (Str_eq_p(tag_name, "head")) {
+        } else if (str_eq(tag_name.p, tag_name.size, "head", -1)) {
             vm = html->head_vm;
             ra = html->head_ra;
-        } else if (Str_eq_p(tag_name, "body")) {
+        } else if (str_eq(tag_name.p, tag_name.size, "body", -1)) {
             vm = html->body_vm;
             ra = html->body_ra;
-        } else if (Str_eq_p(tag_name, "title")) {
+        } else if (str_eq(tag_name.p, tag_name.size, "title", -1)) {
             vm = html->title_vm;
             ra = html->title_ra;
         } else if ((tag_type & TTYPE_HEAD) != 0) {

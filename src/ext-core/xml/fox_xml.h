@@ -1,5 +1,5 @@
-#ifndef FOX_XML_H_
-#define FOX_XML_H_
+#ifndef _FOX_XML_H_
+#define _FOX_XML_H_
 
 #include "fox_io.h"
 #include "m_xml.h"
@@ -98,4 +98,4 @@ int delete_css(Value *vret, Value *v, int num, Str sel);
 int delete_nodelist(Value *vret, Value *v, int num, RefArray *ra);
 
 
-#endif /* FOX_XML_H_ */
+#endif /* _FOX_XML_H_ */

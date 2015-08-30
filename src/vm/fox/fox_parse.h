@@ -21,6 +21,9 @@ enum {
     OP_GET_LOCAL_V, // ローカル変数をstk_topにpush(var)
     OP_SET_LOCAL,   // スタック変数代入(stack index)
     OP_NOT,         // stktopの値がnull,falseならtrue else false
+
+    OP_SIZE_2,
+
     OP_JMP,         // 無条件ジャンプ
     OP_JIF,         // pop ならジャンプ
     OP_JIF_N,       // !pop ならジャンプ
@@ -28,9 +31,6 @@ enum {
     OP_IF_NP,       // ==null ならジャンプ else pop
     OP_IFP,         // !=null ならpop,jmp
     OP_IFP_N,       // ==null ならpop,jmp
-
-    OP_SIZE_2,
-
     OP_GET_FIELD,   // フィールド取得
     OP_SET_FIELD,   // フィールド設定
     OP_THROW,       // stk_topをthrow
@@ -107,7 +107,7 @@ typedef struct Tok
     int32_t int_val;
     double real_val;
     Str str_val;
-    mp_int mp_val[2];   // intの場合は0のみ使う、rationalの場合は0,1を使う
+    BigInt bi_val[2];   // intの場合は0のみ使う、rationalの場合は0,1を使う
 
     int simple_mode;   // 設定ファイル等の解析で使用する
     RefNode *module;

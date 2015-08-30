@@ -345,12 +345,12 @@ static int parse_css_selector_sub(XMLPattern **pp, int *pnum, SelectorTok *tk, M
                     attr->val = tk->val;
                     break;
                 case STK_COLON:
-                    if (Str_eq_p(tk->val, "checked")) {
+                    if (str_eq(tk->val.p, tk->val.size, "checked", -1)) {
                         attr->type = XT_ATTR_EXIST;
-                        attr->key = Str_new("checked", 7);
-                    } else if (Str_eq_p(tk->val, "selected")) {
+                        attr->key = Str_new("checked", -1);
+                    } else if (str_eq(tk->val.p, tk->val.size, "selected", -1)) {
                         attr->type = XT_ATTR_EXIST;
-                        attr->key = Str_new("selected", 8);
+                        attr->key = Str_new("selected", -1);
                     } else {
                         goto ERROR_END;
                     }

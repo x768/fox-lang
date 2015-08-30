@@ -41,6 +41,45 @@ static Hash *load_type_function(Mem *mem)
     return &mods;
 }
 
+/**
+ * 8bit  ->      0 -   255 or -1.0 - 1.0
+ * 16bit -> -32768 - 32767 or -1.0 - 1.0
+ */
+static int value_to_audio_range(Value v, int width)
+{
+    int upper, lower;
+    RefNode *type = fs->Value_type(v);
+
+    if (width == 2) {
+        upper = 32767;
+        lower = -32768;
+    } else {
+        upper = 255;
+        lower = 0;
+    }
+    if (type == fs->cls_int) {
+        int err = FALSE;
+        int64_t val = fs->Value_int64(v, &err);
+        if (err || val < lower) {
+            return lower;
+        } else if (val > upper) {
+            return upper;
+        } else {
+            return (int)val;
+        }
+    } else {
+        double d = (fs->Value_float(v) * (upper - lower) + (upper + lower)) / 2.0;
+
+        if (d < (double)lower) {
+            return lower;
+        } else if (d > (double)upper) {
+            return upper;
+        } else {
+            return (int)d;
+        }
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////
 
 int Audio_set_size(RefAudio *snd, int size)
@@ -50,14 +89,14 @@ int Audio_set_size(RefAudio *snd, int size)
         fs->throw_error_select(THROW_MAX_ALLOC_OVER__INT, fs->max_alloc);
         return FALSE;
     }
-    if (snd->max < size) {
-        if (snd->max == 0) {
-            snd->max = 65536;
+    if (snd->alloc_size < size) {
+        if (snd->alloc_size == 0) {
+            snd->alloc_size = SOUND_INIT_SIZE;
         }
-        while (snd->max < size) {
-            snd->max *= 2;
+        while (snd->alloc_size < size) {
+            snd->alloc_size *= 2;
         }
-        length = snd->max * snd->width * snd->channels;
+        length = snd->alloc_size * snd->width * snd->channels;
         snd->u.u8 = realloc(snd->u.u8, length);
     }
     snd->length = size;
@@ -93,7 +132,7 @@ static int audio_new(Value *vret, Value *v, RefNode *node)
     snd->samples = samples;
     snd->width = bits / 8;
     snd->channels = channels;
-    snd->max = SOUND_INIT_SIZE;
+    snd->alloc_size = SOUND_INIT_SIZE;
     snd->length = 0;
     data_size = SOUND_INIT_SIZE * snd->width * snd->channels;
     snd->u.u8 = malloc(data_size);
@@ -321,7 +360,7 @@ static int audio_index(Value *vret, Value *v, RefNode *node)
         // -32768 - 32767
         int16_t val = snd->u.i16[pos];
         if (f) {
-            *vret = fs->float_Value(((double)val) / 32768.0);
+            *vret = fs->float_Value(fs->cls_float, ((double)val) / 32768.0);
         } else {
             *vret = int32_Value(val);
         }
@@ -329,7 +368,7 @@ static int audio_index(Value *vret, Value *v, RefNode *node)
         // 0 - 255
         uint8_t val = snd->u.u8[pos];
         if (f) {
-            *vret = fs->float_Value((((double)val) - 128.0) / 128.0);
+            *vret = fs->float_Value(fs->cls_float, (((double)val) - 128.0) / 128.0);
         } else {
             *vret = int32_Value(val);
         }
@@ -342,7 +381,7 @@ static int audio_index_set(Value *vret, Value *v, RefNode *node)
     RefAudio *snd = Value_vp(*v);
     int64_t pos = fs->Value_int64(v[1], NULL);
     int64_t ch = fs->Value_int64(v[2], NULL);
-    int64_t val = fs->Value_int64(v[3], NULL);
+    int val;
 
     if (snd->u.u8 == NULL) {
         throw_already_closed();
@@ -363,22 +402,12 @@ static int audio_index_set(Value *vret, Value *v, RefNode *node)
     if (snd->channels == 2) {
         pos = pos * 2 + ch;
     }
+    val = value_to_audio_range(v[3], snd->width);
     if (snd->width == 2) {
-        if (val < -32768) {
-            val = -32768;
-        } else if (val > 32767) {
-            val = 32767;
-        }
         snd->u.i16[pos] = val;
     } else {
-        if (val < 0) {
-            val = 0;
-        } else if (val > 255) {
-            val = 255;
-        }
         snd->u.u8[pos] = val;
     }
-
     return TRUE;
 }
 
@@ -399,7 +428,8 @@ static int audio_sub(Value *vret, Value *v, RefNode *node)
         } else if (type == cls_timedelta) {
             begin = begin * snd->samples / 1000;
         } else if (type == fs->cls_str) {
-            if (!fs->timedelta_parse_string(&begin, fs->Value_str(v[1]))) {
+            RefStr *rs = Value_vp(v[1]);
+            if (!fs->timedelta_parse_string(&begin, rs->c, rs->size)) {
                 fs->throw_errorf(fs->mod_lang, "ValueError", "Invalid time format");
                 return FALSE;
             }
@@ -427,7 +457,8 @@ static int audio_sub(Value *vret, Value *v, RefNode *node)
         } else if (type == cls_timedelta) {
             end = end * snd->samples / 1000;
         } else if (type == fs->cls_str) {
-            if (!fs->timedelta_parse_string(&end, fs->Value_str(v[2]))) {
+            RefStr *rs = Value_vp(v[2]);
+            if (!fs->timedelta_parse_string(&end, rs->c, rs->size)) {
                 fs->throw_errorf(fs->mod_lang, "ValueError", "Invalid time format");
                 return FALSE;
             }
@@ -453,10 +484,57 @@ static int audio_sub(Value *vret, Value *v, RefNode *node)
         RefAudio *snd2 = fs->buf_new(cls_audio, sizeof(RefAudio));
         *vret = vp_Value(snd2);
         *snd2 = *snd;
-        snd2->max = 0;
+        snd2->alloc_size = 0;
         snd2->u.u8 = NULL;
         Audio_set_size(snd2, size2);
         memcpy(snd2->u.u8, snd->u.u8 + (begin * n), size2 * n);
+    }
+
+    return TRUE;
+}
+static int audio_push(Value *vret, Value *v, RefNode *node)
+{
+    RefAudio *snd = Value_vp(*v);
+    Value v1 = v[1];
+    RefNode *v1_type = fs->Value_type(v1);
+    int pos = snd->length;
+
+    if (snd->u.u8 == NULL) {
+        throw_already_closed();
+        return FALSE;
+    }
+
+    snd->length++;
+    if (snd->alloc_size < snd->length) {
+        snd->alloc_size *= 2;
+        snd->u.u8 = realloc(snd->u.u8, snd->alloc_size);
+    }
+
+    if (snd->channels == 2) {
+        int val1, val2;
+        Value v2 = v[2];
+        RefNode *v2_type = fs->Value_type(v2);
+
+        if (v1_type != v2_type) {
+            fs->throw_error_select(THROW_ARGMENT_TYPE__NODE_NODE_INT, v1_type, v2_type, 2);
+            return FALSE;
+        }
+        val1 = value_to_audio_range(v1, snd->width);
+        val2 = value_to_audio_range(v2, snd->width);
+        if (snd->width == 2) {
+            snd->u.i16[pos * 2 + 0] = val1;
+            snd->u.i16[pos * 2 + 1] = val2;
+        } else {
+            snd->u.u8[pos * 2 + 0] = val1;
+            snd->u.u8[pos * 2 + 1] = val2;
+        }
+    } else {
+        int val1 = value_to_audio_range(v1, snd->width);
+        if (snd->width == 2) {
+            snd->u.i16[pos] = val1;
+        } else {
+            snd->u.u8[pos] = val1;
+        }
     }
 
     return TRUE;
@@ -477,11 +555,11 @@ static int audio_write(Value *vret, Value *v, RefNode *node)
         fs->throw_errorf(fs->mod_lang, "ValueError", "Data length must be %d * n", n);
         return FALSE;
     }
-    if (snd->max < snd->length + data_size) {
-        while (snd->max < snd->length + data_size) {
-            snd->max *= 2;
+    if (snd->alloc_size < snd->length + data_size) {
+        while (snd->alloc_size < snd->length + data_size) {
+            snd->alloc_size *= 2;
         }
-        snd->u.u8 = realloc(snd->u.u8, snd->max);
+        snd->u.u8 = realloc(snd->u.u8, snd->alloc_size);
     }
     memcpy(snd->u.u8 + snd->length * n, data, data_size);
     snd->length += data_size / n;
@@ -522,7 +600,7 @@ static int audio_convert(Value *vret, Value *v, RefNode *node)
     snd->samples = samples;
     snd->width = bits / 8;
     snd->channels = channels;
-    snd->max = SOUND_INIT_SIZE;
+    snd->alloc_size = SOUND_INIT_SIZE;
     snd->length = 0;
     data_size = SOUND_INIT_SIZE * snd->width * snd->channels;
     snd->u.u8 = malloc(data_size);
@@ -614,6 +692,8 @@ static void define_class(RefNode *m)
     fs->define_native_func_a(n, audio_sub, 1, 2, NULL, NULL, NULL);
     n = fs->define_identifier(m, cls, "dup", NODE_FUNC_N, 0);
     fs->define_native_func_a(n, audio_sub, 0, 0, NULL);
+    n = fs->define_identifier(m, cls, "push", NODE_FUNC_N, 0);
+    fs->define_native_func_a(n, audio_push, 1, 2, NULL, fs->cls_number, fs->cls_number);
     n = fs->define_identifier(m, cls, "write", NODE_FUNC_N, 0);
     fs->define_native_func_a(n, audio_write, 1, 1, NULL, fs->cls_bytesio);
     n = fs->define_identifier(m, cls, "convert", NODE_FUNC_N, 0);

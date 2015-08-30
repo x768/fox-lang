@@ -17,7 +17,8 @@
 typedef struct OpBuf
 {
     OpCode *p;
-    int cur, max, prev;
+    int cur, prev;
+    int alloc_size;
     int n_stack;
 } OpBuf;
 
@@ -28,7 +29,7 @@ static const char *token_name[] = {
     "&&", "||", "..", "...", "=>", "~X", "!X", "+X", "-X",
     "=", "+=", "-=", "*=", "/=", "%=", "<<=", ">>=", "&=", "|=", "^=", "++", "--", "in",
 
-    ")", "{", "}", "]", "(", "[", ",", ";", ".X",
+    ")", "{", "}", "]", "(", "[", ",", ";", ".X", "a=>",
 
     "(Pragma)", "(Int)", "(Int)", "(Float)", "(Rational)", "(Str)", "(Bytes)", "(Regex)", "(Class)", "(var)", "(const)",
     "(Str)", "(Str)", "(Str)", "(Str)",
@@ -90,9 +91,9 @@ static void OpBuf_init(OpBuf *buf)
 {
     buf->cur = 0;
     buf->prev = -1;
-    buf->max = 32;
+    buf->alloc_size = 32;
     buf->n_stack = 0;
-    buf->p = malloc(sizeof(OpCode) * buf->max);
+    buf->p = malloc(sizeof(OpCode) * buf->alloc_size);
 }
 static void OpBuf_close(OpBuf *buf)
 {
@@ -119,9 +120,9 @@ static int OpBuf_add_op1(OpBuf *buf, int32_t type, int32_t s)
     };
     OpCode *op;
 
-    if (buf->max <= buf->cur + OP_SIZE) {
-        buf->max *= 2;
-        buf->p = realloc(buf->p, sizeof(OpCode) * buf->max);
+    if (buf->alloc_size <= buf->cur + OP_SIZE) {
+        buf->alloc_size *= 2;
+        buf->p = realloc(buf->p, sizeof(OpCode) * buf->alloc_size);
     }
 
     op = &buf->p[buf->cur];
@@ -149,9 +150,9 @@ static int OpBuf_add_op2(OpBuf *buf, int32_t type, int32_t s, Value v1)
     };
     OpCode *op;
 
-    if (buf->max <= buf->cur + OP_SIZE) {
-        buf->max *= 2;
-        buf->p = realloc(buf->p, sizeof(OpCode) * buf->max);
+    if (buf->alloc_size <= buf->cur + OP_SIZE) {
+        buf->alloc_size *= 2;
+        buf->p = realloc(buf->p, sizeof(OpCode) * buf->alloc_size);
     }
 
     op = &buf->p[buf->cur];
@@ -184,9 +185,9 @@ static int OpBuf_add_op3(OpBuf *buf, int32_t type, int32_t s, Value v1, Value v2
     };
     OpCode *op;
 
-    if (buf->max <= buf->cur + OP_SIZE) {
-        buf->max *= 2;
-        buf->p = realloc(buf->p, sizeof(OpCode) * buf->max);
+    if (buf->alloc_size <= buf->cur + OP_SIZE) {
+        buf->alloc_size *= 2;
+        buf->p = realloc(buf->p, sizeof(OpCode) * buf->alloc_size);
     }
 
     op = &buf->p[buf->cur];
@@ -212,9 +213,9 @@ static int OpBuf_add_op3(OpBuf *buf, int32_t type, int32_t s, Value v1, Value v2
 }
 static void OpBuf_grow(OpBuf *buf, int n)
 {
-    if (buf->max <= buf->cur + n) {
-        buf->max *= 2;
-        buf->p = realloc(buf->p, sizeof(OpCode) * buf->max);
+    if (buf->alloc_size <= buf->cur + n) {
+        buf->alloc_size *= 2;
+        buf->p = realloc(buf->p, sizeof(OpCode) * buf->alloc_size);
     }
     buf->cur += n;
 }
@@ -757,10 +758,10 @@ static int parse_elem(OpBuf *buf, Block *bk, Tok *tk)
         Tok_next(tk);
         break;
     }
-    case TL_MPINT: {
+    case TL_BIGINT: {
         RefInt *mp = buf_new(fs->cls_int, sizeof(RefInt));
         Value v = vp_Value(mp);
-        mp->mp = tk->mp_val[0];
+        mp->bi = tk->bi_val[0];
         OpBuf_add_op2(buf, OP_LITERAL, 0, v);
         Tok_next(tk);
         break;
@@ -768,8 +769,8 @@ static int parse_elem(OpBuf *buf, Block *bk, Tok *tk)
     case TL_FRAC: {
         RefFrac *md = buf_new(fs->cls_frac, sizeof(RefFrac));
         Value v = vp_Value(md);
-        md->md[0] = tk->mp_val[0];
-        md->md[1] = tk->mp_val[1];
+        md->bi[0] = tk->bi_val[0];
+        md->bi[1] = tk->bi_val[1];
         OpBuf_add_op2(buf, OP_LITERAL, 0, v);
         Tok_next(tk);
         break;
@@ -2603,7 +2604,7 @@ static int parse_statements(OpBuf *buf, Block *bk, Tok *tk, RefNode *klass)
             }
             break;
         case TL_INT:
-        case TL_MPINT:
+        case TL_BIGINT:
         case TL_FLOAT:
         case TL_STR:
         case TL_REGEX:
@@ -3323,6 +3324,7 @@ static int load_max_alloc(void)
             } else {
                 fs->max_alloc = max_alloc;
             }
+            BigInt_set_max_alloc(fs->max_alloc);
             return TRUE;
         }
     }
@@ -3388,13 +3390,13 @@ static int parse_pragma(RefNode *module, Tok *tk, Str line)
 
     switch (key.p[0]) {
     case 'c':
-        if (Str_eq_p(key, "cgi")) {
+        if (str_eq(key.p, key.size, "cgi", -1)) {
             fs->cgi_mode = TRUE;
             return TRUE;
         }
         break;
     case 'f':
-        if (Str_eq_p(key, "foxinfo")) {
+        if (str_eq(key.p, key.size, "foxinfo", -1)) {
             if (module == fv->startup) {
                 if (fs->cgi_mode) {
                     cgi_init_responce();
@@ -3581,7 +3583,7 @@ BREAK2:
             throw_syntax_error(tk, "'super' cannot use here");
             return FALSE;
         case TL_INT:
-        case TL_MPINT:
+        case TL_BIGINT:
         case TL_FLOAT:
         case TL_STR:
         case TL_REGEX:

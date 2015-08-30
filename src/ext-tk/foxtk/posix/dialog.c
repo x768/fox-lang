@@ -59,21 +59,21 @@ int confirm_dialog(RefStr *msg, RefStr *title, WndHandle parent)
  * *.bmp;*.jpg -> "*.bmp;*.jpg", "*.bmp;*.jpg"
  * Image file:*.bmp;*.jpg -> "Image file", "*.bmp;*.jpg"
  */
-static void split_filter_name(Str *name, Str *filter, Str src)
+static void split_filter_name(Str *name, Str *filter, RefStr *src)
 {
     int i;
 
-    for (i = src.size - 1; i >= 0; i--) {
-        if (src.p[i] == ':') {
-            name->p = src.p;
+    for (i = src->size - 1; i >= 0; i--) {
+        if (src->c[i] == ':') {
+            name->p = src->c;
             name->size = i;
-            filter->p = src.p + i + 1;
-            filter->size = src.size - i - 1;
+            filter->p = src->c + i + 1;
+            filter->size = src->size - i - 1;
             return;
         }
     }
-    *name = src;
-    *filter = src;
+    *name = Str_new(src->c, src->size);
+    *filter = *name;
 }
 
 static void file_open_dialog_add_filter(GtkFileChooser *dlg, Str name, Str filter)
@@ -105,10 +105,9 @@ static void file_open_dialog_add_filter(GtkFileChooser *dlg, Str name, Str filte
     gtk_file_chooser_add_filter(dlg, fr);
 }
 
-int file_open_dialog(Value *vret, Str title, RefArray *filter, WndHandle parent, int type)
+int file_open_dialog(Value *vret, const char *title, RefArray *filter, WndHandle parent, int type)
 {
     int ret = FALSE;
-    char *title_p = fs->str_dup_p(title.p, title.size, NULL);
     GtkWidget *dialog;
     int type_id;
     const char *btn_id = "document-open";
@@ -127,7 +126,7 @@ int file_open_dialog(Value *vret, Str title, RefArray *filter, WndHandle parent,
         break;
     }
 
-    dialog = gtk_file_chooser_dialog_new(title_p,
+    dialog = gtk_file_chooser_dialog_new(title,
             GTK_WINDOW(parent),
             type_id,
             "Cancel", GTK_RESPONSE_CANCEL,
@@ -146,7 +145,7 @@ int file_open_dialog(Value *vret, Str title, RefArray *filter, WndHandle parent,
         int i;
         for (i = 0; i < filter->size; i++) {
             Str name, ft;
-            split_filter_name(&name, &ft, fs->Value_str(filter->p[i]));
+            split_filter_name(&name, &ft, Value_vp(filter->p[i]));
             file_open_dialog_add_filter(GTK_FILE_CHOOSER(dialog), name, ft);
         }
     }
@@ -181,7 +180,6 @@ int file_open_dialog(Value *vret, Str title, RefArray *filter, WndHandle parent,
         }
     }
     gtk_widget_destroy(dialog);
-    free(title_p);
 
     return ret;
 }

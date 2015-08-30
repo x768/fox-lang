@@ -19,6 +19,15 @@ assert_equal 4 % -3, -2
 assert_equal -4 / -3, 1
 assert_equal -4 % -3, -1
 
+assert_equal 4_000_000_000 / 3_000_000_000, 1
+assert_equal 4_000_000_000 % 3_000_000_000, 1_000_000_000
+assert_equal -4_000_000_000 / 3_000_000_000, -2
+assert_equal -4_000_000_000 % 3_000_000_000, 2_000_000_000
+assert_equal 4_000_000_000 / -3_000_000_000, -2
+assert_equal 4_000_000_000 % -3_000_000_000, -2_000_000_000
+assert_equal -4_000_000_000 / -3_000_000_000, 1
+assert_equal -4_000_000_000 % -3_000_000_000, -1_000_000_000
+
 assert_error () => 1 / 0, ZeroDivisionError
 
 assert_equal Int(10.0), 10

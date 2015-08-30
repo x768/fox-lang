@@ -3,6 +3,7 @@ project(m_markdown)
 add_library(m_markdown SHARED
   ${SRC_COMMON}
   m_markdown.c
+  md_parse.c
 )
 set_target_properties(m_markdown
   PROPERTIES

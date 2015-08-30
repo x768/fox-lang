@@ -255,7 +255,7 @@ static int color_rgb(Value *vret, Value *v, RefNode *node)
     int i;
 
     for (i = 0; i < argc; i++) {
-        int val = fs->Value_int64(v[i + 1], NULL);
+        int64_t val = fs->Value_int64(v[i + 1], NULL);
 
         if (val < 0) {
             val = 0;
@@ -298,14 +298,36 @@ static int color_hsl(Value *vret, Value *v, RefNode *node)
 }
 static int color_cmyk(Value *vret, Value *v, RefNode *node)
 {
+    int r, g, b;
     int c = fs->Value_int64(v[1], NULL);
     int m = fs->Value_int64(v[2], NULL);
     int y = fs->Value_int64(v[3], NULL);
     int k = fs->Value_int64(v[4], NULL);
 
-    int r = (255 - c) * (255 - k) / 255;
-    int g = (255 - m) * (255 - k) / 255;
-    int b = (255 - y) * (255 - k) / 255;
+    if (c < 0) {
+        c = 0;
+    } else if (c > 255) {
+        c = 255;
+    }
+    if (m < 0) {
+        m = 0;
+    } else if (m > 255) {
+        m = 255;
+    }
+    if (y < 0) {
+        y = 0;
+    } else if (y > 255) {
+        y = 255;
+    }
+    if (k < 0) {
+        k = 0;
+    } else if (k > 255) {
+        k = 255;
+    }
+
+    r = (255 - c) * (255 - k) / 255;
+    g = (255 - m) * (255 - k) / 255;
+    b = (255 - y) * (255 - k) / 255;
     
     if (r < 0) {
         r = 0;
@@ -326,17 +348,20 @@ static int color_cmyk(Value *vret, Value *v, RefNode *node)
 
     return TRUE;
 }
-static int color_parse_name(uint32_t *ret, Str name)
+static int color_parse_name(uint32_t *ret, const char *name_p, int name_size)
 {
     int i;
     char buf[16];
 
-    if (name.size >= sizeof(buf)) {
+    if (name_size < 0) {
+        name_size = strlen(name_p);
+    }
+    if (name_size >= sizeof(buf)) {
         return FALSE;
     }
 
-    for (i = 0; i < name.size; i++) {
-        int ch = name.p[i];
+    for (i = 0; i < name_size; i++) {
+        int ch = name_p[i];
 
         if (!isupper_fox(ch) && !islower_fox(ch)) {
             return FALSE;
@@ -443,28 +468,28 @@ static int read_percent_or_float(double *result, const char **pp, const char *en
 // CSS3の色表記をparseする
 static int color_parse(Value *vret, Value *v, RefNode *node)
 {
-    Str s = fs->Value_str(v[1]);
+    RefStr *s = Value_vp(v[1]);
     int i;
     uint32_t ret = 0;
 
-    if (color_parse_name(&ret, s)) {
+    if (color_parse_name(&ret, s->c, s->size)) {
         *vret = integral_Value(cls_color, ret);
         return TRUE;
     }
 
-    if (s.size >= 4 && s.p[0] == '#') {
-        if (s.size == 4) {
+    if (s->size >= 4 && s->c[0] == '#') {
+        if (s->size == 4) {
             for (i = 0; i < 3; i++) {
-                int j = char2hex(s.p[i + 1]);
+                int j = char2hex(s->c[i + 1]);
                 if (j < 0) {
                     goto ERROR;
                 }
                 ret |= (j << (i * 8 + 4)) | (j << (i * 8));
             }
-        } else if (s.size == 7) {
+        } else if (s->size == 7) {
             for (i = 0; i < 3; i++) {
-                int j = char2hex(s.p[i*2 + 1]);
-                int k = char2hex(s.p[i*2 + 2]);
+                int j = char2hex(s->c[i*2 + 1]);
+                int k = char2hex(s->c[i*2 + 2]);
                 if (j < 0 || k < 0) {
                     goto ERROR;
                 }
@@ -474,13 +499,13 @@ static int color_parse(Value *vret, Value *v, RefNode *node)
             goto ERROR;
         }
         ret |= COLOR_A_MASK;
-    } else if (s.size > 5 && (memcmp(s.p, "rgb(", 4) == 0 || memcmp(s.p, "rgba(", 5) == 0) && s.p[s.size - 1] == ')') {
+    } else if (s->size > 5 && (memcmp(s->c, "rgb(", 4) == 0 || memcmp(s->c, "rgba(", 5) == 0) && s->c[s->size - 1] == ')') {
         const char *p;
-        const char *end = s.p + s.size - 1;
-        if (s.p[3] == '(') {
-            p = s.p + 4;
+        const char *end = s->c + s->size - 1;
+        if (s->c[3] == '(') {
+            p = s->c + 4;
         } else {
-            p = s.p + 5;
+            p = s->c + 5;
         }
 
         for (i = 0; i < 3; i++) {
@@ -490,7 +515,7 @@ static int color_parse(Value *vret, Value *v, RefNode *node)
             }
             ret |= j << (i * 8);
         }
-        if (s.p[3] == '(') {
+        if (s->c[3] == '(') {
             ret |= COLOR_A_MASK;
         } else {
             double d;
@@ -508,14 +533,14 @@ static int color_parse(Value *vret, Value *v, RefNode *node)
         if (p < end) {
             goto ERROR;
         }
-    } else if (s.size > 5 && (memcmp(s.p, "hsl(", 4) == 0 || memcmp(s.p, "hsla(", 5) == 0) && s.p[s.size - 1] == ')') {
+    } else if (s->size > 5 && (memcmp(s->c, "hsl(", 4) == 0 || memcmp(s->c, "hsla(", 5) == 0) && s->c[s->size - 1] == ')') {
         const char *p;
-        const char *end = s.p + s.size - 1;
+        const char *end = s->c + s->size - 1;
         double vh, vs, vl;
-        if (s.p[3] == '(') {
-            p = s.p + 4;
+        if (s->c[3] == '(') {
+            p = s->c + 4;
         } else {
-            p = s.p + 5;
+            p = s->c + 5;
         }
 
         if (!read_percent_or_float(&vh, &p, end, TRUE)) {
@@ -529,7 +554,7 @@ static int color_parse(Value *vret, Value *v, RefNode *node)
         }
         ret = color_hsl_sub(vh, vs, vl);
 
-        if (s.p[3] == '(') {
+        if (s->c[3] == '(') {
             ret |= COLOR_A_MASK;
         } else {
             double d;
@@ -583,9 +608,9 @@ static int color_marshal_write(Value *vret, Value *v, RefNode *node)
 static int color_get_rgb(Value *vret, Value *v, RefNode *node)
 {
     int ord = FUNC_INT(node);
-    int val = fs->Value_int64(*v, NULL);
+    uint32_t ival = Value_integral(*v);
 
-    *vret = int32_Value((val >> (ord * 8)) & 0xFF);
+    *vret = int32_Value((ival >> (ord * 8)) & 0xFF);
 
     return TRUE;
 }
@@ -593,11 +618,11 @@ static int color_get_hsl(Value *vret, Value *v, RefNode *node)
 {
     double ret[3];
     int ord = FUNC_INT(node);
-    int val = fs->Value_int64(*v, NULL);
+    uint32_t ival = Value_integral(*v);
     RefFloat *rd = fs->buf_new(fs->cls_float, sizeof(RefFloat));
     *vret = vp_Value(rd);
 
-    color_to_hsl(&ret[0], &ret[1], &ret[2], val);
+    color_to_hsl(&ret[0], &ret[1], &ret[2], ival);
     rd->d = ret[ord];
 
     return TRUE;
@@ -605,8 +630,8 @@ static int color_get_hsl(Value *vret, Value *v, RefNode *node)
 
 static int color_tostr(Value *vret, Value *v, RefNode *node)
 {
-    Str fmt;
-    int val = Value_integral(*v);
+    RefStr *fmt;
+    uint32_t val = Value_integral(*v);
     char buf[64];
     int r = (val & COLOR_R_MASK) >> COLOR_R_SHIFT;
     int g = (val & COLOR_G_MASK) >> COLOR_G_SHIFT;
@@ -614,39 +639,38 @@ static int color_tostr(Value *vret, Value *v, RefNode *node)
     int a = (val & COLOR_A_MASK) >> COLOR_A_SHIFT;
 
     if (fg->stk_top > v + 1) {
-        fmt = fs->Value_str(v[1]);
+        fmt = Value_vp(v[1]);
     } else {
-        fmt.p = NULL;
-        fmt.size = 0;
+        fmt = fs->str_0;
     }
 
-    if (Str_eq_p(fmt, "")) {
+    if (fmt->size == 0) {
         if (a == 255) {
             sprintf(buf, "Color(r=%d, g=%d, b=%d)", r, g, b);
         } else {
             sprintf(buf, "Color(r=%d, g=%d, b=%d, a=%d)", r, g, b, a);
         }
-    } else if (Str_eq_p(fmt, "hex")) {
+    } else if (str_eq(fmt->c, fmt->size, "hex", -1)) {
         sprintf(buf, "#%02x%02x%02x", r, g, b);
-    } else if (Str_eq_p(fmt, "HEX")) {
+    } else if (str_eq(fmt->c, fmt->size, "HEX", -1)) {
         sprintf(buf, "#%02X%02X%02X", r, g, b);
-    } else if (Str_eq_p(fmt, "x")) {
+    } else if (str_eq(fmt->c, fmt->size, "x", -1)) {
         sprintf(buf, "#%x%x%x", r >> 4, g >> 4, b >> 4);
-    } else if (Str_eq_p(fmt, "X")) {
+    } else if (str_eq(fmt->c, fmt->size, "X", -1)) {
         sprintf(buf, "#%X%X%X", r >> 4, g >> 4, b >> 4);
-    } else if (Str_eq_p(fmt, "rgb")) {
+    } else if (str_eq(fmt->c, fmt->size, "rgb", -1)) {
         sprintf(buf, "rgb(%d, %d, %d)", r, g, b);
-    } else if (Str_eq_p(fmt, "rgb%")) {
+    } else if (str_eq(fmt->c, fmt->size, "rgb%", -1)) {
         sprintf(buf, "rgb(%.1f%%, %.1f%%, %.1f%%)", (double)r / 2.55, (double)g / 2.55, (double)b / 2.55);
-    } else if (Str_eq_p(fmt, "rgba")) {
+    } else if (str_eq(fmt->c, fmt->size, "rgba", -1)) {
         sprintf(buf, "rgba(%d, %d, %d, %.1f%%)", r, g, b, (double)a / 2.55);
-    } else if (Str_eq_p(fmt, "rgba%")) {
+    } else if (str_eq(fmt->c, fmt->size, "rgba%", -1)) {
         sprintf(buf, "rgba(%.1f%%, %.1f%%, %.1f%%, %.1f%%)", (double)r / 2.55, (double)g / 2.55, (double)b / 2.55, (double)a / 2.55);
-    } else if (Str_eq_p(fmt, "hsl")) {
+    } else if (str_eq(fmt->c, fmt->size, "hsl", -1)) {
         double h, s, l;
         color_to_hsl(&h, &s, &l, val);
         sprintf(buf, "hsl(%.1f, %.1f%%, %.1f%%)", h, s * 100.0, l * 100.0);
-    } else if (Str_eq_p(fmt, "hsla")) {
+    } else if (str_eq(fmt->c, fmt->size, "hsla", -1)) {
         double h, s, l;
         color_to_hsl(&h, &s, &l, val);
         sprintf(buf, "hsla(%.1f, %.1f%%, %.1f%%, %.1f%%)", h, s * 100.0, l * 100.0, (double)a / 2.55);
@@ -924,19 +948,14 @@ static int image_save_to_writer(Value image, Value w, RefStr *type, Value param)
 
 static int image_new(Value *vret, Value *v, RefNode *node)
 {
-    int err = FALSE;
-    int64_t width = fs->Value_int64(v[1], &err);
-    int64_t height = fs->Value_int64(v[2], &err);
+    int64_t width = fs->Value_int64(v[1], NULL);
+    int64_t height = fs->Value_int64(v[2], NULL);
     size_t size_alloc;
     int channels;
     int bands;
     RefImage *image;
     RefArray *ref_pal = NULL;
 
-    if (err) {
-        throw_image_large();
-        return FALSE;
-    }
     if (width < 1 || height < 1) {
         fs->throw_errorf(fs->mod_lang, "ValueError", "width and height must be more than 0");
         return FALSE;
@@ -1065,9 +1084,9 @@ static int image_save(Value *vret, Value *v, RefNode *node)
         }
     } else if (type == NULL) {
         // typeを設定
-        Str fname = fs->Value_str(v[1]);
-        if (fname.size > 0) {
-            type = fs->mimetype_from_suffix(fname);
+        RefStr *fname = Value_vp(v[1]);
+        if (fname->size > 0) {
+            type = fs->mimetype_from_suffix(fname->c, fname->size);
         }
     }
     if (fg->stk_top > v + 3) {
@@ -1372,9 +1391,8 @@ static int image_dup(Value *vret, Value *v, RefNode *node)
 static int image_index(Value *vret, Value *v, RefNode *node)
 {
     RefImage *image = Value_vp(*v);
-    int err = FALSE;
-    int64_t x = fs->Value_int64(v[1], &err);
-    int64_t y = fs->Value_int64(v[2], &err);
+    int64_t x = fs->Value_int64(v[1], NULL);
+    int64_t y = fs->Value_int64(v[2], NULL);
     uint32_t color;
     uint8_t *line;
 
@@ -1382,7 +1400,7 @@ static int image_index(Value *vret, Value *v, RefNode *node)
         throw_already_closed();
         return FALSE;
     }
-    if (err || x < 0 || x >= image->width || y < 0 || y >= image->height) {
+    if (x < 0 || x >= image->width || y < 0 || y >= image->height) {
         fs->throw_errorf(fs->mod_lang, "IndexError", "Invalid position");
         return FALSE;
     }
@@ -1434,16 +1452,15 @@ static int image_index(Value *vret, Value *v, RefNode *node)
 static int image_index_set(Value *vret, Value *v, RefNode *node)
 {
     RefImage *image = Value_vp(*v);
-    int err = FALSE;
-    int64_t x = fs->Value_int64(v[1], &err);
-    int64_t y = fs->Value_int64(v[2], &err);
+    int64_t x = fs->Value_int64(v[1], NULL);
+    int64_t y = fs->Value_int64(v[2], NULL);
     uint8_t *line;
 
     if (image->data == NULL) {
         throw_already_closed();
         return FALSE;
     }
-    if (err || x < 0 || x >= image->width || y < 0 || y >= image->height) {
+    if (x < 0 || x >= image->width || y < 0 || y >= image->height) {
         fs->throw_errorf(fs->mod_lang, "IndexError", "Invalid position");
         return FALSE;
     }
@@ -1732,16 +1749,10 @@ static int image_copy(Value *vret, Value *v, RefNode *node)
     int alpha = FUNC_INT(node);
     RefImage *src = Value_vp(v[1]);
     RefImage *dst = Value_vp(*v);
-    int err = FALSE;
-    int64_t x = fs->Value_int64(v[2], &err);
-    int64_t y = fs->Value_int64(v[3], &err);
+    int64_t x = fs->Value_int64(v[2], NULL);
+    int64_t y = fs->Value_int64(v[3], NULL);
     RefRect *src_rect;
     RefRect src_rect_v;
-
-    if (err) {
-        fs->throw_errorf(fs->mod_lang, "ValueError", "Parameter overflow");
-        return FALSE;
-    }
 
     if (fg->stk_top > v + 4) {
         src_rect = Value_vp(v[4]);
@@ -1756,6 +1767,16 @@ static int image_copy(Value *vret, Value *v, RefNode *node)
     if (src->data == NULL || dst->data == NULL) {
         throw_already_closed();
         return FALSE;
+    }
+    if (x < -MAX_IMAGE_SIZE) {
+        x = -MAX_IMAGE_SIZE;
+    } else if (x > MAX_IMAGE_SIZE) {
+        x = MAX_IMAGE_SIZE;
+    }
+    if (y < -MAX_IMAGE_SIZE) {
+        y = -MAX_IMAGE_SIZE;
+    } else if (y > MAX_IMAGE_SIZE) {
+        y = MAX_IMAGE_SIZE;
     }
     copy_image_sub(dst, src, x, y, src_rect->i, alpha);
 
@@ -2009,7 +2030,7 @@ static void define_class(RefNode *m, RefNode *mod_math)
     fs->define_native_func_a(n, rect_hash, 0, 0, NULL);
 
     n = fs->define_identifier_p(m, cls, fs->symbol_stock[T_EQ], NODE_FUNC_N, 0);
-    fs->define_native_func_a(n, rect_eq, 1, 1, NULL, cls_image);
+    fs->define_native_func_a(n, rect_eq, 1, 1, NULL, cls_rect);
     n = fs->define_identifier(m, cls, "x", NODE_FUNC_N, NODEOPT_PROPERTY);
     fs->define_native_func_a(n, rect_get, 0, 0, (void*) INDEX_RECT_X);
     n = fs->define_identifier(m, cls, "y", NODE_FUNC_N, NODEOPT_PROPERTY);

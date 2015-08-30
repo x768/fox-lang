@@ -68,18 +68,18 @@ int confirm_dialog(RefStr *msg, RefStr *title, WndHandle parent)
  * *.bmp;*.jpg -> "*.bmp;*.jpg"
  * Image file:*.bmp;*.jpg -> "*.bmp;*.jpg"
  */
-static void split_filter_name(Str *filter, Str src)
+static void split_filter_name(Str *filter, RefStr *src)
 {
     int i;
     
-    for (i = src.size - 1; i >= 0; i--) {
-        if (src.p[i] == ':') {
-            filter->p = src.p + i + 1;
-            filter->size = src.size - i - 1;
+    for (i = src->size - 1; i >= 0; i--) {
+        if (src->c[i] == ':') {
+            filter->p = src->c + i + 1;
+            filter->size = src->size - i - 1;
             return;
         }
     }
-    *filter = src;
+    *filter = Str_new(src->c, src->size);
 }
 
 static void nsarray_add_filter(NSMutableArray *arr, int *other, Str filter)
@@ -119,7 +119,7 @@ static NSMutableArray *make_filter_string(int *other, RefArray *r)
     
     for (i = 0; i < r->size; i++) {
         Str filter;
-        split_filter_name(&filter, fs->Value_str(r->p[i]));
+        split_filter_name(&filter, Value_vp(r->p[i]));
         nsarray_add_filter(arr, other, filter);
     }
     return arr;
@@ -130,9 +130,9 @@ static Value NSURL_to_file_Value(NSURL *url)
     return fs->cstr_Value(fs->cls_file, path, -1);
 }
 
-int file_open_dialog(Value *vret, Str title, RefArray *filter, WndHandle parent, int type)
+int file_open_dialog(Value *vret, const char *title, RefArray *filter, WndHandle parent, int type)
 {
-    NSString *ntitle = cstr_to_nsstring(title.p, title.size);
+    NSString *ntitle = cstr_to_nsstring(title, -1);
     
     if (type == FILEOPEN_SAVE) {
         NSSavePanel *panel = [NSSavePanel savePanel];

@@ -16,13 +16,11 @@ void Window_set_menu(WndHandle wnd, MenuHandle menu)
 {
     gtk_container_add(GTK_CONTAINER(wnd), menu);
 }
-void Menu_add_submenu(MenuHandle menu, MenuHandle submenu, Str text)
+void Menu_add_submenu(MenuHandle menu, MenuHandle submenu, const char *text)
 {
-    char *text_p = fs->str_dup_p(text.p, text.size, NULL);
-    GtkWidget *menu_item = gtk_menu_item_new_with_label(text_p);
+    GtkWidget *menu_item = gtk_menu_item_new_with_label(text);
     gtk_menu_item_set_submenu(GTK_MENU_ITEM(menu_item), submenu);
     gtk_menu_shell_append(GTK_MENU_SHELL(menu), menu_item);
-    free(text_p);
 }
 
 int invoke_event(Value event, Value fn)
@@ -46,18 +44,16 @@ static void signal_menu_activate(GtkMenuItem *menuitem, gpointer user_data)
     invoke_event(evt, sender_r->v[INDEX_MENUITEM_FN]);
 }
 
-void Menu_add_item(MenuHandle menu, Value fn, Str text)
+void Menu_add_item(MenuHandle menu, Value fn, const char *text)
 {
     GtkWidget *item;
     Ref *r = fs->ref_new(cls_menuitem);
-    char *text_p = fs->str_dup_p(text.p, text.size, NULL);
 
     r->v[INDEX_MENUITEM_FN] = fs->Value_cp(fn);
 
-    item = gtk_menu_item_new_with_label(text_p);
+    item = gtk_menu_item_new_with_label(text);
     g_signal_connect(G_OBJECT(item), "activate", G_CALLBACK(signal_menu_activate), r);
     gtk_menu_shell_append(GTK_MENU_SHELL(menu), item);
-    free(text_p);
 }
 void Menu_add_separator(MenuHandle menu)
 {

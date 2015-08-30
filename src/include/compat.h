@@ -64,7 +64,7 @@ DIR *opendir_fox(const char *dname);
 struct dirent *readdir_fox(DIR *d);
 void closedir_fox(DIR *d);
 
-#else
+#else  /* WIN32 */
 
 #include <unistd.h>
 #include <fcntl.h>
@@ -91,7 +91,9 @@ typedef int FileHandle;
 #define readdir_fox readdir
 #define closedir_fox closedir
 
-#endif
+#endif  /* WIN32 */
+
+int64_t get_file_size(FileHandle fh);
 
 
 #endif /* _COMPAT_H_ */

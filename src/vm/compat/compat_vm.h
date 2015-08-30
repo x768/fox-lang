@@ -41,7 +41,7 @@ const char *dlerror_fox(void);
 int win_read_console(FileHandle fd, char *dst, int dst_size);
 int win_write_console(FileHandle fd, const char *str, int size);
 
-#else
+#else  /* WIN32 */
 
 #define mkdir_fox mkdir
 #define remove_fox remove
@@ -51,14 +51,13 @@ int win_write_console(FileHandle fd, const char *str, int size);
 #define dlsym_fox dlsym
 #define dlerror_fox dlerror
 
-#endif
+#endif  /* WIN32 */
 
-int64_t get_file_size(FileHandle fh);
 int get_file_mtime(int64_t *tm, const char *fname);
 int exists_file(const char *file);
-int is_root_dir(Str path);
-int is_absolute_path(Str path);
-Str get_root_name(Str path);
+int is_root_dir(const char *path_p, int path_size);
+int is_absolute_path(const char *path_p, int path_size);
+Str get_root_name(const char *path_p, int path_size);
 const char *get_fox_home(void);
 void native_sleep(int ms);
 const char *get_default_locale(void);

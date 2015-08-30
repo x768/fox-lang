@@ -2,11 +2,10 @@
 #define _M_MATH_H_
 
 #include "fox.h"
-#include "mpi2.h"
 
 typedef struct {
     RefHeader rh;
-    mp_int mp;
+    BigInt bi;
 } RefInt;
 
 typedef struct {
@@ -24,7 +23,7 @@ typedef struct {
 
 typedef struct {
     RefHeader rh;
-    mp_int md[2];
+    BigInt bi[2];
 } RefFrac;
 
 typedef struct {

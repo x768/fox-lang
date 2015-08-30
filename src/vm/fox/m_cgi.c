@@ -42,7 +42,7 @@ int is_content_type_html()
         return TRUE;
     }
     if (found) {
-        if (Str_eq_p(type, "text/html")) {
+        if (str_eq(type.p, type.size, "text/html", -1)) {
             return TRUE;
         }
     }
@@ -81,7 +81,7 @@ static void write_http_cookie(
         char c_buf[48];
 
         // 期限を1日前に設定(削除する)
-        time_to_cookie_date(now - 86400000LL, c_buf);
+        timestamp_to_cookie_date(now - 86400000LL, c_buf);
         StrBuf_add(buf, " ;expires=", -1);
         StrBuf_add(buf, c_buf, -1);
     } else {
@@ -90,7 +90,7 @@ static void write_http_cookie(
 
         if (cookie_has_expires) {
             char c_buf[48];
-            time_to_cookie_date(cookie_expires, c_buf);
+            timestamp_to_cookie_date(cookie_expires, c_buf);
             StrBuf_add(buf, " ;expires=", -1);
             StrBuf_add(buf, c_buf, -1);
         }
@@ -534,7 +534,7 @@ static int cgi_stdin_param(Value keys, RefCharset *cs)
         if (!parse_header_sub(&boundary, "boundary", -1, ctype_p, -1)) {
             return TRUE;
         }
-        if (!mimerandomreader_sub(map_post, fg->v_cio, boundary, cs, "Content-Disposition", -1, "name", -1, TRUE)) {
+        if (!mimerandomreader_sub(map_post, fg->v_cio, boundary.p, boundary.size, cs, "Content-Disposition", -1, "name", -1, TRUE)) {
             return FALSE;
         }
         map_false_to_null(map_post);

@@ -254,7 +254,7 @@ static int gui_alert(Value *vret, Value *v, RefNode *node)
 }
 static int gui_fileopen_dialog(Value *vret, Value *v, RefNode *node)
 {
-    Str title = fs->Value_str(v[1]);
+    RefStr *title = Value_vp(v[1]);
     RefArray *ra = NULL;
     WndHandle parent = NULL;
     int type = FUNC_INT(node);
@@ -276,7 +276,7 @@ static int gui_fileopen_dialog(Value *vret, Value *v, RefNode *node)
         }
     }
 
-    file_open_dialog(vret, title, ra, parent, FUNC_INT(node));
+    file_open_dialog(vret, title->c, ra, parent, FUNC_INT(node));
     return TRUE;
 }
 
@@ -523,7 +523,7 @@ static int form_get_opacity(Value *vret, Value *v, RefNode *node)
     if (!check_already_closed(window)) {
         return FALSE;
     }
-    *vret = fs->float_Value(window_get_opacity(r));
+    *vret = fs->float_Value(fs->cls_float, window_get_opacity(r));
 
     return TRUE;
 }
@@ -602,7 +602,7 @@ static int form_add_menu(Value *vret, Value *v, RefNode *node)
     Ref *r2 = Value_ref(v[2]);
     MenuHandle menu = Value_handle(r2->v[INDEX_MENU_HANDLE]);
     MenuHandle menubar = NULL;
-    Str text = fs->Value_str(v[1]);
+    RefStr *text = Value_vp(v[1]);
     int init = FALSE;
 
     if (!check_already_closed(window)) {
@@ -615,7 +615,7 @@ static int form_add_menu(Value *vret, Value *v, RefNode *node)
         r->v[INDEX_FORM_MENU] = handle_Value(menubar);
         init = TRUE;
     }
-    Menu_add_submenu(menubar, menu, text);
+    Menu_add_submenu(menubar, menu, text->c);
     if (init) {
         Window_set_menu(window, menubar);
     }
@@ -809,12 +809,12 @@ static int menu_new(Value *vret, Value *v, RefNode *node)
     for (i = 1; i < argc; ) {
         RefNode *v_type = fs->Value_type(v[i]);
         if (v_type == fs->cls_str) {
-            Str text = fs->Value_str(v[i]);
+            RefStr *text = Value_vp(v[i]);
             i++;
             if (i < argc) {
                 RefNode *v2_type = fs->Value_type(v[i]);
                 if (v2_type == fs->cls_fn) {
-                    Menu_add_item(menu, v[i], text);
+                    Menu_add_item(menu, v[i], text->c);
                 } else if (v2_type == cls_menu) {
                     Ref *menu_r = Value_ref(v[i]);
                     if (Value_bool(menu_r->v[INDEX_MENU_HAS_PARENT])) {
@@ -822,7 +822,7 @@ static int menu_new(Value *vret, Value *v, RefNode *node)
                         return FALSE;
                     } else {
                         MenuHandle submenu = Value_handle(menu_r->v[INDEX_MENU_HANDLE]);
-                        Menu_add_submenu(menu, submenu, text);
+                        Menu_add_submenu(menu, submenu, text->c);
                         menu_r->v[INDEX_MENU_HAS_PARENT] = VALUE_TRUE;
                     }
                 } else {
@@ -856,11 +856,11 @@ static int menu_add(Value *vret, Value *v, RefNode *node)
 {
     Ref *r = Value_ref(*v);
     MenuHandle menu = Value_handle(r->v[INDEX_MENU_HANDLE]);
-    Str text = fs->Value_str(v[1]);
+    RefStr *text = Value_vp(v[1]);
     RefNode *v2_type = fs->Value_type(v[2]);
 
     if (v2_type == fs->cls_fn) {
-        Menu_add_item(menu, v[2], text);
+        Menu_add_item(menu, v[2], text->c);
     } else if (v2_type == cls_menu) {
         Ref *menu_r = Value_ref(v[2]);
         if (Value_bool(menu_r->v[INDEX_MENU_HAS_PARENT])) {
@@ -868,7 +868,7 @@ static int menu_add(Value *vret, Value *v, RefNode *node)
             return FALSE;
         } else {
             MenuHandle submenu = Value_handle(menu_r->v[INDEX_MENU_HANDLE]);
-            Menu_add_submenu(menu, submenu, text);
+            Menu_add_submenu(menu, submenu, text->c);
         }
     } else {
         fs->throw_error_select(THROW_ARGMENT_TYPE2__NODE_NODE_NODE_INT, fs->cls_fn, cls_menu, v2_type, 2);

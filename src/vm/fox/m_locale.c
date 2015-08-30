@@ -469,7 +469,7 @@ static int load_locale_from_file(LocaleData *loc, const char *fname)
             Tok_simple_next(&tk);
             switch (key.p[0]) {
             case 'a':
-                if (Str_eq_p(key, "am_pm")) {
+                if (str_eq(key.p, key.size, "am_pm", -1)) {
                     if (!parse_ini_array(loc->am_pm, lengthof(loc->am_pm), &tk, &loc->mem)) {
                         goto ERROR_END;
                     }
@@ -477,14 +477,14 @@ static int load_locale_from_file(LocaleData *loc, const char *fname)
                 }
                 break;
             case 'b':
-                if (Str_eq_p(key, "bidi")) {
+                if (str_eq(key.p, key.size, "bidi", -1)) {
                     if (tk.v.type != TL_VAR) {
                         goto ERROR_END;
                     }
                     if (loc->bidi == '\0') {
-                        if (Str_eq_p(tk.str_val, "ltr")) {
+                        if (str_eq(tk.str_val.p, tk.str_val.size, "ltr", -1)) {
                             loc->bidi = 'L';
-                        } else if (Str_eq_p(tk.str_val, "rtl")) {
+                        } else if (str_eq(tk.str_val.p, tk.str_val.size, "rtl", -1)) {
                             loc->bidi = 'R';
                         } else {
                             goto ERROR_END;
@@ -495,22 +495,22 @@ static int load_locale_from_file(LocaleData *loc, const char *fname)
                 }
                 break;
             case 'd':
-                if (Str_eq_p(key, "date")) {
+                if (str_eq(key.p, key.size, "date", -1)) {
                     if (!parse_ini_array(loc->date, lengthof(loc->date), &tk, &fg->st_mem)) {
                         goto ERROR_END;
                     }
                     goto LINE_END;
-                } else if (Str_eq_p(key, "decimal")) {
+                } else if (str_eq(key.p, key.size, "decimal", -1)) {
                     if (!parse_ini_array(&loc->decimal, 1, &tk, &fg->st_mem)) {
                         goto ERROR_END;
                     }
                     goto LINE_END;
-                } else if (Str_eq_p(key, "days")) {
+                } else if (str_eq(key.p, key.size, "days", -1)) {
                     if (!parse_ini_array(loc->week, lengthof(loc->week), &tk, &fg->st_mem)) {
                         goto ERROR_END;
                     }
                     goto LINE_END;
-                } else if (Str_eq_p(key, "days_w")) {
+                } else if (str_eq(key.p, key.size, "days_w", -1)) {
                     if (!parse_ini_array(loc->week_w, lengthof(loc->week_w), &tk, &fg->st_mem)) {
                         goto ERROR_END;
                     }
@@ -518,12 +518,12 @@ static int load_locale_from_file(LocaleData *loc, const char *fname)
                 }
                 break;
             case 'g':
-                if (Str_eq_p(key, "group")) {
+                if (str_eq(key.p, key.size, "group", -1)) {
                     if (!parse_ini_array(&loc->group, 1, &tk, &fg->st_mem)) {
                         goto ERROR_END;
                     }
                     goto LINE_END;
-                } else if (Str_eq_p(key, "group_n")) {
+                } else if (str_eq(key.p, key.size, "group_n", -1)) {
                     if (tk.v.type != TL_INT) {
                         goto ERROR_END;
                     }
@@ -535,7 +535,7 @@ static int load_locale_from_file(LocaleData *loc, const char *fname)
                 }
                 break;
             case 'l':
-                if (Str_eq_p(key, "langtag")) {
+                if (str_eq(key.p, key.size, "langtag", -1)) {
                     if (tk.v.type != TL_STR) {
                         goto ERROR_END;
                     }
@@ -547,12 +547,12 @@ static int load_locale_from_file(LocaleData *loc, const char *fname)
                 }
                 break;
             case 'm':
-                if (Str_eq_p(key, "month")) {
+                if (str_eq(key.p, key.size, "month", -1)) {
                     if (!parse_ini_array(loc->month, lengthof(loc->month), &tk, &fg->st_mem)) {
                         goto ERROR_END;
                     }
                     goto LINE_END;
-                } else if (Str_eq_p(key, "month_w")) {
+                } else if (str_eq(key.p, key.size, "month_w", -1)) {
                     if (!parse_ini_array(loc->month_w, lengthof(loc->month_w), &tk, &fg->st_mem)) {
                         goto ERROR_END;
                     }
@@ -560,7 +560,7 @@ static int load_locale_from_file(LocaleData *loc, const char *fname)
                 }
                 break;
             case 't':
-                if (Str_eq_p(key, "time")) {
+                if (str_eq(key.p, key.size, "time", -1)) {
                     if (!parse_ini_array(loc->time, lengthof(loc->time), &tk, &fg->st_mem)) {
                         goto ERROR_END;
                     }
@@ -944,7 +944,7 @@ static int load_resource_sub(RefResource *res, const char *fname)
             if (tk.v.type != TL_STR) {
                 goto ERROR_END;
             }
-            if (Str_eq_p(key, "locale")) {
+            if (str_eq(key.p, key.size, "locale", -1)) {
                 if (tk.v.type != TL_STR) {
                     goto ERROR_END;
                 }
@@ -1121,13 +1121,13 @@ static int resource_locale(Value *vret, Value *v, RefNode *node)
 static int resource_file(Value *vret, Value *v, RefNode *node)
 {
     char *path;
-    Str name_s = Value_str(v[1]);
-    Str ext_s = Value_str(v[2]);
-    char *ext = malloc(ext_s.size + 4);
+    RefStr *name_s = Value_vp(v[1]);
+    RefStr *ext_s = Value_vp(v[2]);
+    char *ext = malloc(ext_s->size + 4);
 
     ext[0] = '.';
-    strcpy(ext + 1, ext_s.p);
-    path = resource_to_path(name_s, ext);
+    strcpy(ext + 1, ext_s->c);
+    path = resource_to_path(Str_new(name_s->c, name_s->size), ext);
     free(ext);
 
     if (path == NULL) {

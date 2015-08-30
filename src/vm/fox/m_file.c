@@ -298,13 +298,13 @@ static int file_cat(Value *vret, Value *v, RefNode *node)
 static int file_path(Value *vret, Value *v, RefNode *node)
 {
     int type = FUNC_INT(node);
-    Str s = Value_str(*v);
+    RefStr *s = Value_vp(*v);
     Str path;
     int i;
 
     switch (type) {
     case FILEPATH_BASEDIR: // basedir:File
-        path = base_dir_with_sep(s.p, s.size);
+        path = base_dir_with_sep(s->c, s->size);
         if (path.p[0] != '.') {
             // 末尾の / を除去
             path.size--;
@@ -314,19 +314,19 @@ static int file_path(Value *vret, Value *v, RefNode *node)
         break;
     case FILEPATH_PATH:          // path:Str
     case FILEPATH_PATH_BYTES:    // path_bytes:Bytes
-        if (is_root_dir(s)) {
-            path = get_root_name(s);
+        if (is_root_dir(s->c, s->size)) {
+            path = get_root_name(s->c, s->size);
         } else {
-            path = s;
+            path = Str_new(s->c, s->size);
         }
         break;
     case FILEPATH_FILENAME:       // filename:Str
     case FILEPATH_FILENAME_BYTES: // filename_bytes:Bytes
-        path = file_name_from_path(s);
+        path = file_name_from_path(s->c, s->size);
         break;
     case FILEPATH_BASENAME:       // basename:Str
     case FILEPATH_BASENAME_BYTES: // basename_bytes:Bytes
-        path = file_name_from_path(s);
+        path = file_name_from_path(s->c, s->size);
         // 最後の.以降を削除
         for (i = path.size - 1; i >= 0; i--) {
             if (path.p[i] == '.') {
@@ -337,7 +337,7 @@ static int file_path(Value *vret, Value *v, RefNode *node)
         break;
     case FILEPATH_SUFFIX:       // suffix:Str
     case FILEPATH_SUFFIX_BYTES: // suffix_bytes:Bytes
-        path = s;
+        path = Str_new(s->c, s->size);
         // 最後の.以降
         for (i = path.size - 1; i >= 0; i--) {
             if (path.p[i] == '.') {
@@ -827,9 +827,13 @@ static int fileio_read(Value *vret, Value *v, RefNode *node)
     Ref *r = Value_ref(*v);
     RefFileHandle *fh = Value_vp(r->v[INDEX_FILEIO_HANDLE]);
     RefBytesIO *mb = Value_vp(v[1]);
-    int size = Value_int64(v[2], NULL);
+    int size = Value_int32(v[2]);
     int rd;
 
+    if (size < 0) {
+        throw_errorf(fs->mod_lang, "ValueError", "Illigal parameter (argument #2)");
+        return FALSE;
+    }
     if (fh->fd_read == -1) {
         throw_error_select(THROW_NOT_OPENED_FOR_READ);
         return FALSE;

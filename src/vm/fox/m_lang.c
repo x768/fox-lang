@@ -513,10 +513,10 @@ static int error_tostr(Value *vret, Value *v, RefNode *node)
 {
     Ref *r = Value_ref(*v);
     RefNode *type = r->rh.type;
-    Str msg = Value_str(r->v[INDEX_ERROR_MESSAGE]);
+    RefStr *msg = Value_vp(r->v[INDEX_ERROR_MESSAGE]);
 
-    if (msg.size > 0) {
-        *vret = printf_Value("%n:%S", type, msg);
+    if (msg != NULL && msg->size > 0) {
+        *vret = printf_Value("%n:%r", type, msg);
     } else {
         *vret = vp_Value(type->name);
     }

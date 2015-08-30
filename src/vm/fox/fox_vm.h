@@ -5,6 +5,7 @@
 #include "m_number.h"
 #include "compat.h"
 #include "compat_vm.h"
+#include "bigint.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -21,10 +22,11 @@ enum {
     T_COMMA,
     T_SEMICL,
     T_MEMB,
+    T_LAMBDA,// (a)=>
 
     TL_PRAGMA,
     TL_INT,
-    TL_MPINT,
+    TL_BIGINT,
     TL_FLOAT,
     TL_FRAC,
     TL_STR,
@@ -343,7 +345,7 @@ int is_string_only_ascii(const char *p, int size, const char *except);
 
 // file.c
 Str base_dir_with_sep(const char *path_p, int path_size);
-Str file_name_from_path(Str path);
+Str file_name_from_path(const char *path_p, int path_size);
 int make_path_regularize(char *path, int size);
 char *path_normalize(Str *ret, RefStr *base_dir, const char *path_p, int path_size, Mem *mem);
 Str get_name_part_from_path(Str path);
@@ -351,14 +353,14 @@ Str get_name_part_from_path(Str path);
 
 // value.c
 RefNode *Value_type(Value v);
+int32_t Value_int32(Value v);
 int64_t Value_int64(Value v, int *err);
 double Value_float(Value v);
-Str Value_str(Value v);
 char *Value_frac_s(Value v, int max_frac);
 int Value_frac10(int64_t *val, Value v, int factor);
 
 Value int64_Value(int64_t i);
-Value float_Value(double dval);
+Value float_Value(RefNode *klass, double dval);
 Value cstr_Value(RefNode *klass, const char *p, int size);
 Value cstr_Value_conv(const char *p, int size, RefCharset *cs);
 Value frac_s_Value(const char *str);
@@ -450,7 +452,6 @@ void init_cgi_module_1(void);
 
 // m_charset.c
 RefCharset *get_charset_from_name(const char *name_p, int name_size);
-RefCharset *get_charset_from_cp(int cp);
 
 int convert_str_to_bin_sub(StrBuf *dst_buf, const char *src_p, int src_size, RefCharset *cs, const char *alt_s);
 int convert_str_to_bin(Value *dst, StrBuf *dst_buf, int arg);
@@ -567,12 +568,12 @@ void init_marshal_module_1(RefNode *m);
 
 // m_mime.c
 int parse_header_sub(Str *s_ret, const char *subkey_p, int subkey_size, const char *src_p, int src_size);
-int mimerandomreader_sub(RefMap *rm, Value reader, Str boundary, RefCharset *cs, const char *key_p, int key_size, const char *subkey_p, int subkey_size, int keys);
+int mimerandomreader_sub(RefMap *rm, Value reader, const char *boundary_p, int boundary_size, RefCharset *cs, const char *key_p, int key_size, const char *subkey_p, int subkey_size, int keys);
 int mimedata_get_header_sub(int *p_found, Str *s_ret, RefMap *map, const char *key_p, int key_size, const char *subkey_p, int subkey_size);
-int mimereader_next_sub(Value *vret, Value v, Str s_bound, RefCharset *cs);
+int mimereader_next_sub(Value *vret, Value v, const char *boundary_p, int boundary_size, RefCharset *cs);
 int mimetype_new_sub(Value *v, RefStr *src);
 RefStr *mimetype_from_name_refstr(RefStr *name);
-RefStr *mimetype_from_suffix(Str name);
+RefStr *mimetype_from_suffix(const char *name_p, int name_size);
 RefStr *mimetype_from_magic(const char *p, int size);
 RefStr *mimetype_get_parent(RefStr *name);
 RefStr *resolve_mimetype_alias(RefStr *name);
@@ -581,9 +582,9 @@ void init_mime_module_1(void);
 
 
 // m_number.c
-void fix_bigint(Value *v, mp_int *mp);
-int get_recurrence(int *ret, mp_int *mp);
-char *frac_tostr_sub(int sign, mp_int *mi, mp_int *rem, int width_f);
+void fix_bigint(Value *v, BigInt *bi);
+int get_recurrence(int *ret, BigInt *bi);
+char *frac_tostr_sub(int sign, BigInt *mi, BigInt *rem, int width_f);
 void define_lang_number_func(RefNode *m);
 void define_lang_number_class(RefNode *m);
 
@@ -595,7 +596,7 @@ int sequence_cmp(Value *vret, Value *v, RefNode *node);
 int sequence_hash(Value *vret, Value *v, RefNode *node);
 int sequence_marshal_read(Value *vret, Value *v, RefNode *node);
 int sequence_marshal_write(Value *vret, Value *v, RefNode *node);
-void string_substr_position(int *pbegin, int *pend, Str src, Value *v);
+void string_substr_position(int *pbegin, int *pend, const char *src_p, int src_size, Value *v);
 void calc_splice_position(int *pstart, int *plen, int size, Value *v);
 int strclass_tostr(Value *vret, Value *v, RefNode *node);
 void define_lang_str_func(RefNode *m);
@@ -608,9 +609,9 @@ Value time_Value(int64_t i_tm, RefTimeZone *tz);
 RefTimeZone *get_local_tz(void);
 void adjust_timezone(RefTime *dt);
 void adjust_date(RefTime *dt);
-int timedelta_parse_string(int64_t *ret, Str src);
-void time_to_RFC2822_UTC(int64_t tm, char *dst);
-void time_to_cookie_date(int64_t tm, char *dst);
+int timedelta_parse_string(int64_t *ret, const char *src_p, int src_size);
+void timestamp_to_RFC2822_UTC(int64_t tm, char *dst);
+void timestamp_to_cookie_date(int64_t tm, char *dst);
 RefNode *init_time_module_stubs(void);
 void init_time_module_1(RefNode *m);
 

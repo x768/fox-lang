@@ -98,7 +98,7 @@ Value handle_Value(void *handle);
 // dialog.c
 void alert_dialog(RefStr *msg, RefStr *title, WndHandle parent);
 int confirm_dialog(RefStr *msg, RefStr *title, WndHandle parent);
-int file_open_dialog(Value *vret, Str title, RefArray *filter, WndHandle parent, int type);
+int file_open_dialog(Value *vret, const char *title, RefArray *filter, WndHandle parent, int type);
 
 // form.c
 void create_form_window(Value *v, WndHandle parent, int *size);
@@ -148,8 +148,8 @@ MenuHandle Menu_new(void);
 MenuHandle Menubar_new(void);
 int invoke_event(Value event, Value fn);
 void Window_set_menu(WndHandle wnd, MenuHandle menu);
-void Menu_add_submenu(MenuHandle menu, MenuHandle submenu, Str text);
-void Menu_add_item(MenuHandle menu, Value fn, Str text);
+void Menu_add_submenu(MenuHandle menu, MenuHandle submenu, const char *text);
+void Menu_add_item(MenuHandle menu, Value fn, const char *text);
 void Menu_add_separator(MenuHandle menu);
 #ifdef WIN32
 Ref *get_menu_object(int id);

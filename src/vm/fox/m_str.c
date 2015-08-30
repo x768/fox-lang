@@ -105,14 +105,14 @@ int string_format_sub(Value *v, Str src, const char *fmt_p, int fmt_size, int ut
 
         switch (fm.size >= 1 ? fm.p[0] : '\0') {
         case 'b':
-            if (Str_eq_p(fm, "b64")) {
+            if (str_eq(fm.p, fm.size, "b64", -1)) {
                 int size;
                 StrBuf_alloc(&buf, src.size * 4 / 3 + 4);
                 size = encode_b64_sub(buf.p, src.p, src.size, FALSE);
                 buf.size = size;
                 found = TRUE;
                 utf8 = TRUE;
-            } else if (Str_eq_p(fm, "b64url")) {
+            } else if (str_eq(fm.p, fm.size, "b64url", -1)) {
                 int size;
                 StrBuf_alloc(&buf, src.size * 4 / 3 + 4);
                 size = encode_b64_sub(buf.p, src.p, src.size, TRUE);
@@ -122,7 +122,7 @@ int string_format_sub(Value *v, Str src, const char *fmt_p, int fmt_size, int ut
             }
             break;
         case 'h':
-            if (Str_eq_p(fm, "hex")) {
+            if (str_eq(fm.p, fm.size, "hex", -1)) {
                 StrBuf_alloc(&buf, src.size * 2);
                 encode_hex_sub(buf.p, src.p, src.size, FALSE);
                 found = TRUE;
@@ -130,7 +130,7 @@ int string_format_sub(Value *v, Str src, const char *fmt_p, int fmt_size, int ut
             }
             break;
         case 'H':
-            if (Str_eq_p(fm, "HEX")) {
+            if (str_eq(fm.p, fm.size, "HEX", -1)) {
                 StrBuf_alloc(&buf, src.size * 2);
                 encode_hex_sub(buf.p, src.p, src.size, TRUE);
                 found = TRUE;
@@ -138,7 +138,7 @@ int string_format_sub(Value *v, Str src, const char *fmt_p, int fmt_size, int ut
             }
             break;
         case 's':
-            if (Str_eq_p(fm, "str")) {
+            if (str_eq(fm.p, fm.size, "str", -1)) {
                 found = TRUE;
                 if (!utf8) {
                     alt_utf8_string(&buf, src.p, src.size);
@@ -147,7 +147,7 @@ int string_format_sub(Value *v, Str src, const char *fmt_p, int fmt_size, int ut
             }
             break;
         case 'j':
-            if (Str_eq_p(fm, "js")) {
+            if (str_eq(fm.p, fm.size, "js", -1)) {
                 found = TRUE;
                 if (utf8) {
                     add_backslashes_sub(&buf, src.p, src.size, ADD_BACKSLASH_UCS2);
@@ -160,11 +160,11 @@ int string_format_sub(Value *v, Str src, const char *fmt_p, int fmt_size, int ut
             }
             break;
         case 'u':   // urlencode
-            if (Str_eq_p(fm, "url")) {
+            if (str_eq(fm.p, fm.size, "url", -1)) {
                 urlencode_sub(&buf, src.p, src.size, FALSE);
                 found = TRUE;
                 utf8 = TRUE;
-            } else if (Str_eq_p(fm, "url+")) {
+            } else if (str_eq(fm.p, fm.size, "url+", -1)) {
                 urlencode_sub(&buf, src.p, src.size, TRUE);
                 found = TRUE;
                 utf8 = TRUE;
@@ -249,7 +249,6 @@ static int sequence_from_iterator(Value *vret, Value v, int is_str)
             throw_errorf(fs->mod_lang, "TypeError", "Int required but %n", type);
             goto ERROR_END;
         }
-        err = FALSE;
         val = Value_int64(fg->stk_top[-1], &err);
         Value_pop();
         if (err || val < 0 || (is_str && val > 0x10FFFF) || (!is_str && val > 255)) {
@@ -308,8 +307,8 @@ int sequence_hash(Value *vret, Value *v, RefNode *node)
 }
 static int sequence_empty(Value *vret, Value *v, RefNode *node)
 {
-    Str s1 = Value_str(*v);
-    *vret = bool_Value(s1.size == 0);
+    RefStr *rs = Value_vp(*v);
+    *vret = bool_Value(rs->size == 0);
 
     return TRUE;
 }
@@ -395,8 +394,8 @@ static int sequence_mul(Value *vret, Value *v, RefNode *node)
         *v = VALUE_NULL;
     } else if (num < fs->max_alloc) {
         RefNode *type = Value_type(*v);
-        Str s = Value_str(*v);
-        int64_t size = (int64_t)s.size * num;
+        RefStr *s = Value_vp(*v);
+        int64_t size = (int64_t)s->size * num;
         RefStr *rs;
         int i;
 
@@ -407,7 +406,7 @@ static int sequence_mul(Value *vret, Value *v, RefNode *node)
         rs = refstr_new_n(type, size);
         *vret = vp_Value(rs);
         for (i = 0; i < num; i++) {
-            memcpy(rs->c + s.size * i, s.p, s.size);
+            memcpy(rs->c + s->size * i, s->c, s->size);
         }
         rs->c[size] = '\0';
     } else {
@@ -417,12 +416,12 @@ static int sequence_mul(Value *vret, Value *v, RefNode *node)
 
     return TRUE;
 }
-static int sequence_find_sub(Str s1, Str s2, int offset)
+static int sequence_find_sub(RefStr *s1, RefStr *s2, int offset)
 {
-    const char *p1 = s1.p;
-    const char *p2 = s2.p;
-    int len1 = s1.size - s2.size;
-    int len2 = s2.size;
+    const char *p1 = s1->c;
+    const char *p2 = s2->c;
+    int len1 = s1->size - s2->size;
+    int len2 = s2->size;
     int i, j;
 
     for (i = offset; i <= len1; i++) {
@@ -447,11 +446,11 @@ static int sequence_find(Value *vret, Value *v, RefNode *node)
     RefNode *v0_type = Value_type(v0);
     RefNode *v1_type = Value_type(v1);
 
-    Str s1 = Value_str(v0);
+    RefStr *s1 = Value_vp(v0);
     int idx = -1;
 
     if (v1_type == v0_type) {
-        Str s2 = Value_str(v1);
+        RefStr *s2 = Value_vp(v1);
         idx = sequence_find_sub(s1, s2, 0);
     } else if (v1_type == fs->cls_regex) {
         pcre *re = Value_pcre_ptr(v1);
@@ -462,7 +461,7 @@ static int sequence_find(Value *vret, Value *v, RefNode *node)
         m_size = (m_count + 1) * 3;
         matches = malloc(sizeof(int) * m_size);
 
-        if (pcre_exec(re, NULL, s1.p, s1.size, 0, 0, matches, m_size) >= 1) {
+        if (pcre_exec(re, NULL, s1->c, s1->size, 0, 0, matches, m_size) >= 1) {
             idx = matches[0];
         }
         free(matches);
@@ -480,14 +479,14 @@ static int sequence_match(Value *vret, Value *v, RefNode *node)
     Value v1 = v[1];
     RefNode *v0_type = Value_type(v0);
     RefNode *v1_type = Value_type(v1);
-    Str src = Value_str(v0);
+    RefStr *src = Value_vp(v0);
 
     RefNode *cls_matches = FUNC_VP(node);
     RefMatches *r = NULL;
     int offset = 0;
 
     if (v1_type == v0_type) {
-        Str s1 = Value_str(v1);
+        RefStr *s1 = Value_vp(v1);
         int idx = sequence_find_sub(src, s1, offset);
         if (idx >= 0) {
             r = buf_new(cls_matches, sizeof(RefMatches) + sizeof(int) * 2);
@@ -495,7 +494,7 @@ static int sequence_match(Value *vret, Value *v, RefNode *node)
 
             r->matches = (int*)r->buf;
             r->matches[0] = idx;
-            r->matches[1] = idx + s1.size;
+            r->matches[1] = idx + s1->size;
             r->is_bytes = (v0_type == fs->cls_bytes);
             r->count = 1;
         }
@@ -517,7 +516,7 @@ static int sequence_match(Value *vret, Value *v, RefNode *node)
         r->matches = (int*)r->buf;
         r->name_entry = r->buf + sizeof(int) * m_size;
 
-        n_match = pcre_exec(re, NULL, src.p, src.size, offset, 0, r->matches, m_size);
+        n_match = pcre_exec(re, NULL, src->c, src->size, offset, 0, r->matches, m_size);
         if (n_match >= 0) {
             r->name_count = name_count;
             pcre_fullinfo(re, NULL, PCRE_INFO_NAMEENTRYSIZE, &r->name_size);
@@ -585,33 +584,33 @@ static int sequence_replace(Value *vret, Value *v, RefNode *node)
     RefNode *v2_type = Value_type(v2);
     int is_str = (v_type == fs->cls_str);
 
-    Str src = Value_str(*v);
-    Str repl_to;
+    RefStr *src = Value_vp(*v);
+    RefStr *repl_to;
     StrBuf buf;
     int callback;
     int offset = 0;
 
     if (v2_type == v_type) {
-        repl_to = Value_str(v2);
+        repl_to = Value_vp(v2);
         callback = FALSE;
     } else if (v2_type == fs->cls_fn) {
-        repl_to = fs->Str_EMPTY;
+        repl_to = fs->str_0;
         callback = TRUE;
     } else {
         throw_error_select(THROW_ARGMENT_TYPE2__NODE_NODE_NODE_INT, v_type, fs->cls_fn, v2_type, 1);
         return FALSE;
     }
 
-    StrBuf_init_refstr(&buf, src.size);
+    StrBuf_init_refstr(&buf, src->size);
     if (v1_type == v_type) {
-        Str s1 = Value_str(v1);
+        RefStr *s1 = Value_vp(v1);
         int prev = 0;
 
         for (;;) {
             Str result;
             int idx = sequence_find_sub(src, s1, offset);
             if (idx < 0) {
-                result = Str_new(src.p + prev, src.size - prev);
+                result = Str_new(src->c + prev, src->size - prev);
                 if (is_str) {
                     result = fix_utf8_part(result);
                 }
@@ -621,7 +620,7 @@ static int sequence_replace(Value *vret, Value *v, RefNode *node)
                 break;
             }
 
-            result = Str_new(src.p + prev, idx - prev);
+            result = Str_new(src->c + prev, idx - prev);
             if (is_str) {
                 result = fix_utf8_part(result);
             }
@@ -629,9 +628,9 @@ static int sequence_replace(Value *vret, Value *v, RefNode *node)
                 return FALSE;
             }
 
-            prev = idx + s1.size;
+            prev = idx + s1->size;
             offset = prev;
-            if (s1.size == 0) {
+            if (s1->size == 0) {
                 offset++;
             }
 
@@ -646,7 +645,7 @@ static int sequence_replace(Value *vret, Value *v, RefNode *node)
                 r->count = 1;
                 r->matches = (int*)r->buf;
                 r->matches[0] = idx;
-                r->matches[1] = idx + s1.size;
+                r->matches[1] = idx + s1->size;
                 r->is_bytes = (v_type == fs->cls_bytes);
                 r->source = Value_cp(*v);
 
@@ -654,7 +653,7 @@ static int sequence_replace(Value *vret, Value *v, RefNode *node)
                     return FALSE;
                 }
             } else {
-                if (!StrBuf_add(&buf, repl_to.p, repl_to.size)) {
+                if (!StrBuf_add(&buf, repl_to->c, repl_to->size)) {
                     return FALSE;
                 }
             }
@@ -671,10 +670,10 @@ static int sequence_replace(Value *vret, Value *v, RefNode *node)
 
         for (;;) {
             Str result;
-            int n_match = pcre_exec(re, NULL, src.p, src.size, offset, 0, matches, m_size);
+            int n_match = pcre_exec(re, NULL, src->c, src->size, offset, 0, matches, m_size);
 
             if (n_match < 0) {
-                result = Str_new(src.p + prev, src.size - prev);
+                result = Str_new(src->c + prev, src->size - prev);
                 if (is_str) {
                     result = fix_utf8_part(result);
                 }
@@ -684,7 +683,7 @@ static int sequence_replace(Value *vret, Value *v, RefNode *node)
                 }
                 break;
             }
-            result = Str_new(src.p + prev, matches[0] - prev);
+            result = Str_new(src->c + prev, matches[0] - prev);
             if (is_str) {
                 result = fix_utf8_part(result);
             }
@@ -738,7 +737,7 @@ static int sequence_replace(Value *vret, Value *v, RefNode *node)
 
                 matches = malloc(sizeof(int) * m_size);
             } else {
-                if (!StrBuf_add(&buf, repl_to.p, repl_to.size)) {
+                if (!StrBuf_add(&buf, repl_to->c, repl_to->size)) {
                     free(matches);
                     return FALSE;
                 }
@@ -792,9 +791,9 @@ void calc_splice_position(int *pstart, int *plen, int size, Value *v)
 }
 static int sequence_splice(Value *vret, Value *v, RefNode *node)
 {
-    Str src = Value_str(*v);
+    RefStr *src = Value_vp(*v);
     RefNode *v_type = Value_type(*v);
-    Str append;
+    RefStr *append;
     int start, len;
     int size;
     RefStr *rs;
@@ -805,28 +804,28 @@ static int sequence_splice(Value *vret, Value *v, RefNode *node)
             throw_error_select(THROW_ARGMENT_TYPE__NODE_NODE_INT, v_type, v3_type, 3);
             return FALSE;
         }
-        append = Value_str(v[3]);
+        append = Value_vp(v[3]);
     } else {
-        append = fs->Str_EMPTY;
+        append = fs->str_0;
     }
 
     if (v_type == fs->cls_str) {
-        size = strlen_utf8(src.p, src.size);
+        size = strlen_utf8(src->c, src->size);
     } else {
-        size = src.size;
+        size = src->size;
     }
     calc_splice_position(&start, &len, size, v);
     if (v_type == fs->cls_str) {
-        len = utf8_position(src.p + start, src.size - start, len);
-        start = utf8_position(src.p, src.size, start);
+        len = utf8_position(src->c + start, src->size - start, len);
+        start = utf8_position(src->c, src->size, start);
     }
-    rs = refstr_new_n(v_type, src.size + append.size - len);
+    rs = refstr_new_n(v_type, src->size + append->size - len);
     *vret = vp_Value(rs);
-    memcpy(rs->c, src.p, start);
-    if (append.size > 0) {
-        memcpy(rs->c + start, append.p, append.size);
+    memcpy(rs->c, src->c, start);
+    if (append->size > 0) {
+        memcpy(rs->c + start, append->c, append->size);
     }
-    memcpy(rs->c + start + append.size, src.p + start + len, src.size - start - len);
+    memcpy(rs->c + start + append->size, src->c + start + len, src->size - start - len);
     rs->c[rs->size] = '\0';
 
     return TRUE;
@@ -840,7 +839,7 @@ static int sequence_split(Value *vret, Value *v, RefNode *node)
 {
     Value v1 = v[1];
     RefNode *v1_type = Value_type(v1);
-    Str src = Value_str(*v);
+    RefStr *src = Value_vp(*v);
     RefNode *v_type = Value_type(*v);
     int offset = 0;
 
@@ -848,23 +847,23 @@ static int sequence_split(Value *vret, Value *v, RefNode *node)
     *vret = vp_Value(arr);
 
     if (v1_type == v_type) {
-        Str s1 = Value_str(v1);
+        RefStr *s1 = Value_vp(v1);
         int prev = 0;
 
         for (;;) {
             Str result;
             int idx = sequence_find_sub(src, s1, offset);
             if (idx < 0) {
-                result = Str_new(src.p + prev, src.size - prev);
+                result = Str_new(src->c + prev, src->size - prev);
                 refarray_push_str(arr, result.p, result.size, v_type);
                 break;
             }
-            result = Str_new(src.p + prev, idx - prev);
+            result = Str_new(src->c + prev, idx - prev);
             refarray_push_str(arr, result.p, result.size, v_type);
 
-            prev = idx + s1.size;
+            prev = idx + s1->size;
             offset = prev;
-            if (s1.size == 0) {
+            if (s1->size == 0) {
                 // マッチした幅が0の場合は1進めないと、無限ループになってしまう
                 offset++;
             }
@@ -881,17 +880,17 @@ static int sequence_split(Value *vret, Value *v, RefNode *node)
 
         for (;;) {
             Str result;
-            int n_match = pcre_exec(re, NULL, src.p, src.size, offset, 0, matches, m_size);
+            int n_match = pcre_exec(re, NULL, src->c, src->size, offset, 0, matches, m_size);
 
             if (n_match < 0) {
-                result = Str_new(src.p + prev, src.size - prev);
+                result = Str_new(src->c + prev, src->size - prev);
                 if (v_type == fs->cls_str) {
                     result = fix_utf8_part(result);
                 }
                 refarray_push_str(arr, result.p, result.size, v_type);
                 break;
             }
-            result = Str_new(src.p + prev, matches[0] - prev);
+            result = Str_new(src->c + prev, matches[0] - prev);
             if (v_type == fs->cls_str) {
                 result = fix_utf8_part(result);
             }
@@ -918,19 +917,19 @@ static int sequence_caseconv(Value *vret, Value *v, RefNode *node)
 {
     int i;
     int lower = FUNC_INT(node);
-    Str src = Value_str(*v);
+    RefStr *src = Value_vp(*v);
     RefNode *v_type = Value_type(*v);
-    RefStr *rs = refstr_new_n(v_type, src.size);
+    RefStr *rs = refstr_new_n(v_type, src->size);
     *vret = vp_Value(rs);
 
     if (lower) {
-        for (i = 0; i < src.size; i++) {
-            int ch = src.p[i] & 0xFF;
+        for (i = 0; i < src->size; i++) {
+            int ch = src->c[i] & 0xFF;
             rs->c[i] = (ch >= 'A' && ch <= 'Z') ? ch + ('a' - 'A') : ch;
         }
     } else {
-        for (i = 0; i < src.size; i++) {
-            int ch = src.p[i] & 0xFF;
+        for (i = 0; i < src->size; i++) {
+            int ch = src->c[i] & 0xFF;
             rs->c[i] = (ch >= 'a' && ch <= 'z') ? ch - ('a' - 'A') : ch;
         }
     }
@@ -940,7 +939,7 @@ static int sequence_caseconv(Value *vret, Value *v, RefNode *node)
 }
 static int sequence_trim(Value *vret, Value *v, RefNode *node)
 {
-    Str src = Value_str(*v);
+    RefStr *src = Value_vp(*v);
     RefNode *v_type = Value_type(*v);
     int i, j;
     // TRUE  : 前後の空白・制御文字を除去し、中間の空白・制御文字の連続を1個にまとめる
@@ -948,32 +947,32 @@ static int sequence_trim(Value *vret, Value *v, RefNode *node)
     int collapse = FUNC_INT(node);
 
     // 左の空白を除去
-    for (i = 0; i < src.size; i++) {
+    for (i = 0; i < src->size; i++) {
         if (collapse) {
-            if ((src.p[i] & 0xFF) > ' ') {
+            if ((src->c[i] & 0xFF) > ' ') {
                 break;
             }
         } else {
-            if (!isspace_fox(src.p[i])) {
+            if (!isspace_fox(src->c[i])) {
                 break;
             }
         }
     }
     // 右の空白を除去
-    for (j = src.size; j > i; j--) {
+    for (j = src->size; j > i; j--) {
         if (collapse) {
-            if ((src.p[j - 1] & 0xFF) > ' ') {
+            if ((src->c[j - 1] & 0xFF) > ' ') {
                 break;
             }
         } else {
-            if (!isspace_fox(src.p[j - 1])) {
+            if (!isspace_fox(src->c[j - 1])) {
                 break;
             }
         }
     }
 
     if (collapse) {
-        Str ret = Str_new(src.p + i, j - i);
+        Str ret = Str_new(src->c + i, j - i);
         int k, l;
 
         // スペースの連続または制御文字が存在するか調べる
@@ -1014,8 +1013,8 @@ static int sequence_trim(Value *vret, Value *v, RefNode *node)
         }
     }
 
-    if (collapse || i > 0 || j < src.size) {
-        *vret = cstr_Value(v_type, src.p + i, j - i);
+    if (collapse || i > 0 || j < src->size) {
+        *vret = cstr_Value(v_type, src->c + i, j - i);
     } else {
         // 長さの変化がないため、そのまま
         *vret = *v;
@@ -1032,14 +1031,14 @@ static int sequence_count(Value *vret, Value *v, RefNode *node)
     int offset = 0;
     int count = 0;
 
-    Str s1 = Value_str(*v);
+    RefStr *s1 = Value_vp(*v);
 
     if (v1_type == v_type) {
-        Str s2 = Value_str(v1);
+        RefStr *s2 = Value_vp(v1);
         for (;;) {
             int idx = sequence_find_sub(s1, s2, offset);
             if (idx >= 0) {
-                offset = idx + s2.size;
+                offset = idx + s2->size;
                 count++;
             } else {
                 break;
@@ -1055,7 +1054,7 @@ static int sequence_count(Value *vret, Value *v, RefNode *node)
         matches = malloc(sizeof(int) * m_size);
 
         for (;;) {
-            if (pcre_exec(re, NULL, s1.p, s1.size, offset, 0, matches, m_size) >= 1) {
+            if (pcre_exec(re, NULL, s1->c, s1->size, offset, 0, matches, m_size) >= 1) {
                 offset = matches[1];
                 count++;
             } else {
@@ -1146,19 +1145,19 @@ static int seqiter_next(Value *vret, Value *v, RefNode *node)
 {
     Ref *r = Value_ref(*v);
     int i = Value_integral(r->v[INDEX_SEQITER_CUR]);
-    Str s = Value_str(r->v[INDEX_SEQITER_SRC]);
+    RefStr *s = Value_vp(r->v[INDEX_SEQITER_SRC]);
     int ret;
 
-    if (i >= s.size) {
+    if (i >= s->size) {
         throw_stopiter();
         return FALSE;
     } else if (Value_bool(r->v[INDEX_SEQITER_IS_STR])) {
-        const char *p = &s.p[i];
+        const char *p = &s->c[i];
         ret = utf8_codepoint_at(p);
-        utf8_next(&p, &s.p[s.size]);
-        i = p - s.p;
+        utf8_next(&p, &s->c[s->size]);
+        i = p - s->c;
     } else {
-        ret = s.p[i];
+        ret = s->c[i];
         i++;
     }
     r->v[INDEX_SEQITER_CUR] = int32_Value(i);
@@ -1192,8 +1191,8 @@ static int string_new(Value *vret, Value *v, RefNode *node)
             *vret = v1;
             v[1] = VALUE_NULL;
         } else if (type == fs->cls_bytes) {
-            Str src = Value_str(v1);
-            *vret = cstr_Value_conv(src.p, src.size, NULL);
+            RefStr *src = Value_vp(v1);
+            *vret = cstr_Value_conv(src->c, src->size, NULL);
         } else {
             // 引数に積んだ値をthisとして、to_strを呼び出す
             if (!call_member_func(fs->str_tostr, 0, TRUE)) {
@@ -1274,7 +1273,8 @@ static int string_tostr(Value *vret, Value *v, RefNode *node)
 {
     if (fg->stk_top > v + 1) {
         RefStr *fmt = Value_vp(v[1]);
-        if (!string_format_sub(vret, Value_str(v[0]), fmt->c, fmt->size, TRUE)) {
+        RefStr *src = Value_vp(v[0]);
+        if (!string_format_sub(vret, Str_new(src->c, src->size), fmt->c, fmt->size, TRUE)) {
             return FALSE;
         }
     } else {
@@ -1290,8 +1290,8 @@ static int string_tostr(Value *vret, Value *v, RefNode *node)
  */
 static int string_size_utf8(Value *vret, Value *v, RefNode *node)
 {
-    Str s1 = Value_str(*v);
-    int size = strlen_utf8(s1.p, s1.size);
+    RefStr *s1 = Value_vp(*v);
+    int size = strlen_utf8(s1->c, s1->size);
     *vret = int32_Value(size);
     return TRUE;
 }
@@ -1312,10 +1312,10 @@ static int string_index(Value *vret, Value *v, RefNode *node)
 
     return TRUE;
 }
-void string_substr_position(int *pbegin, int *pend, Str src, Value *v)
+void string_substr_position(int *pbegin, int *pend, const char *src_p, int src_size, Value *v)
 {
     int begin = 0;
-    int end = src.size;
+    int end = src_size;
 
     if (fg->stk_top > v + 2) {
         int32_t begin_i = Value_int64(v[1], NULL);
@@ -1323,17 +1323,17 @@ void string_substr_position(int *pbegin, int *pend, Str src, Value *v)
 
         if (begin_i >= 0 && end_i >= 0) {
             if (end_i > begin_i) {
-                begin = utf8_position(src.p, src.size, begin_i);
-                end = begin + utf8_position(src.p + begin, src.size - begin, end_i - begin_i);
+                begin = utf8_position(src_p, src_size, begin_i);
+                end = begin + utf8_position(src_p + begin, src_size - begin, end_i - begin_i);
             } else {
                 begin = 0;
                 end = 0;
             }
         } else if (begin_i < 0 && end_i < 0) {
             if (end_i > begin_i) {
-                end = utf8_position(src.p, src.size, end_i);
+                end = utf8_position(src_p, src_size, end_i);
                 if (end > 0) {
-                    begin = utf8_position(src.p, end, begin_i - end_i);
+                    begin = utf8_position(src_p, end, begin_i - end_i);
                 } else {
                     begin = 0;
                     end = 0;
@@ -1343,11 +1343,11 @@ void string_substr_position(int *pbegin, int *pend, Str src, Value *v)
                 end = 0;
             }
         } else {
-            begin = utf8_position(src.p, src.size, begin_i);
+            begin = utf8_position(src_p, src_size, begin_i);
             if (begin < 0) {
                 begin = 0;
             }
-            end = utf8_position(src.p, src.size, end_i);
+            end = utf8_position(src_p, src_size, end_i);
             if (end < 0) {
                 end = 0;
             }
@@ -1357,11 +1357,11 @@ void string_substr_position(int *pbegin, int *pend, Str src, Value *v)
         }
     } else if (fg->stk_top > v + 1) {
         int32_t begin_i = Value_int64(v[1], NULL);
-        begin = utf8_position(src.p, src.size, begin_i);
+        begin = utf8_position(src_p, src_size, begin_i);
         if (begin < 0) {
             begin = 0;
         }
-        end = src.size;
+        end = src_size;
     }
     *pbegin = begin;
     *pend = end;
@@ -1373,14 +1373,12 @@ void string_substr_position(int *pbegin, int *pend, Str src, Value *v)
  */
 static int string_substr(Value *vret, Value *v, RefNode *node)
 {
-    Str src = Value_str(*v);
-    int begin;
-    int end;
-    int len;
+    RefStr *src = Value_vp(*v);
+    int begin, end, len;
 
-    string_substr_position(&begin, &end, src, v);
+    string_substr_position(&begin, &end, src->c, src->size, v);
     len = end - begin;
-    *vret = cstr_Value(fs->cls_str, src.p + begin, len);
+    *vret = cstr_Value(fs->cls_str, src->c + begin, len);
 
     return TRUE;
 }
@@ -1501,8 +1499,9 @@ static int bytes_strcat(Value *vret, Value *v, RefNode *node)
 static int bytes_tostr(Value *vret, Value *v, RefNode *node)
 {
     if (fg->stk_top > v + 1) {
+        RefStr *src = Value_vp(v[0]);
         RefStr *fmt = Value_vp(v[1]);
-        if (!string_format_sub(vret, Value_str(v[0]), fmt->c, fmt->size, FALSE)) {
+        if (!string_format_sub(vret, Str_new(src->c, src->size), fmt->c, fmt->size, FALSE)) {
             return FALSE;
         }
     } else {
@@ -1520,25 +1519,25 @@ static int bytes_tostr(Value *vret, Value *v, RefNode *node)
 }
 static int bytes_size(Value *vret, Value *v, RefNode *node)
 {
-    Str s1 = Value_str(*v);
-    *vret = int32_Value(s1.size);
+    RefStr *s1 = Value_vp(*v);
+    *vret = int32_Value(s1->size);
 
     return TRUE;
 }
 static int bytes_index(Value *vret, Value *v, RefNode *node)
 {
     Value v1 = v[1];
-    Str src = Value_str(*v);
+    RefStr *src = Value_vp(*v);
     int32_t idx = Value_int64(v1, NULL);
 
     if (idx < 0) {
-        idx += src.size;
+        idx += src->size;
     }
-    if (idx >= 0 && idx < src.size) {
-        char c = src.p[idx];
+    if (idx >= 0 && idx < src->size) {
+        char c = src->c[idx];
         *vret = int32_Value(c & 0xFF);
     } else {
-        throw_error_select(THROW_INVALID_INDEX__VAL_INT, v1, src.size);
+        throw_error_select(THROW_INVALID_INDEX__VAL_INT, v1, src->size);
         return FALSE;
     }
 
@@ -1552,39 +1551,39 @@ static int bytes_index(Value *vret, Value *v, RefNode *node)
  */
 static int bytes_substr(Value *vret, Value *v, RefNode *node)
 {
-    Str src = Value_str(*v);
+    RefStr *src = Value_vp(*v);
     int32_t begin = Value_int64(v[1], NULL);
     int32_t end;
     int32_t len;
 
     if (begin < 0) {
-        begin += src.size;
+        begin += src->size;
         if (begin < 0) {
             begin = 0;
         }
     } else {
-        if (begin > src.size) {
-            begin = src.size;
+        if (begin > src->size) {
+            begin = src->size;
         }
     }
 
     if (fg->stk_top > v + 2) {
         end = Value_int64(v[2], NULL);
         if (end < 0) {
-            end += src.size;
+            end += src->size;
         } else {
-            if (end > src.size) {
-                end = src.size;
+            if (end > src->size) {
+                end = src->size;
             }
         }
         if (end < begin) {
             end = begin;
         }
     } else {
-        end = src.size;
+        end = src->size;
     }
     len = end - begin;
-    *vret = cstr_Value(fs->cls_bytes, src.p + begin, len);
+    *vret = cstr_Value(fs->cls_bytes, src->c + begin, len);
 
     return TRUE;
 }
@@ -1606,11 +1605,11 @@ static int regex_new(Value *vret, Value *v, RefNode *node)
 
     // 第2引数をオプションとして解析
     if (fg->stk_top > v + 2) {
-        Str opt = Value_str(v[2]);
+        RefStr *opt = Value_vp(v[2]);
         int i;
 
-        for (i = 0; i < opt.size; i++) {
-            switch (opt.p[i]) {
+        for (i = 0; i < opt->size; i++) {
+            switch (opt->c[i]) {
             case 'i':
                 options |= PCRE_CASELESS;
                 break;
@@ -1628,7 +1627,7 @@ static int regex_new(Value *vret, Value *v, RefNode *node)
                 options |= PCRE_UTF8;
                 break;
             default:
-                throw_errorf(fs->mod_lang, "RegexError", "Unknown option flag %c", opt.p[i]);
+                throw_errorf(fs->mod_lang, "RegexError", "Unknown option flag %c", opt->c[i]);
                 return FALSE;
             }
         }
@@ -1911,8 +1910,8 @@ static int matches_index(Value *vret, Value *v, RefNode *node)
     {
         int begin = r->matches[idx * 2 + 0];
         int end = r->matches[idx * 2 + 1];
-        Str src = Value_str(r->source);
-        Str s = Str_new(src.p + begin, end - begin);
+        RefStr *src = Value_vp(r->source);
+        Str s = Str_new(src->c + begin, end - begin);
 
         if (r->is_bytes) {
             *vret = cstr_Value(fs->cls_bytes, s.p, s.size);
@@ -1942,8 +1941,8 @@ static int matches_position(Value *vret, Value *v, RefNode *node)
     {
         int pos = r->matches[idx * 2 + (end ? 1 : 0)];
         if (!r->is_bytes) {
-            Str src = Value_str(r->source);
-            pos = strlen_utf8(src.p, pos);
+            RefStr *src = Value_vp(r->source);
+            pos = strlen_utf8(src->c, pos);
         }
         *vret = int32_Value(pos);
     }
@@ -2082,12 +2081,12 @@ static int str_urlencode(Value *vret, Value *v, RefNode *node)
 
 static int str_urldecode(Value *vret, Value *v, RefNode *node)
 {
-    Str src = Value_str(v[1]);
+    RefStr *src = Value_vp(v[1]);
     Str str;
     StrBuf buf;
 
-    StrBuf_init(&buf, src.size);
-    urldecode_sub(&buf, src.p, src.size);
+    StrBuf_init(&buf, src->size);
+    urldecode_sub(&buf, src->c, src->size);
     str = Str_new(buf.p, buf.size);
 
     if (!convert_bin_to_str(vret, &str, 1)) {

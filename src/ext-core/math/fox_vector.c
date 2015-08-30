@@ -144,7 +144,7 @@ static int vector_norm(Value *vret, Value *v, RefNode *node)
         norm += d * d;
     }
     norm = sqrt(norm);
-    *vret = fs->float_Value(norm);
+    *vret = fs->float_Value(fs->cls_float, norm);
 
     return TRUE;
 }
@@ -178,7 +178,7 @@ static int vector_to_list(Value *vret, Value *v, RefNode *node)
     *vret = vp_Value(ra);
 
     for (i = 0; i < vec->size; i++) {
-        ra->p[i] = fs->float_Value(vec->d[i]);
+        ra->p[i] = fs->float_Value(fs->cls_float, vec->d[i]);
     }
     return TRUE;
 }
@@ -251,7 +251,7 @@ static int vector_index(Value *vret, Value *v, RefNode *node)
         i += vec->size;
     }
     if (!err && i >= 0 && i < vec->size) {
-        *vret = fs->float_Value(vec->d[i]);
+        *vret = fs->float_Value(fs->cls_float, vec->d[i]);
     } else {
         fs->throw_error_select(THROW_INVALID_INDEX__VAL_INT, v[1], vec->size);
         return FALSE;
@@ -612,7 +612,7 @@ static int matrix_to_list(Value *vret, Value *v, RefNode *node)
         ra->p[i] = vp_Value(ra2);
 
         for (j = 0; j < mat->cols; j++) {
-            ra2->p[j] = fs->float_Value(src[j]);
+            ra2->p[j] = fs->float_Value(fs->cls_float, src[j]);
         }
     }
     return TRUE;
@@ -792,7 +792,7 @@ static double get_matrix_norm(RefMatrix *mat)
 static int matrix_norm(Value *vret, Value *v, RefNode *node)
 {
     double norm = get_matrix_norm(Value_vp(*v));
-    *vret = fs->float_Value(norm);
+    *vret = fs->float_Value(fs->cls_float, norm);
     return TRUE;
 }
 
@@ -808,7 +808,7 @@ static int matrix_index(Value *vret, Value *v, RefNode *node)
         j += mat->cols;
     }
     if (i >= 0 && i < mat->rows && j >= 0 && j < mat->cols) {
-        *vret = fs->float_Value(mat->d[i * mat->cols + j]);
+        *vret = fs->float_Value(fs->cls_float, mat->d[i * mat->cols + j]);
     } else {
         fs->throw_errorf(fs->mod_lang, "IndexError", "Invalid matrix index ((%v, %v) of (%d, %d))", v[1], v[2], mat->rows, mat->cols);
         return FALSE;
@@ -841,17 +841,16 @@ static int matrix_tostr(Value *vret, Value *v, RefNode *node)
     const RefMatrix *mat = Value_vp(*v);
     int cols = mat->cols;
     int size = cols * mat->rows;
-    Str fmt;
+    RefStr *fmt;
     int i;
 
     if (fg->stk_top > v + 1) {
-        fmt = fs->Value_str(v[1]);
+        fmt = Value_vp(v[1]);
     } else {
-        fmt.p = NULL;
-        fmt.size = 0;
+        fmt = fs->str_0;
     }
 
-    if (Str_eq_p(fmt, "p") || Str_eq_p(fmt, "pretty")) {
+    if (str_eq(fmt->c, fmt->size, "p", -1) || str_eq(fmt->c, fmt->size, "pretty", -1)) {
         // 各列の横幅の最大値を求める
         uint8_t *max_w = malloc(cols);
         int rows = mat->rows;
@@ -891,7 +890,7 @@ static int matrix_tostr(Value *vret, Value *v, RefNode *node)
         free(max_w);
 
         *vret = fs->StrBuf_str_Value(&sb, fs->cls_str);
-    } else if (fmt.size == 0) {
+    } else if (fmt->size == 0) {
         fs->StrBuf_init_refstr(&sb, 0);
         fs->StrBuf_add(&sb, "Matrix([", 8);
 
@@ -951,7 +950,7 @@ static int math_dot(Value *vret, Value *v, RefNode *node)
     for (i = 0; i < n; i++) {
         d += v1->d[i] * v2->d[i];
     }
-    *vret = fs->float_Value(d);
+    *vret = fs->float_Value(fs->cls_float, d);
 
     return TRUE;
 }

@@ -45,21 +45,21 @@ int confirm_dialog(RefStr *msg, RefStr *title, WndHandle parent)
  * *.bmp;*.jpg -> "*.bmp;*.jpg", "*.bmp;*.jpg"
  * Image file:*.bmp;*.jpg -> "Image file", "*.bmp;*.jpg"
  */
-static void split_filter_name(Str *name, Str *filter, Str src)
+static void split_filter_name(Str *name, Str *filter, RefStr *src)
 {
     int i;
 
-    for (i = src.size - 1; i >= 0; i--) {
-        if (src.p[i] == ':') {
-            name->p = src.p;
+    for (i = src->size - 1; i >= 0; i--) {
+        if (src->c[i] == ':') {
+            name->p = src->c;
             name->size = i;
-            filter->p = src.p + i + 1;
-            filter->size = src.size - i - 1;
+            filter->p = src->c + i + 1;
+            filter->size = src->size - i - 1;
             return;
         }
     }
-    *name = src;
-    *filter = src;
+    *name = Str_new(src->c, src->size);
+    *filter = *name;
 }
 
 static wchar_t *make_filter_string(RefArray *r)
@@ -75,7 +75,7 @@ static wchar_t *make_filter_string(RefArray *r)
         wchar_t *wname, *wft;
         int next;
 
-        split_filter_name(&name, &ft, fs->Value_str(r->p[i]));
+        split_filter_name(&name, &ft, Value_vp(r->p[i]));
 
         wname = cstr_to_utf16(name.p, name.size);
         wft = cstr_to_utf16(ft.p, ft.size);
@@ -123,13 +123,13 @@ static wchar_t *concat_filename(const wchar_t *dir, const wchar_t *file)
     return p;
 }
 
-int file_open_dialog(Value *vret, Str title, RefArray *filter, WndHandle parent, int type)
+int file_open_dialog(Value *vret, const char *title, RefArray *filter, WndHandle parent, int type)
 {
     enum {
         RETBUF_MAX = 32 * 1024,
     };
     int ret = FALSE;
-    wchar_t *title_p = cstr_to_utf16(title.p, title.size);
+    wchar_t *title_p = cstr_to_utf16(title, -1);
     wchar_t *filter_p = NULL;
     wchar_t *wbuf = malloc(RETBUF_MAX);
     int offset = 0;

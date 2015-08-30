@@ -55,17 +55,6 @@ int str_eqi(const char *s_p, int s_size, const char *t_p, int t_size)
     return TRUE;
 }
 
-int stricmp_fox(const char *s1, const char *s2)
-{
-    while (*s1 != '\0') {
-        int c1 = tolower_fox(*s1);
-        int c2 = tolower_fox(*s2);
-        if (c1 != c2) {
-            return c1 - c2;
-        }
-    }
-    return (*s2 != '\0' ? -1 : 0);
-}
 int str_has0(const char *p, int size)
 {
     int i;
@@ -92,11 +81,6 @@ Str Str_new(const char *p, int len)
     }
     s.size = len;
     return s;
-}
-int Str_eq_p(Str s, const char *p)
-{
-    int len = strlen(p);
-    return s.size == len && memcmp(s.p, p, len) == 0;
 }
 
 ////////////////////////////////////////////////////////////////////////////

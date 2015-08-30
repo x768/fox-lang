@@ -15,6 +15,10 @@ assert_equal %(abc\t), "abc\t"
 assert_equal %Q(abc\t), "abc\t"
 assert_equal %q(abc\t), "abc\\t"
 
+assert_equal "\
+abc\
+def", "abcdef"
+
 assert_equal <<<EOS
 abc
 def

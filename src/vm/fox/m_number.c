@@ -1,5 +1,4 @@
 #include "fox_vm.h"
-#include "mplogic.h"
 #include <errno.h>
 #include <string.h>
 #include <stdio.h>
@@ -19,17 +18,17 @@ typedef struct NumberFormat {
     int width_f;  // 小数部
 } NumberFormat;
 
-#define Value_mp(v) (((RefInt*)(intptr_t)(v))->mp)
+#define Value_bigint(v) (((RefInt*)(intptr_t)(v))->bi)
 
 /**
  * BigIntがint32の範囲内に収まっている場合は
  * VALUE_INT に変換する
  */
-void fix_bigint(Value *v, mp_int *mp)
+void fix_bigint(Value *v, BigInt *bi)
 {
-    // 0x4000 0000 より小さいか
-    if (mp->used < 2 || (mp->used == 2 && (mp->dp[1] & 0x8000) == 0)) {
-        int32_t ret = mp2_tolong(mp);
+    // 絶対値が 0x4000 0000 より小さいか
+    if (bi->size < 2 || (bi->size == 2 && (bi->d[1] & 0x8000) == 0)) {
+        int32_t ret = BigInt_int32(bi);
         Value_dec(*v);
         *v = int32_Value(ret);
     }
@@ -88,8 +87,8 @@ static int integer_new(Value *vret, Value *v, RefNode *node)
             } else {
                 RefInt *m1 = buf_new(fs->cls_int, sizeof(RefInt));
                 *vret = vp_Value(m1);
-                mp_init(&m1->mp);
-                mp2_set_double(&m1->mp, d);
+                BigInt_init(&m1->bi);
+                double_BigInt(&m1->bi, d);
             }
         } else if (type == fs->cls_str || type == fs->cls_bytes) {
             RefStr *rs = Value_vp(v1);
@@ -101,8 +100,11 @@ static int integer_new(Value *vret, Value *v, RefNode *node)
                 if (errno != 0 || val <= INT32_MIN || val > INT32_MAX) {
                     RefInt *m1 = buf_new(fs->cls_int, sizeof(RefInt));
                     *vret = vp_Value(m1);
-                    mp_init(&m1->mp);
-                    mp_read_radix(&m1->mp, (unsigned char*)rs->c, 10);
+                    BigInt_init(&m1->bi);
+                    if (!cstr_BigInt(&m1->bi, 10, rs->c, rs->size)) {
+                        throw_error_select(THROW_MAX_ALLOC_OVER__INT, fs->max_alloc);
+                        return FALSE;
+                    }
                 } else {
                     *vret = int32_Value((int32_t)val);
                 }
@@ -110,18 +112,18 @@ static int integer_new(Value *vret, Value *v, RefNode *node)
                 *vret = int32_Value(0);
             }
         } else if (type == fs->cls_frac) {
-            mp_int rem;
+            BigInt rem;
             RefFrac *md = Value_vp(v1);
             RefInt *m1 = buf_new(fs->cls_int, sizeof(RefInt));
             *vret = vp_Value(m1);
 
-            mp_init(&m1->mp);
-            mp_init(&rem);
+            BigInt_init(&m1->bi);
+            BigInt_init(&rem);
 
-            mp_div(&md->md[0], &md->md[1], &m1->mp, &rem);
-            mp_clear(&rem);
+            BigInt_divmod(&m1->bi, &rem, &md->bi[0], &md->bi[1]);
+            BigInt_close(&rem);
 
-            fix_bigint(vret, &m1->mp);
+            fix_bigint(vret, &m1->bi);
         } else if (type == fs->cls_int) {
             // そのまま
             *vret = Value_cp(v1);
@@ -171,8 +173,11 @@ static int integer_parse(Value *vret, Value *v, RefNode *node)
     if (errno != 0 || ret <= INT32_MIN || ret > INT32_MAX) {
         RefInt *mp = buf_new(fs->cls_int, sizeof(RefInt));
         *vret = vp_Value(mp);
-        mp_init(&mp->mp);
-        mp_read_radix(&mp->mp, (unsigned char*)rs->c, base);
+        BigInt_init(&mp->bi);
+        if (!cstr_BigInt(&mp->bi, base, rs->c, rs->size)) {
+            throw_error_select(THROW_MAX_ALLOC_OVER__INT, fs->max_alloc);
+            return FALSE;
+        }
     } else {
         *vret = int32_Value(ret);
     }
@@ -223,7 +228,9 @@ static int integer_marshal_read(Value *vret, Value *v, RefNode *node)
         throw_errorf(fs->mod_lang, "ValueError", "Invalid size number");
         return FALSE;
     }
-    if (digits <= 2) {
+    if (digits == 0) {
+        *vret = int32_Value(0);
+    } else if (digits <= 2) {
         uint8_t data[8];
         rd_size = digits * 2;
         if (!stream_read_data(r, NULL, (char*)data, &rd_size, FALSE, TRUE)) {
@@ -234,13 +241,16 @@ static int integer_marshal_read(Value *vret, Value *v, RefNode *node)
             RefInt *mp = buf_new(fs->cls_int, sizeof(RefInt));
             *vret = vp_Value(mp);
 
-            mp_init_size(&mp->mp, digits);
+            BigInt_init(&mp->bi);
+            BigInt_reserve(&mp->bi, digits);
             for (i = 0; i < digits; i++) {
-                mp->mp.dp[i] = (data[i * 2] << 8) | data[i * 2 + 1];
+                mp->bi.d[i] = (data[i * 2] << 8) | data[i * 2 + 1];
             }
-            mp->mp.used = digits;
+            mp->bi.size = digits;
             if (minus) {
-                mp->mp.sign = MP_NEG;
+                mp->bi.sign = -1;
+            } else {
+                mp->bi.sign = 1;
             }
         } else {
             int32_t ival = dp_to_int32(data, digits);
@@ -252,13 +262,19 @@ static int integer_marshal_read(Value *vret, Value *v, RefNode *node)
     } else {
         RefInt *mp = buf_new(fs->cls_int, sizeof(RefInt));
         *vret = vp_Value(mp);
-        mp_init_size(&mp->mp, digits);
-        if (!read_int16_array(mp->mp.dp, digits, r)) {
+        BigInt_init(&mp->bi);
+        if (!BigInt_reserve(&mp->bi, digits)) {
+            throw_error_select(THROW_MAX_ALLOC_OVER__INT, fs->max_alloc);
             return FALSE;
         }
-        mp->mp.used = digits;
+        if (!read_int16_array(mp->bi.d, digits, r)) {
+            return FALSE;
+        }
+        mp->bi.size = digits;
         if (minus) {
-            mp->mp.sign = MP_NEG;
+            mp->bi.sign = -1;
+        } else {
+            mp->bi.sign = 1;
         }
     }
 
@@ -300,11 +316,11 @@ static int integer_marshal_write(Value *vret, Value *v, RefNode *node)
 
     if (Value_isref(*v)) {
         RefInt *mp = Value_vp(*v);
-        if (mp->mp.sign == MP_NEG) {
+        if (mp->bi.sign < 0) {
             minus = 1;
         }
-        digits = mp->mp.used;
-        data = mp->mp.dp;
+        digits = mp->bi.size;
+        data = mp->bi.d;
     } else {
         int32_t ival = Value_integral(*v);
         if (ival < 0) {
@@ -330,7 +346,7 @@ static int integer_marshal_write(Value *vret, Value *v, RefNode *node)
 static int integer_dispose(Value *vret, Value *v, RefNode *node)
 {
     RefInt *mp = Value_vp(*v);
-    mp_clear(&mp->mp);
+    BigInt_close(&mp->bi);
     return TRUE;
 }
 static int integer_eq(Value *vret, Value *v, RefNode *node)
@@ -343,7 +359,7 @@ static int integer_eq(Value *vret, Value *v, RefNode *node)
         if (Value_isref(v1)) {
             RefInt *m1 = Value_vp(v0);
             RefInt *m2 = Value_vp(v1);
-            eq = (mp_cmp(&m1->mp, &m2->mp) == 0);
+            eq = (BigInt_cmp(&m1->bi, &m2->bi) == 0);
         } else {
             eq = FALSE;
         }
@@ -368,15 +384,17 @@ static int integer_cmp(Value *vret, Value *v, RefNode *node)
         if (Value_isref(v1)) {
             RefInt *m1 = Value_vp(v0);
             RefInt *m2 = Value_vp(v1);
-            cmp = mp_cmp(&m1->mp, &m2->mp);
+            cmp = BigInt_cmp(&m1->bi, &m2->bi);
         } else {
             RefInt *m1 = Value_vp(v0);
-            cmp = mp_cmp_int(&m1->mp, Value_integral(v1));
+            // always |v0| > |v1|
+            cmp = m1->bi.sign;
         }
     } else {
         if (Value_isref(v1)) {
             RefInt *m2 = Value_vp(v1);
-            cmp = -mp_cmp_int(&m2->mp, Value_integral(v0));
+            // always |v0| > |v1|
+            cmp = -m2->bi.sign;
         } else {
             int i0 = Value_integral(v0);
             int i1 = Value_integral(v1);
@@ -416,35 +434,31 @@ static int integer_addsub(Value *vret, Value *v, RefNode *node)
             *vret = int32_Value(ret);
         }
     } else {
-        mp_int m0;
-        mp_int m1;
+        BigInt m1;
         RefInt *mp = buf_new(fs->cls_int, sizeof(RefInt));
         *vret = vp_Value(mp);
 
         if (Value_isint(v0)) {
-            mp_init(&m0);
-            mp_set_int(&m0, Value_integral(v0));
+            BigInt_init(&mp->bi);
+            int64_BigInt(&mp->bi, Value_integral(v0));
         } else {
-            m0 = Value_mp(v0);
+            BigInt_copy(&mp->bi, &Value_bigint(v0));
         }
         if (Value_isint(v1)) {
-            mp_init(&m1);
-            mp_set_int(&m1, Value_integral(v1));
+            BigInt_init(&m1);
+            int64_BigInt(&m1, Value_integral(v1));
         } else {
-            m1 = Value_mp(v1);
+            m1 = Value_bigint(v1);
         }
         if (sub) {
-            mp_sub(&m0, &m1, &mp->mp);
+            BigInt_sub(&mp->bi, &m1);
         } else {
-            mp_add(&m0, &m1, &mp->mp);
-        }
-        if (Value_isint(v0)) {
-            mp_clear(&m0);
+            BigInt_add(&mp->bi, &m1);
         }
         if (Value_isint(v1)) {
-            mp_clear(&m1);
+            BigInt_close(&m1);
         }
-        fix_bigint(vret, &mp->mp);
+        fix_bigint(vret, &mp->bi);
     }
     return TRUE;
 }
@@ -475,31 +489,31 @@ static int integer_mul(Value *vret, Value *v, RefNode *node)
             *vret = int32_Value(ret);
         }
     } else {
-        mp_int m0;
-        mp_int m1;
+        BigInt m0;
+        BigInt m1;
         RefInt *mp = buf_new(fs->cls_int, sizeof(RefInt));
         *vret = vp_Value(mp);
 
         if (Value_isint(v0)) {
-            mp_init(&m0);
-            mp_set_int(&m0, Value_integral(v0));
+            BigInt_init(&m0);
+            int64_BigInt(&m0, Value_integral(v0));
         } else {
-            m0 = Value_mp(v0);
+            m0 = Value_bigint(v0);
         }
         if (Value_isint(v1)) {
-            mp_init(&m1);
-            mp_set_int(&m1, Value_integral(v1));
+            BigInt_init(&m1);
+            int64_BigInt(&m1, Value_integral(v1));
         } else {
-            m1 = Value_mp(v1);
+            m1 = Value_bigint(v1);
         }
-        mp_mul(&m0, &m1, &mp->mp);
+        BigInt_mul(&mp->bi, &m0, &m1);
         if (Value_isint(v0)) {
-            mp_clear(&m0);
+            BigInt_close(&m0);
         }
         if (Value_isint(v1)) {
-            mp_clear(&m1);
+            BigInt_close(&m1);
         }
-        if (mp_cmp_z(&mp->mp) == 0) {
+        if (mp->bi.sign == 0) {
             Value_dec(*vret);
             *vret = int32_Value(0);
         }
@@ -546,56 +560,53 @@ static int integer_div(Value *vret, Value *v, RefNode *node)
     } else {
         // mp_intに合わせる
         RefInt *mp;
-        mp_int m0, m1;
-        mp_int mdiv, mmod;
-        int sgn1, sgn2;
+        BigInt m0, m1;
+        BigInt mdiv, mmod;
 
         if (Value_isint(v0)) {
-            mp_init(&m0);
-            mp_set_int(&m0, Value_integral(v0));
+            BigInt_init(&m0);
+            int64_BigInt(&m0, Value_integral(v0));
         } else {
-            m0 = Value_mp(v0);
+            m0 = Value_bigint(v0);
         }
         if (Value_isint(v1)) {
-            mp_init(&m1);
-            mp_set_int(&m1, Value_integral(v1));
+            BigInt_init(&m1);
+            int64_BigInt(&m1, Value_integral(v1));
         } else {
-            m1 = Value_mp(v1);
+            m1 = Value_bigint(v1);
         }
 
-        mp_init(&mdiv);
-        mp_init(&mmod);
-        mp_div(&m0, &m1, &mdiv, &mmod);
-        sgn1 = mp_cmp_z(&m0);
-        sgn2 = mp_cmp_z(&m1);
+        BigInt_init(&mdiv);
+        BigInt_init(&mmod);
+        BigInt_divmod(&mdiv, &mmod, &m0, &m1);
 
         // 負の数の除数をpython方式に合わせるため、ごにょごにょする
         mp = buf_new(fs->cls_int, sizeof(RefInt));
         *vret = vp_Value(mp);
         if (modulo) {
-            if ((sgn1 < 0 && sgn2 > 0) || (sgn1 > 0 && sgn2 < 0)) {
-                if ((mp_cmp_z(&mmod) != 0)) {
-                    mp_add(&mmod, &m1, &mmod);
+            if ((m0.sign < 0 && m1.sign > 0) || (m0.sign > 0 && m1.sign < 0)) {
+                if (mmod.sign != 0) {
+                    BigInt_add(&mmod, &m1);
                 }
             }
-            mp->mp = mmod;
-            mp_clear(&mdiv);
+            mp->bi = mmod;
+            BigInt_close(&mdiv);
             fix_bigint(vret, &mmod);
         } else {
-            if ((sgn1 < 0 && sgn2 > 0) || (sgn1 > 0 && sgn2 < 0)) {
-                if ((mp_cmp_z(&mdiv) != 0)) {
-                    mp_sub_d(&mdiv, 1, &mdiv);
+            if ((m0.sign < 0 && m1.sign > 0) || (m0.sign > 0 && m1.sign < 0)) {
+                if (mdiv.sign != 0) {
+                    BigInt_add_d(&mdiv, -1);
                 }
             }
-            mp->mp = mdiv;
-            mp_clear(&mmod);
+            mp->bi = mdiv;
+            BigInt_close(&mmod);
             fix_bigint(vret, &mdiv);
         }
         if (Value_isint(v0)) {
-            mp_clear(&m0);
+            BigInt_close(&m0);
         }
         if (Value_isint(v1)) {
-            mp_clear(&m1);
+            BigInt_close(&m1);
         }
     }
     return TRUE;
@@ -610,8 +621,9 @@ static int integer_negative(Value *vret, Value *v, RefNode *node)
         RefInt *mp = buf_new(fs->cls_int, sizeof(RefInt));
         *vret = vp_Value(mp);
 
-        mp_init(&mp->mp);
-        mp_neg(&src->mp, &mp->mp);
+        BigInt_init(&mp->bi);
+        BigInt_copy(&mp->bi, &src->bi);
+        mp->bi.sign *= -1;
     } else {
         *vret = int32_Value(-Value_integral(*v));
     }
@@ -631,19 +643,19 @@ static int integer_inc(Value *vret, Value *v, RefNode *node)
         if (ret < -INT32_MAX || ret > INT32_MAX) {
             RefInt *mp = buf_new(fs->cls_int, sizeof(RefInt));
             *vret = vp_Value(mp);
-            mp_init(&mp->mp);
-            mp_set_int(&mp->mp, ret);
+            BigInt_init(&mp->bi);
+            int64_BigInt(&mp->bi, ret);
         } else {
             *vret = int32_Value(ret);
         }
     } else {
         RefInt *m1 = Value_vp(*v);
-        RefInt *m = buf_new(fs->cls_int, sizeof(RefInt));
-        *vret = vp_Value(m);
+        RefInt *mp = buf_new(fs->cls_int, sizeof(RefInt));
+        *vret = vp_Value(mp);
 
-        mp_init(&m->mp);
-        mp_add_d(&m1->mp, inc, &m->mp);
-        fix_bigint(vret, &m->mp);
+        BigInt_init(&mp->bi);
+        BigInt_copy(&mp->bi, &m1->bi);
+        BigInt_add_d(&mp->bi, inc);
     }
     return TRUE;
 }
@@ -673,41 +685,38 @@ static int integer_logical(Value *vret, Value *v, RefNode *node)
             break;
         }
     } else {
-        mp_int m0;
-        mp_int m1;
+        BigInt m1;
         RefInt *mp = buf_new(fs->cls_int, sizeof(RefInt));
         *vret = vp_Value(mp);
 
         if (Value_isint(v0)) {
-            mp_init(&m0);
-            mp_set_int(&m0, Value_integral(v0));
+            BigInt_init(&mp->bi);
+            int64_BigInt(&mp->bi, Value_integral(v0));
         } else {
-            m0 = Value_mp(v0);
+            BigInt_copy(&mp->bi, &Value_bigint(v0));
         }
         if (Value_isint(v1)) {
-            mp_init(&m1);
-            mp_set_int(&m1, Value_integral(v1));
+            BigInt_init(&m1);
+            int64_BigInt(&m1, Value_integral(v1));
         } else {
-            m1 = Value_mp(v1);
+            m1 = Value_bigint(v1);
         }
+        // TODO:負の数に対応
         switch (type) {
         case T_AND:
-            mpl_and(&m0, &m1, &mp->mp);
+            BigInt_and(&mp->bi, &m1);
             break;
         case T_OR:
-            mpl_or(&m0, &m1, &mp->mp);
+            BigInt_or(&mp->bi, &m1);
             break;
         case T_XOR:
-            mpl_xor(&m0, &m1, &mp->mp);
+            BigInt_xor(&mp->bi, &m1);
             break;
         }
-        if (Value_isint(v0)) {
-            mp_clear(&m0);
-        }
         if (Value_isint(v1)) {
-            mp_clear(&m1);
+            BigInt_close(&m1);
         }
-        fix_bigint(vret, &mp->mp);
+        fix_bigint(vret, &mp->bi);
     }
     return TRUE;
 
@@ -752,9 +761,9 @@ static int integer_shift(Value *vret, Value *v, RefNode *node)
         } if (shift + get_msb_pos(i1) > 31) {
             RefInt *mp = buf_new(fs->cls_int, sizeof(RefInt));
             *vret = vp_Value(mp);
-            mp_init(&mp->mp);
-            mp_set_int(&mp->mp, i1);
-            mpl_lsh(&mp->mp, &mp->mp, shift);
+            BigInt_init(&mp->bi);
+            int64_BigInt(&mp->bi, i1);
+            BigInt_lsh(&mp->bi, shift);
         } else if (shift >= 0) {
             *vret = int32_Value(i1 << shift);
         } else {
@@ -763,20 +772,21 @@ static int integer_shift(Value *vret, Value *v, RefNode *node)
     } else {
         RefInt *mp = Value_vp(*v);
 
-        if (mp->mp.sign == MP_NEG) {
+        if (mp->bi.sign < 0) {
+            // TODO:負の数に対応
             goto ERROR_END;
         }
         if (shift > 0) {
             RefInt *mp2 = buf_new(fs->cls_int, sizeof(RefInt));
             *vret = vp_Value(mp2);
-            mp_init(&mp2->mp);
-            mpl_lsh(&mp->mp, &mp2->mp, shift);
+            BigInt_init(&mp2->bi);
+            BigInt_lsh(&mp->bi, shift);
         } else if (shift < 0) {
             RefInt *mp2 = buf_new(fs->cls_int, sizeof(RefInt));
             *vret = vp_Value(mp2);
-            mp_init(&mp2->mp);
-            mpl_rsh(&mp->mp, &mp2->mp, -shift);
-            fix_bigint(vret, &mp2->mp);
+            BigInt_init(&mp2->bi);
+            BigInt_rsh(&mp->bi, -shift);
+            fix_bigint(vret, &mp2->bi);
         } else {
             *vret = *v;
             *v = VALUE_NULL;
@@ -788,11 +798,34 @@ ERROR_END:
     throw_errorf(fs->mod_lang, "ValueError", "Negative value is not supported");
     return FALSE;
 }
+/**
+ * 2の補数
+ */
+static int integer_inv(Value *vret, Value *v, RefNode *node)
+{
+    if (Value_isref(*v)) {
+        RefInt *mp = buf_new(fs->cls_int, sizeof(RefInt));
+        RefInt *src = Value_vp(*v);
+        BigInt_init(&mp->bi);
+        BigInt_copy(&mp->bi, &src->bi);
+        mp->bi.sign *= -1;
+        BigInt_add_d(&mp->bi, -1);
+        fix_bigint(vret, &mp->bi);
+    } else {
+        int32_t val = ~Value_integral(*v);
+        if (val == INT32_MIN) {
+            *vret = int64_Value(val);
+        } else {
+            *vret = int32_Value(val);
+        }
+    }
+    return TRUE;
+}
 static int integer_sign(Value *vret, Value *v, RefNode *node)
 {
     if (Value_isref(*v)) {
         RefInt *mp = Value_vp(*v);
-        if (mp->mp.sign == MP_NEG) {
+        if (mp->bi.sign < 0) {
             *vret = int32_Value(-1);
         } else {
             *vret = int32_Value(1);
@@ -818,7 +851,7 @@ static int integer_tofloat(Value *vret, Value *v, RefNode *node)
         rd->d = (double)Value_integral(*v);
     } else {
         RefInt *mp = Value_vp(*v);
-        rd->d = mp2_todouble(&mp->mp);
+        rd->d = BigInt_double(&mp->bi);
     }
 
     return TRUE;
@@ -827,16 +860,16 @@ static int integer_tofrac(Value *vret, Value *v, RefNode *node)
 {
     RefFrac *md = buf_new(fs->cls_frac, sizeof(RefFrac));
     *vret = vp_Value(md);
-    mp_init(&md->md[0]);
-    mp_init(&md->md[1]);
+    BigInt_init(&md->bi[0]);
+    BigInt_init(&md->bi[1]);
+    int64_BigInt(&md->bi[1], 1);  // 分母=1
 
     if (Value_isint(*v)) {
-        mp_set_int(&md->md[0], Value_integral(*v));
+        int64_BigInt(&md->bi[0], Value_integral(*v));
     } else {
         RefInt *mp = Value_vp(*v);
-        mp_copy(&mp->mp, &md->md[0]);
+        BigInt_copy(&md->bi[0], &mp->bi);
     }
-    mp_set(&md->md[1], 1);  // 分母=1
 
     return TRUE;
 }
@@ -858,7 +891,7 @@ static int integer_hash(Value *vret, Value *v, RefNode *node)
         *vret = int32_Value(h);
     } else {
         RefInt *mp = Value_vp(*v);
-        *vret = int32_Value(mp2_get_hash(&mp->mp));
+        *vret = int32_Value(BigInt_hash(&mp->bi));
     }
     return TRUE;
 }
@@ -901,7 +934,7 @@ static char *ltostr(char *dst, int64_t i, int base, int upper)
 /**
  * 数値のフォーマット文字列解析
  */
-static int parse_format_str(NumberFormat *nf, Str fmt)
+static int parse_format_str(NumberFormat *nf, const char *fmt_p, int fmt_size)
 {
     int i = 0;
 
@@ -917,12 +950,12 @@ static int parse_format_str(NumberFormat *nf, Str fmt)
     // フォーマット文字列解析
     // 5  -> "   12"
     // 05 -> "00012"
-    if (i < fmt.size && (fmt.p[i] == '+' || fmt.p[i] == '-')) {
-        nf->sign = fmt.p[i];
+    if (i < fmt_size && (fmt_p[i] == '+' || fmt_p[i] == '-')) {
+        nf->sign = fmt_p[i];
         i++;
     }
-    if (i < fmt.size) {
-        char c = fmt.p[i];
+    if (i < fmt_size) {
+        char c = fmt_p[i];
 
         if (c == ',') {
             nf->group = TRUE;
@@ -937,8 +970,8 @@ static int parse_format_str(NumberFormat *nf, Str fmt)
                 nf->padding = c;
                 i++;
             }
-            for ( ; i < fmt.size && isdigit(fmt.p[i]); i++) {
-                width = width * 10 + (fmt.p[i] - '0');
+            for ( ; i < fmt_size && isdigit(fmt_p[i]); i++) {
+                width = width * 10 + (fmt_p[i] - '0');
                 if (width > 32767) {
                     throw_errorf(fs->mod_lang, "FormatError", "Width number overflow (0 - 32767)");
                     return FALSE;
@@ -946,11 +979,11 @@ static int parse_format_str(NumberFormat *nf, Str fmt)
             }
             nf->width = width;
         }
-        if (i < fmt.size && fmt.p[i] == '.') {
+        if (i < fmt_size && fmt_p[i] == '.') {
             int width = 0;
             i++;
-            for ( ; i < fmt.size && isdigit(fmt.p[i]); i++) {
-                width = width * 10 + (fmt.p[i] - '0');
+            for ( ; i < fmt_size && isdigit(fmt_p[i]); i++) {
+                width = width * 10 + (fmt_p[i] - '0');
                 if (width > 32767) {
                     throw_errorf(fs->mod_lang, "FormatError", "Width number overflow (0 - 32767)");
                     return FALSE;
@@ -959,8 +992,8 @@ static int parse_format_str(NumberFormat *nf, Str fmt)
             nf->width_f = width;
         }
     }
-    if (i < fmt.size) {
-        char c = fmt.p[i];
+    if (i < fmt_size) {
+        char c = fmt_p[i];
         nf->upper = isupper(c);
 
         switch (c) {
@@ -978,9 +1011,9 @@ static int parse_format_str(NumberFormat *nf, Str fmt)
         case 'r': case 'R': {
             int base = 0;
             i++;
-            if (i < fmt.size) {
-                for ( ; i < fmt.size && isdigit(fmt.p[i]); i++) {
-                    base = base * 10 + (fmt.p[i] - '0');
+            if (i < fmt_size) {
+                for ( ; i < fmt_size && isdigit(fmt_p[i]); i++) {
+                    base = base * 10 + (fmt_p[i] - '0');
                     if (base > 36) {
                         throw_errorf(fs->mod_lang, "FormatError", "Invalid radix number(2 - 36)");
                         return FALSE;
@@ -1143,12 +1176,12 @@ static void number_format_str(char *dst, int *plen, const char *src, NumberForma
 
     *plen = (p - dst);
 }
-static Value mp2_number_format(mp_int *mp, NumberFormat *nf, const LocaleData *loc)
+static Value BigInt_number_format(BigInt *bi, NumberFormat *nf, const LocaleData *loc)
 {
     int len;
-    char *ptr = malloc(mp_radix_size(mp, nf->base) + 2);
+    char *ptr = malloc(BigInt_str_bufsize(bi, nf->base) + 2);
     RefStr *rs;
-    mp_toradix(mp, (unsigned char *)ptr, nf->base);
+    BigInt_str(bi, nf->base, ptr, nf->upper);
 
     len = number_format_maxlength(ptr, nf, loc);
     rs = refstr_new_n(fs->cls_str, len);
@@ -1267,11 +1300,11 @@ FINISH:
  * 入力:v (Int)
  * 出力:v (Str)
  */
-static int integer_tostr_sub(Value *vret, Value v, Str fmt, const LocaleData *loc)
+static int integer_tostr_sub(Value *vret, Value v, RefStr *fmt, const LocaleData *loc)
 {
     NumberFormat nf;
 
-    if (!parse_format_str(&nf, fmt)) {
+    if (!parse_format_str(&nf, fmt->c, fmt->size)) {
         return FALSE;
     }
 
@@ -1293,15 +1326,9 @@ static int integer_tostr_sub(Value *vret, Value v, Str fmt, const LocaleData *lo
             ptr = ltostr(c_buf + sizeof(c_buf) - 4, Value_integral(v), nf.base, nf.upper);
         } else {
             RefInt *mp = Value_vp(v);
-            p_ptr = malloc(mp_radix_size(&mp->mp, nf.base) + 8);
+            p_ptr = malloc(BigInt_str_bufsize(&mp->bi, nf.base) + 8);
             ptr = p_ptr;
-            mp_toradix(&mp->mp, (unsigned char *)ptr, nf.base);
-            if (!nf.upper) {
-                char *p2;
-                for (p2 = ptr; *p2 != '\0'; p2++) {
-                    *p2 = tolower(*p2);
-                }
-            }
+            BigInt_str(&mp->bi, nf.base, ptr, nf.upper);
         }
         if (nf.other == 'f') {
             strcat(ptr, ".0");
@@ -1324,7 +1351,7 @@ static int integer_tostr_sub(Value *vret, Value v, Str fmt, const LocaleData *lo
             val = (double)Value_integral(v);
         } else {
             RefInt *mp = Value_vp(v);
-            val = mp2_todouble(&mp->mp);
+            val = BigInt_double(&mp->bi);
         }
         *vret = number_to_si_unit(val, &nf, loc, FALSE);
         break;
@@ -1345,7 +1372,7 @@ static int integer_tostr(Value *vret, Value *v, RefNode *node)
         } else {
             loc = fv->loc_neutral;
         }
-        if (!integer_tostr_sub(vret, *v, Value_str(v[1]), loc)) {
+        if (!integer_tostr_sub(vret, *v, Value_vp(v[1]), loc)) {
             return FALSE;
         }
     } else {
@@ -1356,8 +1383,8 @@ static int integer_tostr(Value *vret, Value *v, RefNode *node)
             *vret = cstr_Value(fs->cls_str, c_buf, -1);
         } else {
             RefInt *mp = Value_vp(*v);
-            char *c_buf = malloc(mp_radix_size(&mp->mp, 10) + 2);
-            mp_toradix(&mp->mp, (unsigned char *)c_buf, 10);
+            char *c_buf = malloc(BigInt_str_bufsize(&mp->bi, 10) + 2);
+            BigInt_str(&mp->bi, 10, c_buf, FALSE);
             *vret = cstr_Value(fs->cls_str, c_buf, -1);
             free(c_buf);
         }
@@ -1388,13 +1415,13 @@ static int frac_new(Value *vret, Value *v, RefNode *node)
             return FALSE;
         }
 
-        mp_init(&md->md[0]);
-        mp_init(&md->md[1]);
+        BigInt_init(&md->bi[0]);
+        BigInt_init(&md->bi[1]);
         if (Value_isint(v1)) {
-            mp_set_int(&md->md[0], Value_integral(v1));
+            int64_BigInt(&md->bi[0], Value_integral(v1));
         } else {
             RefInt *m1 = Value_vp(v1);
-            mp_copy(&m1->mp, &md->md[0]);
+            BigInt_copy(&md->bi[0], &m1->bi);
         }
         if (Value_isint(v2)) {
             int32_t i2 = Value_integral(v2);
@@ -1402,12 +1429,12 @@ static int frac_new(Value *vret, Value *v, RefNode *node)
                 throw_errorf(fs->mod_lang, "ZeroDivisionError", "denominator == 0");
                 return FALSE;
             }
-            mp_set_int(&md->md[1], i2);
+            int64_BigInt(&md->bi[1], i2);
         } else {
             RefInt *m2 = Value_vp(v2);
-            mp_copy(&m2->mp, &md->md[1]);
+            BigInt_copy(&md->bi[1], &m2->bi);
         }
-        mp2_fix_rational(&md->md[0], &md->md[1]);
+        BigRat_fix(md->bi);
     } else if (fg->stk_top > v + 1) {
         Value v1 = v[1];
         const RefNode *type = Value_type(v1);
@@ -1420,21 +1447,21 @@ static int frac_new(Value *vret, Value *v, RefNode *node)
         }
 
         if (type == fs->cls_int) {
-            mp_init(&md->md[0]);
-            mp_init(&md->md[1]);
+            BigInt_init(&md->bi[0]);
+            BigInt_init(&md->bi[1]);
             if (Value_isint(v1)) {
-                mp_set_int(&md->md[0], Value_integral(v1));
+                int64_BigInt(&md->bi[0], Value_integral(v1));
             } else {
                 RefInt *m1 = Value_vp(v1);
-                mp_copy(&m1->mp, &md->md[0]);
+                BigInt_copy(&md->bi[0], &m1->bi);
             }
-            mp_set(&md->md[1], 1);  // 分母=1
+            int64_BigInt(&md->bi[1], 1);  // 分母=1
         } else if (type == fs->cls_str || type == fs->cls_bytes) {
             RefStr *rs = Value_vp(v1);
 
-            mp_init(&md->md[0]);
-            mp_init(&md->md[1]);
-            if (mp2_read_rational(md->md, rs->c, NULL) != MP_OKAY) {
+            BigInt_init(&md->bi[0]);
+            BigInt_init(&md->bi[1]);
+            if (!cstr_BigRat(md->bi, rs->c, NULL)) {
                 // 読み込みエラー時は0とする
                 goto SET_ZERO;
             }
@@ -1443,17 +1470,17 @@ static int frac_new(Value *vret, Value *v, RefNode *node)
             if (isinf(d)) {
                 goto SET_ZERO;
             } else {
-                mp_init(&md->md[0]);
-                mp_init(&md->md[1]);
-                mp2_double_to_rational(md->md, d);
+                BigInt_init(&md->bi[0]);
+                BigInt_init(&md->bi[1]);
+                double_BigRat(md->bi, d);
             }
         } else if (type == fs->cls_bool) {
-            mp_init(&md->md[0]);
-            mp_init(&md->md[1]);
+            BigInt_init(&md->bi[0]);
+            BigInt_init(&md->bi[1]);
             if (Value_bool(v1)) {
-                mp_set(&md->md[0], 1);
+                int64_BigInt(&md->bi[0], 1);
             }
-            mp_set(&md->md[1], 1);
+            int64_BigInt(&md->bi[1], 1);
         }
         // 未知の型の場合、0とする
     } else {
@@ -1463,9 +1490,9 @@ static int frac_new(Value *vret, Value *v, RefNode *node)
     return TRUE;
 
 SET_ZERO:
-    mp_init(&md->md[0]);
-    mp_init(&md->md[1]);
-    mp_set(&md->md[1], 1);
+    BigInt_init(&md->bi[0]);
+    BigInt_init(&md->bi[1]);
+    int64_BigInt(&md->bi[1], 1);
     return TRUE;
 }
 static int frac_parse(Value *vret, Value *v, RefNode *node)
@@ -1478,14 +1505,13 @@ static int frac_parse(Value *vret, Value *v, RefNode *node)
 
     *vret = vp_Value(md);
 
-    mp_init(&md->md[0]);
-    mp_init(&md->md[1]);
-    if (mp2_read_rational(md->md, rs->c, &end) != MP_OKAY || *end != '\0') {
+    BigInt_init(&md->bi[0]);
+    BigInt_init(&md->bi[1]);
+    if (!cstr_BigRat(md->bi, rs->c, &end) || *end != '\0') {
         // 読み込みエラー時は例外
         throw_errorf(fs->mod_lang, "ParseError", "Invalid rational string");
         return FALSE;
     }
-
     return TRUE;
 }
 static int frac_marshal_read(Value *vret, Value *v, RefNode *node)
@@ -1505,31 +1531,45 @@ static int frac_marshal_read(Value *vret, Value *v, RefNode *node)
     if (!stream_read_uint32(r, &digits)) {
         return FALSE;
     }
-    if (digits > 0xffff) {
-        throw_errorf(fs->mod_lang, "ValueError", "Invalid size number");
+    BigInt_init(&md->bi[0]);
+    if (!BigInt_reserve(&md->bi[0], digits)) {
+        throw_error_select(THROW_MAX_ALLOC_OVER__INT, fs->max_alloc);
         return FALSE;
     }
-    mp_init_size(&md->md[0], digits);
-    if (!read_int16_array(md->md[0].dp, digits, r)) {
+    if (!read_int16_array(md->bi[0].d, digits, r)) {
         return FALSE;
     }
-    md->md[0].used = digits;
+    md->bi[0].size = digits;
+    if (digits > 0) {
+        if (minus) {
+            md->bi[0].sign = -1;
+        } else {
+            md->bi[0].sign = 1;
+        }
+    } else {
+        md->bi[0].sign = 0;
+    }
 
     if (!stream_read_uint32(r, &digits)) {
         return FALSE;
     }
-    if (digits > 0xffff) {
-        throw_errorf(fs->mod_lang, "ValueError", "Invalid size number");
+    BigInt_init(&md->bi[1]);
+    if (!BigInt_reserve(&md->bi[1], digits)) {
+        throw_error_select(THROW_MAX_ALLOC_OVER__INT, fs->max_alloc);
         return FALSE;
     }
-    mp_init_size(&md->md[1], digits);
-    if (!read_int16_array(md->md[1].dp, digits, r)) {
+    if (!read_int16_array(md->bi[1].d, digits, r)) {
         return FALSE;
     }
-    md->md[1].used = digits;
+    md->bi[1].size = digits;
+    if (digits == 0) {
+        throw_errorf(fs->mod_lang, "ZeroDivisionError", "denominator == 0");
+        return FALSE;
+    }
+    md->bi[1].sign = 1;
 
     if (minus) {
-        md->md[0].sign = MP_NEG;
+        md->bi[0].sign = -1;
     }
 
     return TRUE;
@@ -1540,24 +1580,24 @@ static int frac_marshal_write(Value *vret, Value *v, RefNode *node)
     char minus = 0;
     RefFrac *md = Value_vp(*v);
 
-    if (md->md[0].sign == MP_NEG) {
+    if (md->bi[0].sign < 0) {
         minus = 1;
     }
     if (!stream_write_data(w, &minus, 1)) {
         return FALSE;
     }
 
-    if (!stream_write_uint32(w, md->md[0].used)) {
+    if (!stream_write_uint32(w, md->bi[0].size)) {
         return FALSE;
     }
-    if (!write_int16_array(w, md->md[0].dp, md->md[0].used)) {
+    if (!write_int16_array(w, md->bi[0].d, md->bi[0].size)) {
         return FALSE;
     }
 
-    if (!stream_write_uint32(w, md->md[1].used)) {
+    if (!stream_write_uint32(w, md->bi[1].size)) {
         return FALSE;
     }
-    if (!write_int16_array(w, md->md[1].dp, md->md[1].used)) {
+    if (!write_int16_array(w, md->bi[1].d, md->bi[1].size)) {
         return FALSE;
     }
 
@@ -1566,23 +1606,23 @@ static int frac_marshal_write(Value *vret, Value *v, RefNode *node)
 static int frac_dispose(Value *vret, Value *v, RefNode *node)
 {
     RefFrac *md = Value_vp(*v);
-    mp_clear(&md->md[0]);
-    mp_clear(&md->md[1]);
+    BigInt_close(&md->bi[0]);
+    BigInt_close(&md->bi[1]);
 
     return TRUE;
 }
 static int frac_empty(Value *vret, Value *v, RefNode *node)
 {
     RefFrac *md = Value_vp(*v);
-    int empty = mp_cmp_z(&md->md[0]);
+    int empty = (md->bi[0].sign == 0);
     *vret = bool_Value(empty);
     return TRUE;
 }
 static int frac_hash(Value *vret, Value *v, RefNode *node)
 {
     RefFrac *md = Value_vp(*v);
-    uint32_t hash = mp2_get_hash(&md->md[0]) ^ mp2_get_hash(&md->md[1]);
-    *vret = int32_Value(hash);
+    uint32_t hash = BigInt_hash(&md->bi[0]) ^ BigInt_hash(&md->bi[1]);
+    *vret = int32_Value(hash & INT32_MAX);
     return TRUE;
 }
 static int frac_eq(Value *vret, Value *v, RefNode *node)
@@ -1591,8 +1631,7 @@ static int frac_eq(Value *vret, Value *v, RefNode *node)
     RefFrac *md2 = Value_vp(v[1]);
 
     // eq(a/b, c/d) -> a == c && b == d
-
-    int result = (mp_cmp(&md1->md[0], &md2->md[0]) == 0 && mp_cmp(&md1->md[1], &md2->md[1]) == 0);
+    int result = (BigInt_cmp(&md1->bi[0], &md2->bi[0]) == 0 && BigInt_cmp(&md1->bi[1], &md2->bi[1]) == 0);
     *vret = bool_Value(result);
 
     return TRUE;
@@ -1601,20 +1640,22 @@ static int frac_cmp(Value *vret, Value *v, RefNode *node)
 {
     RefFrac *md1 = Value_vp(*v);
     RefFrac *md2 = Value_vp(v[1]);
-    mp_int c1, c2;
     int result;
 
-    // cmp(a/b, c/d) -> cmp(a*d, c*b)
+    if (md1->bi[0].sign != md2->bi[0].sign) {
+        result = md1->bi[0].sign - md2->bi[0].sign;
+    } else {
+        BigInt c1, c2;
+        // cmp(a/b, c/d) -> cmp(a*d, c*b)
+        BigInt_init(&c1);
+        BigInt_init(&c2);
+        BigInt_mul(&c1, &md1->bi[0], &md2->bi[1]);
+        BigInt_mul(&c2, &md2->bi[0], &md1->bi[1]);
 
-    mp_init(&c1);
-    mp_init(&c2);
-    mp_mul(&md1->md[0], &md2->md[1], &c1);
-    mp_mul(&md2->md[0], &md1->md[1], &c2);
-
-    result = mp_cmp(&c1, &c2);
-    mp_clear(&c1);
-    mp_clear(&c2);
-
+        result = BigInt_cmp(&c1, &c2);
+        BigInt_close(&c1);
+        BigInt_close(&c2);
+    }
     *vret = int32_Value(result);
 
     return TRUE;
@@ -1625,18 +1666,19 @@ static int frac_negative(Value *vret, Value *v, RefNode *node)
     RefFrac *md = buf_new(fs->cls_frac, sizeof(RefFrac));
     *vret = vp_Value(md);
 
-    mp_init(&md->md[0]);
-    mp_init(&md->md[1]);
+    BigInt_init(&md->bi[0]);
+    BigInt_init(&md->bi[1]);
 
-    mp_neg(&src->md[0], &md->md[0]);
-    mp_copy(&src->md[1], &md->md[1]);
+    BigInt_copy(&md->bi[0], &src->bi[0]);
+    BigInt_copy(&md->bi[1], &src->bi[1]);
+    md->bi[0].sign *= -1;
 
     return TRUE;
 }
 static int frac_addsub(Value *vret, Value *v, RefNode *node)
 {
     int sub = FUNC_INT(node);
-    mp_int tmp;
+    BigInt tmp;
 
     RefFrac *md = buf_new(fs->cls_frac, sizeof(RefFrac));
     RefFrac *md1 = Value_vp(*v);
@@ -1644,24 +1686,24 @@ static int frac_addsub(Value *vret, Value *v, RefNode *node)
 
     *vret = vp_Value(md);
 
-    mp_init(&md->md[0]);
-    mp_init(&md->md[1]);
-    mp_init(&tmp);
+    BigInt_init(&md->bi[0]);
+    BigInt_init(&md->bi[1]);
+    BigInt_init(&tmp);
 
     // (a/b) + (c/d) -> (a*d + b*c) / (b*d)
     // 分子
-    mp_mul(&md1->md[0], &md2->md[1], &md->md[0]);
-    mp_mul(&md2->md[0], &md1->md[1], &tmp);
+    BigInt_mul(&md->bi[0], &md1->bi[0], &md2->bi[1]);
+    BigInt_mul(&tmp, &md2->bi[0], &md1->bi[1]);
     if (sub) {
-        mp_sub(&md->md[0], &tmp, &md->md[0]);
+        BigInt_sub(&md->bi[0], &tmp);
     } else {
-        mp_add(&md->md[0], &tmp, &md->md[0]);
+        BigInt_add(&md->bi[0], &tmp);
     }
-    mp_clear(&tmp);
+    BigInt_close(&tmp);
 
     // 分母
-    mp_mul(&md1->md[1], &md2->md[1], &md->md[1]);
-    mp2_fix_rational(&md->md[0], &md->md[1]);
+    BigInt_mul(&md->bi[1], &md1->bi[1], &md2->bi[1]);
+    BigRat_fix(md->bi);
 
     return TRUE;
 }
@@ -1673,14 +1715,14 @@ static int frac_mul(Value *vret, Value *v, RefNode *node)
 
     *vret = vp_Value(md);
 
-    mp_init(&md->md[0]);
-    mp_init(&md->md[1]);
+    BigInt_init(&md->bi[0]);
+    BigInt_init(&md->bi[1]);
 
     // (a/b) * (c/d) -> (a*c) / (b*d)
-    mp_mul(&md1->md[0], &md2->md[0], &md->md[0]);
-    mp_mul(&md1->md[1], &md2->md[1], &md->md[1]);
+    BigInt_mul(&md->bi[0], &md1->bi[0], &md2->bi[0]);
+    BigInt_mul(&md->bi[1], &md1->bi[1], &md2->bi[1]);
 
-    mp2_fix_rational(&md->md[0], &md->md[1]);
+    BigRat_fix(md->bi);
 
     return TRUE;
 }
@@ -1693,19 +1735,19 @@ static int frac_div(Value *vret, Value *v, RefNode *node)
     *vret = vp_Value(md);
 
     // ゼロ除算チェック
-    if (mp_cmp_z(&md2->md[0]) == 0) {
+    if (md2->bi[0].sign == 0) {
         throw_errorf(fs->mod_lang, "ZeroDivisionError", "Frac / 0d");
         return FALSE;
     }
 
-    mp_init(&md->md[0]);
-    mp_init(&md->md[1]);
+    BigInt_init(&md->bi[0]);
+    BigInt_init(&md->bi[1]);
 
     // (a/b) / (c/d) -> (a*d) / (b*c)
-    mp_mul(&md1->md[0], &md2->md[1], &md->md[0]);
-    mp_mul(&md1->md[1], &md2->md[0], &md->md[1]);
+    BigInt_mul(&md->bi[0], &md1->bi[0], &md2->bi[1]);
+    BigInt_mul(&md->bi[1], &md1->bi[1], &md2->bi[0]);
 
-    mp2_fix_rational(&md->md[0], &md->md[1]);
+    BigRat_fix(md->bi);
 
     return TRUE;
 }
@@ -1716,15 +1758,15 @@ static int frac_get_part(Value *vret, Value *v, RefNode *node)
 {
     RefFrac *md = Value_vp(*v);
     int part = FUNC_INT(node);
+    int32_t val = BigInt_int32(&md->bi[part]);
 
-    if (mp_cmp_int(&md->md[part], INT32_MAX) <= 0 && mp_cmp_int(&md->md[part], -INT32_MAX) >= 0) {
-        int32_t i = mp2_tolong(&md->md[part]);
-        *vret = int32_Value(i);
+    if (val != INT32_MIN) {
+        *vret = int32_Value(val);
     } else {
         RefInt *mp = buf_new(fs->cls_int, sizeof(RefInt));
         *vret = vp_Value(mp);
-        mp_init(&mp->mp);
-        mp_copy(&md->md[part], &mp->mp);
+        BigInt_init(&mp->bi);
+        BigInt_copy(&mp->bi, &md->bi[part]);
     }
 
     return TRUE;
@@ -1732,14 +1774,7 @@ static int frac_get_part(Value *vret, Value *v, RefNode *node)
 static int frac_sign(Value *vret, Value *v, RefNode *node)
 {
     RefFrac *md = Value_vp(*v);
-
-    if (mp_cmp_z(&md->md[0])) {
-        *vret = int32_Value(0);
-    } else if (md->md[1].sign == MP_NEG) {
-        *vret = int32_Value(-1);
-    } else {
-        *vret = int32_Value(1);
-    }
+    *vret = int32_Value(md->bi[0].sign);
     return TRUE;
 }
 // 有理数を0方向に切り捨てて整数型に変換する
@@ -1747,16 +1782,16 @@ static int frac_toint(Value *vret, Value *v, RefNode *node)
 {
     RefFrac *md = Value_vp(*v);
     RefInt *mp = buf_new(fs->cls_int, sizeof(RefInt));
-    mp_int rem;
+    BigInt rem;
 
     *vret = vp_Value(mp);
 
-    mp_init(&mp->mp);
-    mp_init(&rem);
+    BigInt_init(&mp->bi);
+    BigInt_init(&rem);
 
-    mp_div(&md->md[0], &md->md[1], &mp->mp, &rem);
-    mp_clear(&rem);
-    fix_bigint(vret, &mp->mp);
+    BigInt_divmod(&mp->bi, &rem, &md->bi[0], &md->bi[1]);
+    BigInt_close(&rem);
+    fix_bigint(vret, &mp->bi);
 
     return TRUE;
 }
@@ -1765,8 +1800,8 @@ static int frac_tofloat(Value *vret, Value *v, RefNode *node)
 {
     RefFrac *md = Value_vp(*v);
     RefFloat *rd = buf_new(fs->cls_float, sizeof(RefFloat));
-    double d1 = mp2_todouble(&md->md[0]);
-    double d2 = mp2_todouble(&md->md[1]);
+    double d1 = BigInt_double(&md->bi[0]);
+    double d2 = BigInt_double(&md->bi[1]);
 
     *vret = vp_Value(rd);
 
@@ -1779,28 +1814,28 @@ static int frac_tofloat(Value *vret, Value *v, RefNode *node)
     return TRUE;
 }
 
-// m = (m * 10) / d
-static void mul10mod(mp_int *m, mp_int *d)
+// m = (m * 10) % d
+static void mul10mod(BigInt *m, BigInt *d)
 {
-    mp_mul_d(m, 10, m);
-    mp_div(m, d, NULL, m);
+    BigInt_mul_sd(m, 10);
+    BigInt_divmod(0, m, m, d);
 }
-int get_recurrence(int *ret, mp_int *mp)
+int get_recurrence(int *ret, BigInt *mp)
 {
     int begin = 0;
     int end = 0;
-    mp_int m;
-    mp_int p;
+    BigInt m;
+    BigInt p;
 
-    if (mp_cmp_z(mp) == 0) {
+    if (mp->sign == 0) {
         ret[0] = 0;
         ret[1] = 0;
         return FALSE;
     }
-    mp_init(&m);
-    mp_set(&m, 1);
-    mp_init(&p);
-    mp_set(&p, 1);
+    BigInt_init(&m);
+    int64_BigInt(&m, 1);
+    BigInt_init(&p);
+    int64_BigInt(&p, 1);
 
     for (;;) {
         end++;
@@ -1811,21 +1846,20 @@ int get_recurrence(int *ret, mp_int *mp)
         // p = (p * 10) % mp;
         mul10mod(&p, mp);
         mul10mod(&p, mp);
-
-        if (mp_cmp(&m, &p) == 0) {
+        if (BigInt_cmp(&m, &p) == 0) {
             break;
         }
     }
 
-    if (mp_cmp_z(&p) == 0) {
+    if (p.sign == 0) {
         ret[0] = end;
         ret[1] = end;
         goto NOT_RECR;
     }
 
-    mp_set(&p, 1);
+    int64_BigInt(&p, 1);
     begin = 1;
-    while (mp_cmp(&m, &p) != 0) {
+    while (BigInt_cmp(&m, &p) != 0) {
         begin++;
         // m = (m * 10) % mp;
         mul10mod(&m, mp);
@@ -1837,33 +1871,35 @@ int get_recurrence(int *ret, mp_int *mp)
     //p = (p * 10) % n;
     mul10mod(&p, mp);
     end = begin;
-    while (mp_cmp(&m, &p) != 0) {
+    while (BigInt_cmp(&m, &p) != 0) {
         end++;
         //p = (p * 10) % mp;
         mul10mod(&p, mp);
     }
     ret[0] = begin;
     ret[1] = end;
+    BigInt_close(&m);
+    BigInt_close(&p);
     return TRUE;
 
 NOT_RECR:
-    mp_clear(&m);
-    mp_clear(&p);
+    BigInt_close(&m);
+    BigInt_close(&p);
     return FALSE;
 }
-char *frac_tostr_sub(int sign, mp_int *mi, mp_int *rem, int width_f)
+char *frac_tostr_sub(int sign, BigInt *mi, BigInt *rem, int width_f)
 {
     int len, len2;
 
-    char *c_buf = malloc(mp_radix_size(mi, 10) + width_f + 3);
-    if (mp_cmp_z(mi) == 0 && sign == MP_NEG) {
+    char *c_buf = malloc(BigInt_str_bufsize(mi, 10) + width_f + 3);
+    if (mi->sign == 0 && sign == -1) {
         strcpy(c_buf, "-0");
     } else {
-        mp_toradix(mi, (unsigned char*)c_buf, 10);
+        BigInt_str(mi, 10, c_buf, FALSE);
     }
     len = strlen(c_buf);
     c_buf[len++] = '.';
-    mp_toradix(rem, (unsigned char*)c_buf + len, 10);
+    BigInt_str(rem, 10, c_buf + len, FALSE);
 
     len2 = strlen(c_buf + len);
     if (len2 < width_f) {
@@ -1885,9 +1921,9 @@ static int frac_tostr(Value *vret, Value *v, RefNode *node)
     LocaleData *loc = fv->loc_neutral;
 
     if (fg->stk_top > v + 1) {
-        Str fmt = Value_str(v[1]);
+        RefStr *fmt = Value_vp(v[1]);
 
-        if (!parse_format_str(&nf, fmt)) {
+        if (!parse_format_str(&nf, fmt->c, fmt->size)) {
             return FALSE;
         }
 
@@ -1911,29 +1947,29 @@ static int frac_tostr(Value *vret, Value *v, RefNode *node)
         // 整数部
         char *c_buf;
         int len;
-        mp_int mi, rem;
+        BigInt mi, rem;
         int ellip = FALSE;
-        mp_init(&mi);
-        mp_init(&rem);
-        mp_div(&md->md[0], &md->md[1], &mi, &rem);
-        rem.sign = MP_ZPOS;
-
+        BigInt_init(&mi);
+        BigInt_init(&rem);
+        BigInt_divmod(&mi, &rem, &md->bi[0], &md->bi[1]);
+        if (rem.sign < 0) {
+            rem.sign = 1;
+        }
         // 小数部
         if (nf.width_f == 0) {
             // 整数部のみ出力
-            c_buf = malloc(mp_radix_size(&mi, 10));
-            mp_toradix(&mi, (unsigned char*)c_buf, 10);
+            c_buf = malloc(BigInt_str_bufsize(&mi, 10));
+            BigInt_str(&mi, 10, c_buf, FALSE);
         } else {
             int recr[2];
             int n_ex;
-            mp_int ex;
-            mp_int rem2;
+            BigInt ex;
 
             if (nf.width_f > 0) {
                 n_ex = nf.width_f;
-            } else if (mp_cmp_z(&rem) == 0) {
+            } else if (rem.sign == 0) {
                 n_ex = 1;
-            } else if (get_recurrence(recr, &md->md[1])) {
+            } else if (get_recurrence(recr, &md->bi[1])) {
                 // 循環小数
                 if (recr[1] - recr[0] > 6) {
                     n_ex = recr[1];
@@ -1948,19 +1984,18 @@ static int frac_tostr(Value *vret, Value *v, RefNode *node)
                     n_ex = 1;
                 }
             }
-            mp_init(&ex);
-            mp_init(&rem2);
-            mp_set(&ex, 10);
+            BigInt_init(&ex);
+            int64_BigInt(&ex, 10);
 
-            if (n_ex > 1) {
-                mp_expt_d(&ex, n_ex, &ex);     // ex = ex ** width_f
+            BigInt_pow(&ex, n_ex);     // ex = ex ** width_f
+            BigInt_mul(&rem, &rem, &ex);
+
+            BigInt_divmod(&rem, NULL, &rem, &md->bi[1]);
+
+            c_buf = frac_tostr_sub(md->bi[0].sign, &mi, &rem, n_ex);
+            if (n_ex > 0) {
+                BigInt_close(&ex);
             }
-            mp_mul(&rem, &ex, &rem);
-            mp_div(&rem, &md->md[1], &rem, &rem2);
-
-            c_buf = frac_tostr_sub(md->md[0].sign, &mi, &rem, n_ex);
-            mp_clear(&ex);
-            mp_clear(&rem2);
         }
         {
             RefStr *rs = refstr_new_n(fs->cls_str, number_format_maxlength(c_buf, &nf, loc));
@@ -1976,18 +2011,18 @@ static int frac_tostr(Value *vret, Value *v, RefNode *node)
         }
 
         free(c_buf);
-        mp_clear(&mi);
-        mp_clear(&rem);
+        BigInt_close(&mi);
+        BigInt_close(&rem);
         break;
     }
     case 'r': {
         // (numerator/denominator)
         int len;
-        RefStr *rs = refstr_new_n(fs->cls_str, mp_radix_size(&md->md[0], 10) + mp_radix_size(&md->md[1], 10) + 5);
+        RefStr *rs = refstr_new_n(fs->cls_str, BigInt_str_bufsize(&md->bi[0], 10) + BigInt_str_bufsize(&md->bi[1], 10) + 5);
         *vret = vp_Value(rs);
 
         strcpy(rs->c, "(");
-        mp_toradix(&md->md[0], (unsigned char*)rs->c + 1, 10);
+        BigInt_str(&md->bi[0], 10, rs->c + 1, FALSE);
 
         if (rs->c[1] == '-') {
             rs->c[0] = '-';
@@ -1996,7 +2031,7 @@ static int frac_tostr(Value *vret, Value *v, RefNode *node)
 
         len = strlen(rs->c);
         strcpy(rs->c + len, "/");
-        mp_toradix(&md->md[1], (unsigned char*)rs->c + len + 1, 10);
+        BigInt_str(&md->bi[1], 10, rs->c + len + 1, FALSE);
         len = strlen(rs->c);
         strcpy(rs->c + len, ")");
         rs->size = len + 1;
@@ -2004,24 +2039,24 @@ static int frac_tostr(Value *vret, Value *v, RefNode *node)
     }
     case 's': case 'S': {
         // SI接頭語
-        double d1 = mp2_todouble(&md->md[0]);
-        double d2 = mp2_todouble(&md->md[1]);
+        double d1 = BigInt_double(&md->bi[0]);
+        double d2 = BigInt_double(&md->bi[1]);
 
         double val = d1 / d2;
         *vret = number_to_si_unit(val, &nf, loc, TRUE);
         break;
     }
     case '\0': {
-        mp_int mp, rem;
+        BigInt mp, rem;
 
-        mp_init(&mp);
-        mp_init(&rem);
-        mp_div(&md->md[0], &md->md[1], &mp, &rem);
+        BigInt_init(&mp);
+        BigInt_init(&rem);
+        BigInt_divmod(&mp, &rem, &md->bi[0], &md->bi[1]);
 
-        *vret = mp2_number_format(&mp, &nf, loc);
+        *vret = BigInt_number_format(&mp, &nf, loc);
 
-        mp_clear(&mp);
-        mp_clear(&rem);
+        BigInt_close(&mp);
+        BigInt_close(&rem);
         break;
     }
     default:
@@ -2050,7 +2085,7 @@ static int float_new(Value *vret, Value *v, RefNode *node)
                 rd->d = (double)Value_integral(v1);
             } else {
                 RefInt *mp = Value_vp(v1);
-                rd->d = mp2_todouble(&mp->mp);
+                rd->d = BigInt_double(&mp->bi);
                 if (isinf(rd->d)) {
                     rd->d = 0.0;
                 }
@@ -2072,8 +2107,8 @@ static int float_new(Value *vret, Value *v, RefNode *node)
         } else if (type == fs->cls_frac) {
             RefFloat *rd = buf_new(fs->cls_float, sizeof(RefFloat));
             RefFrac *md = Value_vp(v[1]);
-            double d1 = mp2_todouble(&md->md[0]);
-            double d2 = mp2_todouble(&md->md[1]);
+            double d1 = BigInt_double(&md->bi[0]);
+            double d2 = BigInt_double(&md->bi[1]);
 
             *vret = vp_Value(rd);
             rd->d = d1 / d2;
@@ -2094,7 +2129,7 @@ static int float_parse(Value *vret, Value *v, RefNode *node)
 {
     RefFloat *rd = buf_new(fs->cls_float, sizeof(RefFloat));
     RefStr *rs = Value_vp(v[1]);
-    char *end;
+    char *end = rs->c;
 
     *vret = vp_Value(rd);
     errno = 0;
@@ -2106,7 +2141,7 @@ static int float_parse(Value *vret, Value *v, RefNode *node)
     if (*end != '\0') {
         // 読み込みエラー時は例外
         throw_errorf(fs->mod_lang, "ParseError", "Invalid float string");
-        return TRUE;
+        return FALSE;
     }
 
     return TRUE;
@@ -2240,9 +2275,9 @@ static int float_tostr(Value *vret, Value *v, RefNode *node)
     int i, ex = 0;
 
     if (fg->stk_top > v + 1) {
-        Str fmt = Value_str(v[1]);
+        RefStr *fmt = Value_vp(v[1]);
 
-        if (!parse_format_str(&nf, fmt)) {
+        if (!parse_format_str(&nf, fmt->c, fmt->size)) {
             return FALSE;
         }
         if (nf.base != 10) {
@@ -2351,12 +2386,12 @@ static int float_tostr(Value *vret, Value *v, RefNode *node)
         *vret = number_to_si_unit(rd->d, &nf, loc, TRUE);
         break;
     case '\0': {
-        mp_int mp;
+        BigInt mp;
 
-        mp_init(&mp);
-        mp2_set_double(&mp, rd->d);
-        *vret = mp2_number_format(&mp, &nf, loc);
-        mp_clear(&mp);
+        BigInt_init(&mp);
+        double_BigInt(&mp, rd->d);
+        *vret = BigInt_number_format(&mp, &nf, loc);
+        BigInt_close(&mp);
         break;
     }
     default:
@@ -2483,8 +2518,8 @@ static int float_toint(Value *vret, Value *v, RefNode *node)
     } else {
         RefInt *mp = buf_new(fs->cls_int, sizeof(RefInt));
         *vret = vp_Value(mp);
-        mp_init(&mp->mp);
-        mp2_set_double(&mp->mp, d);
+        BigInt_init(&mp->bi);
+        double_BigInt(&mp->bi, d);
     }
     return TRUE;
 }
@@ -2498,9 +2533,9 @@ static int float_tofrac(Value *vret, Value *v, RefNode *node)
         return FALSE;
     } else {
         *vret = vp_Value(md);
-        mp_init(&md->md[0]);
-        mp_init(&md->md[1]);
-        mp2_double_to_rational(md->md, d);
+        BigInt_init(&md->bi[0]);
+        BigInt_init(&md->bi[1]);
+        double_BigRat(md->bi, d);
     }
 
     return TRUE;
@@ -2639,8 +2674,8 @@ static void reverse_cstr(char *p, int size)
 static int base58encode(Value *vret, Value *v, RefNode *node)
 {
     char base58[60];
-    mp_int mp;
-    mp_int *mpp;
+    BigInt mp;
+    BigInt *mpp;
     StrBuf buf;
     int offset = offsetof(RefStr, c);
 
@@ -2656,8 +2691,8 @@ static int base58encode(Value *vret, Value *v, RefNode *node)
 
     if (Value_isref(v[1])) {
         RefInt *ri = Value_vp(v[1]);
-        mpp = &ri->mp;
-        if (mpp->sign == MP_NEG) {
+        mpp = &ri->bi;
+        if (mpp->sign < 0) {
             throw_errorf(fs->mod_lang, "ValueError", "Negative values not allowed here");
             return FALSE;
         }
@@ -2667,23 +2702,23 @@ static int base58encode(Value *vret, Value *v, RefNode *node)
             throw_errorf(fs->mod_lang, "ValueError", "Negative values not allowed here");
             return FALSE;
         }
-        mp_init(&mp);
-        mp_set_int(&mp, i);
+        BigInt_init(&mp);
+        int64_BigInt(&mp, i);
         mpp = &mp;
     }
 
     StrBuf_init_refstr(&buf, 0);
     for (;;) {
-        mp_digit r;
-        mp_div_d(mpp, 58, mpp, &r);
+        uint16_t r;
+        BigInt_divmod_sd(mpp, 58, &r);
         StrBuf_add_c(&buf, base58[r]);
 
-        if (mp_cmp_z(mpp) == 0) {
+        if (mpp->sign == 0) {
             break;
         }
     }
     if (mpp == &mp) {
-        mp_clear(&mp);
+        BigInt_close(&mp);
     }
     reverse_cstr(buf.p + offset, buf.size - offset);
     *vret = StrBuf_str_Value(&buf, fs->cls_str);
@@ -2745,7 +2780,7 @@ static int base58decode(Value *vret, Value *v, RefNode *node)
     }
 
     ri = buf_new(fs->cls_int, sizeof(RefInt));
-    mp_init(&ri->mp);
+    BigInt_init(&ri->bi);
     for (i = 0; i < rs->size; i++) {
         uint8_t c = rs->c[i];
         int n;
@@ -2756,10 +2791,10 @@ static int base58decode(Value *vret, Value *v, RefNode *node)
         if (n >= 58) {
             goto ERROR_END;
         }
-        mp_mul_d(&ri->mp, 58, &ri->mp);
-        mp_add_d(&ri->mp, n, &ri->mp);
+        BigInt_mul_sd(&ri->bi, 58);
+        BigInt_add_d(&ri->bi, n);
     }
-    fix_bigint(vret, &ri->mp);
+    fix_bigint(vret, &ri->bi);
 
     return TRUE;
 
@@ -2854,6 +2889,8 @@ void define_lang_number_class(RefNode *m)
     define_native_func_a(n, integer_shift, 1, 1, (void*)FALSE, fs->cls_int);
     n = define_identifier_p(m, cls, fs->symbol_stock[T_RSH], NODE_FUNC_N, 0);
     define_native_func_a(n, integer_shift, 1, 1, (void*)TRUE, fs->cls_int);
+    n = define_identifier_p(m, cls, fs->symbol_stock[T_INV], NODE_FUNC_N, 0);
+    define_native_func_a(n, integer_inv, 0, 0, NULL);
     n = define_identifier(m, cls, "sign", NODE_FUNC_N, NODEOPT_PROPERTY);
     define_native_func_a(n, integer_sign, 0, 0, NULL);
     n = define_identifier_p(m, cls, toint, NODE_FUNC_N, 0);
@@ -2960,10 +2997,10 @@ void define_lang_number_class(RefNode *m)
     define_native_func_a(n, float_tofrac, 0, 0, NULL);
 
     n = define_identifier(m, cls, "INF", NODE_CONST, 0);
-    n->u.k.val = float_Value(1.0 / 0.0);
+    n->u.k.val = float_Value(fs->cls_float, 1.0 / 0.0);
     extends_method(cls, fs->cls_number);
     n = define_identifier(m, cls, "EPSILON", NODE_CONST, 0);
-    n->u.k.val = float_Value(DBL_EPSILON);
+    n->u.k.val = float_Value(fs->cls_float, DBL_EPSILON);
 
     extends_method(cls, fs->cls_number);
 }

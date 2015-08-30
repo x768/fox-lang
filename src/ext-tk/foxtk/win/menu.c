@@ -16,10 +16,10 @@ void Window_set_menu(WndHandle wnd, MenuHandle menu)
 {
     SetMenu(wnd, (HMENU)menu);
 }
-void Menu_add_submenu(MenuHandle menu, MenuHandle submenu, Str text)
+void Menu_add_submenu(MenuHandle menu, MenuHandle submenu, const char *text)
 {
     MENUITEMINFOW mii;
-    wchar_t *text_p = cstr_to_utf16(text.p, text.size);
+    wchar_t *text_p = cstr_to_utf16(text, -1);
 
     memset(&mii, 0, sizeof(mii));
     mii.cbSize = sizeof(mii);
@@ -87,7 +87,7 @@ void remove_menu_object(int id)
     }
 }
 
-void Menu_add_item(MenuHandle menu, Value fn, Str text)
+void Menu_add_item(MenuHandle menu, Value fn, const char *text)
 {
     int id;
     Ref *r = fs->ref_new(cls_menuitem);
@@ -96,7 +96,7 @@ void Menu_add_item(MenuHandle menu, Value fn, Str text)
     id = bind_menu_id(r);
     if (id >= 0) {
         MENUITEMINFOW mii;
-        wchar_t *text_p = cstr_to_utf16(text.p, text.size);
+        wchar_t *text_p = cstr_to_utf16(text, -1);
 
         memset(&mii, 0, sizeof(mii));
         mii.cbSize = sizeof(mii);

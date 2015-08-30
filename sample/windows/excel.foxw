@@ -1,0 +1,8 @@
+import windows
+import time
+
+var ex = OLEObject("Excel.Application")
+ex.Visible = true
+var wb = ex.Workbooks.Add()
+var ws = wb.Worksheets(1)
+ws.Range("A1:C1").Value = [1, "abc", Time.now()]

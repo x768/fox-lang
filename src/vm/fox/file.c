@@ -39,30 +39,34 @@ Str base_dir_with_sep(const char *path_p, int path_size)
  * in  : /hoge/aaa/bbb.txt
  * out : bbb.txt
  */
-Str file_name_from_path(Str path)
+Str file_name_from_path(const char *path_p, int path_size)
 {
     Str ret;
     const char *p;
 
-    ret.p = path.p;
-    ret.size = path.size;
+    if (path_size < 0) {
+        path_size = strlen(path_p);
+    }
 
-    p = &path.p[ret.size];
+    ret.p = path_p;
+    ret.size = path_size;
 
-    while (p > path.p) {
+    p = &path_p[ret.size];
+
+    while (p > path_p) {
         if (p[-1] == SEP_C) {
             break;
         }
         p--;
     }
 
-    if (p > path.p) {
+    if (p > path_p) {
         ret.p = p;
-        ret.size = &path.p[ret.size] - p;
+        ret.size = &path_p[ret.size] - p;
     } else {
-        ret = path;
+        ret.p = path_p;
+        ret.size = path_size;
     }
-
     return ret;
 }
 
@@ -170,7 +174,7 @@ char *path_normalize(Str *ret, RefStr *base_dir, const char *path_p, int path_si
         path_size = strlen(path_p);
     }
 
-    if (base_dir->size == 0 || is_absolute_path(Str_new(path_p, path_size))) {
+    if (base_dir->size == 0 || is_absolute_path(path_p, path_size)) {
         ptr = str_dup_p(path_p, path_size, mem);
         size = path_size;
 #ifdef WIN32

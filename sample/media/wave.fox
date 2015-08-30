@@ -1,0 +1,12 @@
+import media
+import math
+
+let wav = Audio(22050, 8, 1)
+
+for i in 0..65536 {
+    let rad = i.to_float() * 0.125
+    wav.push sin(rad)
+}
+
+wav.save "sin.wav"
+puts wav, "... saved as 'sin.wav'"

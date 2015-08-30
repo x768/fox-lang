@@ -141,6 +141,10 @@ enum {
     SURROGATE_END       = 0xE000,
     CODEPOINT_END       = 0x110000,
 };
+enum {
+	BIGINT_DIGIT_BITS = 16,
+    BIGINT_MASK_BITS = 0xFFFF,
+};
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -186,6 +190,13 @@ typedef struct {
     int32_t size;
     int32_t alloc_size;
 } StrBuf;
+
+typedef struct {
+    int8_t sign;
+    int32_t size;
+    int32_t alloc_size;
+    uint16_t *d;
+} BigInt;
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -472,16 +483,16 @@ struct FoxStatic
     int (*parse_hex)(const char **pp, const char *end, int n);
 
     RefNode *(*Value_type)(Value v);
+    int32_t (*Value_int32)(Value v);
     int64_t (*Value_int64)(Value v, int *err);
     double (*Value_float)(Value v);
-    Str (*Value_str)(Value v);
     char *(*Value_frac_s)(Value v, int max_frac);
     int (*Value_frac10)(int64_t *val, Value v, int factor);
     int64_t (*Value_timestamp)(Value v, RefTimeZone *tz);
 
     Value (*Value_cp)(Value v);
     Value (*int64_Value)(int64_t i);
-    Value (*float_Value)(double dval);
+    Value (*float_Value)(RefNode *klass, double dval);
     Value (*cstr_Value)(RefNode *klass, const char *p, int size);
     Value (*cstr_Value_conv)(const char *p, int size, RefCharset *cs);
     Value (*frac_s_Value)(const char *str);
@@ -500,11 +511,31 @@ struct FoxStatic
     void (*Value_pop)(void);
     RefNode *(*get_node_member)(RefNode *node, ...);
 
+    void (*BigInt_init)(BigInt *bi);
+    void (*BigInt_close)(BigInt *bi);
+    void (*BigInt_copy)(BigInt *dst, const BigInt *src);
+    void (*int64_BigInt)(BigInt *bi, int64_t value);
+    int (*cstr_BigInt)(BigInt *bi, int radix, const char *str, int size);
+    void (*BigRat_fix)(BigInt *rat);
+    int32_t (*BigInt_int32)(const BigInt *bi);
+    int (*BigInt_int64)(const BigInt *bi, int64_t *value);
+    double (*BigInt_double)(const BigInt *bi);
+    int (*BigInt_add)(BigInt *a, const BigInt *b);
+    int (*BigInt_add_d)(BigInt *a, int b);
+    int (*BigInt_sub)(BigInt *a, const BigInt *b);
+    int (*BigInt_mul)(BigInt *ret, const BigInt *a, const BigInt *b);
+    int (*BigInt_divmod)(BigInt *ret, BigInt *mod, const BigInt *a, const BigInt *b);
+    int (*BigInt_pow)(BigInt *a, uint32_t n);
+    int (*BigInt_lsh)(BigInt *bi, uint32_t sh);
+    void (*BigInt_rsh)(BigInt *bi, uint32_t sh);
+    int (*BigInt_gcd)(BigInt *ret, const BigInt *a, const BigInt *b);
+    int (*BigInt_cmp)(const BigInt *a, const BigInt *b);
+
     RefTimeZone *(*get_local_tz)(void);
     void (*adjust_timezone)(RefTime *dt);
     void (*adjust_date)(RefTime *dt);
     void (*Calendar_to_Time)(int64_t *timer, const Calendar *cal);
-    int (*timedelta_parse_string)(int64_t *ret, Str src);
+    int (*timedelta_parse_string)(int64_t *ret, const char *src_p, int src_size);
 
     int (*is_subclass)(RefNode *klass, RefNode *super);
     RefNode *(*get_module_by_name)(const char *name_p, int name_size, int syslib, int initialize);
@@ -524,7 +555,7 @@ struct FoxStatic
     char *(*file_value_to_path)(Str *ret, Value v, int argn);
     int (*value_to_streamio)(Value *stream, Value v, int writemode, int argn);
     void (*get_random)(void *buf, int len);
-    void (*fix_bigint)(Value *v, void *mp);
+    void (*fix_bigint)(Value *v, BigInt *bi);
 
     int (*call_function)(RefNode *node, int argc);
     int (*call_function_obj)(int argc);
@@ -547,7 +578,7 @@ struct FoxStatic
     int (*get_loader_function)(RefNode **fn, const char *type_p, int type_size, const char *prefix, Hash *hash);
     int (*load_aliases_file)(Hash *ret, const char *filename);
     RefStr *(*mimetype_from_name_refstr)(RefStr *name);
-    RefStr *(*mimetype_from_suffix)(Str name);
+    RefStr *(*mimetype_from_suffix)(const char *name_p, int name_size);
     RefStr *(*mimetype_from_magic)(const char *p, int size);
     void (*utf8_next)(const char **pp, const char *end);
     int (*utf8_codepoint_at)(const char *p);
@@ -568,7 +599,6 @@ struct FoxStatic
     HashValueEntry *(*refmap_get_strkey)(RefMap *rm, const char *key_p, int key_size);
     int (*refmap_del)(Value *val, RefMap *rm, Value key);
 
-    int64_t (*get_file_size)(FileHandle fh);
     char *(*read_from_file)(int *psize, const char *path, Mem *mem);
 };
 
@@ -591,7 +621,7 @@ struct FoxGlobal
 ////////////////////////////////////////////////////////////////////////////////
 
 #define FOX_VERSION_MAJOR    0
-#define FOX_VERSION_MINOR    12
+#define FOX_VERSION_MINOR    13
 #define FOX_VERSION_REVISION 0
 
 
@@ -647,14 +677,11 @@ extern const char *fox_ctype_flags;
 
 // strutil.c
 Str Str_new(const char *p, int len);
-int Str_eq_p(Str s, const char *p);
-int str_eq(const char *s_p, int s_size, const char *t_p, int t_size);
-int str_eqi(const char *s_p, int s_size, const char *t_p, int t_size);
 int refstr_eq(RefStr *r1, RefStr *r2);
 int refstr_cmp(RefStr *r1, RefStr *r2);
-
+int str_eq(const char *s_p, int s_size, const char *t_p, int t_size);
+int str_eqi(const char *s_p, int s_size, const char *t_p, int t_size);
 int str_has0(const char *p, int size);
-int stricmp_fox(const char *s1, const char *s2);
 
 uint16_t ptr_read_uint16(const char *p);
 uint32_t ptr_read_uint32(const char *p);

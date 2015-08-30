@@ -54,19 +54,25 @@ const char *dlerror_fox(void)
 
 ////////////////////////////////////////////////////////////////////////////////////////////////
 
-int is_root_dir(Str path)
+int is_root_dir(const char *path_p, int path_size)
 {
-    if (path.size == 2) {
+    if (path_size < 0) {
+        path_size = strlen(path_p);
+    }
+    if (path_size == 2) {
         return TRUE;
     } else {
         return FALSE;
     }
 }
-int is_absolute_path(Str path)
+int is_absolute_path(const char *path_p, int path_size)
 {
-    if (path.size >= 2 && isalpha(path.p[0]) && path.p[1] == ':') {
+    if (path_size < 0) {
+        path_size = strlen(path_p);
+    }
+    if (path_size >= 2 && isalpha(path_p[0]) && path_p[1] == ':') {
         return TRUE;
-    } else if (path.size >= 3 && (path.p[0] == '\\' || path.p[0] == '/') && (path.p[1] == '\\' || path.p[1] == '/')) {
+    } else if (path_size >= 3 && (path_p[0] == '\\' || path_p[0] == '/') && (path_p[1] == '\\' || path_p[1] == '/')) {
         return TRUE;
     } else {
         return FALSE;
@@ -75,17 +81,20 @@ int is_absolute_path(Str path)
 
 // 通常、ディレクトリ名は最後の/または\を省略して表現するが、
 // rootディレクトリは/またはC:\で表すため、表示するときだけ変換する
-Str get_root_name(Str path)
+Str get_root_name(const char *path_p, int path_size)
 {
-    if (path.size == 2 && isalpha(path.p[0]) && path.p[1] == ':') {
+    if (path_size < 0) {
+        path_size = strlen(path_p);
+    }
+    if (path_size == 2 && isalpha(path_p[0]) && path_p[1] == ':') {
         char buf[4];
         const RefStr *p;
 
-        sprintf(buf, "%c:\\", toupper(path.p[0]));
+        sprintf(buf, "%c:\\", toupper(path_p[0]));
         p = intern(buf, 3);
         return Str_new(p->c, p->size);
     } else {
-        return path;
+        return Str_new(path_p, path_size);
     }
 }
 
@@ -128,18 +137,6 @@ int rename_fox(const char *fname, const char *tname)
     free(wtname);
 
     return ret != 0 ? 0 : -1;
-}
-
-int64_t get_file_size(FileHandle fh)
-{
-    if (fh != -1) {
-        HANDLE hFile = (HANDLE)fh;
-        DWORD size_h;
-        DWORD size = GetFileSize(hFile, &size_h);
-        return ((uint64_t)size) | ((uint64_t)size_h << 32);
-    } else {
-        return -1;
-    }
 }
 
 int get_file_mtime(int64_t *tm, const char *fname)

@@ -388,7 +388,7 @@ static int read_header_from_stream(RefMap *header, Value r, RefCharset *cs)
  * keysが指定されていない場合、全て
  * 終端に達した場合、vretは変更されない
  */
-int mimereader_next_sub(Value *vret, Value v, Str s_bound, RefCharset *cs)
+int mimereader_next_sub(Value *vret, Value v, const char *boundary_p, int boundary_size, RefCharset *cs)
 {
     Value headers;
     Ref *r;
@@ -408,7 +408,7 @@ int mimereader_next_sub(Value *vret, Value v, Str s_bound, RefCharset *cs)
     r->v[INDEX_MIMEDATA_HEADER] = headers;
     mb = Value_vp(r->v[INDEX_MIMEDATA_BUF]);
 
-    if (s_bound.size == 0) {
+    if (boundary_size == 0) {
         int size_read = fs->max_alloc;
         if (!stream_read_data(v, &mb->buf, NULL, &size_read, FALSE, FALSE)) {
             return FALSE;
@@ -439,12 +439,12 @@ int mimereader_next_sub(Value *vret, Value v, Str s_bound, RefCharset *cs)
             if (size_trim >= 1 && buf[size_trim - 1] == '\r') {
                 size_trim--;
             }
-            if (size_trim == s_bound.size + 4) {
-                if (buf[0] == '-' && buf[1] == '-' && memcmp(buf + 2, s_bound.p, s_bound.size) == 0 && buf[s_bound.size + 2] == '-' && buf[s_bound.size + 3] == '-') {
+            if (size_trim == boundary_size + 4) {
+                if (buf[0] == '-' && buf[1] == '-' && memcmp(buf + 2, boundary_p, boundary_size) == 0 && buf[boundary_size + 2] == '-' && buf[boundary_size + 3] == '-') {
                     break;
                 }
-            } else if (size_trim == s_bound.size + 2) {
-                if (buf[0] == '-' && buf[1] == '-' && memcmp(buf + 2, s_bound.p, s_bound.size) == 0) {
+            } else if (size_trim == boundary_size + 2) {
+                if (buf[0] == '-' && buf[1] == '-' && memcmp(buf + 2, boundary_p, boundary_size) == 0) {
                     break;
                 }
             }
@@ -520,9 +520,12 @@ static int mimereader_next(Value *vret, Value *v, RefNode *node)
     Ref *r = Value_ref(*v);
     RefCharset *cs = Value_vp(r->v[INDEX_MIMEREADER_CHARSET]);
     Value reader = r->v[INDEX_MIMEREADER_SRC];
-    Str boundary = Value_str(r->v[INDEX_MIMEREADER_BOUNDARY]);
+    RefStr *boundary = Value_vp(r->v[INDEX_MIMEREADER_BOUNDARY]);
 
-    if (!mimereader_next_sub(vret, reader, boundary, cs)) {
+    if (boundary == NULL) {
+        boundary = fs->str_0;
+    }
+    if (!mimereader_next_sub(vret, reader, boundary->c, boundary->size, cs)) {
         return FALSE;
     }
     if (*vret == VALUE_NULL) {
@@ -535,7 +538,7 @@ static int mimereader_next(Value *vret, Value *v, RefNode *node)
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 int mimerandomreader_sub(
-    RefMap *rm, Value reader, Str boundary, RefCharset *cs,
+    RefMap *rm, Value reader, const char *boundary_p, int boundary_size, RefCharset *cs,
     const char *key_p, int key_size, const char *subkey_p, int subkey_size, int keys)
 {
     for (;;) {
@@ -545,7 +548,7 @@ int mimerandomreader_sub(
         Ref *r2;
         RefMap *hdr;
 
-        if (!mimereader_next_sub(&tmp, reader, boundary, cs)) {
+        if (!mimereader_next_sub(&tmp, reader, boundary_p, boundary_size, cs)) {
             return FALSE;
         }
         if (tmp == VALUE_NULL) {
@@ -630,7 +633,8 @@ static int mimerandomreader_new(Value *vret, Value *v, RefNode *node)
     }
 
     if (fg->stk_top > v + 5) {
-        boundary = Value_str(v[5]);
+        RefStr *rs = Value_vp(v[5]);
+        boundary = Str_new(rs->c, rs->size);
     } else {
         int found = FALSE;
         RefMap *hdr = refmap_new(16);
@@ -645,7 +649,7 @@ static int mimerandomreader_new(Value *vret, Value *v, RefNode *node)
         Value_dec(vp_Value(hdr));
     }
 
-    if (!mimerandomreader_sub(rm, reader, boundary, cs, key->c, key->size, subkey->c, subkey->size, FALSE)) {
+    if (!mimerandomreader_sub(rm, reader, boundary.p, boundary.size, cs, key->c, key->size, subkey->c, subkey->size, FALSE)) {
         Value_dec(reader);
         return FALSE;
     }
@@ -787,18 +791,22 @@ RefStr *mimetype_from_name_refstr(RefStr *name)
  * name : ファイル名
  * @return : mime-type 見つからなければapplication/octet-stream
  */
-RefStr *mimetype_from_suffix(Str name)
+RefStr *mimetype_from_suffix(const char *name_p, int name_size)
 {
     int len = 0;
     char buf[8];
     const char *p;
     RefStr *ret = NULL;
 
-    for (p = name.p + name.size; p > name.p; p--) {
+    if (name_size < 0) {
+        name_size = strlen(name_p);
+    }
+
+    for (p = name_p + name_size; p > name_p; p--) {
         if (p[-1] == '.') {
             int i;
 
-            len = name.size - (p - name.p);
+            len = name_size - (p - name_p);
             if (len >= sizeof(buf)) {
                 len = sizeof(buf) - 1;
             }
@@ -825,8 +833,8 @@ static int mimetype_new_from_name(Value *vret, Value *v, RefNode *node)
     RefNode *type = Value_type(v[1]);
 
     if (type == fs->cls_str || type == fs->cls_file) {
-        Str fname = Value_str(v[1]);
-        RefStr *mime = mimetype_from_suffix(fname);
+        RefStr *fname = Value_vp(v[1]);
+        RefStr *mime = mimetype_from_suffix(fname->c, fname->size);
         *vret = cstr_Value(fs->cls_mimetype, mime->c, mime->size);
     } else {
         throw_error_select(THROW_ARGMENT_TYPE2__NODE_NODE_NODE_INT, fs->cls_str, fs->cls_file, type, 1);
@@ -1009,11 +1017,11 @@ static int mimetype_new_from_magic(Value *vret, Value *v, RefNode *node)
     int size = sizeof(buf);
 
     if (v1_type == fs->cls_bytes) {
-        Str s = Value_str(v[1]);
-        if (size < s.size) {
-            size = s.size;
+        RefStr *s = Value_vp(v[1]);
+        if (size < s->size) {
+            size = s->size;
         }
-        memcpy(buf, s.p, size);
+        memcpy(buf, s->c, size);
     } else if (v1_type == fs->cls_str || v1_type == fs->cls_file) {
         int fd;
         Str path_s;
@@ -1058,12 +1066,12 @@ static int mimetype_get_name(Value *vret, Value *v, RefNode *node)
  */
 static int mimetype_match(Value *vret, Value *v, RefNode *node)
 {
-    Str s = Value_str(*v);
-    Str t = Value_str(v[1]);
-    const char *src = t.p;
-    const char *dst = s.p;
-    const char *src_end = src + t.size;
-    const char *dst_end = dst + s.size;
+    RefStr *s = Value_vp(*v);
+    RefStr *t = Value_vp(v[1]);
+    const char *src = t->c;
+    const char *dst = s->c;
+    const char *src_end = src + t->size;
+    const char *dst_end = dst + s->size;
     int result = TRUE;
 
     while (src < src_end) {
@@ -1241,7 +1249,7 @@ static int mimeheader_index_set_sub(StrBuf *sb, Value v)
     } else if (type == fs->cls_timestamp) {
         char c_buf[48];
         RefInt64 *tm = Value_vp(v);
-        time_to_RFC2822_UTC(tm->u.i, c_buf);
+        timestamp_to_RFC2822_UTC(tm->u.i, c_buf);
         StrBuf_add_c(sb, '"');
         StrBuf_add(sb, c_buf, -1);
         StrBuf_add_c(sb, '"');
@@ -1730,39 +1738,43 @@ static int parse_server(Str *url, Str src)
 
     return TRUE;
 }
-static int parse_url(Str *url, Str src)
+static int parse_url(Str *url, const char *src_p, int src_size)
 {
     int i;
     int pos;
 
+    if (src_size < 0) {
+        src_size = strlen(src_p);
+    }
+
     // scheme  [a-z+\-\.]*:
-    for (i = 0; i < src.size; i++) {
-        if (src.p[i] == ':') {
+    for (i = 0; i < src_size; i++) {
+        if (src_p[i] == ':') {
             if (url != NULL) {
-                url[URL_SCHEME] = Str_new(src.p, i);
+                url[URL_SCHEME] = Str_new(src_p, i);
             }
             i++;
             break;
         }
     }
-    if (i == src.size) {
+    if (i == src_size) {
         return FALSE;
     }
 
-    if (i + 2 > src.size || src.p[i] != '/' || src.p[i + 1] != '/') {
+    if (i + 2 > src_size || src_p[i] != '/' || src_p[i + 1] != '/') {
         return FALSE;
     }
     i += 2;
     // 次に/が出現するまでを切り出す
     pos = i;
-    for (; i < src.size; i++) {
-        int c = src.p[i];
+    for (; i < src_size; i++) {
+        int c = src_p[i];
         if (c == '/') {
             break;
         }
     }
     if (i > pos) {
-        if (!parse_server(url, Str_new(src.p + pos, i - pos))) {
+        if (!parse_server(url, Str_new(src_p + pos, i - pos))) {
             return FALSE;
         }
     } else {
@@ -1775,33 +1787,33 @@ static int parse_url(Str *url, Str src)
 
     // #または?が出るまで
     pos = i;
-    for (; i < src.size; i++) {
-        int c = src.p[i];
+    for (; i < src_size; i++) {
+        int c = src_p[i];
         if (c == '?' || c == '#') {
             break;
         }
     }
     if (url != NULL) {
-        url[URL_PATH] = Str_new(src.p + pos, i - pos);
+        url[URL_PATH] = Str_new(src_p + pos, i - pos);
     }
 
-    if (i < src.size && src.p[i] == '?') {
+    if (i < src_size && src_p[i] == '?') {
         i++;
         // #が出るまで
         pos = i;
-        for (; i < src.size; i++) {
-            if (src.p[i] == '#') {
+        for (; i < src_size; i++) {
+            if (src_p[i] == '#') {
                 break;
             }
         }
         if (url != NULL) {
-            url[URL_QUERY] = Str_new(src.p + pos, i - pos);
+            url[URL_QUERY] = Str_new(src_p + pos, i - pos);
         }
     }
-    if (i < src.size && src.p[i] == '#') {
+    if (i < src_size && src_p[i] == '#') {
         i++;
         if (url != NULL) {
-            url[URL_HASH] = Str_new(src.p + i, src.size - i);
+            url[URL_HASH] = Str_new(src_p + i, src_size - i);
         }
     }
 
@@ -1874,14 +1886,13 @@ static int uri_marshal_read(Value *vret, Value *v, RefNode *node)
 }
 static int uri_get_part(Value *vret, Value *v, RefNode *node)
 {
-    Str src = Value_str(*v);
+    RefStr *src = Value_vp(*v);
     Str part[URL_NUM];
     int idx = FUNC_INT(node);
 
     memset(part, 0, sizeof(part));
-    if (parse_url(part, src)) {
-        Str s = part[idx];
-        *vret = cstr_Value(fs->cls_str, s.p, s.size);
+    if (parse_url(part, src->c, src->size)) {
+        *vret = cstr_Value(fs->cls_str, part[idx].p, part[idx].size);
     } else {
         throw_errorf(fs->mod_lang, "ParseError", "Invalid URL string format");
         return FALSE;
@@ -1890,12 +1901,12 @@ static int uri_get_part(Value *vret, Value *v, RefNode *node)
 }
 static int uri_get_scheme(Value *vret, Value *v, RefNode *node)
 {
-    Str src = Value_str(*v);
+    RefStr *src = Value_vp(*v);
     int i, len;
     RefStr *rs;
 
-    for (i = 0; i < src.size; i++) {
-        if (src.p[i] == ':') {
+    for (i = 0; i < src->size; i++) {
+        if (src->c[i] == ':') {
             break;
         }
     }
@@ -1903,7 +1914,7 @@ static int uri_get_scheme(Value *vret, Value *v, RefNode *node)
     rs = refstr_new_n(fs->cls_str, len);
     *vret = vp_Value(rs);
     for (i = 0; i < len; i++) {
-        rs->c[i] = tolower(src.p[i]);
+        rs->c[i] = tolower(src->c[i]);
     }
     rs->c[i] = '\0';
 
@@ -1911,11 +1922,11 @@ static int uri_get_scheme(Value *vret, Value *v, RefNode *node)
 }
 static int uri_get_port(Value *vret, Value *v, RefNode *node)
 {
-    Str src = Value_str(*v);
+    RefStr *src = Value_vp(*v);
     Str part[URL_NUM];
 
     memset(part, 0, sizeof(part));
-    if (parse_url(part, src)) {
+    if (parse_url(part, src->c, src->size)) {
         Str port = part[URL_PORT];
         if (port.size > 0) {
             int port_i = parse_int(port.p, port.size, 65535);
@@ -1937,8 +1948,8 @@ static int uri_get_port(Value *vret, Value *v, RefNode *node)
 }
 static int uri_is_url(Value *vret, Value *v, RefNode *node)
 {
-    Str src = Value_str(*v);
-    *vret = bool_Value(parse_url(NULL, src));
+    RefStr *src = Value_vp(*v);
+    *vret = bool_Value(parse_url(NULL, src->c, src->size));
     return TRUE;
 }
 
@@ -1952,18 +1963,18 @@ static int uri_is_url(Value *vret, Value *v, RefNode *node)
  */
 static int uri_tofile(Value *vret, Value *v, RefNode *node)
 {
-    Str src = Value_str(*v);
-    const char *p = src.p;
-    const char *end = p + src.size;
+    RefStr *src = Value_vp(*v);
+    const char *p = src->c;
+    const char *end = p + src->size;
 
     StrBuf buf;
     char *path;
     Str path_s;
 
-    if (src.size < 7 || memcmp(src.p, "file://", 7) != 0) {
+    if (src->size < 7 || memcmp(src->c, "file://", 7) != 0) {
         goto ERROR_END;
     }
-    p = src.p + 7;
+    p = src->c + 7;
 
 #ifdef WIN32
     if (p < end) {

@@ -1,14 +1,7 @@
 project(m_json)
 
-set(MPI_COMMON
-  ../../common/mpi.c
-  ../../common/mpi2.c
-  ../../common/mplogic.c
-)
-
 add_library(m_json SHARED
   ${SRC_COMMON}
-  ${MPI_COMMON}
   m_json.c
 )
 set_target_properties(m_json

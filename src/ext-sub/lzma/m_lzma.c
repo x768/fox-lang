@@ -222,12 +222,12 @@ static int invoke_read(char *buf, int *size, Value v)
 
     r_type = fs->Value_type(fg->stk_top[-1]);
     if (r_type == fs->cls_bytes) {
-        Str s = fs->Value_str(fg->stk_top[-1]);
-        if (s.size <= BUFFER_SIZE) {
-            memcpy(buf, s.p, s.size);
-            *size = s.size;
+        RefStr *s = Value_vp(fg->stk_top[-1]);
+        if (s->size <= BUFFER_SIZE) {
+            memcpy(buf, s->c, s->size);
+            *size = s->size;
         } else {
-            memcpy(buf, s.p, BUFFER_SIZE);
+            memcpy(buf, s->c, BUFFER_SIZE);
             *size = BUFFER_SIZE;
         }
     } else {

@@ -5,6 +5,8 @@ assert_equal Complex(1.0, 2.0) + Complex(3.0, 4.0), Complex(4.0, 6.0)
 assert_equal Complex(3.0, 4.0) - Complex(1.0, 2.0), Complex(2.0, 2.0)
 assert_equal Complex(1.0, 2.0) * Complex(3.0, 4.0), Complex(-5.0, 10.0)
 assert_equal Complex(2.0, 4.0) / Complex(1.0, 2.0), Complex(2.0, 0.0)
+assert_equal -Complex(1.0, 2.0), Complex(-1.0, -2.0)
+assert_equal ~Complex(1.0, 2.0), Complex(1.0, -2.0)
 
 let c = Complex(3.0, 4.0)
 assert_equal c.real, 3.0

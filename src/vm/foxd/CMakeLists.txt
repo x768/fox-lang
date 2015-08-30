@@ -7,17 +7,10 @@ include_directories(../fox)
 set(DEST_DIR ../../../../bin)
 file(GLOB LIST_SRC ../fox/*.c)
 
-set(MPI_COMMON
-  ../../common/mpi.c
-  ../../common/mpi2.c
-  ../../common/mplogic.c
-)
-
 
 add_executable(foxd
   ${LIST_SRC}
   ${SRC_COMMON}
-  ${MPI_COMMON}
   ../compat/c_${TARGET_OS}_cl.${TARGET_EXT}
   ../compat/main_cl.c
   interactive.c

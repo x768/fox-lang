@@ -181,12 +181,12 @@ static int math_rand_seed(Value *vret, Value *v, RefNode *node)
 
         if (v1_type == fs->cls_int) {
             if (Value_isref(v1)) {
-                mp_int *mp = Value_vp(*v);
-                c_buf_len = (mp->used + 1) / 2;
+                RefInt *mp = Value_vp(*v);
+                c_buf_len = (mp->bi.size + 1) / 2;
                 c_buf = malloc(c_buf_len * 4);
-                memcpy(c_buf, mp->dp, mp->used * 2);
-                if ((mp->used % 2) != 0) {
-                    memset(c_buf + mp->used * 2, 0, 1);
+                memcpy(c_buf, mp->bi.d, mp->bi.size * 2);
+                if ((mp->bi.size % 2) != 0) {
+                    memset(c_buf + mp->bi.size * 2, 0, 1);
                 }
             } else {
                 uint32_t ival = Value_integral(v1);
@@ -195,12 +195,12 @@ static int math_rand_seed(Value *vret, Value *v, RefNode *node)
                 memcpy(c_buf, &ival, 4);
             }
         } else if (v1_type == fs->cls_str || v1_type == fs->cls_bytes) {
-            Str s = fs->Value_str(v1);
-            c_buf_len = (s.size + 3) / 4;
+            RefStr *s = Value_vp(v1);
+            c_buf_len = (s->size + 3) / 4;
             c_buf = malloc(c_buf_len * 4);
-            memcpy(c_buf, s.p, s.size);
-            if ((s.size % 4) != 0) {
-                memset(c_buf + s.size, 0, c_buf_len * 4 - s.size);
+            memcpy(c_buf, s->c, s->size);
+            if ((s->size % 4) != 0) {
+                memset(c_buf + s->size, 0, c_buf_len * 4 - s->size);
             }
         } else {
             fs->throw_error_select(THROW_ARGMENT_TYPE2__NODE_NODE_NODE_INT, fs->cls_int, fs->cls_sequence, v1_type, 1);
@@ -261,35 +261,33 @@ static int math_rand_int(Value *vret, Value *v, RefNode *node)
         init_rand48();
     }
     if (Value_isref(v1)) {
-        mp_int mp, q;
+        BigInt mp;
         int i, n;
-        mp_int *mpval = Value_vp(v1);
+        RefInt *mpval = Value_vp(v1);
         RefInt *rem;
 
-        if (mpval->sign == MP_NEG) {
+        if (mpval->bi.sign <= 0) {
             fs->throw_errorf(fs->mod_lang, "ValueError", "Must be > 0 (argument #1)");
             return FALSE;
         }
-        n = (mp_count_bits(mpval) / 32) + 1;
+        n = (mpval->bi.size + 1) / 2;
 
-        mp_init(&mp);
+        fs->BigInt_init(&mp);
         for (i = 0; i < n; i++) {
             uint32_t r = gen_int32();
 
-            mpl_lsh(&mp, &mp, 16);
-            mp_add_d(&mp, r & 0xFFFF, &mp);
-            mpl_lsh(&mp, &mp, 16);
-            mp_add_d(&mp, r >> 16, &mp);
+            fs->BigInt_lsh(&mp, 16);
+            fs->BigInt_add_d(&mp, r & 0xFFFF);
+            fs->BigInt_lsh(&mp, 16);
+            fs->BigInt_add_d(&mp, r >> 16);
         }
-        mp_init(&q);
         rem = fs->buf_new(fs->cls_int, sizeof(RefInt));
         *vret = vp_Value(rem);
-        mp_init(&rem->mp);
-        mp_div(&mp, mpval, &q, &rem->mp);
-        mp_clear(&mp);
-        mp_clear(&q);
+        fs->BigInt_init(&rem->bi);
+        fs->BigInt_divmod(NULL, &rem->bi, &mp, &mpval->bi);
+        fs->BigInt_close(&mp);
 
-        fs->fix_bigint(vret, &rem->mp);
+        fs->fix_bigint(vret, &rem->bi);
     } else {
         int32_t lval = Value_integral(v1);
 
@@ -318,7 +316,7 @@ static int math_rand_float(Value *vret, Value *v, RefNode *node)
         init_rand48();
     }
     dval = (double)gen_int32() / 4294967296.0;
-    *vret = fs->float_Value(dval);
+    *vret = fs->float_Value(fs->cls_float, dval);
 
     return TRUE;
 }
@@ -352,7 +350,7 @@ static int math_rand_gaussian(Value *vret, Value *v, RefNode *node)
         has_next = TRUE;
         dval = v1 * norm;
     }
-    *vret = fs->float_Value(dval);
+    *vret = fs->float_Value(fs->cls_float, dval);
 
     return TRUE;
 }

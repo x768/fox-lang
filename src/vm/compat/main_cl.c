@@ -420,9 +420,8 @@ static int parse_args(ArgumentInfo *ai, int argc, const char **argv)
             }
         } else {
             // ファイル名を取得
-            Str src = Str_new(p, -1);
-            if (is_absolute_path(src)) {
-                srcfile = str_dup_p(src.p, src.size, NULL);
+            if (is_absolute_path(p, -1)) {
+                srcfile = str_dup_p(p, -1, NULL);
             } else {
                 // 相対パス
                 srcfile = str_printf("%r" SEP_S "%s", fv->cur_dir, p);

@@ -18,4 +18,3 @@ assert_equal Frac('1e+6'), 1_000_000d
 assert_equal Frac(-10), -10d
 assert_equal Frac(-10.0), -10d
 assert_equal Frac('-1.23456789'), -1.23456789d
-

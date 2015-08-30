@@ -469,9 +469,9 @@ int list_cmp_sub(int *ret, RefArray *r1, RefArray *r2, Hash *hash1, Hash *hash2,
             if (!call_member_func(fs->symbol_stock[T_CMP], 1, TRUE)) {
                 return FALSE;
             }
-            ret2 = Value_int64(fg->stk_top[-1], NULL);
+            ret2 = Value_int32(fg->stk_top[-1]);
             Value_pop();
-            if (ret2 != 0) {
+            if (ret2 != 0 && ret2 != INT32_MIN) {
                 *ret = ret2;
                 return TRUE;
             }
@@ -600,7 +600,7 @@ static void array_grow_size(RefArray *r, int grow)
  */
 static int array_new_sub(Value *vret, int n)
 {
-    int64_t size;
+    int32_t size;
     Value *v = fg->stk_base + n;
     RefNode *type = Value_type(*v);
     RefArray *r;
@@ -610,8 +610,8 @@ static int array_new_sub(Value *vret, int n)
         return FALSE;
     }
 
-    size = Value_int64(*v, NULL);
-    if (size < 0 || size > INT32_MAX) {
+    size = Value_int32(*v);
+    if (size < 0) {
         throw_errorf(fs->mod_lang, "ValueError", "Invalid size number (argument #%d)", n);
         return FALSE;
     }
@@ -793,11 +793,10 @@ static int array_size(Value *vret, Value *v, RefNode *node)
 static int array_set_size(Value *vret, Value *v, RefNode *node)
 {
     RefArray *ra = Value_vp(*v);
-    int err;
-    int64_t size = Value_int64(v[1], &err);
+    int32_t size = Value_int32(v[1]);
 
-    if (err || size < INT32_MIN || size > INT32_MAX) {
-        throw_errorf(fs->mod_lang, "ValueError", "array size too large");
+    if (size < 0) {
+        throw_errorf(fs->mod_lang, "ValueError", "illigal array size (%v)", v[1]);
         return FALSE;
     }
     if (!refarray_set_size(ra, size)) {
@@ -853,13 +852,12 @@ static int array_new_cat(Value *vret, Value *v, RefNode *node)
 static int array_mul(Value *vret, Value *v, RefNode *node)
 {
     RefArray *r;
-    int err = FALSE;
     RefArray *r1 = Value_vp(v[0]);
-    int n = Value_int64(v[1], &err);
+    int32_t n = Value_int32(v[1]);
     int i;
 
-    if (err || n < 0 || n > INT_MAX / sizeof(Value)) {
-        throw_errorf(fs->mod_lang, "ValueError", "Illigal Array operand");
+    if (n < 0) {
+        throw_errorf(fs->mod_lang, "ValueError", "Illigal multiple operand (%v)", v[1]);
         return FALSE;
     }
 
@@ -1242,7 +1240,7 @@ int value_cmp_invoke(Value v1, Value v2, Value fn)
         return (iv == 0 ? VALUE_CMP_EQ : (iv > 0 ? VALUE_CMP_GT : VALUE_CMP_LT));
     } else if (Value_type(v) == fs->cls_int) {
         RefInt *mp = Value_vp(v);
-        int ret = (mp->mp.sign == MP_NEG ? VALUE_CMP_LT : VALUE_CMP_GT);
+        int ret = (mp->bi.sign < 0 ? VALUE_CMP_LT : VALUE_CMP_GT);
         Value_pop();
         return ret;
     } else {
@@ -1791,7 +1789,7 @@ int range_marshal_read(Value *vret, Value *v, RefNode *node)
 
     Ref *r = ref_new(fs->cls_range);
     Value d = v[1];
-    Value rd = Value_ref(*v)->v[INDEX_MARSHALDUMPER_SRC];
+    Value rd = Value_ref(d)->v[INDEX_MARSHALDUMPER_SRC];
 
     *vret = vp_Value(r);
 
@@ -1821,7 +1819,7 @@ int range_marshal_write(Value *vret, Value *v, RefNode *node)
 {
     Ref *r = Value_ref(*v);
     Value d = v[1];
-    Value w = Value_ref(*v)->v[INDEX_MARSHALDUMPER_SRC];
+    Value w = Value_ref(d)->v[INDEX_MARSHALDUMPER_SRC];
     int i;
     char is_dec = Value_bool(r->v[INDEX_RANGE_IS_DEC]) ? 1 : 0;
     char is_open = Value_bool(r->v[INDEX_RANGE_OPEN]) ? 1 : 0;
@@ -1960,6 +1958,20 @@ static int range_get(Value *vret, Value *v, RefNode *node)
     Ref *r = Value_ref(*v);
     int idx = FUNC_INT(node);
     *vret = Value_cp(r->v[idx]);
+    return TRUE;
+}
+static int range_size(Value *vret, Value *v, RefNode *node)
+{
+    Ref *r = Value_ref(*v);
+    
+    // size => r.end - r.begin
+    Value_push("vv", r->v[INDEX_RANGE_END], r->v[INDEX_RANGE_BEGIN]);
+    if (!call_member_func(fs->symbol_stock[T_SUB], 1, TRUE)) {
+        return FALSE;
+    }
+    *vret = fg->stk_top[-1];
+    fg->stk_top--;
+    
     return TRUE;
 }
 
@@ -2286,7 +2298,7 @@ static int iterator_find_if(Value *vret, Value *v, RefNode *node)
 }
 static int iterator_skip(Value *vret, Value *v, RefNode *node)
 {
-    int last = Value_int64(v[1], NULL);
+    int last = Value_int32(v[1]);
     if (last < 0) {
         throw_errorf(fs->mod_lang, "ValueError", "Argument #1 must >= 0");
         return FALSE;
@@ -2806,6 +2818,8 @@ void define_lang_col_class(RefNode *m)
     define_native_func_a(n, range_get, 0, 0, (void*) INDEX_RANGE_END);
     n = define_identifier(m, cls, "step", NODE_FUNC_N, NODEOPT_PROPERTY);
     define_native_func_a(n, range_get, 0, 0, (void*) INDEX_RANGE_STEP);
+    n = define_identifier(m, cls, "size", NODE_FUNC_N, NODEOPT_PROPERTY);
+    define_native_func_a(n, range_size, 0, 0, NULL);
     extends_method(cls, fs->cls_iterable);
 
 

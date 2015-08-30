@@ -1,0 +1,44 @@
+import markdown
+import marshal.xml
+
+let src = <<<EOS
+Programming Language fox
+========================
+
+What's this
+-----------
+fox language is a programming language.
+
+Libraries
+---------
+- Image operation
+  - JPEG
+  - GIF
+  - PNG
+- Zip archive operation
+- etc.
+
+Website
+-------
+Please visit [x768's GitHub Page].
+
+[x768's GitHub Page]: https://github.com/x768
+EOS
+
+let md = Markdown()
+md.compile src
+
+let root = md.make_xml("div")
+let html = XMLDocument(
+    DTD_HTML5,
+    XMLElem("html",
+        XMLElem("head",
+            XMLElem("title", XMLText("Programming Language fox")),
+        ),
+        XMLElem("body",
+            root
+        ),
+    ),
+)
+html.save "markdown.html", "html pretty", Charset.UTF8
+

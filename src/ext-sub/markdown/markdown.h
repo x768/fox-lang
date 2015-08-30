@@ -1,0 +1,142 @@
+#ifndef _MARKDOWN_H_
+#define _MARKDOWN_H_
+
+#include "fox.h"
+#include "m_xml.h"
+
+enum {
+    MD_NONE,
+    MD_EOS,
+    MD_FATAL_ERROR,
+    MD_IGNORE,        // child要素を出力
+
+    // 1行
+    MD_NEWLINE,       // 空行
+    MD_HEADING,       // opt=1...6 <h1>child</h1>, <h2>child</h2>
+    MD_HEADING_D,     // === or ---
+    MD_PARAGRAPH,     // <p>child</p>
+    MD_HORIZONTAL,    // <hr>
+    MD_BLOCK_PLUGIN,  // %plugin
+
+    // インライン要素
+    MD_TEXT,          // text
+    MD_EM,            // <em>child</em>
+    MD_STRONG,        // <strong>child</strong>
+    MD_STRIKE,        // <strike>child</strike>
+    MD_CODE_INLINE,   // <code>#hilight:link text</code>
+    MD_LINK,          // <a href="link" title="title">child</a>
+    MD_CODE,          // title=filename, <pre><code></code></pre>
+    MD_INLINE_PLUGIN, // [%plugin]
+
+    MD_LINK_BRAKET,   // [hogehoge]
+    MD_LINK_BRAKET_NEXT,// [hoge]    # [...]の後ろに限る
+    MD_LINK_PAREN,    // (hogehoge)  # [...]の後ろに限る
+
+    // 単一要素
+    MD_IMAGE,         // <img src="link" alt="title">
+    MD_TEX_FORMULA,   // optional: $$ {e} ^ {i\pi} + 1 = 0 $$
+    MD_COLON,         // :
+    MD_PLUGIN,
+
+    // 複数行
+    MD_UNORDERD_LIST, // <ul>child</ul>
+    MD_ORDERD_LIST,   // <ol>child</ol>
+    MD_DEFINE_LIST,   // <dl>child</dl>
+    MD_LIST_ITEM,     // <li>child</li>
+    MD_DEFINE_DT,     // <dt>child</dt>
+    MD_DEFINE_DD,     // <dd>child</dd>
+    MD_BLOCKQUOTE,    // title=, link=, <blockquote></blockquote>
+
+    // テーブル
+    MD_TABLE,         // "|","||",... <table></table>
+    MD_TABLE_ROW,     // <tr></tr>
+    MD_TABLE_HEADER,  // <th></th>
+    MD_TABLE_CELL,    // <td></td>
+};
+
+enum {
+    INDEX_MARKDOWN_MD,
+    INDEX_MARKDOWN_NUM,
+};
+
+enum {
+    OPT_LINK_RESOLVED,
+    OPT_LINK_NAME_REF,
+    OPT_TEXT_BACKSLASHES,
+    OPT_TEXT_NO_BACKSLASHES,
+};
+
+enum {
+    SIMPLE_HASH_MAX = 32,
+};
+
+
+typedef struct MDNode {
+    struct MDNode *child;
+    struct MDNode *next;
+    struct MDNode *parent;
+
+    uint16_t type;
+    uint16_t opt;
+    uint16_t indent;
+
+    char *cstr;
+    char *href;
+} MDNode;
+
+typedef struct SimpleHash
+{
+    struct SimpleHash *next;
+    uint32_t hash;
+    const char *name;
+    MDNode *node;
+} SimpleHash;
+
+typedef struct {
+    int enable_semantic;
+    int enable_tex;
+    int quiet_error;
+    int tabstop;
+    int heading;
+
+    Mem mem;
+    SimpleHash *link_map[SIMPLE_HASH_MAX];
+    MDNode *root;
+} Markdown;
+
+
+
+#ifndef DEFINE_GLOBALS
+#define extern
+#endif
+
+extern const FoxStatic *fs;
+extern FoxGlobal *fg;
+
+extern RefNode *mod_markdown;
+extern RefNode *mod_xml;
+extern const XMLStatic *xst;
+
+extern RefNode *cls_xmlelem;
+extern RefNode *cls_xmltext;
+extern RefNode *cls_nodelist;
+
+extern RefStr *str_link_callback;
+extern RefStr *str_inline_plugin;
+extern RefStr *str_block_plugin;
+
+#ifndef DEFINE_GLOBALS
+#undef extern
+#endif
+
+// m_markdown.c
+MDNode *SimpleHash_get_node(SimpleHash **hash, const char *name);
+void SimpleHash_add_node(SimpleHash **hash, Mem *mem, const char *name, MDNode *node);
+MDNode *MDNode_new(int type, Markdown *r);
+
+// md_parse.c
+int parse_markdown(Markdown *r, const char *p);
+int link_markdown(Ref *r);
+
+
+#endif /* _MARKDOWN_H_ */

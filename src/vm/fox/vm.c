@@ -65,9 +65,9 @@ void init_so_func(void)
     fs->parse_hex = parse_hex;
 
     fs->Value_type = Value_type;
+    fs->Value_int32 = Value_int32;
     fs->Value_int64 = Value_int64;
     fs->Value_float = Value_float;
-    fs->Value_str = Value_str;
     fs->Value_frac_s = Value_frac_s;
     fs->Value_frac10 = Value_frac10;
     fs->Value_timestamp = Value_timestamp;
@@ -92,6 +92,26 @@ void init_so_func(void)
     fs->Value_pop = Value_pop;
     fs->get_node_member = get_node_member;
 
+    fs->BigInt_init = BigInt_init;
+    fs->BigInt_close = BigInt_close;
+    fs->BigInt_copy = BigInt_copy;
+    fs->int64_BigInt = int64_BigInt;
+    fs->cstr_BigInt = cstr_BigInt;
+    fs->BigRat_fix = BigRat_fix;
+    fs->BigInt_int32 = BigInt_int32;
+    fs->BigInt_int64 = BigInt_int64;
+    fs->BigInt_double = BigInt_double;
+    fs->BigInt_add = BigInt_add;
+    fs->BigInt_add_d = BigInt_add_d;
+    fs->BigInt_sub = BigInt_sub;
+    fs->BigInt_mul = BigInt_mul;
+    fs->BigInt_divmod = BigInt_divmod;
+    fs->BigInt_pow = BigInt_pow;
+    fs->BigInt_lsh = BigInt_lsh;
+    fs->BigInt_rsh = BigInt_rsh;
+    fs->BigInt_gcd = BigInt_gcd;
+    fs->BigInt_cmp = BigInt_cmp;
+
     fs->is_subclass = is_subclass;
     fs->get_module_by_name = get_module_by_name;
     fs->define_identifier = define_identifier;
@@ -109,7 +129,7 @@ void init_so_func(void)
     fs->file_value_to_path = file_value_to_path;
     fs->value_to_streamio = value_to_streamio;
     fs->get_random = get_random;
-    fs->fix_bigint = (void (*)(Value *v, void *mp))fix_bigint;
+    fs->fix_bigint = fix_bigint;
     fs->bytesio_get_strbuf = bytesio_get_strbuf;
 
     fs->get_loader_function = get_loader_function;
@@ -159,7 +179,6 @@ void init_so_func(void)
     fs->refmap_get_strkey = refmap_get_strkey;
     fs->refmap_del = refmap_del;
 
-    fs->get_file_size = get_file_size;
     fs->read_from_file = read_from_file;
 }
 
@@ -648,7 +667,7 @@ FileHandle open_errorlog_file()
     const char *err_path;
     FileHandle fd;
 
-    if (is_absolute_path(Str_new(fv->err_dst, -1))) {
+    if (is_absolute_path(fv->err_dst, -1)) {
         err_path = fv->err_dst;
     } else {
         pbuf = str_printf("%r%p", fv->cur_dir, fv->err_dst);

@@ -300,8 +300,8 @@ static int textio_print_sub(Value v_textio, StrBuf *sb, Value v, Ref *r_loc)
         }
     } else if (v_type == fs->cls_int) {
         RefInt *mp = Value_vp(v);
-        char *c_buf = malloc(mp_radix_size(&mp->mp, 10) + 2);
-        mp_toradix(&mp->mp, (unsigned char *)c_buf, 10);
+        char *c_buf = malloc(BigInt_str_bufsize(&mp->bi, 10));
+        BigInt_str(&mp->bi, 10, c_buf, FALSE);
         if (!stream_write_sub_s(vb, sb, c_buf, -1, tio)) {
             result = FALSE;
         }
@@ -394,10 +394,10 @@ static int textio_print(Value *vret, Value *v, RefNode *node)
  *
  * v, sbどちらかが必要
  */
-static int textio_printf_sub(Value v, StrBuf *sb, Str fmt_src, int start_arg, Ref *r_loc)
+static int textio_printf_sub(Value v, StrBuf *sb, RefStr *fmt_src, int start_arg, Ref *r_loc)
 {
-    const char *p = fmt_src.p;
-    const char *end = p + fmt_src.size;
+    const char *p = fmt_src->c;
+    const char *end = p + fmt_src->size;
 
     Value *varg = fg->stk_base + start_arg;
     int vargc = (fg->stk_top - fg->stk_base) - start_arg;
@@ -568,12 +568,12 @@ static int textio_printf(Value *vret, Value *v, RefNode *node)
 {
     int str = FUNC_INT(node);
     RefNode *v1_type = Value_type(v[1]);
-    Str s_fmt;
+    RefStr *s_fmt;
     Ref *r_loc = NULL;
     int start_arg;
 
     if (v1_type == fs->cls_str) {
-        s_fmt = Value_str(v[1]);
+        s_fmt = Value_vp(v[1]);
         start_arg = 2;
     } else if (v1_type == fs->cls_locale) {
         if (fg->stk_top > v + 2) {
@@ -587,7 +587,7 @@ static int textio_printf(Value *vret, Value *v, RefNode *node)
             return FALSE;
         }
         r_loc = Value_ref(v[1]);
-        s_fmt = Value_str(v[2]);
+        s_fmt = Value_vp(v[2]);
         start_arg = 3;
     } else {
         throw_error_select(THROW_ARGMENT_TYPE2__NODE_NODE_NODE_INT, fs->cls_str, fs->cls_locale, v1_type, 1);
@@ -696,14 +696,10 @@ static int strio_tostr(Value *vret, Value *v, RefNode *node)
 static int strio_data(Value *vret, Value *v, RefNode *node)
 {
     RefBytesIO *mb = Value_bytesio(*v);
-    Str s = Str_new(mb->buf.p, mb->buf.size);
-    int begin;
-    int end;
+    int begin, end;
 
-    string_substr_position(&begin, &end, s, v);
-    s.size = end - begin;
-    s.p += begin;
-    *vret = cstr_Value(fs->cls_str, s.p, s.size);
+    string_substr_position(&begin, &end, mb->buf.p, mb->buf.size, v);
+    *vret = cstr_Value(fs->cls_str, mb->buf.p + begin, end - begin);
 
     return TRUE;
 }

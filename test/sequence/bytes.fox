@@ -12,3 +12,7 @@ assert_equal b'C:\WINDOWS\SYSTEM32', b"C:\\WINDOWS\\SYSTEM32"
 assert_equal %B(abc\n), b"abc\n"
 assert_equal %b(abc\n), b'abc\n'
 
+assert_equal b"\
+abc\
+def", b"abcdef"
+

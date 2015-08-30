@@ -17,7 +17,7 @@ for d in get_module_dirs("").sort() {
             puts "OK"
             succeeded++
         } catch e:Error {
-            puts "Failed ", e.stack_trace[1]
+            puts "Failed ", e.stack_trace.join(" ")
             failed++
         }
         STDIO.flush()

@@ -19,7 +19,7 @@ static RefNode *cls_zipentryiter;
 static RefNode *cls_fileio;
 
 
-static int get_file_size(int *pret, Value reader)
+static int get_reader_file_size(int *pret, Value reader)
 {
     RefNode *ret_type;
     int64_t ret;
@@ -242,7 +242,6 @@ static int invoke_read(char *buf, int *size, Value v)
 {
     static RefStr *str_read;
     RefNode *r_type;
-    Str s;
 
     if (str_read == NULL) {
         str_read = fs->intern("read", -1);
@@ -253,12 +252,12 @@ static int invoke_read(char *buf, int *size, Value v)
     }
     r_type = fs->Value_type(fg->stk_top[-1]);
     if (r_type == fs->cls_bytes) {
-        s = fs->Value_str(fg->stk_top[-1]);
-        if (s.size <= BUFFER_SIZE) {
-            memcpy(buf, s.p, s.size);
-            *size = s.size;
+        RefStr *s = Value_vp(fg->stk_top[-1]);
+        if (s->size <= BUFFER_SIZE) {
+            memcpy(buf, s->c, s->size);
+            *size = s->size;
         } else {
-            memcpy(buf, s.p, BUFFER_SIZE);
+            memcpy(buf, s->c, BUFFER_SIZE);
             *size = BUFFER_SIZE;
         }
     } else {
@@ -378,7 +377,7 @@ static int zip_randomreader_new(Value *vret, Value *v, RefNode *node)
     if (!fs->value_to_streamio(&reader, v1, FALSE, 0)) {
         return FALSE;
     }
-    if (!get_file_size(&file_size, reader)) {
+    if (!get_reader_file_size(&file_size, reader)) {
         return FALSE;
     }
     cdir = get_central_dir(reader, file_size, cs, tz);
@@ -1026,16 +1025,16 @@ static int zipentry_set_filename(Value *vret, Value *v, RefNode *node)
     Ref *r = Value_ref(*v);
     CentralDir *cd = Value_ptr(r->v[INDEX_ZIPENTRY_CDIR]);
     StrBuf *sb;
-    Str name = fs->Value_str(v[1]);
+    RefStr *name = Value_vp(v[1]);
 
-    if (name.size > 65535) {
+    if (name->size > 65535) {
         fs->throw_errorf(fs->mod_lang, "ValueError", "Filename must be less than 65535 bytes");
         return FALSE;
     }
 
     sb = &cd->filename;
     sb->size = 0;
-    fs->StrBuf_add(sb, name.p, name.size);
+    fs->StrBuf_add(sb, name->c, name->size);
     if (fs->Value_type(v[1]) == fs->cls_str) {
         cd->flags |= CDIR_FLAG_UTF8;
     } else {

@@ -5,9 +5,8 @@
 
 
 #if 0
-int utf8_to_utf16(wchar_t *dst_p, const char *src, int len)
+int cstr_to_utf16(wchar_t *dst_p, const char *src, int len)
 {
-    const wchar_t *dst = dst_p;
     const unsigned char *p = (const unsigned char*)ptr;
     const unsigned char *end;
 
@@ -17,6 +16,8 @@ int utf8_to_utf16(wchar_t *dst_p, const char *src, int len)
     end = p + len;
 
     if (dst_p != NULL) {
+        const wchar_t *dst = dst_p;
+
         while (p < end) {
             int c = *p;
             int code;
@@ -49,7 +50,9 @@ int utf8_to_utf16(wchar_t *dst_p, const char *src, int len)
                 *dst++ = code;
             }
         }
+        return dst - dst_p;
     } else {
+        int dst = 0;
         while (p < end) {
             int c = *p;
 
@@ -72,8 +75,8 @@ int utf8_to_utf16(wchar_t *dst_p, const char *src, int len)
                 }
             }
         }
+        return dst;
     }
-    return dst - dst_p;
 }
 #endif
 
@@ -184,6 +187,18 @@ int64_t seek_fox(FileHandle fd, int64_t offset, int whence)
     i64.QuadPart = offset;
     SetFilePointerEx((HANDLE)fd, i64, &i64, whence);
     return i64.QuadPart;
+}
+
+int64_t get_file_size(FileHandle fh)
+{
+    if (fh != -1) {
+        HANDLE hFile = (HANDLE)fh;
+        DWORD size_h;
+        DWORD size = GetFileSize(hFile, &size_h);
+        return ((uint64_t)size) | ((uint64_t)size_h << 32);
+    } else {
+        return -1;
+    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////

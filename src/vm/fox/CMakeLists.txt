@@ -9,30 +9,21 @@ include_directories(./)
 set(DEST_DIR ../../../../bin)
 file(GLOB LIST_SRC *.c)
 
-set(MPI_COMMON
-  ../../common/mpi.c
-  ../../common/mpi2.c
-  ../../common/mplogic.c
-)
-
 add_executable(fox_cl
   ${LIST_SRC}
   ${SRC_COMMON}
-  ${MPI_COMMON}
   ../compat/c_${TARGET_OS}_cl.${TARGET_EXT}
   ../compat/main_cl.c
 )
 add_executable(fox_cgi
   ${LIST_SRC}
   ${SRC_COMMON}
-  ${MPI_COMMON}
   ../compat/c_${TARGET_OS}_cgi.${TARGET_EXT}
   ../compat/main_cgi.c
 )
 add_executable(fox_gui
   ${LIST_SRC}
   ${SRC_COMMON}
-  ${MPI_COMMON}
   ../compat/c_${TARGET_OS}_gui.${TARGET_EXT}
   ../compat/main_gui.c
 )

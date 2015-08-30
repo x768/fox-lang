@@ -38,7 +38,7 @@ int64_t Value_int64(Value v, int *err)
         if (type == fs->cls_int) {
             RefInt *mp = Value_vp(v);
             int64_t ret;
-            if (mp2_toint64(&mp->mp, &ret) != MP_OKAY) {
+            if (!BigInt_int64(&mp->bi, &ret)) {
                 if (err != NULL) {
                     *err = TRUE;
                 }
@@ -65,16 +65,16 @@ int64_t Value_int64(Value v, int *err)
         } else if (type == fs->cls_frac) {
             int64_t ret;
             RefFrac *md = Value_vp(v);
-            mp_int mp, rem;
+            BigInt mp, rem;
 
-            mp_init(&mp);
-            mp_init(&rem);
+            BigInt_init(&mp);
+            BigInt_init(&rem);
 
-            mp_div(&md->md[0], &md->md[1], &mp, &rem);
-            mp_clear(&rem);
+            BigInt_divmod(&mp, &rem, &md->bi[0], &md->bi[1]);
+            BigInt_close(&rem);
 
-            if (mp2_toint64(&mp, &ret) != MP_OKAY) {
-                if (mp.sign == MP_NEG) {
+            if (!BigInt_int64(&mp, &ret)) {
+                if (mp.sign < 0) {
                     ret = -INT64_MAX;
                 } else {
                     ret = INT64_MAX;
@@ -83,7 +83,47 @@ int64_t Value_int64(Value v, int *err)
                     *err = TRUE;
                 }
             }
-            mp_clear(&mp);
+            BigInt_close(&mp);
+            return ret;
+        }
+    }
+    return 0LL;
+}
+/**
+ * Valueから整数を取得(Int)
+ * 取得できなければINT32_MINを返す
+ */
+int Value_int32(Value v)
+{
+    if (Value_isint(v)) {
+        return Value_integral(v);
+    } else if (Value_isref(v)) {
+        RefNode *type = Value_ref_header(v)->type;
+        if (type == fs->cls_int) {
+            RefInt *mp = Value_vp(v);
+            return BigInt_int32(&mp->bi);
+        } else if (type == fs->cls_float) {
+            RefFloat *pd = Value_vp(v);
+            double d = pd->d;
+
+            if (d > (double)INT32_MAX || d < -(double)INT32_MAX) {
+                return INT32_MIN;
+            } else {
+                return (int32_t)d;
+            }
+        } else if (type == fs->cls_frac) {
+            int32_t ret;
+            RefFrac *md = Value_vp(v);
+            BigInt mp, rem;
+
+            BigInt_init(&mp);
+            BigInt_init(&rem);
+
+            BigInt_divmod(&mp, &rem, &md->bi[0], &md->bi[1]);
+            BigInt_close(&rem);
+
+            ret = BigInt_int32(&mp);
+            BigInt_close(&mp);
             return ret;
         }
     }
@@ -105,11 +145,11 @@ double Value_float(Value v)
             return rd->d;
         } else if (type == fs->cls_int) {
             RefInt *mp = Value_vp(v);
-            return mp2_todouble(&mp->mp);
+            return BigInt_double(&mp->bi);
         } else if (type == fs->cls_frac) {
             RefFrac *md = Value_vp(v);
-            double d1 = mp2_todouble(&md->md[0]);
-            double d2 = mp2_todouble(&md->md[1]);
+            double d1 = BigInt_double(&md->bi[0]);
+            double d2 = BigInt_double(&md->bi[1]);
             return d1 / d2;
         }
     }
@@ -125,24 +165,23 @@ char *Value_frac_s(Value v, int max_frac)
 {
     char *c_buf = NULL;
     RefFrac *md = Value_vp(v);
-    mp_int mi, rem;
+    BigInt mi, rem;
 
-    mp_init(&mi);
-    mp_init(&rem);
-    mp_div(&md->md[0], &md->md[1], &mi, &rem);
-    rem.sign = MP_ZPOS;
+    BigInt_init(&mi);
+    BigInt_init(&rem);
+    BigInt_divmod(&mi, &rem, &md->bi[0], &md->bi[1]);
+    rem.sign = (rem.sign < 0) ? 1 : rem.sign;
 
     // 小数部がない場合、整数部のみ出力
-    if (mp_cmp_z(&rem) == 0) {
-        c_buf = malloc(mp_radix_size(&mi, 10) + 1);
-        mp_toradix(&mi, (unsigned char*)c_buf, 10);
+    if (rem.sign == 0) {
+        c_buf = malloc(BigInt_str_bufsize(&mi, 10) + 1);
+        BigInt_str(&mi, 10, c_buf, FALSE);
     } else {
         int recr[2];
         int n_ex;
-        mp_int ex;
-        mp_int rem2;
+        BigInt ex;
 
-        if (get_recurrence(recr, &md->md[1])) {
+        if (get_recurrence(recr, &md->bi[1])) {
             if (max_frac < 0) {
                 return NULL;
             }
@@ -153,19 +192,15 @@ char *Value_frac_s(Value v, int max_frac)
                 n_ex = max_frac;
             }
         }
-        mp_init(&ex);
-        mp_init(&rem2);
-        mp_set(&ex, 10);
+        BigInt_init(&ex);
+        int64_BigInt(&ex, 10);
 
-        if (n_ex > 1) {
-            mp_expt_d(&ex, n_ex, &ex);     // ex = ex ** width_f
-        }
-        mp_mul(&rem, &ex, &rem);
-        mp_div(&rem, &md->md[1], &rem, &rem2);
+        BigInt_pow(&ex, n_ex);     // ex = ex ** width_f
+        BigInt_mul(&rem, &rem, &ex);
+        BigInt_divmod(&rem, NULL, &rem, &md->bi[1]);
 
-        c_buf = frac_tostr_sub(md->md[0].sign, &mi, &rem, n_ex);
-        mp_clear(&ex);
-        mp_clear(&rem2);
+        c_buf = frac_tostr_sub(md->bi[0].sign, &mi, &rem, n_ex);
+        BigInt_close(&ex);
     }
     return c_buf;
 }
@@ -178,19 +213,19 @@ char *Value_frac_s(Value v, int max_frac)
 int Value_frac10(int64_t *val, Value v, int factor)
 {
     RefFrac *md = Value_vp(v);
-    mp_int mp;
-    mp_int rem;
+    BigInt mp;
     int ret;
 
-    mp_init(&mp);
-    mp_init(&rem);
-    mp_mul_d(&md->md[0], factor, &mp);
-    mp_div(&mp, &md->md[1], &mp, &rem);
+    BigInt_init(&mp);
 
-    ret = mp2_toint64(&mp, val);
-    mp_clear(&mp);
-    mp_clear(&rem);
-    return ret == MP_OKAY;
+    BigInt_copy(&mp, &md->bi[0]);
+    BigInt_mul_sd(&mp, factor);
+    BigInt_divmod(&mp, NULL, &mp, &md->bi[1]);
+
+    ret = BigInt_int64(&mp, val);
+
+    BigInt_close(&mp);
+    return ret;
 }
 
 /**
@@ -313,16 +348,16 @@ Value int64_Value(int64_t i)
     if (i < -INT32_MAX || i > INT32_MAX) {
         RefInt *mp = buf_new(fs->cls_int, sizeof(RefInt));
         Value v = vp_Value(mp);
-        mp_init(&mp->mp);
-        mp2_set_int64(&mp->mp, i);
+        BigInt_init(&mp->bi);
+        int64_BigInt(&mp->bi, i);
         return v;
     } else {
         return (i << 32) | 5ULL;
     }
 }
-Value float_Value(double dval)
+Value float_Value(RefNode *klass, double dval)
 {
-    RefFloat *rf = buf_new(fs->cls_float, sizeof(RefFloat));
+    RefFloat *rf = buf_new(klass, sizeof(RefFloat));
     Value v = vp_Value(rf);
     rf->d = dval;
     return v;
@@ -334,12 +369,11 @@ Value float_Value(double dval)
  */
 Value frac_s_Value(const char *str)
 {
-    const char *end;
     RefFrac *md = buf_new(fs->cls_frac, sizeof(RefFrac));
 
-    mp_init(&md->md[0]);
-    mp_init(&md->md[1]);
-    if (!mp2_read_rational(md->md, str, &end)) {
+    BigInt_init(&md->bi[0]);
+    BigInt_init(&md->bi[1]);
+    if (!cstr_BigRat(md->bi, str, NULL)) {
         return VALUE_NULL;
     }
     return vp_Value(md);
@@ -352,11 +386,11 @@ Value frac10_Value(int64_t val, int factor)
 {
     RefFrac *md = buf_new(fs->cls_frac, sizeof(RefFrac));
 
-    mp_init(&md->md[0]);
-    mp_init(&md->md[1]);
-    mp2_set_int64(&md->md[0], val);
-    mp_set_int(&md->md[1], factor);
-    mp2_fix_rational(&md->md[0], &md->md[1]);
+    BigInt_init(&md->bi[0]);
+    BigInt_init(&md->bi[1]);
+    int64_BigInt(&md->bi[0], val);
+    int64_BigInt(&md->bi[1], factor);
+    BigRat_fix(md->bi);
 
     return vp_Value(md);
 }

@@ -72,7 +72,7 @@ static Value cursor_get_sub(sqlite3_stmt *stmt, int i)
     case SQLITE_INTEGER:
         return fs->int64_Value(sqlite3_column_int64(stmt, i));
     case SQLITE_FLOAT:
-        return fs->float_Value(sqlite3_column_double(stmt, i));
+        return fs->float_Value(fs->cls_float, sqlite3_column_double(stmt, i));
     case SQLITE_TEXT: {
         const char *p = (const char*)sqlite3_column_text(stmt, i);
         int len = sqlite3_column_bytes(stmt, i);
@@ -108,12 +108,12 @@ static int conn_new(Value *vret, Value *v, RefNode *node)
     }
 
     if (fg->stk_top > v + 2) {
-        Str m = fs->Value_str(v[2]);
-        if (Str_eq_p(m, "r")) {
-        } else if (Str_eq_p(m, "w")) {
+        RefStr *m = Value_vp(v[2]);
+        if (str_eq(m->c, m->size, "r", -1)) {
+        } else if (str_eq(m->c, m->size, "w", -1)) {
             flag = SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE;
         } else {
-            fs->throw_errorf(fs->mod_lang, "ValueError", "Unknown open mode %Q", m);
+            fs->throw_errorf(fs->mod_lang, "ValueError", "Unknown open mode %q", m->c);
             free(path);
             return FALSE;
         }
@@ -337,7 +337,7 @@ static void sqlite_callback_args(int argc, sqlite3_value **argv)
             *vp = fs->int64_Value(sqlite3_value_int64(sv));
             break;
         case SQLITE_FLOAT:
-            *vp = fs->float_Value(sqlite3_value_double(sv));
+            *vp = fs->float_Value(fs->cls_float, sqlite3_value_double(sv));
             break;
         case SQLITE_TEXT: {
             const char *p = (const char*)sqlite3_value_text(sv);
@@ -376,17 +376,11 @@ static int sqlite_callback_return(Value v, sqlite3_context *ctx)
         double dval = Value_float2(v);
         sqlite3_result_double(ctx, dval);
     } else if (r_type == fs->cls_str) {
-        Str s = fs->Value_str(v);
-        if (s.size == 0) {
-            s.p = "";
-        }
-        sqlite3_result_text(ctx, s.p, s.size, SQLITE_TRANSIENT);
+        RefStr *s = Value_vp(v);
+        sqlite3_result_text(ctx, s->c, s->size, SQLITE_TRANSIENT);
     } else if (r_type == fs->cls_bytes) {
-        Str s = fs->Value_str(v);
-        if (s.size == 0) {
-            s.p = "";
-        }
-        sqlite3_result_blob(ctx, s.p, s.size, SQLITE_TRANSIENT);
+        RefStr *s = Value_vp(v);
+        sqlite3_result_blob(ctx, s->c, s->size, SQLITE_TRANSIENT);
     } else if (r_type == fs->cls_null) {
         sqlite3_result_null(ctx);
     } else {

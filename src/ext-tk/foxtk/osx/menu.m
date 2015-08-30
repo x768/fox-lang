@@ -14,10 +14,10 @@ MenuHandle Menubar_new()
 void Window_set_menu(WndHandle wnd, MenuHandle menu)
 {
 }
-void Menu_add_submenu(MenuHandle menu, MenuHandle submenu, Str text)
+void Menu_add_submenu(MenuHandle menu, MenuHandle submenu, const char *text)
 {
 }
-void Menu_add_item(MenuHandle menu, Value *fn, Str text)
+void Menu_add_item(MenuHandle menu, Value *fn, const char *text)
 {
 }
 void Menu_add_separator(MenuHandle menu)

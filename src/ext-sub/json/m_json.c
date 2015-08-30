@@ -35,7 +35,7 @@ typedef struct {
     const char *end;
     int type;
 
-    mp_int mp_val;
+    BigInt bi_val;
     int32_t int_val;
     double real_val;
     Str str_val;
@@ -111,8 +111,8 @@ static void JSTok_parse_digit(JSTok *tk)
         errno = 0;
         tk->int_val = strtol(top, NULL, 10);
         if (errno != 0 || tk->int_val == INT32_MIN) {
-            mp_init(&tk->mp_val);
-            mp_read_radix(&tk->mp_val, (unsigned char*)top, 10);
+            fs->BigInt_init(&tk->bi_val);
+            fs->cstr_BigInt(&tk->bi_val, 10, top, -1);
             tk->type = JS_BIGINT;
         } else {
             tk->type = JS_INT;
@@ -383,11 +383,11 @@ static int json_encode_sub(StrBuf *buf, Value v, Mem *mem, Hash *hash, int mode,
     const RefNode *type = fs->Value_type(v);
 
     if (type == fs->cls_str) {
-        Str val = fs->Value_str(v);
+        RefStr *val = Value_vp(v);
         if (!fs->StrBuf_add_c(buf, '"')) {
             return FALSE;
         }
-        fs->add_backslashes_sub(buf, val.p, val.size, mode);
+        fs->add_backslashes_sub(buf, val->c, val->size, mode);
         if (!fs->StrBuf_add_c(buf, '"')) {
             return FALSE;
         }
@@ -523,10 +523,10 @@ static int json_encode_sub(StrBuf *buf, Value v, Mem *mem, Hash *hash, int mode,
     return TRUE;
 }
 
-static int serialize_parse_format(int *type, int *pretty, Str fmt)
+static int serialize_parse_format(int *type, int *pretty, const char *fmt_p, int fmt_size)
 {
-    const char *ptr = fmt.p;
-    const char *pend = ptr + fmt.size;
+    const char *ptr = fmt_p;
+    const char *pend = ptr + fmt_size;
 
     while (ptr < pend) {
         Str fm;
@@ -548,13 +548,13 @@ static int serialize_parse_format(int *type, int *pretty, Str fmt)
         if (fm.size > 0) {
             switch (fm.p[0]) {
             case 'a':
-                if (fm.size == 1 || Str_eq_p(fm, "ascii")) {
+                if (fm.size == 1 || str_eq(fm.p, fm.size, "ascii", -1)) {
                     *type = ADD_BACKSLASH_U_UCS2;
                     found = TRUE;
                 }
                 break;
             case 'p':
-                if (fm.size == 1 || Str_eq_p(fm, "pretty")) {
+                if (fm.size == 1 || str_eq(fm.p, fm.size, "pretty", -1)) {
                     *pretty = TRUE;
                     found = TRUE;
                 }
@@ -575,14 +575,16 @@ static int json_encode(Value *vret, Value *v, RefNode *node)
     StrBuf buf;
     Hash hash;
     int ret;
-    Str fmt = fs->Str_EMPTY;
+    RefStr *fmt;
     int type = ADD_BACKSLASH_UCS2;
     int pretty = FALSE;
 
     if (fg->stk_top > v + 2) {
-        fmt = fs->Value_str(v[2]);
+        fmt = Value_vp(v[2]);
+    } else {
+        fmt = fs->str_0;
     }
-    if (!serialize_parse_format(&type, &pretty, fmt)) {
+    if (!serialize_parse_format(&type, &pretty, fmt->c, fmt->size)) {
         return FALSE;
     }
 
@@ -626,22 +628,19 @@ static int parse_json_sub(Value *v, JSTok *tk)
     case JS_BIGINT: {
         RefInt *mp = fs->buf_new(fs->cls_int, sizeof(RefInt));
         *v = vp_Value(mp);
-        mp->mp = tk->mp_val;
+        mp->bi = tk->bi_val;
         JSTok_next(tk);
         break;
     }
-    case JS_FLOAT: {
-        RefFloat *rd = fs->buf_new(fs->cls_float, sizeof(RefFloat));
-        *v = vp_Value(rd);
-        rd->d = tk->real_val;
+    case JS_FLOAT:
+        *v = fs->float_Value(fs->cls_float, tk->real_val);
         JSTok_next(tk);
         break;
-    }
     case JS_STR:
         *v = fs->cstr_Value(fs->cls_str, tk->str_val.p, tk->str_val.size);
         JSTok_next(tk);
         break;
-    case JS_LB: {  // Array
+    case JS_LB: {  // List
         // 途中でthrowした時のことを考える
         RefArray *r = fs->refarray_new(0);
         *v = vp_Value(r);

@@ -52,7 +52,7 @@ static const char *ft_err_to_string(FT_Error err)
     return "?";
 }
 
-static int get_file_size(int *pret, Value reader)
+static int get_reader_file_size(int *pret, Value reader)
 {
     const RefNode *ret_type;
     int64_t ret;
@@ -121,7 +121,7 @@ static int ft_open_face_stream(Ref *r, int font_index)
     int size;
     FT_Error ret;
 
-    if (!get_file_size(&size, r->v[FONT_INDEX_SRC])) {
+    if (!get_reader_file_size(&size, r->v[FONT_INDEX_SRC])) {
         return FALSE;
     }
     stream = (FT_Stream)malloc(sizeof(FT_StreamRec));

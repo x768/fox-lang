@@ -1,5 +1,4 @@
 #include "fox_parse.h"
-#include "mplogic.h"
 #include <stdarg.h>
 
 
@@ -931,7 +930,7 @@ NORMAL:
                         cmp = Value_integral(v1);
                     } else if (Value_type(v1) == fs->cls_int) {
                         RefInt *ri = Value_vp(v1);
-                        if (ri->mp.sign) {
+                        if (ri->bi.sign) {
                             cmp = -1;
                         } else {
                             cmp = 1;

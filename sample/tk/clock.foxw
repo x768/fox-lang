@@ -9,7 +9,7 @@ class MyForm : Form
         this.update_time(null)
     }
     def update_time(e) {
-        this.title = sprintf(Locale('best'), "%{0:XX xx}", Time.now())
+        this.title = sprintf(BEST_LOCALE[0], "%{0:XX xx}", Time.now())
     }
 }
 

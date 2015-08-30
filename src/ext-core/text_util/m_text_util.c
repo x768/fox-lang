@@ -36,7 +36,7 @@ static char *init_mem_and_read_file(const char *path, Mem *mem)
         fs->throw_error_select(THROW_CANNOT_OPEN_FILE__STR, Str_new(path, -1));
         return NULL;
     }
-    size = fs->get_file_size(fh);
+    size = get_file_size(fh);
     if (size == -1 || size > fs->max_alloc) {
         fs->throw_error_select(THROW_CANNOT_OPEN_FILE__STR, Str_new(path, -1));
         return NULL;
@@ -114,8 +114,8 @@ static int replacer_new(Value *vret, Value *v, RefNode *node)
     v1_type = fs->Value_type(v[1]);
     if (v1_type == fs->cls_str) {
         // ファイルから読む
-        Str path = fs->Value_str(v[1]);
-        char *path_p = fs->resource_to_path(path, ".txt");
+        RefStr *path = Value_vp(v[1]);
+        char *path_p = fs->resource_to_path(Str_new(path->c, path->size), ".txt");
         char *data;
         RefMapReplace *rp;
 
@@ -142,7 +142,7 @@ static int replacer_new(Value *vret, Value *v, RefNode *node)
         for (i = 0; i < rm->entry_num; i++) {
             HashValueEntry *et;
             for (et = rm->entry[i]; et != NULL; et = et->next) {
-                Str key, val;
+                RefStr *key, *val;
                 // キー・値がStrまたはBytesでなければエラー
                 if (fs->Value_type(et->key) != fs->cls_str || fs->Value_type(et->val) != fs->cls_str) {
                     fs->throw_errorf(fs->mod_lang, "TypeError", "{\"key\":\"value\", ...} required");
@@ -150,15 +150,15 @@ static int replacer_new(Value *vret, Value *v, RefNode *node)
                 }
 
                 // 検索用のデータ構造
-                key = fs->Value_str(et->key);
-                val = fs->Value_str(et->val);
-                if (key.size > 0) {
-                    MapRepl **pp = &rp->map[key.p[0] & 0xFF];
+                key = Value_vp(et->key);
+                val = Value_vp(et->val);
+                if (key->size > 0) {
+                    MapRepl **pp = &rp->map[key->c[0] & 0xFF];
                     MapRepl *p = *pp;
 
                     // keyが長い順に並べる
                     while (p != NULL) {
-                        if (p->key.size <= key.size) {
+                        if (p->key.size <= key->size) {
                             break;
                         }
                         pp = &p->next;
@@ -166,8 +166,8 @@ static int replacer_new(Value *vret, Value *v, RefNode *node)
                     }
                     p = fs->Mem_get(&rp->mem, sizeof(MapRepl));
                     p->next = *pp;
-                    p->key = key;
-                    p->val = val;
+                    p->key = Str_new(key->c, key->size);
+                    p->val = Str_new(val->c, val->size);
                     *pp = p;
                 }
             }
@@ -188,21 +188,21 @@ static int replacer_close(Value *vret, Value *v, RefNode *node)
 static int replacer_replace(Value *vret, Value *v, RefNode *node)
 {
     RefMapReplace *rp = Value_vp(*v);
-    Str src = fs->Value_str(v[1]);
+    RefStr *src = Value_vp(v[1]);
     StrBuf buf;
     int i = 0;
 
-    fs->StrBuf_init_refstr(&buf, src.size);
+    fs->StrBuf_init_refstr(&buf, src->size);
 
-    while (i < src.size) {
-        int c = src.p[i] & 0xFF;
+    while (i < src->size) {
+        int c = src->c[i] & 0xFF;
         MapRepl *p;
-        int last = src.size - i;
+        int last = src->size - i;
         int ret;
         for (p = rp->map[c]; p != NULL; p = p->next) {
             // 残りの文字列長とkeyの長さを比較
             if (last >= p->key.size) {
-                if (memcmp(src.p + i, p->key.p, p->key.size) == 0) {
+                if (memcmp(src->c + i, p->key.p, p->key.size) == 0) {
                     break;
                 }
             }

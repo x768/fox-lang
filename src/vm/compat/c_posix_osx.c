@@ -7,26 +7,6 @@
 #include <errno.h>
 
 
-int64_t get_file_size(FileHandle fh)
-{
-    if (fh != -1) {
-#if defined(_LARGEFILE64_SOURCE) && _LFS64_LARGEFILE-0 && !defined(__APPLE__)
-        struct stat64 st;
-        if (fstat64(fh, &st) == -1) {
-            return -1;
-        }
-#else
-        struct stat st;
-        if (fstat(fh, &st) == -1) {
-            return -1;
-        }
-#endif
-        return st.st_size;
-    } else {
-        return -1;
-    }
-}
-
 int get_file_mtime(int64_t *tm, const char *fname)
 {
     struct stat st;
@@ -57,17 +37,23 @@ int exists_file(const char *file)
     }
 }
 
-int is_root_dir(Str path)
+int is_root_dir(const char *path_p, int path_size)
 {
-    if (path.size == 0) {
+    if (path_size < 0) {
+        path_size = strlen(path_p);
+    }
+    if (path_size == 0) {
         return TRUE;
     } else {
         return FALSE;
     }
 }
-int is_absolute_path(Str path)
+int is_absolute_path(const char *path_p, int path_size)
 {
-    if (path.size > 0 && path.p[0] == '/') {
+    if (path_size < 0) {
+        path_size = strlen(path_p);
+    }
+    if (path_size > 0 && path_p[0] == '/') {
         return TRUE;
     } else {
         return FALSE;
@@ -76,12 +62,15 @@ int is_absolute_path(Str path)
 
 // 通常、ディレクトリ名は最後の/または\を省略して表現するが、
 // rootディレクトリは/またはC:\で表すため、表示するときだけ変換する
-Str get_root_name(Str path)
+Str get_root_name(const char *path_p, int path_size)
 {
-    if (path.size == 0) {
+    if (path_size < 0) {
+        path_size = strlen(path_p);
+    }
+    if (path_size == 0) {
         return Str_new("/", 1);
     } else {
-        return path;
+        return Str_new(path_p, path_size);
     }
 }
 

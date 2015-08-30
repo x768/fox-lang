@@ -51,15 +51,15 @@ static int process_new(Value *vret, Value *v, RefNode *node)
         goto ERROR_END;
     }
     if (fg->stk_top > v + 3) {
-        Str mode_s = fs->Value_str(v[3]);
-        if (Str_eq_p(mode_s, "r")) {
+        RefStr *mode_s = Value_vp(v[3]);
+        if (str_eq(mode_s->c, mode_s->size, "r", -1)) {
             flags = STREAM_READ;
-        } else if (Str_eq_p(mode_s, "w")) {
+        } else if (str_eq(mode_s->c, mode_s->size, "w", -1)) {
             flags = STREAM_WRITE;
-        } else if (Str_eq_p(mode_s, "rw")) {
+        } else if (str_eq(mode_s->c, mode_s->size, "rw", -1)) {
             flags = STREAM_READ|STREAM_WRITE;
         } else {
-            fs->throw_errorf(fs->mod_lang, "ValueError", "Unknown mode %Q", mode_s);
+            fs->throw_errorf(fs->mod_lang, "ValueError", "Unknown mode %q", mode_s->c);
             goto ERROR_END;
         }
     } else {

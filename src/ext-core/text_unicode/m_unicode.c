@@ -307,10 +307,10 @@ static void StrBuf_add_i32(StrBuf *s, uint32_t i)
  */
 static int breaks_split(Value *vret, Value *v, RefNode *node)
 {
-    Str src = fs->Value_str(v[1]);
+    RefStr *src = Value_vp(v[1]);
     int type = name_to_break_type(Value_vp(v[2]));
-    const char *p = src.p;
-    const char *end = p + src.size;
+    const char *p = src->c;
+    const char *end = p + src->size;
     int cnt = 0;
     RefArray *arr;
 
@@ -445,23 +445,23 @@ static int breakiter_next(Value *vret, Value *v, RefNode *node)
     Ref *r = Value_ref(*v);
     int src_begin = Value_integral(r->v[BREAKITER_BEGIN]);
     int src_end = Value_integral(r->v[BREAKITER_END]);
-    Str src = fs->Value_str(r->v[BREAKITER_SRC]);
+    RefStr *src = Value_vp(r->v[BREAKITER_SRC]);
     int ret = FALSE;
 
     switch (Value_integral(r->v[BREAKITER_TYPE])) {
     case BREAKS_POINT: {
-        const char *p = src.p + src_end;
-        const char *end = src.p + src.size;
+        const char *p = src->c + src_end;
+        const char *end = src->c + src->size;
         src_begin = src_end;
         fs->utf8_next(&p, end);
-        src_end = p - src.p;
+        src_end = p - src->c;
         
         ret = (src_begin < src_end);
         break;
     }
     case BREAKS_CHAR: {
-        const char *p = src.p + src_end;
-        const char *end = src.p + src.size;
+        const char *p = src->c + src_end;
+        const char *end = src->c + src->size;
         src_begin = src_end;
 
         if (p < end) {
@@ -479,7 +479,7 @@ static int breakiter_next(Value *vret, Value *v, RefNode *node)
             }
             ret = TRUE;
         }
-        src_end = p - src.p;
+        src_end = p - src->c;
         break;
     }
     case BREAKS_WORD:
@@ -493,7 +493,7 @@ static int breakiter_next(Value *vret, Value *v, RefNode *node)
     r->v[BREAKITER_END] = int32_Value(src_end);
 
     if (ret) {
-        *vret = fs->cstr_Value(fs->cls_str, src.p + src_begin, src_end - src_begin);
+        *vret = fs->cstr_Value(fs->cls_str, src->c + src_begin, src_end - src_begin);
     } else {
         fs->throw_stopiter();
         return FALSE;
@@ -522,10 +522,10 @@ static int unicode_category(Value *vret, Value *v, RefNode *node)
             // 分離子
             "Zl" "Zp" "Zs";
 
-    Str src = fs->Value_str(v[1]);
+    RefStr *src = Value_vp(v[1]);
 
-    if (src.size > 0) {
-        int type = ch_get_category(fs->utf8_codepoint_at(src.p));
+    if (src->size > 0) {
+        int type = ch_get_category(fs->utf8_codepoint_at(src->c));
         *vret = fs->cstr_Value(fs->cls_str, &type_name[type * 2], 2);
     } else {
         fs->throw_errorf(fs->mod_lang, "ValueError", "string length == 0");

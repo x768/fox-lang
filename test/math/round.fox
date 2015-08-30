@@ -1,0 +1,26 @@
+import util.assert
+import math
+
+assert_equal round_down(1.9d), 1d
+assert_equal round_down(-1.9d), -1d
+assert_equal round_up(1.1d), 2d
+assert_equal round_up(-1.1d), -2d
+assert_equal round_floor(1.9d), 1d
+assert_equal round_floor(-1.9d), -2d
+assert_equal round_ceiling(1.1d), 2d
+assert_equal round_ceiling(-1.1d), -1d
+
+assert_equal round_half_down(1.5d), 1d
+assert_equal round_half_down(1.6d), 2d
+assert_equal round_half_down(2.5d), 2d
+assert_equal round_half_down(2.6d), 3d
+
+assert_equal round_half_up(1.4d), 1d
+assert_equal round_half_up(1.5d), 2d
+assert_equal round_half_up(2.4d), 2d
+assert_equal round_half_up(2.5d), 3d
+
+assert_equal round_half_even(1.4d), 1d
+assert_equal round_half_even(1.5d), 2d
+assert_equal round_half_even(2.5d), 2d
+assert_equal round_half_even(2.6d), 3d

@@ -1,5 +1,0 @@
-locale=pa_Arab
-pa:پنجاب
-Arab:العربية
-Guru:گُرمُکھی
-PK:پکستان

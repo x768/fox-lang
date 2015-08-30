@@ -29,11 +29,10 @@ static int parse_args(ArgumentInfo *ai, int argc, const char **argv)
     if (argc >= 2) {
         const char *srcfile = NULL;
         const char *arg_file = argv[1];
-        Str src = Str_new(arg_file, -1);
         char *pwd;
 
-        if (is_absolute_path(src)) {
-            Str curdir_s = base_dir_with_sep(src.p, src.size);
+        if (is_absolute_path(arg_file, -1)) {
+            Str curdir_s = base_dir_with_sep(arg_file, -1);
             char *curdir_p = str_dup_p(curdir_s.p, curdir_s.size, NULL);
             set_current_directory(curdir_p);
             free(curdir_p);
