@@ -1,0 +1,10 @@
+import foxtk
+
+def callback(e)
+{
+    puts e.action, ":", e.file
+    STDIO.flush()
+}
+
+let m = DirMonitor("monitor", callback)
+m.wait()

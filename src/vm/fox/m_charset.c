@@ -65,6 +65,7 @@ static void load_charset_alias_file(const char *filename)
             break;
         }
         case T_NL:
+        case T_SEMICL:
             Tok_simple_next(&tk);
             break;
         case T_EOF:
@@ -151,6 +152,7 @@ static void load_charset_info_file(const char *filename)
             break;
         }
         case T_NL:
+        case T_SEMICL:
             Tok_simple_next(&tk);
             goto LINE_BEGIN;
         case T_EOF:

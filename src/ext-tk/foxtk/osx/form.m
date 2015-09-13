@@ -57,9 +57,8 @@ int window_set_icon(WndHandle window, Ref *r, RefImage *icon)
 {
     return TRUE;
 }
-int window_message_loop(int *loop)
+int window_message_loop()
 {
-    *loop = TRUE;
     return TRUE;
 }
 

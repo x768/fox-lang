@@ -733,7 +733,7 @@ static void Tok_parse_double_bin(TokValue *v, Tok *tk, int term)
             if (ch == term) {
                 tk->p++;
                 v->u.end = dst;
-                v->type = TL_BIN;
+                v->type = TL_BYTES;
                 return;
             }
             tk->p++;
@@ -788,7 +788,7 @@ static void Tok_parse_binhex(TokValue *v, Tok *tk)
             case '"':
                 tk->p++;
                 v->u.end = dst;
-                v->type = TL_BIN;
+                v->type = TL_BYTES;
                 return;
             case '\r':
                 throw_errorf(fs->mod_lang, "TokenError", "Illigal character '\\r'");
@@ -1348,7 +1348,7 @@ START:
                 tk->prev_id = TRUE;
                 break;
             case 'b':  // b'abc'
-                Tok_parse_single_str(v, tk, term, TL_BIN);
+                Tok_parse_single_str(v, tk, term, TL_BYTES);
                 break;
             case 'B':  // b"abc"
                 Tok_parse_double_bin(v, tk, term);
@@ -1464,7 +1464,7 @@ START:
                 // b"hello \0 \xFF"
                 Tok_parse_double_bin(v, tk, '"');
             } else {
-                Tok_parse_single_str(v, tk, '\'', TL_BIN);
+                Tok_parse_single_str(v, tk, '\'', TL_BYTES);
             }
             tk->prev_id = TRUE;
         } else if (ch == 'x' && ch2 == '"') {
@@ -1505,7 +1505,7 @@ void Tok_next(Tok *tk)
 
     // 値の変換が必要な項目のみ
     switch (tk->v.type) {
-    case TL_BIN:
+    case TL_BYTES:
     case TL_STR:
     case TL_STRCAT_BEGIN:
     case TL_STRCAT_MID:
@@ -1677,7 +1677,7 @@ void Tok_simple_next(Tok *tk)
 
     // 値の変換が必要な項目のみ
     switch (tk->v.type) {
-    case TL_BIN:
+    case TL_BYTES:
     case TL_STR:
     case TL_CONST:
     case TL_CLASS:

@@ -45,6 +45,39 @@ void SimpleHash_add_node(SimpleHash **hash, Mem *mem, const char *name, MDNode *
     h->node = node;
     *pp = h;
 }
+static void MDNode_tostr_sub(StrBuf *sb, MDNode *node)
+{
+    for (; node != NULL; node = node->next) {
+        if (node->type == MD_TEXT || node->type == MD_CODE) {
+            fs->StrBuf_add(sb, node->cstr, -1);
+        }
+        if (node->child != NULL) {
+            MDNode_tostr_sub(sb, node->child);
+        }
+    }
+}
+static void MDNode_tostr(StrBuf *sb, MDNode *node)
+{
+    if (node->type == MD_TEXT || node->type == MD_CODE) {
+        fs->StrBuf_add(sb, node->cstr, -1);
+    } else if (node->child != NULL) {
+        MDNode_tostr_sub(sb, node->child);
+    }
+}
+static void cstr_to_heading_id(StrBuf *sb, const char *p, int size)
+{
+    int i;
+    for (i = 0; i < size; i++) {
+        int ch = p[i] & 0xFF;
+        if (isalnumu_fox(ch) || ch == '-') {
+            fs->StrBuf_add_c(sb, ch);
+        } else {
+            char cbuf[8];
+            sprintf(cbuf, ".%02X", ch);
+            fs->StrBuf_add(sb, cbuf, 3);
+        }
+    }
+}
 
 //////////////////////////////////////////////////////////////////////////////////////////
 
@@ -115,6 +148,19 @@ static int xml_convert_line(Ref *r, MDNode *node)
             xmlelem_add(child, Value_vp(fs->cstr_Value(cls_xmltext, node->cstr, -1)));
             break;
         }
+        case MD_LINK_FOOTNOTE: {
+            Ref *sup = xmlelem_new("sup");
+            Ref *link = xmlelem_new("a");
+            char ctext[16];
+            char clink[16];
+            sprintf(ctext, "[%d]", node->opt);
+            sprintf(clink, "#note.%d", node->opt);
+            xmlelem_add_attr(link, "href", clink);
+            xmlelem_add(link, Value_vp(fs->cstr_Value(cls_xmltext, ctext, -1)));
+            xmlelem_add(r, sup);
+            xmlelem_add(sup, link);
+            break;
+        }
         case MD_EM:
         case MD_STRONG:
         case MD_STRIKE: {
@@ -157,15 +203,22 @@ static int xml_source_code(Ref *r, const char *code, const char *type)
     xmlelem_add(r, Value_vp(fs->cstr_Value(cls_xmltext, code, -1)));
     return TRUE;
 }
-static int xml_convert_listitem(Ref *r, MDNode *node)
+static int xml_convert_listitem(Ref *r, MDNode *node, int gen_id)
 {
     Ref *prev_li = NULL;
+    int footnote_id = 1;
 
     for (; node != NULL; node = node->next) {
         switch (node->type) {
         case MD_LIST_ITEM: {
             Ref *li = xmlelem_new("li");
             xmlelem_add(r, li);
+            if (gen_id) {
+                char cbuf[16];
+                sprintf(cbuf, "note.%d", footnote_id);
+                xmlelem_add_attr(li, "id", cbuf);
+                footnote_id++;
+            }
             if (!xml_convert_line(li, node->child)) {
                 return FALSE;
             }
@@ -177,7 +230,7 @@ static int xml_convert_listitem(Ref *r, MDNode *node)
             if (prev_li != NULL) {
                 Ref *list = xmlelem_new(node->type == MD_UNORDERD_LIST ? "ul" : "ol");
                 xmlelem_add(prev_li, list);
-                if (!xml_convert_listitem(list, node->child)) {
+                if (!xml_convert_listitem(list, node->child, FALSE)) {
                     return FALSE;
                 }
             }
@@ -192,7 +245,7 @@ static int xml_from_markdown(Ref *root, Markdown *r, MDNode *node)
         switch (node->type) {
         case MD_HEADING: {
             char tag[4];
-            int head = node->opt + r->heading - 1;
+            int head = node->opt + r->heading_level - 1;
             Ref *heading;
             tag[0] = 'h';
             tag[1] = (head <= 6 ? '0' + head : '6');
@@ -213,7 +266,19 @@ static int xml_from_markdown(Ref *root, Markdown *r, MDNode *node)
         case MD_ORDERD_LIST: {
             Ref *list = xmlelem_new(node->type == MD_UNORDERD_LIST ? "ul" : "ol");
             xmlelem_add(root, list);
-            if (!xml_convert_listitem(list, node->child)) {
+            if (!xml_convert_listitem(list, node->child, FALSE)) {
+                return FALSE;
+            }
+            break;
+        }
+        case MD_FOOTNOTE_LIST: {
+            Ref *div = xmlelem_new("div");
+            Ref *list;
+            xmlelem_add_attr(div, "class", "footnote");
+            list = xmlelem_new("ol");
+            xmlelem_add(root, div);
+            xmlelem_add(div, list);
+            if (!xml_convert_listitem(list, node->child, TRUE)) {
                 return FALSE;
             }
             break;
@@ -310,7 +375,11 @@ static int markdown_new(Value *vret, Value *v, RefNode *node)
 
     fs->Mem_init(&md->mem, 1024);
     md->tabstop = 4;
-    md->heading = 1;
+    md->heading_level = 1;
+    md->footnote_id = 1;
+
+    md->heading_p = &md->heading;
+    md->footnote_p = &md->footnote;
 
     return TRUE;
 }
@@ -373,7 +442,7 @@ static int markdown_tabstop(Value *vret, Value *v, RefNode *node)
     }
     return TRUE;
 }
-static int markdown_heading(Value *vret, Value *v, RefNode *node)
+static int markdown_heading_level(Value *vret, Value *v, RefNode *node)
 {
     Ref *r = Value_vp(*v);
     Markdown *md = Value_ptr(r->v[INDEX_MARKDOWN_MD]);
@@ -383,10 +452,27 @@ static int markdown_heading(Value *vret, Value *v, RefNode *node)
             fs->throw_errorf(fs->mod_lang, "ValueError", "Out of range (1 - 6)");
             return FALSE;
         }
-        md->heading = (int)i64;
+        md->heading_level = (int)i64;
     } else {
-        *vret = int32_Value(md->heading);
+        *vret = int32_Value(md->heading_level);
     }
+    return TRUE;
+}
+static int markdown_heading_list(Value *vret, Value *v, RefNode *node)
+{
+    Ref *r = Value_vp(*v);
+    Markdown *md = Value_ptr(r->v[INDEX_MARKDOWN_MD]);
+    RefArray *ra = fs->refarray_new(0);
+    MDNodeLink *link;
+
+    *vret = vp_Value(ra);
+    for (link = md->heading; link != NULL; link = link->next) {
+        StrBuf sb;
+        fs->StrBuf_init_refstr(&sb, 0);
+        MDNode_tostr(&sb, link->node);
+        *fs->refarray_push(ra) = fs->StrBuf_str_Value(&sb, fs->cls_str);
+    }
+
     return TRUE;
 }
 
@@ -396,6 +482,9 @@ static int markdown_compile(Value *vret, Value *v, RefNode *node)
     Markdown *md = Value_ptr(r->v[INDEX_MARKDOWN_MD]);
 
     if (!parse_markdown(md, Value_cstr(v[1]))) {
+        return FALSE;
+    }
+    if (!link_markdown(r)) {
         return FALSE;
     }
 
@@ -426,9 +515,6 @@ static int markdown_make_xml(Value *vret, Value *v, RefNode *node)
         return FALSE;
     }
 
-    if (!link_markdown(r)) {
-        return FALSE;
-    }
     root = xmlelem_new(root_name->c);
     *vret = vp_Value(root);
     if (!xml_from_markdown(root, md, md->root)) {
@@ -453,7 +539,7 @@ static int md_escape(Value *vret, Value *v, RefNode *node)
         case '[': case ']':
         case '(': case ')':
         case '`': case '~': case '_': case '*':
-        case '&':
+        case '&': case '|': case ':':
         case '\\':
             fs->StrBuf_add_c(&buf, '\\');
             fs->StrBuf_add_c(&buf, ch);
@@ -469,6 +555,19 @@ static int md_escape(Value *vret, Value *v, RefNode *node)
     return TRUE;
 }
 
+static int md_heading_id(Value *vret, Value *v, RefNode *node)
+{
+    StrBuf buf;
+    RefStr *src = Value_vp(v[1]);
+
+    fs->StrBuf_init(&buf, src->size);
+    cstr_to_heading_id(&buf, src->c, src->size);
+    *vret = fs->cstr_Value(fs->cls_str, buf.p, buf.size);
+    StrBuf_close(&buf);
+
+    return TRUE;
+}
+
 /////////////////////////////////////////////////////////////////////////////////////////
 
 static void define_function(RefNode *m)
@@ -477,13 +576,19 @@ static void define_function(RefNode *m)
 
     n = fs->define_identifier(m, m, "md_escape", NODE_FUNC_N, 0);
     fs->define_native_func_a(n, md_escape, 1, 1, NULL, fs->cls_str);
+
+    n = fs->define_identifier(m, m, "md_heading_id", NODE_FUNC_N, 0);
+    fs->define_native_func_a(n, md_heading_id, 1, 1, NULL, fs->cls_str);
 }
 static void define_class(RefNode *m)
 {
     RefNode *n;
     RefNode *cls;
 
-    cls = fs->define_identifier(m, m, "Markdown", NODE_CLASS, NODEOPT_ABSTRACT);
+    RefNode *cls_markdown = fs->define_identifier(m, m, "Markdown", NODE_CLASS, NODEOPT_ABSTRACT);
+
+
+    cls = cls_markdown;
     n = fs->define_identifier_p(m, cls, fs->str_new, NODE_NEW_N, 0);
     fs->define_native_func_a(n, markdown_new, 0, 0, cls);
 
@@ -505,10 +610,13 @@ static void define_class(RefNode *m)
     fs->define_native_func_a(n, markdown_tabstop, 0, 0, NULL);
     n = fs->define_identifier(m, cls, "tabstop=", NODE_FUNC_N, 0);
     fs->define_native_func_a(n, markdown_tabstop, 1, 1, NULL, fs->cls_int);
-    n = fs->define_identifier(m, cls, "heading", NODE_FUNC_N, NODEOPT_PROPERTY);
-    fs->define_native_func_a(n, markdown_heading, 0, 0, NULL);
-    n = fs->define_identifier(m, cls, "heading=", NODE_FUNC_N, 0);
-    fs->define_native_func_a(n, markdown_heading, 1, 1, NULL, fs->cls_int);
+    n = fs->define_identifier(m, cls, "heading_level", NODE_FUNC_N, NODEOPT_PROPERTY);
+    fs->define_native_func_a(n, markdown_heading_level, 0, 0, NULL);
+    n = fs->define_identifier(m, cls, "heading_level=", NODE_FUNC_N, 0);
+    fs->define_native_func_a(n, markdown_heading_level, 1, 1, NULL, fs->cls_int);
+    n = fs->define_identifier(m, cls, "heading_list", NODE_FUNC_N, NODEOPT_PROPERTY);
+    fs->define_native_func_a(n, markdown_heading_list, 0, 0, NULL);
+
 
     n = fs->define_identifier(m, cls, "compile", NODE_FUNC_N, 0);
     fs->define_native_func_a(n, markdown_compile, 1, 1, NULL, fs->cls_str);

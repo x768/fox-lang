@@ -1926,14 +1926,22 @@ static int xml_document_save(Value *vret, Value *v, RefNode *node)
     if (!stream_write_xmldata(writer, &buf, &xof)) {
         goto ERROR_END;
     }
-    if (!node_tostr_xml(&buf, writer, r->v[INDEX_DOCUMENT_ROOT], &xof, (xof.pretty ? 0 : -1))) {
-        goto ERROR_END;
-    }
-    if (xof.pretty && !fs->StrBuf_add_c(&buf, '\n')) {
-        goto ERROR_END;
-    }
-    if (!stream_write_xmldata(writer, &buf, &xof)) {
-        goto ERROR_END;
+    {
+        RefArray *ra = Value_vp(r->v[INDEX_DOCUMENT_LIST]);
+        int i;
+        for (i = 0; i < ra->size; i++) {
+            if (!node_tostr_xml(&buf, VALUE_NULL, ra->p[i], &xof, (xof.pretty ? 0 : -1))) {
+                goto ERROR_END;
+            }
+            if (xof.pretty) {
+                if (!fs->StrBuf_add_c(&buf, '\n')) {
+                    goto ERROR_END;
+                }
+            }
+            if (!stream_write_xmldata(writer, &buf, &xof)) {
+                goto ERROR_END;
+            }
+        }
     }
     StrBuf_close(&buf);
     fs->Value_dec(writer);

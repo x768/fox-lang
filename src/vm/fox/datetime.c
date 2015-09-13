@@ -322,7 +322,7 @@ TimeOffset *TimeZone_offset_local(RefTimeZone *tz, int64_t tm)
 /////////////////////////////////////////////////////////////////////////////////////////////
 
 // グレゴリオ歴を過去に遡って適用する
-void Time_to_Calendar(Calendar *cal, int64_t timer)
+void Timestamp_to_DateTime(DateTime *dt, int64_t timer)
 {
     int64_t y = 1970;
     int64_t days = timer / MSECS_PER_DAY;
@@ -335,13 +335,13 @@ void Time_to_Calendar(Calendar *cal, int64_t timer)
         rem += MSECS_PER_DAY;
     }
 
-    cal->day_of_week = (days + 4) % 7;
-    if (cal->day_of_week < 0) {
-        cal->day_of_week += 7;
+    dt->d.day_of_week = (days + 4) % 7;
+    if (dt->d.day_of_week < 0) {
+        dt->d.day_of_week += 7;
     }
     // ISO 8601
-    if (cal->day_of_week == 0) {
-        cal->day_of_week = 7;
+    if (dt->d.day_of_week == 0) {
+        dt->d.day_of_week = 7;
     }
 
     while (days < 0 || days >= (IS_LEAP_YEAR(y) ? 366 : 365)) {
@@ -351,8 +351,8 @@ void Time_to_Calendar(Calendar *cal, int64_t timer)
             - LEAPS_THRU_END_OF(y - 1));
         y = yg;
     }
-    cal->year = y;
-    cal->day_of_year = days + 1;
+    dt->d.year = y;
+    dt->d.day_of_year = days + 1;
 
     ip = mon_yday[IS_LEAP_YEAR(y) ? 1 : 0];
     month = 11;
@@ -361,29 +361,30 @@ void Time_to_Calendar(Calendar *cal, int64_t timer)
     }
 
     days -= ip[month];
-    cal->month = month + 1;
-    cal->day_of_month = days + 1;
+    dt->d.month = month + 1;
+    dt->d.day_of_month = days + 1;
 
-    cal->hour = rem / MSECS_PER_HOUR;
+    dt->t.hour = rem / MSECS_PER_HOUR;
     rem %= MSECS_PER_HOUR;
-    cal->minute = rem / MSECS_PER_MINUTE;
+    dt->t.minute = rem / MSECS_PER_MINUTE;
     rem %= MSECS_PER_MINUTE;
-    cal->second = rem / MSECS_PER_SECOND;
-    cal->millisec = rem % MSECS_PER_SECOND;
+    dt->t.second = rem / MSECS_PER_SECOND;
+    dt->t.millisec = rem % MSECS_PER_SECOND;
 }
 
 // year, month, day_of_month -> int64_t
-void Calendar_to_Time(int64_t *timer, const Calendar *cal)
+void DateTime_to_Timestamp(int64_t *timer, const DateTime *dt)
 {
     enum {
         JD_1969 = 719499,
     };
 
     int64_t julius;  // ユリウス通日（1969-01-01 == 0）
-    int64_t y = cal->year;
-    int64_t m = cal->month - 2;
-    int64_t d = cal->day_of_month;
+    int64_t y = dt->d.year;
+    int64_t m = dt->d.month - 2;
+    int64_t d = dt->d.day_of_month;
 
+    // 1～12 → 11,12(last year), 1, 2, .. 10
     // 月が1～12の範囲外の場合、正規化する
     if (m > 12) {
         m--;
@@ -402,7 +403,7 @@ void Calendar_to_Time(int64_t *timer, const Calendar *cal)
 
     // TODO year < 0
     julius = (36525 * y / 100) + (y / 400) - (y / 100) + (3059 * m / 100) + d - JD_1969;
-    *timer = julius * MSECS_PER_DAY + cal->hour * MSECS_PER_HOUR + cal->minute * MSECS_PER_MINUTE + cal->second * MSECS_PER_SECOND + cal->millisec;
+    *timer = julius * MSECS_PER_DAY + dt->t.hour * MSECS_PER_HOUR + dt->t.minute * MSECS_PER_MINUTE + dt->t.second * MSECS_PER_SECOND + dt->t.millisec;
 }
 
 static int get_days_of_month(int year, int month)
@@ -420,56 +421,56 @@ static int get_days_of_month(int year, int month)
         return 31;
     }
 }
-void Calendar_adjust(Calendar *cal)
+void DateTime_adjust(DateTime *dt)
 {
     int64_t i_tm;
-    Calendar_to_Time(&i_tm, cal);
-    Time_to_Calendar(cal, i_tm);
+    DateTime_to_Timestamp(&i_tm, dt);
+    Timestamp_to_DateTime(dt, i_tm);
 }
 // 2010-01-31 + 1months => 2010-02-28
-void Calendar_adjust_month(Calendar *cal)
+void Date_adjust_month(Date *dt)
 {
-    if (cal->month < 1 || cal->month > 12) {
-        int y = (cal->month - 1) / 12;
-        int m = (cal->month - 1) % 12;
-        if (cal->month < 1) {
+    if (dt->month < 1 || dt->month > 12) {
+        int y = (dt->month - 1) / 12;
+        int m = (dt->month - 1) % 12;
+        if (dt->month < 1) {
             y--;
         }
         if (m < 0) {
             m += 12;
         }
-        cal->year += y;
-        cal->month = m + 1;
+        dt->year += y;
+        dt->month = m + 1;
     }
     {
-        int dom = get_days_of_month(cal->year, cal->month);
-        if (cal->day_of_month > dom) {
-            cal->day_of_month = dom;
+        int dom = get_days_of_month(dt->year, dt->month);
+        if (dt->day_of_month > dom) {
+            dt->day_of_month = dom;
         }
     }
 }
-void Calendar_set_isoweek(Calendar *cal, int year, int week, int day_of_week)
+void Date_set_isoweek(Date *dt, int year, int week, int day_of_week)
 {
 }
-void Calendar_get_isoweek(int *pyear, int *pweek, const Calendar *cal)
+void Date_get_isoweek(int *pyear, int *pweek, const Date *dt)
 {
-    int year = cal->year;
+    int year = dt->year;
     int week = 1;
 
     // 今年の01-04の曜日 (月曜=0)
-    int wod14 = (cal->day_of_week - (cal->day_of_year - 4) + 53*7) % 7;
+    int wod14 = (dt->day_of_week - (dt->day_of_year - 4) + 53*7) % 7;
     // 今年の01-04を含む週の月曜日(day of year)
     int mon14 = 4 - wod14;
 
-    if (cal->day_of_year < mon14) {
+    if (dt->day_of_year < mon14) {
         // 前年の01-04の曜日 (月曜=0)
-        int wod14_prev = (wod14 + (IS_LEAP_YEAR(cal->year - 1) ? 5 : 6)) % 7;
-        int mon14_prev = mon14 - (IS_LEAP_YEAR(cal->year - 1) ? 366 : 365) - wod14_prev;
+        int wod14_prev = (wod14 + (IS_LEAP_YEAR(dt->year - 1) ? 5 : 6)) % 7;
+        int mon14_prev = mon14 - (IS_LEAP_YEAR(dt->year - 1) ? 366 : 365) - wod14_prev;
         
-        year = cal->year - 1;
-        week = (cal->day_of_year - mon14_prev) / 7;
+        year = dt->year - 1;
+        week = (dt->day_of_year - mon14_prev) / 7;
     } else {
-        if (cal->day_of_year > 51 * 7) {
+        if (dt->day_of_year > 51 * 7) {
         }
     }
 

@@ -1,54 +1,44 @@
-application/cdfv2-corrupt:\xD0\xCF\x11\xE0\xA1\xB1\x1A\xE1
-application/font-woff:wOFF
-application/pdf:%PDF-1.
-application/vnd.ms-cab-compressed:MSCF\0\0\0\0
-application/x-7z-compressed:7z\xBC\xAF\x27\x1C
-application/x-bzip:BZh
-application/x-fox-object:\x89fox\r\n\0\0
-application/x-gzip:\x1F\x8B
-application/x-ms-dos-executable:MZ
-application/x-perl:#!/usr/bin/perl	#!/usr/bin/env perl
-application/x-rar:Rar!
-application/x-shellscript:#!/bin/sh	#!/usr/bin/env sh
-application/x-shockwave-flash:FWS	CWS
-application/x-sqlite3:SQLite format 3
-application/x-xz:\xFD7zXZ\0
-application/xml:<?xml 	\xEF\xBB\xBF<?xml	\xFF\xFE<\0?\0x\0m\0l\0 \0	\xFE\xFF\0<\0?\0x\0m\0l\0 
-application/zip:PK\x03\x04	PK\x05\x06
-audio/basic:.snd
-audio/midi:MThd
-audio/mpeg:\xFF\xFA	\xFF\xFB	ID3
-image/bmp:BM
-{:\xFF\xD8
-image/jpeg:6	JFIF
-image/jpeg:6	Exif
-}
-image/gif:GIF87a	GIF89a
-image/png:\x89PNG\r\n
-image/tiff:MM	II
-image/vnd.microsoft.icon:\0\0\x01\0
-image/x-portable-bitmap:P1	P4
-image/x-portable-graymap:P2	P5
-image/x-portable-pixmap:P3	P6
-text/html:<!DOCTYPE 	<!doctype 
-video/x-flv:FLV
-{:OggS
-audio/x-vorbis+ogg:28	vorbis
-audio/x-speex+ogg:28	Speex  
-audio/x-flac+ogg:28	FLAC
-audio/x-flac+ogg:28	fLaC
-}
-{:RIFF
-audio/x-wav:8	WAVE
-audio/x-wav:8	WAV 
-image/x-webp:8	WEBP
-video/x-msvideo:8	AVI 
-}
-{:
-application/x-lha:2	-lh
-video/mp4:4	ftypisom
-video/mp4:4	ftypmp42
-video/mp4:4	ftypMSNV
-video/mp4:4	ftypM4V 
-video/mp4:4	ftypf4v 
-}
+"application/cdfv2-corrupt" = b"\xD0\xCF\x11\xE0\xA1\xB1\x1A\xE1"
+"application/font-woff" = b"wOFF"
+"application/pdf" = b"%PDF-1."
+"application/vnd.ms-cab-compressed" = b"MSCF\0\0\0\0"
+"application/x-7z-compressed" = b"7z\xBC\xAF\x27\x1C"
+"application/x-bzip" = b"BZh"
+"application/x-executable" = b"\x7FELF"
+"application/x-fox-object" = b"\x89fox\r\n\0\0"
+"application/x-gzip" = b"\x1F\x8B"
+"application/x-lha" = 2 b"-lh"
+"application/x-ms-dos-executable" = b"MZ"
+"application/x-perl" = b"#!/usr/bin/perl" | b"#!/usr/bin/env perl"
+"application/x-rar" = b"Rar!"
+"application/x-shellscript" = b"#!/bin/sh" | b"#!/usr/bin/env sh"
+"application/x-shockwave-flash" = b"FWS" | b"CWS"
+"application/x-sqlite3" = b"SQLite format 3"
+"application/x-xz" = b"\xFD7zXZ\0"
+"application/xml" = b"<?xml " | b"\xEF\xBB\xBF<?xml " | b"\xFF\xFE<\0?\0x\0m\0l\0 \0" | b"\xFE\xFF\0<\0?\0x\0m\0l\0 "
+"application/zip" = b"PK\x03\x04" | b"PK\x05\x06"
+
+"audio/basic" = b".snd"
+"audio/midi" = b"MThd"
+"audio/mpeg" = b"\xFF\xFA" | b"\xFF\xFB" | b"ID3"
+"audio/x-flac+ogg" = b"OggS" 28	b"FLAC" | b"OggS" 28 b"fLaC"
+"audio/x-speex+ogg" = b"OggS" 28 b"Speex  "
+"audio/x-vorbis+ogg" = b"OggS" 28 b"vorbis"
+"audio/x-wav" = b"RIFF" 8 b"WAVE" | b"RIFF" 8 b"WAV "
+
+"image/bmp" = b"BM"
+"image/jpeg" = b"\xFF\xD8"
+"image/gif" = b"GIF87a" | b"GIF89a"
+"image/png" = b"\x89PNG\r\n"
+"image/tiff" = b"MM" | b"II"
+"image/vnd.microsoft.icon" = b"\0\0\x01\0"
+"image/x-portable-bitmap" = b"P1" | b"P4"
+"image/x-portable-graymap" = b"P2" | b"P5"
+"image/x-portable-pixmap" = b"P3" | b"P6"
+"image/x-webp" = b"RIFF" 8 b"WEBP"
+
+"text/html" = b"<!DOCTYPE " | b"<!doctype "
+
+"video/mp4" = 4 b"ftypisom" | 4 b"ftypmp42" | 4 b"ftypMSNV" | 4 b"ftypM4V" | 4 b"ftypf4v"
+"video/x-flv" = b"FLV"
+"video/x-msvideo" = b"RIFF" 8 b"AVI "

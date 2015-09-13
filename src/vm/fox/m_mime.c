@@ -1,4 +1,5 @@
 #include "fox_vm.h"
+#include "fox_parse.h"
 #include <errno.h>
 #include <stdio.h>
 #include <string.h>
@@ -52,8 +53,8 @@ typedef struct Magic
     struct Magic *next;
     struct Magic *sub;
     int offset;
-    int size;
-    const char *buf;
+
+    Str s;
     RefStr *mime;
 } Magic;
 
@@ -843,137 +844,146 @@ static int mimetype_new_from_name(Value *vret, Value *v, RefNode *node)
     return TRUE;
 }
 
-static int open_magic_file(IniTok *tk)
+static Magic *get_add_magic_node_sub(Magic **ppm, const char *p, int size)
 {
-    char *path = str_printf("%r" SEP_S "data" SEP_S "magic.txt", fs->fox_home);
-    int ret = IniTok_load(tk, path);
-    free(path);
-    return ret;
-}
-static int split_number_string(int *num, Str *str, Str src)
-{
-    const char *end = src.p + src.size;
-    char *p = (char*)src.p;
-
-    while (p < end) {
-        if (*p == '\t') {
-            *p++ = '\0';
-
-            errno = 0;
-            *num = strtol(src.p, NULL, 10);
-            if (errno != 0) {
-                return FALSE;
-            }
-            str->size = escape_backslashes_sub(p, p, end - p, TRUE);
-            str->p = p;
-            return TRUE;
-        }
-        p++;
-    }
-    return FALSE;
-}
-static void load_magic_file_sub(IniTok *tk, Magic **magic)
-{
-    while (IniTok_next(tk)) {
-        if (tk->type == INITYPE_STRING) {
-            int offset;
-            Str buf;
-            if (split_number_string(&offset, &buf, tk->val)) {
-                RefStr *pkey = intern(tk->key.p, tk->key.size);
-                Magic *m = Mem_get(&fg->st_mem, sizeof(Magic));
-
-                m->size = buf.size;
-                m->offset = offset;
-                m->buf = str_dup_p(buf.p, buf.size, &fg->st_mem);
-                m->mime = pkey;
-                m->next = NULL;
-
-                m->sub = *magic;
-                *magic = m;
-            }
-        } else if (tk->type == INITYPE_FILE) {
-            if (tk->key.size == 1 && tk->key.p[0] == '}') {
-                break;
-            }
-        } else if (tk->type != INITYPE_NONE) {
+    while (*ppm != NULL) {
+        Magic *pm = *ppm;
+        if (pm->s.size < size) {
             break;
         }
+        if (pm->s.size == size) {
+            int cmp = memcmp(pm->s.p, p, size);
+            if (cmp < 0) {
+                break;
+            } else if (cmp == 0) {
+                return pm;
+            }
+        }
+        ppm = &pm->next;
     }
+    {
+        Magic *m = Mem_get(&fg->st_mem, sizeof(Magic));
+        m->next = *ppm;
+        m->sub = NULL;
+        m->s.p = str_dup_p(p, size, &fg->st_mem);
+        m->s.size = size;
+        m->mime = NULL;
+        *ppm = m;
+        return m;
+    }
+}
+/**
+ * なければ追加して返す
+ */
+static Magic *get_add_magic_node(Magic **magic, const char *p, int size)
+{
+    Magic **ppm;
+
+    if (size == 0) {
+        ppm = &magic[MAGIC_INDEX_MAX];
+    } else {
+        ppm = &magic[*p & 0xFF];
+    }
+    return get_add_magic_node_sub(ppm, p, size);
 }
 static void load_magic_file(Magic **magic)
 {
-    IniTok tk;
+    Tok tk;
+    char *path = path_normalize(NULL, fs->fox_home, "data" SEP_S "magic.txt", -1, NULL);
+    char *buf = read_from_file(NULL, path, NULL);
 
-    if (!open_magic_file(&tk)) {
+    if (buf == NULL) {
+        fatal_errorf("Cannot read file %s", path);
+        free(path);
         return;
     }
 
-    while (IniTok_next(&tk)) {
-        if (tk.type == INITYPE_STRING) {
-            const char *p = tk.val.p;
-            const char *end = p + tk.val.size;
-            RefStr *pkey;
+    Tok_simple_init(&tk, buf);
+    Tok_simple_next(&tk);
 
-            if (tk.key.size == 1 && tk.key.p[0] == '{') {
-                pkey = NULL;
-            } else {
-                pkey = intern(tk.key.p, tk.key.size);
+    for (;;) {
+        switch (tk.v.type) {
+        case TL_STR: {
+            RefStr *mime_str = intern(tk.str_val.p, tk.str_val.size);
+            Tok_simple_next(&tk);
+            if (tk.v.type != T_LET) {
+                goto ERROR_END;
             }
-
-            if (p == end) {
-                Magic **ppm = &magic[MAGIC_INDEX_MAX];
-                if (pkey == NULL) {
-                    load_magic_file_sub(&tk, ppm);
+            Tok_simple_next(&tk);
+            for (;;) {
+                Magic *m;
+                if (tk.v.type == TL_BYTES) {
+                    if (tk.str_val.size > MAGIC_MAX) {
+                        goto ERROR_END;
+                    }
+                    m = get_add_magic_node(magic, tk.str_val.p, tk.str_val.size);
+                    m->offset = 0;
+                    Tok_simple_next(&tk);
+                } else {
+                    m = get_add_magic_node(magic, "", 0);
                 }
-            } else {
-                while (p < end) {
-                    const char *top = p;
-                    int n;
 
-                    while (p < end && *p != '\t') {
-                        p++;
+                while (tk.v.type == TL_INT) {
+                    int offset = tk.int_val;
+                    Tok_simple_next(&tk);
+                    if (tk.v.type != TL_BYTES) {
+                        goto ERROR_END;
                     }
-                    n = escape_backslashes_sub((char*)top, top, p - top, TRUE);
-                    if (p < end) {
-                        p++;
+                    if (tk.str_val.size + offset > MAGIC_MAX) {
+                        goto ERROR_END;
                     }
+                    m = get_add_magic_node_sub(&m->sub, tk.str_val.p, tk.str_val.size);
+                    m->offset = offset;
+                    Tok_simple_next(&tk);
+                }
+                m->mime = mime_str;
+                if (tk.v.type == T_OR) {
+                    Tok_simple_next(&tk);
+                } else {
+                    break;
+                }
+            }
+            break;
+        }
+        case T_NL:
+        case T_SEMICL:
+            Tok_simple_next(&tk);
+            break;
+        case T_EOF:
+            free(path);
+            free(buf);
+            return;
+        default:
+            goto ERROR_END;
+        }
+    }
 
-                    if (n > 0 && n <= MAGIC_MAX) {
-                        Magic **ppm = &magic[*top & 0xFF];
-
-                        Magic *m = Mem_get(&fg->st_mem, sizeof(Magic));
-                        m->size = n;
-                        m->offset = 0;
-                        m->buf = str_dup_p(top, n, &fg->st_mem);
-                        m->mime = pkey;
-
-                        // bufが長いほうが先に来る
-                        while (*ppm != NULL) {
-                            Magic *pm = *ppm;
-                            if (pm->size <= m->size) {
-                                break;
-                            }
-                            ppm = &pm->next;
-                        }
-                        m->next = *ppm;
-                        m->sub = NULL;
-                        *ppm = m;
-                        if (pkey == NULL) {
-                            load_magic_file_sub(&tk, &m->sub);
-                        }
-                    }
+ERROR_END:
+    fatal_errorf("Error at line %d (%s)", tk.v.line, path);
+}
+RefStr *mimetype_from_magic_sub(Magic *pm, const char *p, int size)
+{
+    for (; pm != NULL; pm = pm->next) {
+        if (pm->offset + pm->s.size <= size) {
+            if (memcmp(p + pm->offset, pm->s.p, pm->s.size) == 0) {
+                RefStr *ret = mimetype_from_magic_sub(pm->sub, p, size);
+                if (ret != NULL) {
+                    return ret;
+                }
+                if (pm->mime != NULL) {
+                    return pm->mime;
                 }
             }
         }
     }
-    IniTok_close(&tk);
+    return NULL;
 }
 RefStr *mimetype_from_magic(const char *p, int size)
 {
-    static Magic **magic;
-    Magic *pm;
-
     if (size > 0) {
+        static Magic **magic;
+        RefStr *ret;
+
         if (size > MAGIC_MAX) {
             size = MAGIC_MAX;
         }
@@ -982,30 +992,13 @@ RefStr *mimetype_from_magic(const char *p, int size)
             memset(magic, 0, sizeof(Magic*) * (MAGIC_INDEX_MAX + 1));
             load_magic_file(magic);
         }
-
-        for (pm = magic[p[0] & 0xFF]; pm != NULL; pm = pm->next) {
-            if (size >= pm->size) {
-                if (memcmp(p, pm->buf, pm->size) == 0) {
-                    if (pm->mime != NULL) {
-                        return pm->mime;
-                    } else {
-                        Magic *pm2;
-                        for (pm2 = pm->sub; pm2 != NULL; pm2 = pm2->sub) {
-                            if (memcmp(p + pm2->offset, pm2->buf, pm2->size) == 0) {
-                                return pm2->mime;
-                            }
-                        }
-                    }
-                }
-            }
+        ret = mimetype_from_magic_sub(magic[p[0] & 0xFF], p, size);
+        if (ret != NULL) {
+            return ret;
         }
-        {
-            Magic *pm2;
-            for (pm2 = magic[MAGIC_INDEX_MAX]; pm2 != NULL; pm2 = pm2->sub) {
-                if (memcmp(p + pm2->offset, pm2->buf, pm2->size) == 0) {
-                    return pm2->mime;
-                }
-            }
+        ret = mimetype_from_magic_sub(magic[MAGIC_INDEX_MAX], p, size);
+        if (ret != NULL) {
+            return ret;
         }
     }
     return intern("application/octet-stream", -1);

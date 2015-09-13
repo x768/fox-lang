@@ -1,7 +1,7 @@
 import util.assert
 import time
 
-let time = Time('Asia/Tokyo', 2014, 1, 2, 12, 3, 4, 567)
+let time = DateTime('Asia/Tokyo', 2014, 1, 2, 12, 3, 4, 567)
 assert_equal time.year, 2014
 assert_equal time.month, 1
 assert_equal time.day_of_month, 2
@@ -12,7 +12,7 @@ assert_equal time.second, 4
 assert_equal time.millisec, 567
 assert_equal time.to_str('yyyy/MM/dd HH:mm:ss.SSS'), "2014/01/02 12:03:04.567"
 
-let time2 = Time('Asia/Tokyo', 2015, 1, 2, 12, 3, 4, 567)
+let time2 = DateTime('Asia/Tokyo', 2015, 1, 2, 12, 3, 4, 567)
 let delta = time2.timestamp - time.timestamp
 
 assert_equal delta.days, 365
@@ -20,4 +20,3 @@ assert_equal delta.hours, 365 * 24
 assert_equal delta.minutes, 365 * 24 * 60
 assert_equal delta.seconds, 365 * 24 * 60 * 60
 assert_equal delta.millisecs, 365 * 24 * 60 * 60 * 1000
-

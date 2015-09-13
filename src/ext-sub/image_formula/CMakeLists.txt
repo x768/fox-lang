@@ -17,4 +17,6 @@ set_target_properties(m_image_formula
   LINK_FLAGS_DEBUG "${LINK_FLAGS_DEBUG}"
   LINK_FLAGS_RELEASE "${LINK_FLAGS_RELEASE}"
 )
-
+target_link_libraries(m_image_formula
+  m
+)

@@ -33,11 +33,11 @@ RefTimeZone *get_machine_localtime(void);
 TimeOffset *TimeZone_offset_utc(RefTimeZone *tz, int64_t tm);
 TimeOffset *TimeZone_offset_local(RefTimeZone *tz, int64_t tm);
 
-void Time_to_Calendar(Calendar *cal, int64_t timer);
-void Calendar_to_Time(int64_t *timer, const Calendar *cal);
-void Calendar_adjust(Calendar *cal);
-void Calendar_adjust_month(Calendar *cal);
-void Calendar_set_isoweek(Calendar *cal, int year, int week, int day_of_week);
-void Calendar_get_isoweek(int *pyear, int *pweek, const Calendar *cal);
+void Timestamp_to_DateTime(DateTime *cal, int64_t timer);
+void DateTime_to_Timestamp(int64_t *timer, const DateTime *cal);
+void DateTime_adjust(DateTime *cal);
+void Date_adjust_month(Date *dt);
+void Date_set_isoweek(Date *dt, int year, int week, int day_of_week);
+void Date_get_isoweek(int *pyear, int *pweek, const Date *dt);
 
 #endif /* DATETIME_H_ */

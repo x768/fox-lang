@@ -83,7 +83,7 @@
 "text/html" = "htm", "html"
 "text/x-fox" = "fox"
 "text/x-markdown" = "md", "markdown"
-"text/x-objcsrc" = "m"
+"text/x-objcsrc" = "m", "mm"
 "text/x-python" = "py"
 "text/plain" = "txt", "text", "ini"
 "video/mp4" = "mp4"

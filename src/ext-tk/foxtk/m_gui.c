@@ -467,11 +467,9 @@ static int form_fixed(Value *vret, Value *v, RefNode *node)
 static int form_close(Value *vret, Value *v, RefNode *node)
 {
     WndHandle window = Value_widget_handle(*v);
-    if (!check_already_closed(window)) {
-        return FALSE;
+    if (window != NULL) {
+        window_destroy(window);
     }
-    window_destroy(window);
-
     return TRUE;
 }
 
@@ -625,22 +623,21 @@ static int form_add_menu(Value *vret, Value *v, RefNode *node)
 static int form_wait(Value *vret, Value *v, RefNode *node)
 {
     Ref *r = Value_ref(*v);
-    int loop = TRUE;
 
     if (!check_already_closed(Value_handle(r->v[INDEX_WIDGET_HANDLE]))) {
         return FALSE;
     }
 
-    while (loop) {
-        if (!window_message_loop(&loop)) {
-            return FALSE;
-        }
+    for (;;) {
         if (Value_handle(r->v[INDEX_WIDGET_HANDLE]) == NULL) {
             break;
         }
-    }
-    if (fg->error != VALUE_NULL) {
-        return FALSE;
+        if (!window_message_loop()) {
+            return FALSE;
+        }
+        if (fg->error != VALUE_NULL) {
+            return FALSE;
+        }
     }
 
     return TRUE;
@@ -716,18 +713,17 @@ static int timer_new(Value *vret, Value *v, RefNode *node)
 static int timer_wait(Value *vret, Value *v, RefNode *node)
 {
     Ref *r = Value_ref(*v);
-    int loop = TRUE;
 
-    while (loop) {
+    for (;;) {
         if (r->v[INDEX_TIMER_ID] == VALUE_NULL) {
             break;
         }
-        if (!window_message_loop(&loop)) {
+        if (!window_message_loop()) {
             return FALSE;
         }
-    }
-    if (fg->error != VALUE_NULL) {
-        return FALSE;
+        if (fg->error != VALUE_NULL) {
+            return FALSE;
+        }
     }
     return TRUE;
 }
@@ -743,17 +739,19 @@ static int timer_close(Value *vret, Value *v, RefNode *node)
 
 ////////////////////////////////////////////////////////////////////////////////////////////
 
-static int filemonitor_new(Value *vret, Value *v, RefNode *node)
+static int dirmonitor_new(Value *vret, Value *v, RefNode *node)
 {
     Str path_s;
-    Ref *r = fs->ref_new(cls_filemonitor);
+    Ref *r = fs->ref_new(cls_dirmonitor);
     char *path = fs->file_value_to_path(&path_s, v[1], 0);
 
     *vret = vp_Value(r);
     if (path == NULL) {
         return FALSE;
     }
-    native_filemonitor_new(r, path);
+    if (!native_dirmonitor_new(r, path)) {
+        return FALSE;
+    }
     r->v[INDEX_FILEMONITOR_FILE] = fs->cstr_Value(fs->cls_file, path, -1);
     free(path);
 
@@ -761,18 +759,23 @@ static int filemonitor_new(Value *vret, Value *v, RefNode *node)
 
     return TRUE;
 }
-static int filemonitor_wait(Value *vret, Value *v, RefNode *node)
+static int dirmonitor_target(Value *vret, Value *v, RefNode *node)
 {
     Ref *r = Value_ref(*v);
-    int loop = TRUE;
+    *vret = fs->Value_cp(r->v[INDEX_FILEMONITOR_FILE]);
+    return TRUE;
+}
+static int dirmonitor_wait(Value *vret, Value *v, RefNode *node)
+{
+    Ref *r = Value_ref(*v);
 
     if (r->v[INDEX_FILEMONITOR_STRUCT] == VALUE_NULL) {
-        fs->throw_errorf(mod_gui, "GuiError", "FileMonitor already disposed");
+        fs->throw_errorf(mod_gui, "GuiError", "DirMonitor already disposed");
         return FALSE;
     }
 
-    while (loop) {
-        if (!window_message_loop(&loop)) {
+    for (;;) {
+        if (!window_message_loop()) {
             return FALSE;
         }
         if (r->v[INDEX_FILEMONITOR_STRUCT] == VALUE_NULL) {
@@ -785,12 +788,12 @@ static int filemonitor_wait(Value *vret, Value *v, RefNode *node)
 
     return TRUE;
 }
-static int filemonitor_close(Value *vret, Value *v, RefNode *node)
+static int dirmonitor_close(Value *vret, Value *v, RefNode *node)
 {
     Ref *r = Value_ref(*v);
 
     if (r->v[INDEX_FILEMONITOR_STRUCT] != VALUE_NULL) {
-        native_filemonitor_remove(r);
+        native_dirmonitor_remove(r);
         r->v[INDEX_FILEMONITOR_STRUCT] = VALUE_NULL;
     }
     return TRUE;
@@ -980,18 +983,14 @@ static int evthandler_del(Value *vret, Value *v, RefNode *node)
 
 static int gui_wait_message(Value *vret, Value *v, RefNode *node)
 {
-    int loop = TRUE;
-
-    if (!window_message_loop(&loop)) {
+    if (!window_message_loop()) {
         return FALSE;
     }
-    *vret = bool_Value(loop);
 
     return TRUE;
 }
 static int gui_quit(Value *vret, Value *v, RefNode *node)
 {
-    native_object_remove_all();
     gui_dispose();
     return TRUE;
 }
@@ -1072,7 +1071,7 @@ static void define_class(RefNode *m)
     cls_event = fs->define_identifier(m, m, "Event", NODE_CLASS, 0);
     cls_evt_handler = fs->define_identifier(m, m, "EventHandler", NODE_CLASS, 0);
     cls_timer = fs->define_identifier(m, m, "Timer", NODE_CLASS, 0);
-    cls_filemonitor = fs->define_identifier(m, m, "FileMonitor", NODE_CLASS, 0);
+    cls_dirmonitor = fs->define_identifier(m, m, "DirMonitor", NODE_CLASS, 0);
 
 
     cls = cls_widget;
@@ -1109,6 +1108,8 @@ static void define_class(RefNode *m)
     fs->define_native_func_a(n, form_new, 0, 1, NULL, NULL);
     n = fs->define_identifier(m, cls, "fixed", NODE_NEW_N, 0);
     fs->define_native_func_a(n, form_fixed, 2, 3, NULL, fs->cls_int, fs->cls_int, NULL);
+    n = fs->define_identifier_p(m, cls, fs->str_dispose, NODE_FUNC_N, 0);
+    fs->define_native_func_a(n, form_close, 0, 0, NULL);
 
     n = fs->define_identifier(m, cls, "close", NODE_FUNC_N, 0);
     fs->define_native_func_a(n, form_close, 0, 0, NULL);
@@ -1179,16 +1180,18 @@ static void define_class(RefNode *m)
     fs->extends_method(cls, fs->cls_obj);
 
 
-    cls = cls_filemonitor;
+    cls = cls_dirmonitor;
     n = fs->define_identifier_p(m, cls, fs->str_new, NODE_NEW_N, 0);
-    fs->define_native_func_a(n, filemonitor_new, 2, 2, NULL, NULL, fs->cls_fn);
+    fs->define_native_func_a(n, dirmonitor_new, 2, 2, NULL, NULL, fs->cls_fn);
     n = fs->define_identifier_p(m, cls, fs->str_dispose, NODE_FUNC_N, 0);
-    fs->define_native_func_a(n, filemonitor_close, 0, 0, NULL);
+    fs->define_native_func_a(n, dirmonitor_close, 0, 0, NULL);
 
     n = fs->define_identifier(m, cls, "close", NODE_FUNC_N, 0);
-    fs->define_native_func_a(n, filemonitor_close, 0, 0, NULL);
+    fs->define_native_func_a(n, dirmonitor_close, 0, 0, NULL);
     n = fs->define_identifier(m, cls, "wait", NODE_FUNC_N, 0);
-    fs->define_native_func_a(n, filemonitor_wait, 0, 0, NULL);
+    fs->define_native_func_a(n, dirmonitor_wait, 0, 0, NULL);
+    n = fs->define_identifier(m, cls, "target", NODE_FUNC_N, NODEOPT_PROPERTY);
+    fs->define_native_func_a(n, dirmonitor_target, 0, 0, NULL);
     cls->u.c.n_memb = INDEX_FILEMONITOR_NUM;
     fs->extends_method(cls, fs->cls_obj);
 

@@ -1,0 +1,10 @@
+import foxtk
+
+def callback(e)
+{
+    puts "yeah!"
+    STDIO.flush()
+}
+
+let tm = Timer(1000, callback)
+tm.wait()

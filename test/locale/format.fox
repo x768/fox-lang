@@ -1,0 +1,12 @@
+import util.assert
+import time
+
+let en = Locale("en")
+let ja = Locale("ja")
+let de = Locale("de")
+
+assert_equal sprintf(en, "%{0:,f}", -1234.25), "-1,234.25"
+assert_equal sprintf(de, "%{0:,f}", -1234.25), "-1.234,25"
+
+assert_equal sprintf(en, "%{0:XXX}", DateTime(2010,2,5)), "February 5, 2010"
+assert_equal sprintf(ja, "%{0:XXX}", DateTime(2010,2,5)), "2010年2月5日"

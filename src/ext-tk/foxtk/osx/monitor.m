@@ -14,14 +14,10 @@ void native_timer_remove(Ref *r)
 
 ////////////////////////////////////////////////////////////////////////////////////////////////
 
-int native_filemonitor_new(Ref *r, const char *path)
+int native_dirmonitor_new(Ref *r, const char *path)
 {
     return TRUE;
 }
-void native_filemonitor_remove(Ref *r)
-{
-}
-
-void native_object_remove_all()
+void native_dirmonitor_remove(Ref *r)
 {
 }

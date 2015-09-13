@@ -31,10 +31,6 @@ static gint timeout_callback(gpointer data)
     }
     if (!result) {
         sender_r->v[INDEX_TIMER_ID] = VALUE_NULL;
-
-        // カウンタを1減らす
-        fs->Value_dec(vp_Value(sender_r));
-        root_window_count--;
     }
     return result;
 }
@@ -45,8 +41,6 @@ void native_timer_new(int millisec, Ref *r)
 
     r->v[INDEX_TIMER_ID] = int32_Value(id);
     r->rh.nref++;
-    // イベントループ監視対象なので1増やす
-    root_window_count++;
 }
 void native_timer_remove(Ref *r)
 {
@@ -55,10 +49,6 @@ void native_timer_remove(Ref *r)
 
         g_source_remove(timer_id);
         r->v[INDEX_TIMER_ID] = VALUE_NULL;
-
-        // カウンタを1減らす
-        fs->Value_dec(vp_Value(r));
-        root_window_count--;
     }
 }
 
@@ -95,10 +85,6 @@ void signal_file_changed(
     int ret_code;
     const char *action_val = NULL;
 
-    fs->Value_push("v", &sender_r->v[INDEX_FILEMONITOR_FN]);
-    evt = fg->stk_top++;
-    *evt = event_object_new(sender_r);
-
     switch (event_type) {
     case G_FILE_MONITOR_EVENT_CHANGED:
     case G_FILE_MONITOR_EVENT_CHANGES_DONE_HINT:
@@ -106,7 +92,8 @@ void signal_file_changed(
         action_val = "changed";
         break;
     case G_FILE_MONITOR_EVENT_MOVED:
-        action_val = "moved";
+        // deleted + created
+        action_val = "deleted";
         break;
     case G_FILE_MONITOR_EVENT_DELETED:
         action_val = "deleted";
@@ -115,28 +102,51 @@ void signal_file_changed(
         action_val = "created";
         break;
     default:
-        action_val = "others";
-        break;
+        return;
     }
+
+    fs->Value_push("v", sender_r->v[INDEX_FILEMONITOR_FN]);
+    evt = fg->stk_top++;
+    *evt = event_object_new(sender_r);
+
     v_tmp = fs->cstr_Value(fs->cls_str, action_val, -1);
     event_object_add(*evt, "action", v_tmp);
     fs->Value_dec(v_tmp);
 
-    v_tmp = gfile_to_value(file);
-    event_object_add(*evt, "file", v_tmp);
-    fs->Value_dec(v_tmp);
-
-    v_tmp = gfile_to_value(other_file);
-    event_object_add(*evt, "other_file", v_tmp);
-    fs->Value_dec(v_tmp);
-
+    if (file != NULL) {
+        v_tmp = gfile_to_value(file);
+        event_object_add(*evt, "file", v_tmp);
+        fs->Value_dec(v_tmp);
+    }
     ret_code = fs->call_function_obj(1);
     if (!ret_code && fg->error != VALUE_NULL) {
         //
     }
     fs->Value_pop();
+
+    if (other_file != NULL && event_type == G_FILE_MONITOR_EVENT_MOVED) {
+        action_val = "crated";
+
+        fs->Value_push("v", sender_r->v[INDEX_FILEMONITOR_FN]);
+        evt = fg->stk_top++;
+        *evt = event_object_new(sender_r);
+
+        v_tmp = fs->cstr_Value(fs->cls_str, action_val, -1);
+        event_object_add(*evt, "action", v_tmp);
+        fs->Value_dec(v_tmp);
+
+        v_tmp = gfile_to_value(other_file);
+        event_object_add(*evt, "file", v_tmp);
+        fs->Value_dec(v_tmp);
+
+        ret_code = fs->call_function_obj(1);
+        if (!ret_code && fg->error != VALUE_NULL) {
+            //
+        }
+        fs->Value_pop();
+    }
 }
-int native_filemonitor_new(Ref *r, const char *path)
+int native_dirmonitor_new(Ref *r, const char *path)
 {
     FileMonitor *fm = malloc(sizeof(FileMonitor));
     GFileType type;
@@ -147,9 +157,8 @@ int native_filemonitor_new(Ref *r, const char *path)
 
     if (type == G_FILE_TYPE_DIRECTORY) {
         fm->monitor = g_file_monitor_directory(fm->file, G_FILE_MONITOR_NONE, NULL, &err);
-    } else if (type == G_FILE_TYPE_REGULAR) {
-        fm->monitor = g_file_monitor_file(fm->file, G_FILE_MONITOR_NONE, NULL, &err);
     } else {
+        fs->throw_error_select(THROW_CANNOT_OPEN_FILE__STR, Str_new(path, -1));
         return FALSE;
     }
     if (fm->monitor == NULL) {
@@ -165,16 +174,15 @@ int native_filemonitor_new(Ref *r, const char *path)
 
     return TRUE;
 }
-void native_filemonitor_remove(Ref *r)
+void native_dirmonitor_remove(Ref *r)
 {
     FileMonitor *fm = Value_ptr(r->v[INDEX_FILEMONITOR_STRUCT]);
 
-    g_object_unref(fm->monitor);
-    g_object_unref(fm->file);
+    if (fm != NULL) {
+        g_object_unref(fm->monitor);
+        g_object_unref(fm->file);
+    }
 
     free(fm);
-}
-
-void native_object_remove_all()
-{
+    r->v[INDEX_FILEMONITOR_STRUCT] = VALUE_NULL;
 }

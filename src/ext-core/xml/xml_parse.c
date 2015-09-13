@@ -312,6 +312,8 @@ int resolve_entity(const char *p, const char *end)
             hi = mid - 1;
         } else if (cmp > 0) {
             lo = mid + 1;
+        } else if (e->name[size] != 0) {
+            lo = mid + 1;
         } else {
             return e->code;
         }
@@ -850,7 +852,8 @@ static void XMLTok_next(XMLTok *tk)
                     if (tk->p[0] == '-' && tk->p[1] == '-' && tk->p[2] == '>') {
                         tk->val.size = tk->p - tk->val.p;
                         tk->p += 3;
-                        break;
+                        tk->type = TK_COMMENT;
+                        return;
                     }
                     tk->p++;
                 }

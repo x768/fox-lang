@@ -30,7 +30,7 @@ enum {
     TL_FLOAT,
     TL_FRAC,
     TL_STR,
-    TL_BIN,
+    TL_BYTES,
     TL_REGEX,
     TL_CLASS,
     TL_VAR,
@@ -146,13 +146,6 @@ enum {
     ICONV_INVALID,
 };
 enum {
-    INITYPE_NONE,
-    INITYPE_ERROR,
-    INITYPE_EOF,
-    INITYPE_STRING,
-    INITYPE_FILE,
-};
-enum {
     LOCALE_LANGUAGE,
     LOCALE_SCRIPT,
     LOCALE_TERRITORY,
@@ -171,17 +164,6 @@ enum {
 
 typedef void (*FoxModuleDefine)(RefNode *m, const FoxStatic *fs, FoxGlobal *fg);
 typedef const char *(*FoxModuleVersion)(const FoxStatic *fs);
-
-// deprecated
-typedef struct {
-    char *buf;
-    char *p;
-    char *end;
-
-    int type;
-    Str key;
-    Str val;
-} IniTok;
 
 
 typedef struct {
@@ -317,10 +299,6 @@ int StrBuf_add_v(StrBuf *s, Value v);
 char *read_from_file(int *psize, const char *path, Mem *mem);
 int FileHandle_read_all_to_strbuf(StrBuf *buf, int fd, int limit);
 
-int IniTok_load(IniTok *tk, const char *path);
-void IniTok_close(IniTok *tk);
-int IniTok_next(IniTok *tk);
-
 
 // util_str.c
 int parse_hex(const char **pp, const char *end, int n);
@@ -357,14 +335,12 @@ int32_t Value_int32(Value v);
 int64_t Value_int64(Value v, int *err);
 double Value_float(Value v);
 char *Value_frac_s(Value v, int max_frac);
-int Value_frac10(int64_t *val, Value v, int factor);
 
 Value int64_Value(int64_t i);
 Value float_Value(RefNode *klass, double dval);
 Value cstr_Value(RefNode *klass, const char *p, int size);
 Value cstr_Value_conv(const char *p, int size, RefCharset *cs);
 Value frac_s_Value(const char *str);
-Value frac10_Value(int64_t val, int factor);
 
 Value printf_Value(const char *fmt, ...);
 
@@ -583,7 +559,6 @@ void init_mime_module_1(void);
 
 // m_number.c
 void fix_bigint(Value *v, BigInt *bi);
-int get_recurrence(int *ret, BigInt *bi);
 char *frac_tostr_sub(int sign, BigInt *mi, BigInt *rem, int width_f);
 void define_lang_number_func(RefNode *m);
 void define_lang_number_class(RefNode *m);
@@ -607,8 +582,8 @@ void define_lang_str_class(RefNode *m);
 int64_t Value_timestamp(Value v, RefTimeZone *tz);
 Value time_Value(int64_t i_tm, RefTimeZone *tz);
 RefTimeZone *get_local_tz(void);
-void adjust_timezone(RefTime *dt);
-void adjust_date(RefTime *dt);
+void adjust_timezone(RefDateTime *dt);
+void adjust_datetime(RefDateTime *dt);
 int timedelta_parse_string(int64_t *ret, const char *src_p, int src_size);
 void timestamp_to_RFC2822_UTC(int64_t tm, char *dst);
 void timestamp_to_cookie_date(int64_t tm, char *dst);

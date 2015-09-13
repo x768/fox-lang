@@ -759,6 +759,72 @@ static int rect_eq(Value *vret, Value *v, RefNode *node)
     *vret = VALUE_TRUE;
     return TRUE;
 }
+/**
+ * 重なり領域を返す
+ * 重なりがない場合は、Rect(0, 0, 0, 0)
+ */
+static int rect_and(Value *vret, Value *v, RefNode *node)
+{
+    int i;
+    RefNode *cls = FUNC_VP(node);
+    const RefRect *rc1 = Value_vp(*v);
+    const RefRect *rc2 = Value_vp(v[1]);
+    RefRect *rc = fs->buf_new(cls, sizeof(RefRect));
+    *vret = vp_Value(rc);
+
+    for (i = 0; i < 2; i++) {
+        int b1, b2, b;
+        if (rc1->i[i] > rc2->i[i]) {
+            rc->i[i] = rc1->i[i];
+        } else {
+            rc->i[i] = rc2->i[i];
+        }
+        b1 = rc1->i[i] + rc1->i[i + 2];
+        b2 = rc2->i[i] + rc2->i[i + 2];
+        if (b1 < b2) {
+            b = b1 - rc->i[i];
+        } else {
+            b = b2 - rc->i[i];
+        }
+        if (b < 0) {
+            for (i = 0; i < 4; i++) {
+                rc->i[i] = 0;
+            }
+            return TRUE;
+        }
+        rc->i[i + 2] = b;
+    }
+    return TRUE;
+}
+/**
+ * 両者を包含する最小のRectを返す
+ */
+static int rect_or(Value *vret, Value *v, RefNode *node)
+{
+    int i;
+    RefNode *cls = FUNC_VP(node);
+    const RefRect *rc1 = Value_vp(*v);
+    const RefRect *rc2 = Value_vp(v[1]);
+    RefRect *rc = fs->buf_new(cls, sizeof(RefRect));
+    *vret = vp_Value(rc);
+
+    for (i = 0; i < 2; i++) {
+        int b1, b2;
+        if (rc1->i[i] < rc2->i[i]) {
+            rc->i[i] = rc1->i[i];
+        } else {
+            rc->i[i] = rc2->i[i];
+        }
+        b1 = rc1->i[i] + rc1->i[i + 2];
+        b2 = rc2->i[i] + rc2->i[i + 2];
+        if (b1 > b2) {
+            rc->i[i + 2] = b1 - rc->i[i];
+        } else {
+            rc->i[i + 2] = b2 - rc->i[i];
+        }
+    }
+    return TRUE;
+}
 static int rect_hash(Value *vret, Value *v, RefNode *node)
 {
     const RefRect *rc = Value_vp(*v);
@@ -2031,6 +2097,10 @@ static void define_class(RefNode *m, RefNode *mod_math)
 
     n = fs->define_identifier_p(m, cls, fs->symbol_stock[T_EQ], NODE_FUNC_N, 0);
     fs->define_native_func_a(n, rect_eq, 1, 1, NULL, cls_rect);
+    n = fs->define_identifier_p(m, cls, fs->symbol_stock[T_AND], NODE_FUNC_N, 0);
+    fs->define_native_func_a(n, rect_and, 1, 1, cls, cls_rect);
+    n = fs->define_identifier_p(m, cls, fs->symbol_stock[T_OR], NODE_FUNC_N, 0);
+    fs->define_native_func_a(n, rect_or, 1, 1, cls, cls_rect);
     n = fs->define_identifier(m, cls, "x", NODE_FUNC_N, NODEOPT_PROPERTY);
     fs->define_native_func_a(n, rect_get, 0, 0, (void*) INDEX_RECT_X);
     n = fs->define_identifier(m, cls, "y", NODE_FUNC_N, NODEOPT_PROPERTY);

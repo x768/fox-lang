@@ -34,6 +34,12 @@ else()
   set(LINK_FLAGS_GUI "")
 endif()
 
+if("${TARGET_OS}" STREQUAL "osx")
+  set(DEST_DIR_GUI "${DEST_DIR}/foxw.app/Contents/MacOS")
+else()
+  set(DEST_DIR_GUI "${DEST_DIR}")
+endif()
+
 set_target_properties(fox_cl
   PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY ${DEST_DIR}
@@ -53,7 +59,7 @@ set_target_properties(fox_cgi
 )
 set_target_properties(fox_gui
   PROPERTIES
-  RUNTIME_OUTPUT_DIRECTORY ${DEST_DIR}
+  RUNTIME_OUTPUT_DIRECTORY ${DEST_DIR_GUI}
   OUTPUT_NAME foxw
   LINK_FLAGS "${LINK_FLAGS} ${LINK_FLAGS_GUI}"
   LINK_FLAGS_DEBUG "${LINK_FLAGS_DEBUG}"

@@ -217,7 +217,7 @@ int param_string_init_hash(RefMap *v_map, Value keys)
     return TRUE;
 
 ERROR_END:
-    throw_errorf(fs->mod_lang, "TypeError", "{\"...\":Str|Array, ...} required");
+    throw_errorf(fs->mod_lang, "TypeError", "{\"...\":Str|List, ...} required");
     return FALSE;
 }
 static int param_string_to_hash(RefMap *v_map, const char *p, Value keys, RefCharset *cs, const char *csep)

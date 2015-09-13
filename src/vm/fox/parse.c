@@ -807,7 +807,7 @@ static int parse_elem(OpBuf *buf, Block *bk, Tok *tk)
         OpBuf_add_str(buf, tk);
         Tok_next(tk);
         break;
-    case TL_BIN: {
+    case TL_BYTES: {
         Value v = cstr_Value(fs->cls_bytes, tk->str_val.p, tk->str_val.size);
         OpBuf_add_op2(buf, OP_LITERAL, 0, v);
         Tok_next(tk);

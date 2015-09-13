@@ -1,6 +1,7 @@
 #include "gui_compat.h"
 #include "gui.h"
 #include "gui_win.h"
+#include <stdio.h>
 
 
 static const wchar_t * const FORM_CLASS = L"FoxGuiWindow";
@@ -54,11 +55,6 @@ static LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lPara
         widget_handler_destroy(r);
         fs->Value_dec(r->v[INDEX_WIDGET_HANDLE]);
         r->v[INDEX_WIDGET_HANDLE] = VALUE_NULL;
-
-        root_window_count--;
-        if (root_window_count <= 0) {
-            PostQuitMessage(0);
-        }
         return 0;
     }
     case WM_CLOSE: {
@@ -257,9 +253,6 @@ void create_form_window(Value *v, WndHandle parent, int *size)
     r->v[INDEX_FORM_ALPHA] = int32_Value(255);
     r->v[INDEX_WIDGET_HANDLE] = handle_Value(window);
 
-    // Windowに関連付けたため、+1する
-    fs->Value_inc(*v);
-    root_window_count++;
     SetWindowLongPtr(window, GWLP_USERDATA, (LONG_PTR)r);
     r->v[INDEX_WBASE_CALLBACK] = handle_Value((void*)GetWindowLongPtr(window, GWLP_WNDPROC));
     connect_widget_events(window);
@@ -875,16 +868,14 @@ int window_set_icon(WndHandle window, Ref *r, RefImage *icon)
     free(buf);
     return TRUE;
 }
-int window_message_loop(int *loop)
+int window_message_loop()
 {
     MSG msg;
 
-    if (GetMessageW(&msg, NULL, 0, 0) <= 0) {
-        *loop = FALSE;
-    } else {
+    MsgWaitForMultipleObjectsEx(0, NULL, INFINITE, QS_ALLEVENTS|QS_ALLINPUT|QS_ALLPOSTMESSAGE, MWMO_ALERTABLE);
+    while (PeekMessageW(&msg, NULL, 0, 0, PM_REMOVE) != 0) {
         TranslateMessage(&msg);
         DispatchMessageW(&msg);
-        *loop = TRUE;
     }
 
     return TRUE;

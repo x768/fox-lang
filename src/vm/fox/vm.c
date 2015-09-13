@@ -68,8 +68,6 @@ void init_so_func(void)
     fs->Value_int32 = Value_int32;
     fs->Value_int64 = Value_int64;
     fs->Value_float = Value_float;
-    fs->Value_frac_s = Value_frac_s;
-    fs->Value_frac10 = Value_frac10;
     fs->Value_timestamp = Value_timestamp;
 
     fs->Value_cp = Value_cp;
@@ -77,8 +75,6 @@ void init_so_func(void)
     fs->float_Value = float_Value;
     fs->cstr_Value = cstr_Value;
     fs->cstr_Value_conv = cstr_Value_conv;
-    fs->frac_s_Value = frac_s_Value;
-    fs->frac10_Value = frac10_Value;
     fs->time_Value = time_Value;
     fs->printf_Value = printf_Value;
 
@@ -97,10 +93,15 @@ void init_so_func(void)
     fs->BigInt_copy = BigInt_copy;
     fs->int64_BigInt = int64_BigInt;
     fs->cstr_BigInt = cstr_BigInt;
+    fs->double_BigRat = double_BigRat;
+    fs->cstr_BigRat = cstr_BigRat;
     fs->BigRat_fix = BigRat_fix;
     fs->BigInt_int32 = BigInt_int32;
     fs->BigInt_int64 = BigInt_int64;
     fs->BigInt_double = BigInt_double;
+    fs->BigInt_str_bufsize = BigInt_str_bufsize;
+    fs->BigInt_str = BigInt_str;
+    fs->BigRat_str = BigRat_str;
     fs->BigInt_add = BigInt_add;
     fs->BigInt_add_d = BigInt_add_d;
     fs->BigInt_sub = BigInt_sub;
@@ -165,8 +166,8 @@ void init_so_func(void)
 
     fs->get_local_tz = get_local_tz;
     fs->adjust_timezone = adjust_timezone;
-    fs->adjust_date = adjust_date;
-    fs->Calendar_to_Time = Calendar_to_Time;
+    fs->adjust_datetime = adjust_datetime;
+    fs->DateTime_to_Timestamp = DateTime_to_Timestamp;
     fs->timedelta_parse_string = timedelta_parse_string;
 
     fs->refarray_new = refarray_new;

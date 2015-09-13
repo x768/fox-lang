@@ -176,7 +176,6 @@ static int conn_prepare_sub(sqlite3_stmt **stmt, sqlite3 *conn, Value *v)
     sql = Value_vp(*v1);
     result = sqlite3_prepare_v2(conn, sql->c, -1, stmt, NULL);
     if (result != SQLITE_OK){
-        free(sql);
         if (result != SQLITE_ERROR_USER) {
             fs->throw_errorf(mod_sqlite, "SQLiteError", "%s", sqlite3_errmsg(conn));
         }

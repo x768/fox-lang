@@ -261,7 +261,7 @@ def _format_digit(value:Float, fmt:Str, loc:Locale)
     }
     return "$prefix${v.to_str(f.data, loc)}$postfix"
 }
-def _format_time(value:Time, fmt:Str, loc:Locale)
+def _format_time(value:DateTime, fmt:Str, loc:Locale)
 {
     let s = StrIO()
     var quot = false
@@ -439,7 +439,7 @@ class ExcelCell
     def link => m_link
     def desc => m_desc
     def value {
-        if typeof(m_value) == Float && m_xf.type == Time {
+        if typeof(m_value) == Float && m_xf.type == DateTime {
             return this.to_time()
         } else {
             return m_value
@@ -500,7 +500,7 @@ class ExcelCell
             s.print "text-align:", this.align, ";"
         } else {
             let t = this.type
-            if t == Float || t == Time {
+            if t == Float || t == DateTime {
                 s.print "text-align:right;"
             }
         }
@@ -562,8 +562,8 @@ class ExcelCell
             case Float
                 return _format_digit(m_value, f, loc ? loc : Locale('en'))
             case Str
-                return m_value.to_str(".0f")
-            case Time
+                return m_value.to_str()
+            case DateTime
                 return _format_time(this.to_time(), f, loc ? loc : Locale('en'))
             }
         }
@@ -575,16 +575,16 @@ class ExcelCell
         if typeof(m_value) == Float {
             let utcdays = m_value - m_day_offset
             let ts = TimeStamp(1970, 1, 1) + TimeDelta(0, 0, 0, (utcdays * 86400.0).to_int())
-            let tm = Time(TimeZone.UTC, ts)
-            return Time(tz ? tz : TimeZone.LOCAL, tm.year, tm.month, tm.day_of_month, tm.hour, tm.minute, tm.second)
+            let tm = DateTime(TimeZone.UTC, ts)
+            return DateTime(tz ? tz : TimeZone.LOCAL, tm.year, tm.month, tm.day_of_month, tm.hour, tm.minute, tm.second)
         } else {
             return null
         }
     }
     def type {
         let type = typeof(m_value)
-        if m_xf && m_xf.type == Time && type == Float {
-            return Time
+        if m_xf && m_xf.type == DateTime && type == Float {
+            return DateTime
         } else {
             return type
         }
@@ -693,7 +693,7 @@ class ExcelXF
         if m_format == "" || m_format.toupper() == "GENERAL" {
             m_type = Str
         } elif !m_format.find(/[^hmsday\\\/\-:\s\,AMP]/i) {
-            m_type = Time
+            m_type = DateTime
         } elif m_format.find(/[0#]/) {
             m_type = Float
         } else {

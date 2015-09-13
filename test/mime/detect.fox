@@ -1,0 +1,14 @@
+import util.assert
+
+let dir_path = ENV.has_key("TEST_BATCH") ? "mime" : "."
+
+assert_true MimeType("application/epub+zip") in MimeType("application/zip")
+assert_true MimeType("image/jpeg").match("image/*")
+
+assert_equal MimeType.from_name("test.zip"), MimeType("application/zip")
+assert_equal MimeType.from_name("test.tar.gz"), MimeType("application/x-gzip")
+assert_equal MimeType.from_name("test"), MimeType("application/octet-stream")
+
+assert_equal MimeType.from_magic("${dir_path}/test.zip"), MimeType("application/zip")
+assert_equal MimeType.from_magic("${dir_path}/sin.wav"), MimeType("audio/x-wav")
+assert_equal MimeType.from_magic("${dir_path}/empty"), MimeType("application/octet-stream")

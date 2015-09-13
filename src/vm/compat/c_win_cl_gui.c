@@ -1,5 +1,5 @@
 #include "compat.h"
-#include "fox.h"
+#include "fox_parse.h"
 #include <windows.h>
 
 /**
@@ -36,42 +36,58 @@ static void copy16to8(char *dst, const wchar_t *src)
     }
     dst[i] = '\0';
 }
-static int load_windows_tz_file(IniTok *tk)
-{
-    int ret;
-    StrBuf buf;
-
-    StrBuf_init(&buf, fs->fox_home->size + 20);
-    StrBuf_printf(&buf, "%r" SEP_S "data" SEP_S "windows-tz.txt", fs->fox_home);
-    StrBuf_add_c(&buf, '\0');
-
-    ret = IniTok_load(tk, buf.p);
-    StrBuf_close(&buf);
-
-    return ret;
-}
 static void windows_tz_to_tzid(char *buf, int max, Str name)
 {
-    IniTok tk;
+    Tok tk;
+    char *path = path_normalize(NULL, fs->fox_home, "data" SEP_S "windows-tz.txt", -1, NULL);
+    char *ini_buf = read_from_file(NULL, path, NULL);
 
-    if (!load_windows_tz_file(&tk)) {
+    free(path);
+    if (buf == NULL) {
         goto ERROR_END;
     }
 
-    while (IniTok_next(&tk)) {
-        if (tk.type == INITYPE_STRING && str_eq(tk.key.p, tk.key.size, name.p, name.size)) {
-            int len = tk.val.size;
-            if (len >= max) {
-                len = max - 1;
+    Tok_simple_init(&tk, ini_buf);
+    Tok_simple_next(&tk);
+
+    for (;;) {
+        switch (tk.v.type) {
+        case TL_STR:
+            if (str_eq(tk.str_val.p, tk.str_val.size, name.p, name.size)) {
+                Tok_simple_next(&tk);
+                if (tk.v.type != T_LET) {
+                    goto ERROR_END;
+                }
+                Tok_simple_next(&tk);
+                if (tk.v.type != TL_STR) {
+                    goto ERROR_END;
+                }
+                memcpy(buf, tk.str_val.p, tk.str_val.size);
+                buf[tk.str_val.size] = '\0';
+                free(ini_buf);
+                return;
+            } else {
+                // 行末まで飛ばす
+                while (tk.v.type == T_LET || tk.v.type == TL_STR) {
+                    Tok_simple_next(&tk);
+                }
             }
-            memcpy(buf, tk.val.p, len);
-            buf[len] = '\0';
-            return;
+            break;
+        case T_NL:
+        case T_SEMICL:
+            Tok_simple_next(&tk);
+            break;
+        case T_EOF:
+            goto ERROR_END;
+        default:
+            fatal_errorf("Parse error at line %d (windows-tz.txt)", tk.v.line);
+            break;
         }
     }
 
 ERROR_END:
     strcpy(buf, "Etc/UTC");
+    free(ini_buf);
 }
 static void convert_english_tzname(char *dst, const wchar_t *src)
 {

@@ -222,18 +222,25 @@ typedef uint64_t Value;
 typedef int (*NativeFunc)(Value *vret, Value *v, RefNode *node);
 
 
-
 typedef struct {
     int year;
+    int month;
     int day_of_year;
     int day_of_month;
     int day_of_week;
-    int month;
+} Date;
+
+typedef struct {
     int hour;
     int minute;
     int second;
     int millisec;
-} Calendar;
+} Time;
+
+typedef struct {
+    Date d;
+    Time t;
+} DateTime;
 
 
 // 16bytes (ILP32)
@@ -242,7 +249,7 @@ typedef struct RefHeader {
     int32_t nref;
     int32_t n_memb;
     RefNode *type;
-    struct Ref *weak_ref;
+    Ref *weak_ref;
 } RefHeader;
 
 struct Ref {
@@ -261,10 +268,10 @@ typedef struct {
     RefHeader rh;
 
     int64_t tm;      // *Always* UTC
-    Calendar cal;    // TimeZone adjusted
+    DateTime dt;     // TimeZone adjusted
     RefTimeZone *tz;
     TimeOffset *off;
-} RefTime;
+} RefDateTime;
 
 typedef struct {
     RefHeader rh;
@@ -445,7 +452,7 @@ struct FoxStatic
     RefNode *cls_iterator;
     RefNode *cls_marshaldumper;
 
-    RefNode *cls_time;
+    RefNode *cls_datetime;
     RefNode *cls_timestamp;
     RefNode *cls_timezone;
     RefNode *cls_file;
@@ -486,8 +493,6 @@ struct FoxStatic
     int32_t (*Value_int32)(Value v);
     int64_t (*Value_int64)(Value v, int *err);
     double (*Value_float)(Value v);
-    char *(*Value_frac_s)(Value v, int max_frac);
-    int (*Value_frac10)(int64_t *val, Value v, int factor);
     int64_t (*Value_timestamp)(Value v, RefTimeZone *tz);
 
     Value (*Value_cp)(Value v);
@@ -495,8 +500,6 @@ struct FoxStatic
     Value (*float_Value)(RefNode *klass, double dval);
     Value (*cstr_Value)(RefNode *klass, const char *p, int size);
     Value (*cstr_Value_conv)(const char *p, int size, RefCharset *cs);
-    Value (*frac_s_Value)(const char *str);
-    Value (*frac10_Value)(int64_t val, int factor);
     Value (*time_Value)(int64_t i_tm, RefTimeZone *tz);
 
     Value (*printf_Value)(const char *fmt, ...);
@@ -516,10 +519,15 @@ struct FoxStatic
     void (*BigInt_copy)(BigInt *dst, const BigInt *src);
     void (*int64_BigInt)(BigInt *bi, int64_t value);
     int (*cstr_BigInt)(BigInt *bi, int radix, const char *str, int size);
+    int (*double_BigRat)(BigInt *rat, double d);
+    int (*cstr_BigRat)(BigInt *rat, const char *src, const char **end);
     void (*BigRat_fix)(BigInt *rat);
     int32_t (*BigInt_int32)(const BigInt *bi);
     int (*BigInt_int64)(const BigInt *bi, int64_t *value);
     double (*BigInt_double)(const BigInt *bi);
+    int (*BigInt_str_bufsize)(const BigInt *bi, int radix);
+    int (*BigInt_str)(const BigInt *bi, int radix, char *str, int upper);
+    char *(*BigRat_str)(BigInt *rat, int max_frac);
     int (*BigInt_add)(BigInt *a, const BigInt *b);
     int (*BigInt_add_d)(BigInt *a, int b);
     int (*BigInt_sub)(BigInt *a, const BigInt *b);
@@ -532,9 +540,9 @@ struct FoxStatic
     int (*BigInt_cmp)(const BigInt *a, const BigInt *b);
 
     RefTimeZone *(*get_local_tz)(void);
-    void (*adjust_timezone)(RefTime *dt);
-    void (*adjust_date)(RefTime *dt);
-    void (*Calendar_to_Time)(int64_t *timer, const Calendar *cal);
+    void (*adjust_timezone)(RefDateTime *dt);
+    void (*adjust_datetime)(RefDateTime *dt);
+    void (*DateTime_to_Timestamp)(int64_t *timer, const DateTime *cal);
     int (*timedelta_parse_string)(int64_t *ret, const char *src_p, int src_size);
 
     int (*is_subclass)(RefNode *klass, RefNode *super);
@@ -621,7 +629,7 @@ struct FoxGlobal
 ////////////////////////////////////////////////////////////////////////////////
 
 #define FOX_VERSION_MAJOR    0
-#define FOX_VERSION_MINOR    13
+#define FOX_VERSION_MINOR    14
 #define FOX_VERSION_REVISION 0
 
 

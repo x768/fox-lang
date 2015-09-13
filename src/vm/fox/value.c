@@ -157,78 +157,6 @@ double Value_float(Value v)
 }
 
 /**
- * typeof(v) == Fracに限る
- * 10進数文字列表現
- * max_frac : 小数部の最大桁数 / -1:循環小数はエラー
- */
-char *Value_frac_s(Value v, int max_frac)
-{
-    char *c_buf = NULL;
-    RefFrac *md = Value_vp(v);
-    BigInt mi, rem;
-
-    BigInt_init(&mi);
-    BigInt_init(&rem);
-    BigInt_divmod(&mi, &rem, &md->bi[0], &md->bi[1]);
-    rem.sign = (rem.sign < 0) ? 1 : rem.sign;
-
-    // 小数部がない場合、整数部のみ出力
-    if (rem.sign == 0) {
-        c_buf = malloc(BigInt_str_bufsize(&mi, 10) + 1);
-        BigInt_str(&mi, 10, c_buf, FALSE);
-    } else {
-        int recr[2];
-        int n_ex;
-        BigInt ex;
-
-        if (get_recurrence(recr, &md->bi[1])) {
-            if (max_frac < 0) {
-                return NULL;
-            }
-            n_ex = max_frac;
-        } else {
-            n_ex = recr[0];
-            if (n_ex > max_frac) {
-                n_ex = max_frac;
-            }
-        }
-        BigInt_init(&ex);
-        int64_BigInt(&ex, 10);
-
-        BigInt_pow(&ex, n_ex);     // ex = ex ** width_f
-        BigInt_mul(&rem, &rem, &ex);
-        BigInt_divmod(&rem, NULL, &rem, &md->bi[1]);
-
-        c_buf = frac_tostr_sub(md->bi[0].sign, &mi, &rem, n_ex);
-        BigInt_close(&ex);
-    }
-    return c_buf;
-}
-
-/**
- * typeof(v) == Fracに限る
- * vをfactor倍してvalに入れる
- * 失敗したらreturn false
- */
-int Value_frac10(int64_t *val, Value v, int factor)
-{
-    RefFrac *md = Value_vp(v);
-    BigInt mp;
-    int ret;
-
-    BigInt_init(&mp);
-
-    BigInt_copy(&mp, &md->bi[0]);
-    BigInt_mul_sd(&mp, factor);
-    BigInt_divmod(&mp, NULL, &mp, &md->bi[1]);
-
-    ret = BigInt_int64(&mp, val);
-
-    BigInt_close(&mp);
-    return ret;
-}
-
-/**
  * Valueから文字列を取得
  * 取得できなければ""を返す
  */
@@ -363,37 +291,6 @@ Value float_Value(RefNode *klass, double dval)
     return v;
 }
 
-/**
- * str:    10進数小数
- * return: Value of Frac (エラー時はVALUE_NULL)
- */
-Value frac_s_Value(const char *str)
-{
-    RefFrac *md = buf_new(fs->cls_frac, sizeof(RefFrac));
-
-    BigInt_init(&md->bi[0]);
-    BigInt_init(&md->bi[1]);
-    if (!cstr_BigRat(md->bi, str, NULL)) {
-        return VALUE_NULL;
-    }
-    return vp_Value(md);
-}
-/**
- * return val / factor
- * ex) val = 123, factor = 100 -> 1.23d
- */
-Value frac10_Value(int64_t val, int factor)
-{
-    RefFrac *md = buf_new(fs->cls_frac, sizeof(RefFrac));
-
-    BigInt_init(&md->bi[0]);
-    BigInt_init(&md->bi[1]);
-    int64_BigInt(&md->bi[0], val);
-    int64_BigInt(&md->bi[1], factor);
-    BigRat_fix(md->bi);
-
-    return vp_Value(md);
-}
 Value cstr_Value(RefNode *klass, const char *p, int size)
 {
     RefStr *r;
@@ -734,6 +631,7 @@ int load_aliases_file(Hash *ret, const char *filename)
             break;
         }
         case T_NL:
+        case T_SEMICL:
             Tok_simple_next(&tk);
             break;
         case T_EOF:

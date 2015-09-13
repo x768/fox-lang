@@ -31,6 +31,7 @@ enum {
     MD_LINK_BRAKET,   // [hogehoge]
     MD_LINK_BRAKET_NEXT,// [hoge]    # [...]の後ろに限る
     MD_LINK_PAREN,    // (hogehoge)  # [...]の後ろに限る
+    MD_LINK_FOOTNOTE, // 
 
     // 単一要素
     MD_IMAGE,         // <img src="link" alt="title">
@@ -42,6 +43,7 @@ enum {
     MD_UNORDERD_LIST, // <ul>child</ul>
     MD_ORDERD_LIST,   // <ol>child</ol>
     MD_DEFINE_LIST,   // <dl>child</dl>
+    MD_FOOTNOTE_LIST, // <ol id="footnote">...
     MD_LIST_ITEM,     // <li>child</li>
     MD_DEFINE_DT,     // <dt>child</dt>
     MD_DEFINE_DD,     // <dd>child</dd>
@@ -58,9 +60,16 @@ enum {
     INDEX_MARKDOWN_MD,
     INDEX_MARKDOWN_NUM,
 };
+enum {
+    INDEX_MD_ELEM_TEXT,
+    INDEX_MD_ELEM_LINK,
+    INDEX_MD_ELEM_ID,
+    INDEX_MD_ELEM_NUM,
+};
 
 enum {
     OPT_LINK_RESOLVED,
+    OPT_LINK_PLUGIN_DONE,
     OPT_LINK_NAME_REF,
     OPT_TEXT_BACKSLASHES,
     OPT_TEXT_NO_BACKSLASHES,
@@ -79,10 +88,17 @@ typedef struct MDNode {
     uint16_t type;
     uint16_t opt;
     uint16_t indent;
+    uint16_t footnote_id;
 
     char *cstr;
     char *href;
 } MDNode;
+
+typedef struct MDNodeLink
+{
+    struct MDNodeLink *next;
+    MDNode *node;
+} MDNodeLink;
 
 typedef struct SimpleHash
 {
@@ -97,11 +113,16 @@ typedef struct {
     int enable_tex;
     int quiet_error;
     int tabstop;
-    int heading;
+    int heading_level;
+    int footnote_id;
 
     Mem mem;
     SimpleHash *link_map[SIMPLE_HASH_MAX];
     MDNode *root;
+    MDNodeLink *heading;
+    MDNodeLink **heading_p;
+    MDNodeLink *footnote;
+    MDNodeLink **footnote_p;
 } Markdown;
 
 

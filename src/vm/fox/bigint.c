@@ -481,6 +481,89 @@ ERROR_END:
     return 0;
 }
 
+// m = (m * 10) % d
+static void mul10mod(BigInt *m, BigInt *d)
+{
+    BigInt_mul_sd(m, 10);
+    BigInt_divmod(0, m, m, d);
+}
+int BigInt_get_recurrence(BigInt *mp, int *ret, int limit)
+{
+    int begin = 0;
+    int end = 0;
+    BigInt m;
+    BigInt p;
+
+    if (mp->sign == 0) {
+        ret[0] = 0;
+        ret[1] = 0;
+        return FALSE;
+    }
+    BigInt_init(&m);
+    int64_BigInt(&m, 1);
+    BigInt_init(&p);
+    int64_BigInt(&p, 1);
+
+    for (;;) {
+        if (end >= limit) {
+            begin = end;
+            goto RECR;
+        }
+        end++;
+        // m = (m * 10) % mp;
+        mul10mod(&m, mp);
+
+        // p = (p * 10) % mp;
+        // p = (p * 10) % mp;
+        mul10mod(&p, mp);
+        mul10mod(&p, mp);
+        if (BigInt_cmp(&m, &p) == 0) {
+            break;
+        }
+    }
+
+    if (p.sign == 0 && m.sign == 0) {
+        ret[0] = end;
+        ret[1] = end;
+        goto NOT_RECR;
+    }
+
+    int64_BigInt(&p, 1);
+    begin = 1;
+    while (BigInt_cmp(&m, &p) != 0) {
+        if (begin >= limit) {
+            end = begin;
+            goto RECR;
+        }
+        begin++;
+        // m = (m * 10) % mp;
+        mul10mod(&m, mp);
+
+        // p = (p * 10) % mp;
+        mul10mod(&p, mp);
+    }
+
+    //p = (p * 10) % n;
+    mul10mod(&p, mp);
+    end = begin;
+    while (BigInt_cmp(&m, &p) != 0) {
+        end++;
+        //p = (p * 10) % mp;
+        mul10mod(&p, mp);
+    }
+RECR:
+    ret[0] = begin;
+    ret[1] = end;
+    BigInt_close(&m);
+    BigInt_close(&p);
+    return TRUE;
+
+NOT_RECR:
+    BigInt_close(&m);
+    BigInt_close(&p);
+    return FALSE;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////
 
 void BigInt_set_max_alloc(int max)
@@ -1432,4 +1515,81 @@ int double_BigRat(BigInt *rat, double d)
         rat[0].sign = 0;
     }
     return 1;
+}
+
+char *BigRat_tostr_sub(int sign, BigInt *mi, BigInt *rem, int width_f)
+{
+    int len, len2;
+
+    char *c_buf = malloc(BigInt_str_bufsize(mi, 10) + width_f + 3);
+    if (mi->sign == 0 && sign == -1) {
+        strcpy(c_buf, "-0");
+    } else {
+        BigInt_str(mi, 10, c_buf, FALSE);
+    }
+    if (width_f == 0) {
+        return c_buf;
+    }
+    len = strlen(c_buf);
+    c_buf[len++] = '.';
+    BigInt_str(rem, 10, c_buf + len, FALSE);
+
+    len2 = strlen(c_buf + len);
+    if (len2 < width_f) {
+        int d = width_f - len2;
+        int i;
+        // 123 -> 0123 (\0も移動する)
+        for (i = len2; i >= 0; i--) {
+            c_buf[len + d + i] = c_buf[len + i];
+        }
+        memset(c_buf + len, '0', d);
+    }
+
+    return c_buf;
+}
+/**
+ * 10進数文字列表現
+ * max_frac : 小数部の最大桁数 / -1:循環小数はエラー
+ */
+char *BigRat_str(BigInt *rat, int max_frac)
+{
+    char *c_buf = NULL;
+    BigInt mi, rem;
+
+    BigInt_init(&mi);
+    BigInt_init(&rem);
+    BigInt_divmod(&mi, &rem, &rat[0], &rat[1]);
+    rem.sign = (rem.sign < 0) ? 1 : rem.sign;
+
+    // 小数部がない場合、整数部のみ出力
+    if (rem.sign == 0) {
+        c_buf = malloc(BigInt_str_bufsize(&mi, 10) + 1);
+        BigInt_str(&mi, 10, c_buf, FALSE);
+    } else {
+        int recr[2];
+        int n_ex;
+        BigInt ex;
+
+        if (BigInt_get_recurrence(&rat[1], recr, max_frac + 16)) {
+            if (max_frac < 0) {
+                return NULL;
+            }
+            n_ex = max_frac;
+        } else {
+            n_ex = recr[0];
+            if (n_ex > max_frac) {
+                n_ex = max_frac;
+            }
+        }
+        BigInt_init(&ex);
+        int64_BigInt(&ex, 10);
+
+        BigInt_pow(&ex, n_ex);     // ex = ex ** width_f
+        BigInt_mul(&rem, &rem, &ex);
+        BigInt_divmod(&rem, NULL, &rem, &rat[1]);
+
+        c_buf = BigRat_tostr_sub(rat[0].sign, &mi, &rem, n_ex);
+        BigInt_close(&ex);
+    }
+    return c_buf;
 }

@@ -25,9 +25,7 @@ static void signal_destroy(GObject *object, gpointer user_data)
     Ref *r = g_object_get_data(object, WINDOW_DATA_KEY);
 
     widget_handler_destroy(r);
-    fs->Value_dec(r->v[INDEX_WIDGET_HANDLE]);
     r->v[INDEX_WIDGET_HANDLE] = VALUE_NULL;
-    root_window_count--;
 }
 static void signal_drag_data_received(
         GtkWidget *widget, GdkDragContext *context,
@@ -157,9 +155,6 @@ void create_form_window(Value *v, WndHandle parent, int *size)
     Ref *r = Value_ref(*v);
     GtkWidget *window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
 
-    // Windowに関連付けたため、+1する
-    fs->Value_inc(*v);
-    root_window_count++;
     r->v[INDEX_WIDGET_HANDLE] = handle_Value(window);
     g_object_set_data(G_OBJECT(window), WINDOW_DATA_KEY, r);
 
@@ -255,12 +250,11 @@ int window_set_icon(WndHandle window, Ref *r, RefImage *icon)
     gtk_window_set_icon(GTK_WINDOW(window), img);
     return TRUE;
 }
-int window_message_loop(int *loop)
+int window_message_loop()
 {
     if (gtk_main_iteration_do(TRUE)) {
     } else {
     }
-    *loop = TRUE;
     return TRUE;
 }
 

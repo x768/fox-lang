@@ -668,21 +668,23 @@ static int integer_logical(Value *vret, Value *v, RefNode *node)
     if (Value_isint(v0) && Value_isint(v1)) {
         int32_t i1 = Value_integral(v0);
         int32_t i2 = Value_integral(v1);
+        int32_t ret = 0;
 
-        // TODO:負の数に対応
-        if (i1 < 0 || i2 < 0) {
-            goto ERROR_END;
-        }
         switch (type) {
         case T_AND:
-            *vret = int32_Value(i1 & i2);
+            ret = i1 & i2;
             break;
         case T_OR:
-            *vret = int32_Value(i1 | i2);
+            ret = i1 | i2;
             break;
         case T_XOR:
-            *vret = int32_Value(i1 ^ i2);
+            ret = i1 ^ i2;
             break;
+        }
+        if (ret == INT32_MIN) {
+            *vret = int64_Value(INT32_MIN);
+        } else {
+            *vret = int32_Value(ret);
         }
     } else {
         BigInt m1;
@@ -719,10 +721,6 @@ static int integer_logical(Value *vret, Value *v, RefNode *node)
         fix_bigint(vret, &mp->bi);
     }
     return TRUE;
-
-ERROR_END:
-    throw_errorf(fs->mod_lang, "ValueError", "Negative value is not supported");
-    return FALSE;
 }
 static int get_msb_pos(int32_t val)
 {
@@ -753,9 +751,6 @@ static int integer_shift(Value *vret, Value *v, RefNode *node)
 
     if (Value_isint(*v)){
         int32_t i1 = Value_integral(*v);
-        if (i1 < 0) {
-            goto ERROR_END;
-        }
         if (i1 == 0) {
             *vret = int32_Value(0);
         } if (shift + get_msb_pos(i1) > 31) {
@@ -765,17 +760,18 @@ static int integer_shift(Value *vret, Value *v, RefNode *node)
             int64_BigInt(&mp->bi, i1);
             BigInt_lsh(&mp->bi, shift);
         } else if (shift >= 0) {
-            *vret = int32_Value(i1 << shift);
+            int32_t ret = i1 << shift;
+            if (ret == INT32_MIN) {
+                *vret = int64_Value(INT32_MIN);
+            } else {
+                *vret = int32_Value(ret);
+            }
         } else {
             *vret = int32_Value(i1 >> (-shift));
         }
     } else {
         RefInt *mp = Value_vp(*v);
 
-        if (mp->bi.sign < 0) {
-            // TODO:負の数に対応
-            goto ERROR_END;
-        }
         if (shift > 0) {
             RefInt *mp2 = buf_new(fs->cls_int, sizeof(RefInt));
             *vret = vp_Value(mp2);
@@ -785,7 +781,13 @@ static int integer_shift(Value *vret, Value *v, RefNode *node)
             RefInt *mp2 = buf_new(fs->cls_int, sizeof(RefInt));
             *vret = vp_Value(mp2);
             BigInt_init(&mp2->bi);
-            BigInt_rsh(&mp->bi, -shift);
+            if (mp->bi.sign < 0) {
+                BigInt_add_d(&mp2->bi, -1);
+                BigInt_rsh(&mp->bi, -shift);
+                BigInt_add_d(&mp2->bi, 1);
+            } else {
+                BigInt_rsh(&mp->bi, -shift);
+            }
             fix_bigint(vret, &mp2->bi);
         } else {
             *vret = *v;
@@ -793,10 +795,6 @@ static int integer_shift(Value *vret, Value *v, RefNode *node)
         }
     }
     return TRUE;
-
-ERROR_END:
-    throw_errorf(fs->mod_lang, "ValueError", "Negative value is not supported");
-    return FALSE;
 }
 /**
  * 2の補数
@@ -1814,106 +1812,6 @@ static int frac_tofloat(Value *vret, Value *v, RefNode *node)
     return TRUE;
 }
 
-// m = (m * 10) % d
-static void mul10mod(BigInt *m, BigInt *d)
-{
-    BigInt_mul_sd(m, 10);
-    BigInt_divmod(0, m, m, d);
-}
-int get_recurrence(int *ret, BigInt *mp)
-{
-    int begin = 0;
-    int end = 0;
-    BigInt m;
-    BigInt p;
-
-    if (mp->sign == 0) {
-        ret[0] = 0;
-        ret[1] = 0;
-        return FALSE;
-    }
-    BigInt_init(&m);
-    int64_BigInt(&m, 1);
-    BigInt_init(&p);
-    int64_BigInt(&p, 1);
-
-    for (;;) {
-        end++;
-        // m = (m * 10) % mp;
-        mul10mod(&m, mp);
-
-        // p = (p * 10) % mp;
-        // p = (p * 10) % mp;
-        mul10mod(&p, mp);
-        mul10mod(&p, mp);
-        if (BigInt_cmp(&m, &p) == 0) {
-            break;
-        }
-    }
-
-    if (p.sign == 0) {
-        ret[0] = end;
-        ret[1] = end;
-        goto NOT_RECR;
-    }
-
-    int64_BigInt(&p, 1);
-    begin = 1;
-    while (BigInt_cmp(&m, &p) != 0) {
-        begin++;
-        // m = (m * 10) % mp;
-        mul10mod(&m, mp);
-
-        // p = (p * 10) % mp;
-        mul10mod(&p, mp);
-    }
-
-    //p = (p * 10) % n;
-    mul10mod(&p, mp);
-    end = begin;
-    while (BigInt_cmp(&m, &p) != 0) {
-        end++;
-        //p = (p * 10) % mp;
-        mul10mod(&p, mp);
-    }
-    ret[0] = begin;
-    ret[1] = end;
-    BigInt_close(&m);
-    BigInt_close(&p);
-    return TRUE;
-
-NOT_RECR:
-    BigInt_close(&m);
-    BigInt_close(&p);
-    return FALSE;
-}
-char *frac_tostr_sub(int sign, BigInt *mi, BigInt *rem, int width_f)
-{
-    int len, len2;
-
-    char *c_buf = malloc(BigInt_str_bufsize(mi, 10) + width_f + 3);
-    if (mi->sign == 0 && sign == -1) {
-        strcpy(c_buf, "-0");
-    } else {
-        BigInt_str(mi, 10, c_buf, FALSE);
-    }
-    len = strlen(c_buf);
-    c_buf[len++] = '.';
-    BigInt_str(rem, 10, c_buf + len, FALSE);
-
-    len2 = strlen(c_buf + len);
-    if (len2 < width_f) {
-        int d = width_f - len2;
-        int i;
-        // 123 -> 0123 (\0も移動する)
-        for (i = len2; i >= 0; i--) {
-            c_buf[len + d + i] = c_buf[len + i];
-        }
-        memset(c_buf + len, '0', d);
-    }
-
-    return c_buf;
-}
 static int frac_tostr(Value *vret, Value *v, RefNode *node)
 {
     RefFrac *md = Value_vp(*v);
@@ -1968,21 +1866,18 @@ static int frac_tostr(Value *vret, Value *v, RefNode *node)
             if (nf.width_f > 0) {
                 n_ex = nf.width_f;
             } else if (rem.sign == 0) {
-                n_ex = 1;
-            } else if (get_recurrence(recr, &md->bi[1])) {
+                n_ex = 0;
+            } else if (BigInt_get_recurrence(&md->bi[1], recr, 64)) {
                 // 循環小数
-                if (recr[1] - recr[0] > 6) {
+                if (recr[1] - recr[0] > 16) {
                     n_ex = recr[1];
                 } else {
-                    n_ex = recr[0] + 5;
+                    n_ex = recr[0] + 15;
                 }
                 ellip = TRUE;
             } else {
                 // 循環しない
                 n_ex = recr[0];
-                if (n_ex == 0) {
-                    n_ex = 1;
-                }
             }
             BigInt_init(&ex);
             int64_BigInt(&ex, 10);
@@ -1992,7 +1887,7 @@ static int frac_tostr(Value *vret, Value *v, RefNode *node)
 
             BigInt_divmod(&rem, NULL, &rem, &md->bi[1]);
 
-            c_buf = frac_tostr_sub(md->bi[0].sign, &mi, &rem, n_ex);
+            c_buf = BigRat_tostr_sub(md->bi[0].sign, &mi, &rem, n_ex);
             if (n_ex > 0) {
                 BigInt_close(&ex);
             }
@@ -2224,7 +2119,6 @@ static int adjust_float_str(char *dst, const char *src, int ex)
             src++;
         strcpy(dst, src);
     } else if (ex > 0) {
-        int dpoint = FALSE;
         // 大きくする方向に桁をずらす
         ex++;
         for (; *src != '\0'; src++) {
@@ -2234,7 +2128,6 @@ static int adjust_float_str(char *dst, const char *src, int ex)
                 ex--;
                 if (ex == 0 && src[1] != '\0') {
                     *dst++ = '.';
-                    dpoint = TRUE;
                 }
             }
         }
@@ -2243,26 +2136,10 @@ static int adjust_float_str(char *dst, const char *src, int ex)
             memset(dst, '0', ex);
             dst += ex;
         }
-        if (dpoint) {
-            *dst = '\0';
-        } else {
-            strcpy(dst, ".0");
-        }
+        *dst = '\0';
     } else {
         // そのまま
-        int dpoint = FALSE;
-        for (; *src != '\0'; src++) {
-            int ch = *src;
-            *dst++ = ch;
-            if (ch == '.') {
-                dpoint = TRUE;
-            }
-        }
-        if (dpoint) {
-            *dst = '\0';
-        } else {
-            strcpy(dst, ".0");
-        }
+        strcpy(dst, src);
     }
     return 0;
 }

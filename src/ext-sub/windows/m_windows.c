@@ -138,6 +138,48 @@ static double Value_oledate(Value v)
     SystemTimeToVariantTime(&st, &dt);
     return dt;
 }
+/**
+ * typeof(v) == Fracに限る
+ * vをfactor倍してvalに入れる
+ * 失敗したらreturn false
+ */
+static int Value_frac10(int64_t *val, Value v, int factor)
+{
+    RefFrac *md = Value_vp(v);
+    BigInt mp, mp_fac;
+    int ret;
+
+    fs->BigInt_init(&mp);
+    fs->BigInt_init(&mp_fac);
+
+    fs->BigInt_copy(&mp, &md->bi[0]);
+    fs->int64_BigInt(&mp_fac, factor);
+    fs->BigInt_mul(&mp, &mp, &mp_fac);
+    fs->BigInt_divmod(&mp, NULL, &mp, &md->bi[1]);
+
+    ret = fs->BigInt_int64(&mp, val);
+
+    fs->BigInt_close(&mp);
+    fs->BigInt_close(&mp_fac);
+    return ret;
+}
+/**
+ * return val / factor
+ * ex) val = 123, factor = 100 -> 1.23d
+ */
+static Value frac10_Value(int64_t val, int factor)
+{
+    RefFrac *md = fs->buf_new(fs->cls_frac, sizeof(RefFrac));
+
+    fs->BigInt_init(&md->bi[0]);
+    fs->BigInt_init(&md->bi[1]);
+    fs->int64_BigInt(&md->bi[0], val);
+    fs->int64_BigInt(&md->bi[1], factor);
+    fs->BigRat_fix(md->bi);
+
+    return vp_Value(md);
+}
+
 static void throw_windows_error(const char *err_class, DWORD errcode)
 {
     enum {
@@ -300,14 +342,14 @@ static int fox_value_to_variant(VARIANT *va, Value v, Mem *mem, Hash *hash)
     } else if (type == fs->cls_frac) {
         // 10000倍してint64に変換
         va->vt = VT_CY;
-        if (!fs->Value_frac10(&va->cyVal.int64, v, 10000)) {
+        if (!Value_frac10(&va->cyVal.int64, v, 10000)) {
             fs->throw_errorf(fs->mod_lang, "ValueError", "Currency out of range");
             return FALSE;
         }
     } else if (type == fs->cls_bool) {
         va->vt = VT_BOOL;
         va->boolVal = (Value_bool(v) ? TRUE : FALSE);
-    } else if (type == fs->cls_time || type == fs->cls_timestamp) {
+    } else if (type == fs->cls_datetime || type == fs->cls_timestamp) {
         va->vt = VT_DATE;
         va->date = Value_oledate(v);
     } else if (type == fs->cls_null) {
@@ -380,7 +422,7 @@ static int variant_to_fox_value(Value *v, VARIANT *va)
             i64 = va->cyVal.int64;
         }
         // 1/10000した値をfracに変換
-        *v = fs->frac10_Value(i64, 10000);
+        *v = frac10_Value(i64, 10000);
         if (*v == VALUE_NULL) {
             fs->throw_errorf(fs->mod_lang, "ValueError", "Currency out of range");
             return FALSE;

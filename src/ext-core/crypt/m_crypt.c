@@ -96,10 +96,8 @@ static int ssl_ctx_new(Value *vret, Value *v, RefNode *node)
 #endif
     } else if (str_eq(mode->c, mode->size, "DTLSv1", -1)) {
         method = DTLSv1_client_method();
-    } else if (str_eq(mode->c, mode->size, "SSLv2/3", -1)) {
-        method = SSLv23_client_method();
     } else {
-        fs->throw_errorf(mod_crypt, "SSLError", "Must be 'TLSv1.0', 'TLSv1.1', 'TLSv1.2', 'DTLSv1' or 'SSLv2/3'");
+        fs->throw_errorf(mod_crypt, "SSLError", "Not supported type %q", mode->c);
         return FALSE;
     }
     ctx->ctx = SSL_CTX_new(method);
@@ -255,45 +253,45 @@ static Value X509_NAME_to_val(X509_NAME *name)
         return VALUE_NULL;
     }
 }
-static void ASN1_TIME_to_calendar(Calendar *cal, ASN1_TIME* tm)
+static void ASN1_TIME_to_calendar(DateTime *dt, ASN1_TIME* tm)
 {
     const char* str = (const char*)tm->data;
 
     switch (tm->type) {
     case V_ASN1_UTCTIME:
-        cal->year = (str[0] - '0') * 10 + (str[1] - '0');
-        if (cal->year < 70) {
-            cal->year += 2000;
+        dt->d.year = (str[0] - '0') * 10 + (str[1] - '0');
+        if (dt->d.year < 70) {
+            dt->d.year += 2000;
         } else {
-            cal->year += 1900;
+            dt->d.year += 1900;
         }
         str += 2;
         break;
     case V_ASN1_GENERALIZEDTIME:
-        cal->year = (str[0] - '0') * 1000 + (str[1] - '0') * 100 + (str[2] - '0') * 10 + (str[3] - '0');
+        dt->d.year = (str[0] - '0') * 1000 + (str[1] - '0') * 100 + (str[2] - '0') * 10 + (str[3] - '0');
         str += 4;
         break;
     }
-    cal->month = (str[0] - '0') * 10 + (str[1] - '0');
+    dt->d.month = (str[0] - '0') * 10 + (str[1] - '0');
     str += 2;
-    cal->day_of_month = (str[0] - '0') * 10 + (str[1] - '0');
+    dt->d.day_of_month = (str[0] - '0') * 10 + (str[1] - '0');
     str += 2;
-    cal->hour = (str[0] - '0') * 10 + (str[1] - '0');
+    dt->t.hour = (str[0] - '0') * 10 + (str[1] - '0');
     str += 2;
-    cal->minute = (str[0] - '0') * 10 + (str[1] - '0');
+    dt->t.minute = (str[0] - '0') * 10 + (str[1] - '0');
     str += 2;
-    cal->second = (str[0] - '0') * 10 + (str[1] - '0');
+    dt->t.second = (str[0] - '0') * 10 + (str[1] - '0');
     str += 2;
-    cal->millisec = 0;
+    dt->t.millisec = 0;
 }
 static Value ASN1_TIME_to_val(ASN1_TIME *tm)
 {
     if (tm != NULL) {
         RefInt64 *rt = fs->buf_new(fs->cls_timestamp, sizeof(RefInt64));
-        Calendar cal;
-        memset(&cal, 0, sizeof(cal));
-        ASN1_TIME_to_calendar(&cal, tm);
-        fs->Calendar_to_Time(&rt->u.i, &cal);
+        DateTime dt;
+        memset(&dt, 0, sizeof(dt));
+        ASN1_TIME_to_calendar(&dt, tm);
+        fs->DateTime_to_Timestamp(&rt->u.i, &dt);
         return vp_Value(rt);
     } else {
         return VALUE_NULL;

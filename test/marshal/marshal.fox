@@ -5,7 +5,7 @@ import time
 let data = {
     a = ["abc", b"cde"],
     b = null,
-    c = [1, 3.14, 1.23d, Time.now()],
+    c = [1, 3.14, 1.23d, DateTime.now()],
     d = true,
 	e = 1..10,
 }

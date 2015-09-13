@@ -1,5 +1,5 @@
-#ifndef _M_BIGINT_H_
-#define _M_BIGINT_H_
+#ifndef _BIGINT_H_
+#define _BIGINT_H_
 
 #include "fox.h"
 
@@ -23,9 +23,12 @@ int BigInt_int64(const BigInt *bi, int64_t *value);
 double BigInt_double(const BigInt *bi);
 int BigInt_str_bufsize(const BigInt *bi, int radix);
 int BigInt_str(const BigInt *bi, int radix, char *str, int upper);
+char *BigRat_str(BigInt *rat, int max_frac);
+char *BigRat_tostr_sub(int sign, BigInt *mi, BigInt *rem, int width_f);
 
 uint32_t BigInt_hash(const BigInt *bi);
 int BigInt_cmp(const BigInt *a, const BigInt *b);
+int BigInt_get_recurrence(BigInt *mp, int *ret, int limit);
 
 int BigInt_lsh(BigInt *bi, uint32_t sh);
 void BigInt_rsh(BigInt *bi, uint32_t sh);
@@ -43,4 +46,4 @@ void BigInt_divmod_sd(BigInt *bi, int dv, uint16_t *mod);
 int BigInt_pow(BigInt *a, uint32_t n);
 int BigInt_gcd(BigInt *ret, const BigInt *a, const BigInt *b);
 
-#endif /* _M_BIGINT_H_ */
+#endif /* _BIGINT_H_ */

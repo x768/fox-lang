@@ -202,15 +202,15 @@ static void parse_ext_field(CentralDir *cdir, const char *p, int p_size)
 }
 static int64_t dostime_to_time(int dt, int tm, RefTimeZone *tz)
 {
-    RefTime d;
+    RefDateTime d;
 
-    d.cal.year = ((dt >> 9) & 0xFFFF) + 1980;
-    d.cal.month = (dt >> 5) & 0xF;
-    d.cal.day_of_month = dt & 0x1F;
-    d.cal.hour = (tm >> 11) & 0x1F;
-    d.cal.minute = (tm >> 5) & 0x3F;
-    d.cal.second = (tm & 0x1F) * 2;
-    d.cal.millisec = 0;
+    d.dt.d.year = ((dt >> 9) & 0xFFFF) + 1980;
+    d.dt.d.month = (dt >> 5) & 0xF;
+    d.dt.d.day_of_month = dt & 0x1F;
+    d.dt.t.hour = (tm >> 11) & 0x1F;
+    d.dt.t.minute = (tm >> 5) & 0x3F;
+    d.dt.t.second = (tm & 0x1F) * 2;
+    d.dt.t.millisec = 0;
     d.tz = tz;
 
     fs->adjust_timezone(&d);
@@ -218,19 +218,19 @@ static int64_t dostime_to_time(int dt, int tm, RefTimeZone *tz)
 }
 static void time_to_dostime(int *dt, int *tm, int64_t tm64, RefTimeZone *tz)
 {
-    RefTime d;
+    RefDateTime d;
 
     d.tm = tm64;
     d.tz = tz;
-    fs->adjust_date(&d);
+    fs->adjust_datetime(&d);
 
-    if (d.cal.year < 1980 || d.cal.year > 9999) {
+    if (d.dt.d.year < 1980 || d.dt.d.year > 9999) {
         *dt = (1 << 5) | 1;  // 1980-01-01
         *tm = 0;             // 00:00:00
         return;
     }
-    *dt = ((d.cal.year - 1980) << 9) | (d.cal.month << 5) | d.cal.day_of_month;
-    *tm = (d.cal.hour << 11) | (d.cal.minute << 5) | (d.cal.second >> 1);
+    *dt = ((d.dt.d.year - 1980) << 9) | (d.dt.d.month << 5) | d.dt.d.day_of_month;
+    *tm = (d.dt.t.hour << 11) | (d.dt.t.minute << 5) | (d.dt.t.second >> 1);
 }
 static CentralDir *read_central_dirs(CentralDirEnd *cdir_end, char *cbuf, RefCharset *cs, RefTimeZone *tz)
 {

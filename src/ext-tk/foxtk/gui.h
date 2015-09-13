@@ -62,9 +62,8 @@ extern RefNode *cls_menuitem;
 extern RefNode *cls_event;
 extern RefNode *cls_evt_handler;
 extern RefNode *cls_timer;
-extern RefNode *cls_filemonitor;
+extern RefNode *cls_dirmonitor;
 extern RefNode *cls_image;
-extern int root_window_count;
 
 #ifdef DEFINE_GLOBALS
 #undef extern
@@ -117,7 +116,7 @@ void window_set_title(WndHandle window, const char *s);
 int window_get_visible(WndHandle window);
 void window_set_visible(WndHandle window, int show);
 void window_set_keep_above(WndHandle window, int above);
-int window_message_loop(int *loop);
+int window_message_loop(void);
 
 void connect_widget_events(WndHandle window);
 void create_image_pane_window(Value *v, WndHandle parent);
@@ -126,9 +125,8 @@ int image_pane_set_image_sub(WndHandle window, RefImage *img);
 // monitor.c
 void native_timer_new(int millisec, Ref *r);
 void native_timer_remove(Ref *r);
-int native_filemonitor_new(Ref *r, const char *path);
-void native_filemonitor_remove(Ref *r);
-void native_object_remove_all(void);
+int native_dirmonitor_new(Ref *r, const char *path);
+void native_dirmonitor_remove(Ref *r);
 
 
 // clipboard.c
