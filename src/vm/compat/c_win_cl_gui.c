@@ -9,12 +9,12 @@ const char *get_default_locale(void)
 {
     static const char *def_locale = NULL;
     if (def_locale == NULL) {
-        wchar_t buf[18];
+        wchar_t wbuf[18];
 
-        GetLocaleInfoW(LOCALE_USER_DEFAULT, LOCALE_SISO639LANGNAME, buf, 8);
-        wcscat(buf, L"_");
-        GetLocaleInfoW(LOCALE_USER_DEFAULT, LOCALE_SISO3166CTRYNAME, buf + wcslen(buf), 8);
-        def_locale = utf16to8(buf);
+        GetLocaleInfoW(LOCALE_USER_DEFAULT, LOCALE_SISO639LANGNAME, wbuf, 8);
+        wcscat(wbuf, L"_");
+        GetLocaleInfoW(LOCALE_USER_DEFAULT, LOCALE_SISO3166CTRYNAME, wbuf + wcslen(wbuf), 8);
+        def_locale = utf16_to_cstr(wbuf, -1);
     } else {
         def_locale = "(neutral)";
     }
@@ -154,9 +154,9 @@ static const char **get_cmd_args(int *pargc)
     int i;
 
     for (i = 0; i < argc; i++) {
-        int len = WideCharToMultiByte(CP_UTF8, 0, wargv[i], -1, NULL, 0, NULL, NULL);
+        int len = utf16_to_utf8(NULL, wargv[i], -1);
         char *p = Mem_get(&fg->st_mem, len + 1);
-        WideCharToMultiByte(CP_UTF8, 0, wargv[i], -1, p, len + 1, NULL, NULL);
+        utf16_to_utf8(p, wargv[i], -1);
         argv[i] = p;
     }
     argv[argc] = NULL;

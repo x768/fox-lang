@@ -3,7 +3,7 @@ project(m_media)
 add_library(m_media SHARED
   ${SRC_COMMON}
   m_media.c
-  codec.c
+  wav_io.c
 )
 set_target_properties(m_media
   PROPERTIES

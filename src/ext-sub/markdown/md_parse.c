@@ -234,12 +234,54 @@ static int MDTok_parse_text(MDTok *tk, const char *term, int term_strike)
 }
 static void MDTok_skip_space(MDTok *tk)
 {
-    // 行末までのスペースを除去
+    // スペースを除去(改行まで)
     while (*tk->p != '\0') {
         if ((*tk->p & 0xFF) <= ' ' && *tk->p != '\n') {
             tk->p++;
         } else {
             break;
+        }
+    }
+}
+/**
+ * aaa bbb ccc
+ * ↓
+ *"aaa\0bbb\0ccc\0\0"
+ */
+static int MDTok_parse_list(MDTok *tk, int term)
+{
+    for (;;) {
+        int ch;
+
+        MDTok_skip_space(tk);
+        ch = *tk->p;
+        if (ch == term || ch == '\n' || ch == '\0') {
+            return TRUE;
+        }
+
+        for (;;) {
+            ch = *tk->p & 0xFF;
+            if (ch == term || ch <= ' ') {
+                break;
+            }
+            tk->p++;
+            if (ch == '\\') {
+                ch = *tk->p;
+                if (ch != '\0') {
+                    if (!fs->StrBuf_add_c(&tk->val, ch)) {
+                        return FALSE;
+                    }
+                    tk->p++;
+                }
+            } else {
+                if (!fs->StrBuf_add_c(&tk->val, ch)) {
+                    return FALSE;
+                }
+            }
+        }
+
+        if (!fs->StrBuf_add_c(&tk->val, '\0')) {
+            return FALSE;
         }
     }
 }
@@ -357,16 +399,12 @@ static void MDTok_next(MDTok *tk)
             tk->type = MD_TABLE;
             tk->table_row = TRUE;
             return;
-        case '%': {
-            const char *top;
-
+        case '%':
             tk->p++;
-            MDTok_skip_space(tk);
-            top = tk->p;
-            while (*tk->p != '\0' && *tk->p != '\n') {
-                tk->p++;
+            if (!MDTok_parse_list(tk, '\0')) {
+                tk->type = MD_FATAL_ERROR;
+                return;
             }
-            fs->StrBuf_add(&tk->val, top, tk->p - top);
             if (*tk->p == '\n') {
                 tk->p++;
             }
@@ -374,7 +412,6 @@ static void MDTok_next(MDTok *tk)
             tk->head = TRUE;
             tk->prev_link = FALSE;
             return;
-        }
         case '`':
             if (tk->p[1] == '`' && tk->p[2] == '`') {
                 const char *top;
@@ -417,16 +454,6 @@ RETRY:
     switch (*tk->p) {
     case '\0':
         tk->type = MD_EOS;
-        tk->prev_link = FALSE;
-        return;
-    case '_':
-        tk->p++;
-        if (*tk->p == '_') {
-            tk->p++;
-            tk->type = MD_STRONG;
-        } else {
-            tk->type = MD_EM;
-        }
         tk->prev_link = FALSE;
         return;
     case '*':
@@ -477,18 +504,37 @@ RETRY:
         }
         break;
     }
+    case '!':
+        if (tk->p[1] == '[') {
+            tk->p += 2;
+            tk->type = MD_IMAGE;
+            if (!MDTok_parse_text(tk, "\n]", FALSE)) {
+                tk->type = MD_FATAL_ERROR;
+                return;
+            }
+            if (*tk->p == ']') {
+                tk->p++;
+            }
+            tk->prev_link = TRUE;
+            return;
+        }
+        break;
     case '[':
         if ((tk->p[1] & 0xFF) > ' ') {
             tk->p++;
             if (*tk->p == '%') {
                 tk->p++;
                 tk->type = MD_INLINE_PLUGIN;
+                if (!MDTok_parse_list(tk, ']')) {
+                    tk->type = MD_FATAL_ERROR;
+                    return;
+                }
             } else {
                 tk->type = MD_LINK_BRAKET;
-            }
-            if (!MDTok_parse_text(tk, "\n]", FALSE)) {
-                tk->type = MD_FATAL_ERROR;
-                return;
+                if (!MDTok_parse_text(tk, "\n]", FALSE)) {
+                    tk->type = MD_FATAL_ERROR;
+                    return;
+                }
             }
             if (*tk->p == ']') {
                 tk->p++;
@@ -543,7 +589,7 @@ RETRY:
     }
 
     tk->prev_link = FALSE;
-    if (!MDTok_parse_text(tk, tk->table_row ? "\n*_`[:|" : "\n*_`[:", TRUE)) {
+    if (!MDTok_parse_text(tk, tk->table_row ? "\n*`[:|" : "\n*`[:", TRUE)) {
         tk->type = MD_FATAL_ERROR;
         return;
     }
@@ -678,6 +724,21 @@ static int parse_markdown_line(Markdown *r, MDTok *tk, MDNode **ppnode, int term
                 node->opt = OPT_LINK_NAME_REF;
             }
             break;
+        case MD_IMAGE:
+            node = MDNode_new(MD_IMAGE, r);
+            node->cstr = fs->str_dup_p(tk->val.p, tk->val.size, &r->mem);
+            node->href = node->cstr;
+            *ppnode = node;
+            ppnode = &node->next;
+            MDTok_next(tk);
+
+            if (tk->type == MD_LINK_PAREN) {
+                node->href = fs->str_dup_p(tk->val.p, tk->val.size, &r->mem);
+                MDTok_next(tk);
+            } else {
+                node->href = node->cstr;
+            }
+            break;
         case MD_EM:
         case MD_STRONG:
         case MD_STRIKE: {
@@ -706,6 +767,13 @@ static int parse_markdown_line(Markdown *r, MDTok *tk, MDNode **ppnode, int term
                 ppnode = &node->next;
                 MDTok_next(tk);
             }
+            break;
+        case MD_INLINE_PLUGIN:
+            node = MDNode_new(MD_INLINE_PLUGIN, r);
+            node->cstr = fs->str_dup_p(tk->val.p, tk->val.size, &r->mem);
+            *ppnode = node;
+            ppnode = &node->next;
+            MDTok_next(tk);
             break;
         case MD_NEWLINE:
             MDTok_next(tk);
@@ -918,7 +986,7 @@ static int parse_markdown_block(Markdown *r, MDTok *tk, MDNode **ppnode, int bq_
                 MDTok_next(tk);  // colon
                 MDTok_skip_space(tk);
                 MDTok_next(tk);
-                parse_markdown_line(r, tk, &node, MD_NONE);
+                parse_markdown_line(r, tk, &node, MD_NEWLINE);
                 // footnote
                 if (name[0] == '^') {
                     MDNodeLink *foot = fs->Mem_get(&r->mem, sizeof(MDNodeLink));
@@ -953,10 +1021,12 @@ static int parse_markdown_block(Markdown *r, MDTok *tk, MDNode **ppnode, int bq_
             // fall through
         case MD_TEXT:
         case MD_LINK:
+        case MD_IMAGE:
         case MD_EM:
         case MD_STRONG:
         case MD_STRIKE:
         case MD_CODE_INLINE:
+        case MD_INLINE_PLUGIN:
             node = MDNode_new(MD_PARAGRAPH, r);
             node->indent = tk->indent;
             prev_node = node;
@@ -1036,11 +1106,23 @@ static int ref_has_method(Ref *obj, RefStr *name)
     RefNode *type = obj->rh.type;
     return fs->Hash_get_p(&type->u.c.h, name) != NULL;
 }
+static RefArray *cstr_to_RefArray(const char *str)
+{
+    RefArray *ra = fs->refarray_new(0);
+
+    while (*str != '\0') {
+        Value *vp = fs->refarray_push(ra);
+        int len = strlen(str);
+        *vp = fs->cstr_Value(fs->cls_str, str, len);
+        str += len + 1;
+    }
+    return ra;
+}
 static int link_markdown_plugin(Ref *ref, MDNode *node, RefStr *name, int inline_p)
 {
     RefNode *ret_type;
 
-    fs->Value_push("rs", ref, node->cstr);
+    fs->Value_push("rr", ref, cstr_to_RefArray(node->cstr));
     if (!fs->call_member_func(name, 1, TRUE)) {
         return FALSE;
     }
@@ -1077,29 +1159,32 @@ static int link_markdown_plugin(Ref *ref, MDNode *node, RefStr *name, int inline
     fs->Value_pop();
     return TRUE;
 }
-static int link_callback_plugin(Ref *ref, Markdown *r, MDNode *node)
+static int link_callback_plugin(Ref *ref, Markdown *r, MDNode *node, RefStr *member_func)
 {
     RefNode *ret_type;
-    RefStr *ret_str;
 
     fs->Value_push("rs", ref, node->href);
-    if (!fs->call_member_func(str_link_callback, 1, TRUE)) {
+    if (!fs->call_member_func(member_func, 1, TRUE)) {
         return FALSE;
     }
     ret_type = fs->Value_type(fg->stk_top[-1]);
-    if (ret_type != fs->cls_str) {
+    if (ret_type == fs->cls_str) {
+        RefStr *ret_str = Value_vp(fg->stk_top[-1]);
+        node->href = fs->str_dup_p(ret_str->c, ret_str->size, &r->mem);
+    } else if (ret_type == fs->cls_null) {
+        node->type = MD_TEXT;
+        node->href = NULL;
+    } else {
         fs->throw_error_select(THROW_RETURN_TYPE__NODE_NODE, fs->cls_str, ret_type);
         return FALSE;
     }
-    ret_str = Value_vp(fg->stk_top[-1]);
-    node->href = fs->str_dup_p(ret_str->c, ret_str->size, &r->mem);
-
     fs->Value_pop();
     return TRUE;
 }
 static int link_markdown_sub(Ref *ref, Markdown *r, MDNode *node)
 {
-    int has_callback = ref_has_method(ref, str_link_callback);
+    int has_link_callback = ref_has_method(ref, str_link_callback);
+    int has_image_callback = ref_has_method(ref, str_image_callback);
     int has_block_plugin = ref_has_method(ref, str_block_plugin);
     int has_inline_plugin = ref_has_method(ref, str_inline_plugin);
 
@@ -1109,8 +1194,13 @@ static int link_markdown_sub(Ref *ref, Markdown *r, MDNode *node)
                 MDNode *nd = SimpleHash_get_node(r->link_map, node->href);
                 switch (node->href[0]) {
                 case '^':  // footnote
-                    node->type = MD_LINK_FOOTNOTE;
-                    node->opt = nd->footnote_id;
+                    if (nd != NULL) {
+                        node->type = MD_LINK_FOOTNOTE;
+                        node->opt = nd->footnote_id;
+                    } else {
+                        node->type = MD_LINK_FOOTNOTE;
+                        node->opt = -1;
+                    }
                     break;
                 default:
                     if (nd != NULL) {
@@ -1133,18 +1223,24 @@ static int link_markdown_sub(Ref *ref, Markdown *r, MDNode *node)
                                 node->href = nd->href;
                             }
                         }
-                    } else if (has_callback) {
-                        if (!link_callback_plugin(ref, r, node)) {
+                    } else if (has_link_callback) {
+                        if (!link_callback_plugin(ref, r, node, str_link_callback)) {
                             return FALSE;
                         }
                     }
                     break;
                 }
             } else if (node->opt == OPT_LINK_RESOLVED) {
-                if (has_callback) {
-                    if (!link_callback_plugin(ref, r, node)) {
+                if (has_link_callback) {
+                    if (!link_callback_plugin(ref, r, node, str_link_callback)) {
                         return FALSE;
                     }
+                }
+            }
+        } else if (node->type == MD_IMAGE) {
+            if (has_image_callback) {
+                if (!link_callback_plugin(ref, r, node, str_image_callback)) {
+                    return FALSE;
                 }
             }
         } else if (node->type == MD_BLOCK_PLUGIN) {

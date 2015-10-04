@@ -1,0 +1,44 @@
+import "text/x-csrc"
+
+"alignof" = _ keyword _
+"catch" = _ keyword _
+"class" = _ keyword _
+"compl" = _ keyword _
+"constexpr" = _ keyword _
+"const_cast" = _ keyword _
+"decltype" = _ keyword _
+"delete" = _ keyword _
+"dynamic_cast" = _ keyword _
+"explicit" = _ keyword _
+"export" = _ keyword _
+"false" = _ keyword _
+"final" = _ keyword _
+"friend" = _ keyword _
+"mutable" = _ keyword _
+"namespace" = _ keyword _
+"new" = _ keyword _
+"noexcept" = _ keyword _
+"nullptr" = _ keyword _
+"operator" = _ keyword _
+"override" = _ keyword _
+"private" = _ keyword _
+"protected" = _ keyword _
+"public" = _ keyword _
+"reinterpret_cast" = _ keyword _
+"static_assert" = _ keyword _
+"static_cast" = _ keyword _
+"template" = _ keyword _
+"this" = _ keyword _
+"thread_local" = _ keyword _
+"throw" = _ keyword _
+"true" = _ keyword _
+"try" = _ keyword _
+"typename" = _ keyword _
+"typeid" = _ keyword _
+"using" = _ keyword _
+"virtual" = _ keyword _
+
+"char16_t" = _ typename _
+"char32_t" = _ typename _
+"nullptr_t" = _ typename _
+"type_info" = _ typename _

@@ -17,7 +17,7 @@ static Value ref_set_cookie;
 
 static void for_cgi_mode_error(void)
 {
-    throw_errorf(mod_cgi, "CgiError", "This function is only for cgi-mode");
+    throw_errorf(fs->mod_lang, "NotSupportedError", "This function is only for cgi-mode");
 }
 
 void cgi_init_responce()

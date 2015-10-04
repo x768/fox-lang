@@ -1,10 +1,3 @@
-/*
- * image.h
- *
- *  Created on: 2012/06/02
- *      Author: frog
- */
-
 #ifndef IMAGE_H_
 #define IMAGE_H_
 

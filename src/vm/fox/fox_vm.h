@@ -287,8 +287,8 @@ Str Str_trim(Str src);
 
 void StrBuf_init(StrBuf *s, int size);
 void StrBuf_init_refstr(StrBuf *s, int size);
-void StrBuf_alloc(StrBuf *s, int size);
 Value StrBuf_str_Value(StrBuf *s, RefNode *type);
+int StrBuf_alloc(StrBuf *s, int size);
 int StrBuf_add(StrBuf *s, const char *p, int size);
 int StrBuf_add_c(StrBuf *s, char c);
 int StrBuf_add_r(StrBuf *s, RefStr *r);
@@ -297,7 +297,6 @@ int StrBuf_printf(StrBuf *s, const char *fmt, ...);
 int StrBuf_add_v(StrBuf *s, Value v);
 
 char *read_from_file(int *psize, const char *path, Mem *mem);
-int FileHandle_read_all_to_strbuf(StrBuf *buf, int fd, int limit);
 
 
 // util_str.c
@@ -580,13 +579,13 @@ void define_lang_str_class(RefNode *m);
 
 // m_time.c
 int64_t Value_timestamp(Value v, RefTimeZone *tz);
-Value time_Value(int64_t i_tm, RefTimeZone *tz);
+Value time_Value(int64_t ts, RefTimeZone *tz);
 RefTimeZone *get_local_tz(void);
 void adjust_timezone(RefDateTime *dt);
 void adjust_datetime(RefDateTime *dt);
 int timedelta_parse_string(int64_t *ret, const char *src_p, int src_size);
-void timestamp_to_RFC2822_UTC(int64_t tm, char *dst);
-void timestamp_to_cookie_date(int64_t tm, char *dst);
+void timestamp_to_RFC2822_UTC(int64_t ts, char *dst);
+void timestamp_to_cookie_date(int64_t ts, char *dst);
 RefNode *init_time_module_stubs(void);
 void init_time_module_1(RefNode *m);
 

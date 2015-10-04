@@ -56,11 +56,11 @@ typedef struct {
     int (*invoke_event_handler)(int *result, Value eh, Value evt);
     void (*widget_event_handler_sub)(Value *vret, Ref *r, RefStr *name);
     int (*widget_handler_destroy)(Ref *r);
+    void (*connect_widget_events)(WndHandle window);
 
     Value (*event_object_new)(Ref *sender_r);
     void (*event_object_add)(Value evt, const char *name, Value val);
-
-    void (*connect_widget_events)(WndHandle window);
+    int (*window_message_loop)(void);
 } FoxtkStatic;
 
 

@@ -148,17 +148,29 @@ static int xml_convert_line(Ref *r, MDNode *node)
             xmlelem_add(child, Value_vp(fs->cstr_Value(cls_xmltext, node->cstr, -1)));
             break;
         }
-        case MD_LINK_FOOTNOTE: {
-            Ref *sup = xmlelem_new("sup");
-            Ref *link = xmlelem_new("a");
-            char ctext[16];
-            char clink[16];
-            sprintf(ctext, "[%d]", node->opt);
-            sprintf(clink, "#note.%d", node->opt);
-            xmlelem_add_attr(link, "href", clink);
-            xmlelem_add(link, Value_vp(fs->cstr_Value(cls_xmltext, ctext, -1)));
-            xmlelem_add(r, sup);
-            xmlelem_add(sup, link);
+        case MD_LINK_FOOTNOTE:
+            if (node->opt != 0xFFFF) {
+                Ref *sup = xmlelem_new("sup");
+                Ref *link = xmlelem_new("a");
+                char ctext[16];
+                char clink[16];
+                sprintf(ctext, "[%d]", node->opt);
+                sprintf(clink, "#note.%d", node->opt);
+                xmlelem_add_attr(link, "href", clink);
+                xmlelem_add(link, Value_vp(fs->cstr_Value(cls_xmltext, ctext, -1)));
+                xmlelem_add(r, sup);
+                xmlelem_add(sup, link);
+            } else {
+                Ref *sup = xmlelem_new("sup");
+                xmlelem_add(sup, Value_vp(fs->cstr_Value(cls_xmltext, "###", -1)));
+                xmlelem_add(r, sup);
+            }
+            break;
+        case MD_IMAGE: {
+            Ref *child = xmlelem_new("img");
+            xmlelem_add(r, child);
+            xmlelem_add_attr(child, "src", node->href);
+            xmlelem_add_attr(child, "alt", node->cstr);
             break;
         }
         case MD_EM:
@@ -191,6 +203,11 @@ static int xml_convert_line(Ref *r, MDNode *node)
             xmlelem_add(code, Value_vp(fs->cstr_Value(cls_xmltext, node->cstr, -1)));
             break;
         }
+        case MD_IGNORE:
+            if (!xml_convert_line(r, node->child)) {
+                return FALSE;
+            }
+            break;
         default:
             break;
         }
@@ -642,6 +659,7 @@ void define_module(RefNode *m, const FoxStatic *a_fs, FoxGlobal *a_fg)
     fs->add_unresolved_ptr(m, mod_xml, "XMLNodeList", &cls_nodelist);
 
     str_link_callback = fs->intern("link_callback", -1);
+    str_image_callback = fs->intern("image_callback", -1);
     str_inline_plugin = fs->intern("inline_plugin", -1);
     str_block_plugin = fs->intern("block_plugin", -1);
 

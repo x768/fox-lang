@@ -3,54 +3,58 @@
 #include <windows.h>
 #include <ctype.h>
 
-
-#if 0
-int cstr_to_utf16(wchar_t *dst_p, const char *src, int len)
+// dst_size <= len * 3
+// 出力は'\0'で終端する
+// 入力エラーチェックは厳密ではないが、不正なシーケンスは出力しない
+int utf8_to_utf16(wchar_t *dst_p, const char *src, int len)
 {
-    const unsigned char *p = (const unsigned char*)ptr;
-    const unsigned char *end;
+    const uint8_t *p = (const uint8_t*)src;
+    const uint8_t *end;
 
     if (len < 0) {
-        len = strlen(src) + 1;
+        len = strlen(src);
     }
     end = p + len;
 
     if (dst_p != NULL) {
-        const wchar_t *dst = dst_p;
+        wchar_t *dst = dst_p;
 
         while (p < end) {
             int c = *p;
-            int code;
 
             if ((c & 0x80) == 0) {
-                code = c & 0x7F;
+                *dst++ = c & 0x7F;
                 p += 1;
             } else if ((c & 0xE0) == 0xC0 && p + 1 < end) {
-                code = ((c & 0x1F) << 6) | (p[1] & 0x3F);
+                *dst++ = ((c & 0x1F) << 6) | (p[1] & 0x3F);
                 p += 2;
             } else if ((c & 0xF0) == 0xE0 && p + 2 < end) {
-                code = ((c & 0x0F) << 12) | ((p[1] & 0x3F) << 6) | (p[2] & 0x3F);
+                int code = ((c & 0x0F) << 12) | ((p[1] & 0x3F) << 6) | (p[2] & 0x3F);
+                if (code >= SURROGATE_L_BEGIN && code < SURROGATE_END) {
+                    code = 0xFFFD;
+                }
+                *dst++ = code;
                 p += 3;
             } else if ((c & 0xF8) == 0xF0 && p + 3 < end) {
-                code = ((c & 0x07) << 18) | ((p[1] & 0x3F) << 12)  | ((p[2] & 0x3F) << 6) | (p[3] & 0x3F);
+                int code = ((c & 0x07) << 18) | ((p[1] & 0x3F) << 12)  | ((p[2] & 0x3F) << 6) | (p[3] & 0x3F);
+                if (code >= 0x10000) {
+                    code -= 0x10000;
+                    *dst++ = (code >> 10) | SURROGATE_U_BEGIN;
+                    *dst++ = (code & 0x3FF) | SURROGATE_L_BEGIN;
+                } else {
+                    *dst++ = code;
+                }
                 p += 4;
             } else {
                 p++;
                 while (p < end && (*p & 0xC0) == 0x80) {
                     p++;
                 }
-                code = 0xFFFD;
-            }
-
-            if (code >= 0x10000) {
-                code -= 0x10000;
-                *dst++ = code / 0x400 + SURROGATE_U_BEGIN;
-                *dst++ = code % 0x400 + SURROGATE_L_BEGIN;
-            } else {
-                *dst++ = code;
+                *dst++ = 0xFFFD;
             }
         }
-        return dst - dst_p;
+        *dst = L'\0';
+        return (int)(dst - dst_p);
     } else {
         int dst = 0;
         while (p < end) {
@@ -65,7 +69,7 @@ int cstr_to_utf16(wchar_t *dst_p, const char *src, int len)
                 p += 3;
             } else if ((c & 0xF8) == 0xF0 && p + 3 < end) {
                 p += 4;
-                if (((c & 0x07) << 18) | ((p[1] & 0x3F) << 12) >= 0x10000) {
+                if ((c & 0x07) != 0 || (p[1] & 0x30) != 0) {
                     dst++;
                 }
             } else {
@@ -78,13 +82,101 @@ int cstr_to_utf16(wchar_t *dst_p, const char *src, int len)
         return dst;
     }
 }
-#endif
-
-char *utf16to8(const wchar_t *src)
+// dst_size <= len * 3
+// 出力は'\0'で終端する
+// 入力エラーチェックは厳密ではないが、不正なシーケンスは出力しない
+int utf16_to_utf8(char *dst_p, const wchar_t *src, int len)
 {
-    int len = WideCharToMultiByte(CP_UTF8, 0, src, -1, NULL, 0, NULL, NULL);
-    char *dst = malloc(len + 1);
-    WideCharToMultiByte(CP_UTF8, 0, src, -1, dst, len + 1, NULL, NULL);
+    enum {
+        ALT_SIZE = 3,
+    };
+    const char *alt = "\xEF\xBF\xBD";
+    const wchar_t *p = src;
+    const wchar_t *end;
+
+    if (len < 0) {
+        len = wcslen(src);
+    }
+    end = p + len;
+
+    if (dst_p != NULL) {
+        char *dst = dst_p;
+
+        while (p < end) {
+            int c = *p++;
+
+            if (c < 0x7F) {
+                *dst++ = c;
+            } else if (c < 0x7FF) {
+                *dst++ = 0xC0 | (c >> 6);
+                *dst++ = 0x80 | (c & 0x3F);
+            } else if (c < SURROGATE_U_BEGIN) {
+                *dst++ = 0xE0 | (c >> 12);
+                *dst++ = 0x80 | ((c >> 6) & 0x3F);
+                *dst++ = 0x80 | (c & 0x3F);
+            } else if (c < SURROGATE_L_BEGIN) {
+                if (p < end && *p >= SURROGATE_L_BEGIN && *p < SURROGATE_END) {
+                    int code = (((c - SURROGATE_L_BEGIN) << 10) | (*p - SURROGATE_L_BEGIN)) + 0x10000;
+                    *dst++ = 0xF0 | (code >> 18);
+                    *dst++ = 0x80 | ((code >> 12) & 0x3F);
+                    *dst++ = 0x80 | ((code >> 6) & 0x3F);
+                    *dst++ = 0x80 | (code & 0x3F);
+                    p++;
+                } else {
+                    memcpy(dst, alt, ALT_SIZE);
+                    dst += ALT_SIZE;
+                }
+            } else if (c < SURROGATE_END) {
+                memcpy(dst, alt, ALT_SIZE);
+                dst += ALT_SIZE;
+            } else {
+                *dst++ = 0xE0 | (c >> 12);
+                *dst++ = 0x80 | ((c >> 6) & 0x3F);
+                *dst++ = 0x80 | (c & 0x3F);
+            }
+        }
+        *dst = '\0';
+        return (int)(dst - dst_p);
+    } else {
+        int dst = 0;
+
+        while (p < end) {
+            int c = *p++;
+
+            if (c < 0x7F) {
+                dst += 1;
+            } else if (c < 0x7FF) {
+                dst += 2;
+            } else if (c < SURROGATE_U_BEGIN) {
+                dst += 3;
+            } else if (c < SURROGATE_L_BEGIN) {
+                if (p < end && *p >= SURROGATE_L_BEGIN && *p < SURROGATE_END) {
+                    dst += 4;
+                    p++;
+                } else {
+                    dst += ALT_SIZE;
+                }
+            } else if (c < SURROGATE_END) {
+                dst += ALT_SIZE;
+            } else {
+                dst += 3;
+            }
+        }
+        return dst;
+    }
+}
+
+char *utf16_to_cstr(const wchar_t *src, int src_size)
+{
+    int len;
+    char *dst;
+
+    if (src_size < 0) {
+        src_size = wcslen(src);
+    }
+    len = utf16_to_utf8(NULL, src, src_size);
+    dst = malloc(len + 1);
+    utf16_to_utf8(dst, src, src_size);
     dst[len] = '\0';
     return dst;
 }
@@ -96,9 +188,9 @@ wchar_t *cstr_to_utf16(const char *src, int src_size)
     if (src_size < 0) {
         src_size = strlen(src);
     }
-    len = MultiByteToWideChar(CP_UTF8, 0, src, src_size, NULL, 0);
+    len = utf8_to_utf16(NULL, src, src_size);
     dst = malloc((len + 1) * sizeof(wchar_t));
-    MultiByteToWideChar(CP_UTF8, 0, src, src_size, dst, len + 1);
+    utf8_to_utf16(dst, src, src_size);
     dst[len] = L'\0';
     return dst;
 }
@@ -107,14 +199,14 @@ wchar_t *filename_to_utf16(const char *src, const wchar_t *opt)
     wchar_t *dst;
     int unc = (isalpha(src[0]) && src[1] == ':');
     int pos = (unc ? 4 : 0);
-    int len = MultiByteToWideChar(CP_UTF8, 0, src, strlen(src), NULL, 0);
+    int len = utf8_to_utf16(NULL, src, -1);
     int len2 = (opt != NULL ? wcslen(opt) : 0);
 
     dst = malloc((pos + len + len2 + 1) * sizeof(wchar_t));
     if (unc) {
         wcscpy(dst, L"\\\\?\\");
     }
-    MultiByteToWideChar(CP_UTF8, 0, src, -1, &dst[pos], len + 1);
+    utf8_to_utf16(&dst[pos], src, -1);
     if (opt != NULL) {
         wcscpy(&dst[pos + len], opt);
     } else {
@@ -213,7 +305,7 @@ DIR *opendir_fox(const char *dname)
     if (d->hDir != INVALID_HANDLE_VALUE) {
         WIN32_FIND_DATAW *p = (WIN32_FIND_DATAW*)d->wfd;
         d->first = TRUE;
-        WideCharToMultiByte(CP_UTF8, 0, p->cFileName, -1, d->ent.d_name, sizeof(d->ent.d_name), NULL, NULL);
+        utf16_to_utf8(d->ent.d_name, p->cFileName, -1);
         if ((p->dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0) {
             d->ent.d_type = DT_DIR;
         } else {
@@ -232,7 +324,7 @@ struct dirent *readdir_fox(DIR *d)
         return &d->ent;
     } else if (FindNextFileW(d->hDir, (WIN32_FIND_DATAW*)d->wfd)) {
         WIN32_FIND_DATAW *p = (WIN32_FIND_DATAW*) &d->wfd;
-        WideCharToMultiByte(CP_UTF8, 0, p->cFileName, -1, d->ent.d_name, sizeof(d->ent.d_name), NULL, NULL);
+        utf16_to_utf8(d->ent.d_name, p->cFileName, -1);
         if ((p->dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0) {
             d->ent.d_type = DT_DIR;
         } else {

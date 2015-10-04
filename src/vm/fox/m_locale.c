@@ -1118,8 +1118,50 @@ static int resource_locale(Value *vret, Value *v, RefNode *node)
     return TRUE;
 }
 
-static int resource_file(Value *vret, Value *v, RefNode *node)
+////////////////////////////////////////////////////////////////////////////
+
+static void get_resource_sub(Value *vret, const char *path, int is_stream)
 {
+    int64_t size;
+    FileHandle fd = open_fox(path, O_RDONLY, DEFAULT_PERMISSION);
+
+    if (fd == -1) {
+        return;
+    }
+    size = get_file_size(fd);
+    if (size == -1 || size >= fs->max_alloc) {
+        close_fox(fd);
+        return;
+    }
+
+    if (is_stream) {
+        RefBytesIO *bio = bytesio_new_sub(NULL, 0);
+        StrBuf_alloc(&bio->buf, size);
+        *vret = vp_Value(bio);
+        if (size > 0) {
+            int rd = read_fox(fd, bio->buf.p, size);
+            if (rd >= 0) {
+                bio->buf.size = rd;
+            }
+        }
+    } else {
+        RefStr *rs = refstr_new_n(fs->cls_bytes, size);
+        *vret = vp_Value(rs);
+        if (size > 0) {
+            int rd = read_fox(fd, rs->c, size);
+            if (rd >= 0) {
+                rs->c[rd] = '\0';
+                rs->size = rd;
+            } else {
+                rs->c[0] = '\0';
+                rs->size = 0;
+            }
+        }
+    }
+}
+static int get_resource_data(Value *vret, Value *v, RefNode *node)
+{
+    int is_stream = FUNC_INT(node);
     char *path;
     RefStr *name_s = Value_vp(v[1]);
     RefStr *ext_s = Value_vp(v[2]);
@@ -1133,8 +1175,7 @@ static int resource_file(Value *vret, Value *v, RefNode *node)
     if (path == NULL) {
         return FALSE;
     }
-    *vret = cstr_Value(fs->cls_file, path, -1);
-    free(path);
+    get_resource_sub(vret, path, is_stream);
 
     return TRUE;
 }
@@ -1182,8 +1223,11 @@ static void define_locale_func(RefNode *m)
 {
     RefNode *n;
 
-    n = define_identifier(m, m, "resource_file", NODE_FUNC_N, 0);
-    define_native_func_a(n, resource_file, 2, 2, NULL, fs->cls_str, fs->cls_str);
+    n = define_identifier(m, m, "resource_bytes", NODE_FUNC_N, 0);
+    define_native_func_a(n, get_resource_data, 2, 2, (void*)FALSE, fs->cls_str, fs->cls_str);
+
+    n = define_identifier(m, m, "resource_stream", NODE_FUNC_N, 0);
+    define_native_func_a(n, get_resource_data, 2, 2, (void*)TRUE, fs->cls_str, fs->cls_str);
 }
 static void define_locale_class(RefNode *m)
 {

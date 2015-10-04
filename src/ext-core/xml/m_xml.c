@@ -1069,7 +1069,7 @@ static int xml_elem_new(Value *vret, Value *v, RefNode *node)
         return FALSE;
     }
 
-    r->v[INDEX_ELEM_NAME] = vp_Value(rs_name);
+    r->v[INDEX_ELEM_NAME] = fs->Value_cp(v[1]);
 
     ra = fs->refarray_new(0);
     ra->rh.type = cls_nodelist;
@@ -1367,6 +1367,12 @@ static int xml_elem_iterator(Value *vret, Value *v, RefNode *node)
     Ref *r = Value_ref(*v);
 
     array_iterator(vret, &r->v[INDEX_ELEM_CHILDREN], node);
+    return TRUE;
+}
+static int xml_elem_children(Value *vret, Value *v, RefNode *node)
+{
+    Ref *r = Value_ref(*v);
+    *vret = fs->Value_cp(r->v[INDEX_ELEM_CHILDREN]);
     return TRUE;
 }
 static int xml_elem_tagname(Value *vret, Value *v, RefNode *node)
@@ -2071,8 +2077,6 @@ static void define_class(RefNode *m)
     fs->define_native_func_a(n, get_function_ptr(fs->cls_list, fs->symbol_stock[T_LET_B]), 2, 2, NULL, fs->cls_int, cls_node);
     n = fs->define_identifier_p(m, cls, fs->str_iterator, NODE_FUNC_N, NODEOPT_PROPERTY);
     fs->define_native_func_a(n, get_function_ptr(fs->cls_list, fs->str_iterator), 0, 0, NULL);
-    n = fs->define_identifier(m, cls, "children", NODE_FUNC_N, NODEOPT_PROPERTY);
-    fs->define_native_func_a(n, get_function_ptr(fs->cls_list, fs->str_iterator), 0, 0, NULL);
     n = fs->define_identifier(m, cls, "attr", NODE_FUNC_N, 0);
     fs->define_native_func_a(n, xml_elem_attr, 1, 2, (void*) TRUE, fs->cls_str, NULL);
     n = fs->define_identifier(m, cls, "select", NODE_FUNC_N, 0);
@@ -2112,12 +2116,14 @@ static void define_class(RefNode *m)
     fs->define_native_func_a(n, xml_elem_set_index_key, 2, 2, (void*) FALSE, NULL, fs->cls_str);
     n = fs->define_identifier_p(m, cls, fs->symbol_stock[T_EQ], NODE_FUNC_N, 0);
     fs->define_native_func_a(n, xml_elem_eq, 1, 1, NULL, cls_elem);
+    n = fs->define_identifier_p(m, cls, fs->str_iterator, NODE_FUNC_N, 0);
+    fs->define_native_func_a(n, xml_elem_iterator, 0, 0, NULL);
     n = fs->define_identifier(m, cls, "push", NODE_FUNC_N, 0);
     fs->define_native_func_a(n, xml_elem_push, 1, 1, (void*)FALSE, NULL);
     n = fs->define_identifier(m, cls, "unshift", NODE_FUNC_N, 0);
     fs->define_native_func_a(n, xml_elem_push, 1, 1, (void*)TRUE, NULL);
     n = fs->define_identifier(m, cls, "children", NODE_FUNC_N, NODEOPT_PROPERTY);
-    fs->define_native_func_a(n, xml_elem_iterator, 0, 0, NULL);
+    fs->define_native_func_a(n, xml_elem_children, 0, 0, NULL);
     n = fs->define_identifier(m, cls, "tagname", NODE_FUNC_N, NODEOPT_PROPERTY);
     fs->define_native_func_a(n, xml_elem_tagname, 0, 0, NULL);
     n = fs->define_identifier(m, cls, "attr", NODE_FUNC_N, 0);

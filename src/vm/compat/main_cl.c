@@ -458,17 +458,15 @@ void print_last_error()
             if (fg->v_cio != VALUE_NULL) {
                 stream_flush_sub(fg->v_cio);
             }
+            fox_error_dump(&sb, FALSE);
 #ifdef WIN32
             if (fv->console_error) {
                 // UTF-16で出力
-                fox_error_dump(&sb, FALSE);
                 win_write_console(STDERR_FILENO, sb.p, sb.size);
             } else {
-                fox_error_dump(&sb, FALSE);
                 write_fox(STDERR_FILENO, sb.p, sb.size);
             }
 #else
-            fox_error_dump(&sb, FALSE);
             write_fox(STDERR_FILENO, sb.p, sb.size);
 #endif
         } else {

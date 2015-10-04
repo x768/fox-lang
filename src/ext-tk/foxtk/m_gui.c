@@ -467,9 +467,11 @@ static int form_fixed(Value *vret, Value *v, RefNode *node)
 static int form_close(Value *vret, Value *v, RefNode *node)
 {
     WndHandle window = Value_widget_handle(*v);
+    Ref *r = Value_ref(*v);
     if (window != NULL) {
         window_destroy(window);
     }
+    widget_handler_destroy(r);
     return TRUE;
 }
 
@@ -734,6 +736,8 @@ static int timer_close(Value *vret, Value *v, RefNode *node)
     if (r->v[INDEX_TIMER_ID] != VALUE_NULL) {
         native_timer_remove(r);
     }
+    fs->Value_dec(r->v[INDEX_TIMER_FN]);
+    r->v[INDEX_TIMER_FN] = VALUE_NULL;
     return TRUE;
 }
 
@@ -796,6 +800,8 @@ static int dirmonitor_close(Value *vret, Value *v, RefNode *node)
         native_dirmonitor_remove(r);
         r->v[INDEX_FILEMONITOR_STRUCT] = VALUE_NULL;
     }
+    fs->Value_dec(r->v[INDEX_FILEMONITOR_FN]);
+    r->v[INDEX_FILEMONITOR_FN] = VALUE_NULL;
     return TRUE;
 }
 
@@ -1259,11 +1265,11 @@ static FoxtkStatic *newFoxtkStatic(void)
     f->invoke_event_handler = invoke_event_handler;
     f->widget_event_handler_sub = widget_event_handler_sub;
     f->widget_handler_destroy = widget_handler_destroy;
+    f->connect_widget_events = connect_widget_events;
 
     f->event_object_new = event_object_new;
     f->event_object_add = event_object_add;
-
-    f->connect_widget_events = connect_widget_events;
+    f->window_message_loop = window_message_loop;
 
     return f;
 }

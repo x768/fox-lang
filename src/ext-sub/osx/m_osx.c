@@ -1,20 +1,16 @@
 #define DEFINE_GLOBALS
-#include "fox.h"
-#include "fox_io.h"
+#include "fox_osx.h"
+#include <stdio.h>
+#include <stdlib.h>
 
-
-static const FoxStatic *fs;
-static FoxGlobal *fg;
-static RefNode *mod_osx;
 
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 static void define_class(RefNode *m)
 {
-    RefNode *cls;
-    RefNode *n;
-
+    //RefNode *cls;
+    //RefNode *n;
 }
 
 void define_module(RefNode *m, const FoxStatic *a_fs, FoxGlobal *a_fg)

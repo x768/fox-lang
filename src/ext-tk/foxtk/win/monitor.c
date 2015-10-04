@@ -86,7 +86,7 @@ static int refresh_dirmonitor(FileMonitor *fm, int is_clear);
 
 static Value wstr_to_file(RefStr *base_dir, const wchar_t *wp, int size)
 {
-    int fname_len = WideCharToMultiByte(CP_UTF8, 0, wp, size, NULL, 0, NULL, NULL);
+    int fname_len = utf16_to_utf8(NULL, wp, size);
     int basedir_last_sep = (base_dir->c[base_dir->size - 1] == SEP_C);
     int total_len = base_dir->size + (basedir_last_sep ? 0 : 1) + fname_len;
     RefStr *rs_name = fs->refstr_new_n(fs->cls_file, total_len);
@@ -97,8 +97,7 @@ static Value wstr_to_file(RefStr *base_dir, const wchar_t *wp, int size)
     if (!basedir_last_sep) {
         *dst++ = SEP_C;
     }
-    WideCharToMultiByte(CP_UTF8, 0, wp, size, dst, fname_len + 1, NULL, NULL);
-    dst[fname_len] = '\0';
+    utf16_to_utf8(dst, wp, size);
 
     return vp_Value(rs_name);
 }
@@ -149,7 +148,7 @@ static void CALLBACK file_monitor_callback(DWORD errorCode, DWORD bytesTransfere
             event_object_add(*evt, "action", v_tmp);
             fs->Value_dec(v_tmp);
 
-            v_tmp = wstr_to_file(Value_vp(sender_r->v[INDEX_FILEMONITOR_FILE]), notify->FileName, notify->FileNameLength);
+            v_tmp = wstr_to_file(Value_vp(sender_r->v[INDEX_FILEMONITOR_FILE]), notify->FileName, notify->FileNameLength / sizeof(wchar_t));
             event_object_add(*evt, "file", v_tmp);
             fs->Value_dec(v_tmp);
 

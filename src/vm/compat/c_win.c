@@ -19,14 +19,14 @@ void *dlopen_fox(const char *fname, int dummy)
 }
 void *dlsym_fox(void *handle, const char *name)
 {
-    void *p = GetProcAddress((HANDLE) handle, name);
+    void *p = GetProcAddress((HANDLE)handle, name);
     last_error = (p == NULL);
     return p;
 }
 const char *dlerror_fox(void)
 {
     enum {
-        ERRMSG_SIZE = 512,
+        ERRMSG_SIZE = 256,
     };
     static char *err_buf;
 
@@ -42,9 +42,9 @@ const char *dlerror_fox(void)
             NULL);
         
         if (err_buf == NULL) {
-            err_buf = Mem_get(&fg->st_mem, ERRMSG_SIZE);
+            err_buf = Mem_get(&fg->st_mem, ERRMSG_SIZE * 3);
         }
-        WideCharToMultiByte(CP_UTF8, 0, wbuf, -1, err_buf, ERRMSG_SIZE, NULL, NULL);
+        utf16_to_utf8(err_buf, wbuf, -1);
         free(wbuf);
         return err_buf;
     } else {
@@ -218,7 +218,7 @@ const char *get_fox_home()
         }
     }
 
-    return utf16to8(path);
+    return utf16_to_cstr(path, -1);
 #endif
 }
 
@@ -227,7 +227,7 @@ char *get_current_directory()
     wchar_t wbuf[MAX_PATH];
 
     GetCurrentDirectoryW(MAX_PATH, wbuf);
-    return utf16to8(wbuf);
+    return utf16_to_cstr(wbuf, -1);
 }
 int set_current_directory(const char *path)
 {
@@ -263,7 +263,7 @@ static void init_env(void)
     while (*wenvp != L'\0') {
         Str key;
         const char *val;
-        char *cbuf = utf16to8(wenvp);
+        char *cbuf = utf16_to_cstr(wenvp, -1);
         if (parse_envs(&key, &val, cbuf)) {
             Hash_add_p(&fs->envs, &fg->st_mem, intern(key.p, key.size), str_dup_p(val, -1, &fg->st_mem));
         }
@@ -296,9 +296,9 @@ int win_read_console(FileHandle fd, char *dst, int dst_size)
         wchar_t *wbuf = malloc(INPUT_MAX_CHARS * sizeof(wchar_t));
         DWORD rd;
         if (ReadConsoleW((HANDLE)fd, wbuf, INPUT_MAX_CHARS, &rd, NULL) != 0) {
-            int len = WideCharToMultiByte(CP_UTF8, 0, wbuf, rd, NULL, 0, NULL, NULL);
+            int len = utf16_to_utf8(NULL, wbuf, rd);
             StrBuf_alloc(&buf, len);
-            WideCharToMultiByte(CP_UTF8, 0, wbuf, rd, buf.p, len, NULL, NULL);
+            utf16_to_utf8(buf.p, wbuf, rd);
         } else {
             is_eof = TRUE;
             buf.size = 0;

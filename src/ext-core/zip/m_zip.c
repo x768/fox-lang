@@ -1272,11 +1272,21 @@ static void define_class(RefNode *m)
     fs->extends_method(cls, fs->cls_error);
 }
 
+static ZipStatic *ZipStatic_new(void)
+{
+    ZipStatic *f = fs->Mem_get(&fg->st_mem, sizeof(ZipStatic));
+    f->get_entry_map_static = get_entry_map_static;
+    f->read_entry = read_entry;
+
+    return f;
+}
 void define_module(RefNode *m, const FoxStatic *a_fs, FoxGlobal *a_fg)
 {
     fs = a_fs;
     fg = a_fg;
     mod_zip = m;
+
+    m->u.m.ext = ZipStatic_new();
 
     cls_fileio = fs->Hash_get(&fs->mod_io->u.m.h, "FileIO", -1);
     define_class(m);

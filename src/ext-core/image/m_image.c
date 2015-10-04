@@ -836,6 +836,13 @@ static int rect_hash(Value *vret, Value *v, RefNode *node)
     *vret = int32_Value(hash & INT32_MAX);
     return TRUE;
 }
+static int rect_empty(Value *vret, Value *v, RefNode *node)
+{
+    const RefRect *rc = Value_vp(*v);
+    int is_empty = rc->i[INDEX_RECT_W] == 0 || rc->i[INDEX_RECT_H] == 0;
+    *vret = bool_Value(is_empty);
+    return TRUE;
+}
 static int rect_tostr(Value *vret, Value *v, RefNode *node)
 {
     const RefRect *rc = Value_vp(*v);
@@ -2094,6 +2101,8 @@ static void define_class(RefNode *m, RefNode *mod_math)
     fs->define_native_func_a(n, rect_marshal_write, 1, 1, NULL, fs->cls_marshaldumper);
     n = fs->define_identifier_p(m, cls, fs->str_hash, NODE_FUNC_N, NODEOPT_PROPERTY);
     fs->define_native_func_a(n, rect_hash, 0, 0, NULL);
+    n = fs->define_identifier(m, cls, "empty", NODE_FUNC_N, NODEOPT_PROPERTY);
+    fs->define_native_func_a(n, rect_empty, 0, 0, NULL);
 
     n = fs->define_identifier_p(m, cls, fs->symbol_stock[T_EQ], NODE_FUNC_N, 0);
     fs->define_native_func_a(n, rect_eq, 1, 1, NULL, cls_rect);

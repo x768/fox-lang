@@ -143,6 +143,7 @@ extern RefNode *cls_xmltext;
 extern RefNode *cls_nodelist;
 
 extern RefStr *str_link_callback;
+extern RefStr *str_image_callback;
 extern RefStr *str_inline_plugin;
 extern RefStr *str_block_plugin;
 

@@ -1226,7 +1226,7 @@ static int mimeheader_index_set_sub(StrBuf *sb, Value v)
 {
     RefNode *type = Value_type(v);
 
-    if (type == fs->cls_str || type == fs->cls_bytes) {
+    if (type == fs->cls_str || type == fs->cls_bytes || type == fs->cls_uri) {
         RefStr *rs = Value_vp(v);
         int i;
         for (i = 0; i < rs->size; i++) {
@@ -1253,7 +1253,7 @@ static int mimeheader_index_set_sub(StrBuf *sb, Value v)
         RefCharset *cs = Value_vp(v);
         StrBuf_add_r(sb, cs->iana);
     } else {
-        throw_errorf(fs->mod_lang, "TypeError", "Sequence, Number, TimeStamp, MimeType Locale or Charset required but %n", type);
+        throw_errorf(fs->mod_lang, "TypeError", "Sequence, Number, TimeStamp, MimeType, Uri, Locale or Charset required but %n", type);
         return FALSE;
     }
     return TRUE;
@@ -1946,6 +1946,52 @@ static int uri_is_url(Value *vret, Value *v, RefNode *node)
     return TRUE;
 }
 
+static int uri_add(Value *vret, Value *v, RefNode *node)
+{
+    RefStr *src1 = Value_vp(*v);
+    RefStr *src2 = Value_vp(v[1]);
+    Str part[URL_NUM];
+
+    memset(part, 0, sizeof(part));
+    if (parse_url(part, src1->c, src1->size)) {
+        int path_part = (part[URL_PATH].p + part[URL_PATH].size) - src1->c;
+        Str s1, s2, s3;
+        RefStr *rs;
+        char *dst;
+
+        s1.p = src1->c;
+        s1.size = path_part;
+        s2.p = src2->c;
+        s2.size = src2->size;
+        s3.p = src1->c + path_part;
+        s3.size = src1->size - path_part;
+        if (s1.size > 0 && s1.p[s1.size - 1] == '/') {
+            s1.size--;
+        }
+        if (s2.size > 0 && s2.p[0] == '/') {
+            s2.p++;
+            s2.size--;
+        }
+        rs = refstr_new_n(fs->cls_uri, s1.size + s2.size + s3.size + 1);
+        *vret = vp_Value(rs);
+        dst = rs->c;
+        memcpy(dst, s1.p, s1.size);
+        dst += s1.size;
+        *dst++ = '/';
+        memcpy(dst, s2.p, s2.size);
+        dst += s2.size;
+        if (s3.size > 0) {
+            memcpy(dst, s3.p, s3.size);
+            dst += s3.size;
+        }
+        *dst = '\0';
+    } else {
+        throw_errorf(fs->mod_lang, "ParseError", "Invalid URL string format");
+        return FALSE;
+    }
+    return TRUE;
+}
+
 /**
  * unix
  * file:///dir/dir/file       -> File(/dir/dir/file)
@@ -2174,6 +2220,8 @@ static void define_mime_class(RefNode *m)
 
     n = define_identifier_p(m, cls, fs->str_tostr, NODE_FUNC_N, 0);
     define_native_func_a(n, strclass_tostr, 0, 2, (void*)FALSE, fs->cls_str, fs->cls_locale);
+    n = define_identifier_p(m, cls, fs->symbol_stock[T_DIV], NODE_FUNC_N, 0);
+    define_native_func_a(n, uri_add, 0, 2, NULL, fs->cls_str);
     n = define_identifier(m, cls, "to_file", NODE_FUNC_N, 0);
     define_native_func_a(n, uri_tofile, 0, 0, NULL);
     n = define_identifier(m, cls, "scheme", NODE_FUNC_N, NODEOPT_PROPERTY);

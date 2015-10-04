@@ -200,7 +200,7 @@ def _detect_mode_from_data_string(s:Bytes, mode_s:Str)
 def _read_rsc(ecc_words:Int)
 {
     let cal_tbl = []
-    let f = FileIO(resource_file("barcode.qrcode.rsc${ecc_words}", "dat"))
+    let f = resource_stream("barcode.qrcode.rsc${ecc_words}", "dat")
 
     for i in 0..256 {
         let b = f.read(ecc_words)
@@ -217,7 +217,7 @@ def _read_rsc(ecc_words:Int)
 def _read_frame(version:Int)
 {
     let frame = []
-    let f = FileIO(resource_file("barcode.qrcode.qrvfr${version}", "dat"))
+    let f = resource_stream("barcode.qrcode.qrvfr${version}", "dat")
 
     while let line = f.gets() {
         frame.push line
@@ -316,7 +316,7 @@ class _QRVFile
     def rs_block_order => m_rs_block_order
 
     new(byte_num:Int, version:Int, ecc:Int) {
-        let f = FileIO(resource_file("barcode.qrcode.qrv${version}_${ecc}", "dat"))
+        let f = resource_stream("barcode.qrcode.qrv${version}_${ecc}", "dat")
 
         m_mat_x = f.read(byte_num)
         m_mat_y = f.read(byte_num)

@@ -71,10 +71,10 @@ static void JSTok_parse_digit(JSTok *tk)
     if (*tk->p == '.') {
         is_float = TRUE;
         tk->p++;
-        if (!isdigit(*tk->p)) {
+        if (!isdigit_fox(*tk->p)) {
             goto ERROR_END;
         }
-        while (isdigit(*tk->p)) {
+        while (isdigit_fox(*tk->p)) {
             tk->p++;
         }
     }
@@ -84,10 +84,10 @@ static void JSTok_parse_digit(JSTok *tk)
         if (*tk->p == '+' || *tk->p == '-') {
             tk->p++;
         }
-        if (!isdigit(*tk->p)) {
+        if (!isdigit_fox(*tk->p)) {
             goto ERROR_END;
         }
-        while (isdigit(*tk->p)) {
+        while (isdigit_fox(*tk->p)) {
             tk->p++;
         }
     }
@@ -187,11 +187,11 @@ static void JSTok_parse_str(JSTok *tk)
                 } else if (ch2 < 0x800) {
                     *dst++ = 0xC0 | (ch2 >> 6);
                     *dst++ = 0x80 | (ch2 & 0x3F);
-                } else if (ch2 < 0xD800) {
+                } else if (ch2 < SURROGATE_U_BEGIN) {
                     *dst++ = 0xE0 | (ch2 >> 12);
                     *dst++ = 0x80 | ((ch2 >> 6) & 0x3F);
                     *dst++ = 0x80 | (ch2 & 0x3F);
-                } else if (ch2 < 0xDC00) {
+                } else if (ch2 < SURROGATE_L_BEGIN) {
                     // サロゲート
                     int ch3;
                     if (tk->p + 3 > tk->end || tk->p[0] != '\\' || tk->p[1] != 'u') {
@@ -206,19 +206,19 @@ static void JSTok_parse_str(JSTok *tk)
                         tk->type = JS_TOK_ERR;
                         return;
                     }
-                    if (ch3 < 0xDC00 || ch3 >= 0xE000) {
+                    if (ch3 < SURROGATE_L_BEGIN || ch3 >= SURROGATE_END) {
                         fs->throw_errorf(mod_json, "JSONError", "Missing Low Surrogate");
                         tk->type = JS_TOK_ERR;
                         return;
                     }
-                    ch2 = (ch2 - 0xD800) * 0x400 + 0x10000;
-                    ch3 = ch2 | (ch3 - 0xDC00);
+                    ch2 = (ch2 - SURROGATE_U_BEGIN) * 0x400 + 0x10000;
+                    ch3 = ch2 | (ch3 - SURROGATE_L_BEGIN);
 
                     *dst++ = 0xF0 | (ch3 >> 18);
                     *dst++ = 0x80 | ((ch3 >> 12) & 0x3F);
                     *dst++ = 0x80 | ((ch3 >> 6) & 0x3F);
                     *dst++ = 0x80 | (ch3 & 0x3F);
-                } else if (ch2 < 0xE000) {
+                } else if (ch2 < SURROGATE_END) {
                     // 下位サロゲート
                     fs->throw_errorf(mod_json, "JSONError", "Illigal codepoint (Surrogate) %U", ch2);
                     tk->type = JS_TOK_ERR;
@@ -261,7 +261,7 @@ BREAK:
 static void throw_unexpected_token(JSTok *tk)
 {
     const char *top = tk->p;
-    while (tk->p < tk->end && isalnum(*tk->p)) {
+    while (tk->p < tk->end && isalnumu_fox(*tk->p)) {
         tk->p++;
     }
     *tk->p = '\0';
@@ -271,7 +271,7 @@ static void throw_unexpected_token(JSTok *tk)
 }
 static void JSTok_next(JSTok *tk)
 {
-    while (tk->p < tk->end && isspace(*tk->p)) {
+    while (tk->p < tk->end && isspace(*tk->p & 0xFF)) {
         tk->p++;
     }
     if (tk->p >= tk->end) {

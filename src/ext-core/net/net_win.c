@@ -31,25 +31,26 @@ void shutdown_winsock()
 char *winsock_strerror()
 {
     enum {
-        ERRMSG_SIZE = 512,
+        ERRMSG_SIZE = 256,
     };
     static char *err_buf;
+
     wchar_t *wbuf = malloc(ERRMSG_SIZE * sizeof(wchar_t));
     int len;
 
     FormatMessageW(
         FORMAT_MESSAGE_FROM_SYSTEM,
         NULL,
-        WSAGetLastError(),
-        LOCALE_NEUTRAL,
+        GetLastError(),
+        0,
         wbuf,
         ERRMSG_SIZE,
         NULL);
 
     if (err_buf == NULL) {
-        err_buf = fs->Mem_get(&fg->st_mem, ERRMSG_SIZE);
+        err_buf = fs->Mem_get(&fg->st_mem, ERRMSG_SIZE * 3);
     }
-    WideCharToMultiByte(CP_UTF8, 0, wbuf, -1, err_buf, ERRMSG_SIZE, NULL, NULL);
+    utf16_to_utf8(err_buf, wbuf, -1);
     free(wbuf);
 
     // 末尾の改行を削除

@@ -306,12 +306,11 @@ static HGLOBAL cstr_to_hglobal(const char *src_p, int src_size)
     if (src_size < 0) {
         src_size = strlen(src_p);
     }
-    wlen = MultiByteToWideChar(CP_UTF8, 0, src_p, src_size, NULL, 0);
+    wlen = utf8_to_utf16(NULL, src_p, src_size);
     hGlobal = GlobalAlloc(GHND, (wlen + 1) * sizeof(wchar_t));
 
     buf = (wchar_t*)GlobalLock(hGlobal);
-    MultiByteToWideChar(CP_UTF8, 0, src_p, src_size, buf, wlen + 1);
-    buf[wlen] = L'\0';
+    utf8_to_utf16(buf, src_p, src_size);
     GlobalUnlock(hGlobal);
 
     return hGlobal;

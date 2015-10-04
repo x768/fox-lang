@@ -39,7 +39,7 @@
 
 struct dirent {
     unsigned int d_type;
-    char d_name[1024];
+    char d_name[260 * 3];  // MAX_PATH*3
 };
 typedef struct {
     void *hDir;
@@ -56,7 +56,9 @@ int read_fox(FileHandle fd, char *buf, int size);
 int write_fox(FileHandle fd, const char *buf, int size);
 int64_t seek_fox(FileHandle fd, int64_t offset, int whence);
 
-char *utf16to8(const wchar_t *src);
+int utf8_to_utf16(wchar_t *dst_p, const char *src, int len);
+int utf16_to_utf8(char *dst_p, const wchar_t *src, int len);
+char *utf16_to_cstr(const wchar_t *src, int src_size);
 wchar_t *cstr_to_utf16(const char *src, int src_size);
 wchar_t *filename_to_utf16(const char *src, const wchar_t *opt);
 

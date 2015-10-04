@@ -253,45 +253,47 @@ static Value X509_NAME_to_val(X509_NAME *name)
         return VALUE_NULL;
     }
 }
-static void ASN1_TIME_to_calendar(DateTime *dt, ASN1_TIME* tm)
+static void ASN1_TIME_to_calendar(Date *dt, Time *tm, ASN1_TIME *asn1_tm)
 {
-    const char* str = (const char*)tm->data;
+    const char* str = (const char*)asn1_tm->data;
 
-    switch (tm->type) {
+    switch (asn1_tm->type) {
     case V_ASN1_UTCTIME:
-        dt->d.year = (str[0] - '0') * 10 + (str[1] - '0');
-        if (dt->d.year < 70) {
-            dt->d.year += 2000;
+        dt->year = (str[0] - '0') * 10 + (str[1] - '0');
+        if (dt->year < 70) {
+            dt->year += 2000;
         } else {
-            dt->d.year += 1900;
+            dt->year += 1900;
         }
         str += 2;
         break;
     case V_ASN1_GENERALIZEDTIME:
-        dt->d.year = (str[0] - '0') * 1000 + (str[1] - '0') * 100 + (str[2] - '0') * 10 + (str[3] - '0');
+        dt->year = (str[0] - '0') * 1000 + (str[1] - '0') * 100 + (str[2] - '0') * 10 + (str[3] - '0');
         str += 4;
         break;
     }
-    dt->d.month = (str[0] - '0') * 10 + (str[1] - '0');
+    dt->month = (str[0] - '0') * 10 + (str[1] - '0');
     str += 2;
-    dt->d.day_of_month = (str[0] - '0') * 10 + (str[1] - '0');
+    dt->day_of_month = (str[0] - '0') * 10 + (str[1] - '0');
     str += 2;
-    dt->t.hour = (str[0] - '0') * 10 + (str[1] - '0');
+    tm->hour = (str[0] - '0') * 10 + (str[1] - '0');
     str += 2;
-    dt->t.minute = (str[0] - '0') * 10 + (str[1] - '0');
+    tm->minute = (str[0] - '0') * 10 + (str[1] - '0');
     str += 2;
-    dt->t.second = (str[0] - '0') * 10 + (str[1] - '0');
+    tm->second = (str[0] - '0') * 10 + (str[1] - '0');
     str += 2;
-    dt->t.millisec = 0;
+    tm->millisec = 0;
 }
-static Value ASN1_TIME_to_val(ASN1_TIME *tm)
+static Value ASN1_TIME_to_val(ASN1_TIME *asn1_tm)
 {
-    if (tm != NULL) {
+    if (asn1_tm != NULL) {
         RefInt64 *rt = fs->buf_new(fs->cls_timestamp, sizeof(RefInt64));
-        DateTime dt;
+        Date dt;
+        Time tm;
         memset(&dt, 0, sizeof(dt));
-        ASN1_TIME_to_calendar(&dt, tm);
-        fs->DateTime_to_Timestamp(&rt->u.i, &dt);
+        memset(&tm, 0, sizeof(tm));
+        ASN1_TIME_to_calendar(&dt, &tm, asn1_tm);
+        rt->u.i = fs->DateTime_to_Timestamp(&dt, &tm);
         return vp_Value(rt);
     } else {
         return VALUE_NULL;

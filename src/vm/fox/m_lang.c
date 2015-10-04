@@ -897,6 +897,9 @@ static void define_lang_class(RefNode *m)
     cls = define_identifier(m, m, "LoopReferenceError", NODE_CLASS, 0);
     define_error_class(cls, cls2, m);
 
+    cls = define_identifier(m, m, "NotSupportedError", NODE_CLASS, 0);
+    define_error_class(cls, cls2, m);
+
 
     cls = define_identifier(m, m, "ArgumentError", NODE_CLASS, 0);
     define_error_class(cls, fs->cls_error, m);

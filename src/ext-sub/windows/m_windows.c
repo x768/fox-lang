@@ -57,30 +57,18 @@ static RefTimeZone *default_tz;
 
 static BSTR cstr_to_BSTR(const char *src_p, int src_size)
 {
-    int wlen = MultiByteToWideChar(CP_UTF8, 0, src_p, src_size, NULL, 0);
+    int wlen = utf8_to_utf16(NULL, src_p, src_size);
     BSTR bstr = SysAllocStringLen(NULL, wlen + 1);
-    MultiByteToWideChar(CP_UTF8, 0, src_p, src_size, bstr, wlen + 1);
-    bstr[wlen] = L'\0';
-
+    utf8_to_utf16(bstr, src_p, src_size);
     return bstr;
-}
-static wchar_t *cstr_to_wstr(const char *src_p, int src_size)
-{
-    int wlen = MultiByteToWideChar(CP_UTF8, 0, src_p, src_size, NULL, 0);
-    wchar_t *wstr = malloc((wlen + 1) * sizeof(wchar_t));
-    MultiByteToWideChar(CP_UTF8, 0, src_p, src_size, wstr, wlen + 1);
-    wstr[wlen] = L'\0';
-
-    return wstr;
 }
 static Value BSTR_Value(BSTR bstr)
 {
     if (bstr != NULL) {
         int blen = wcslen((wchar_t*)bstr);
-        int len = WideCharToMultiByte(CP_UTF8, 0, (wchar_t*)bstr, blen, NULL, 0, NULL, NULL);
+        int len = utf16_to_utf8(NULL, (wchar_t*)bstr, blen);
         RefStr *rs = fs->refstr_new_n(fs->cls_str, len);
-        WideCharToMultiByte(CP_UTF8, 0, (wchar_t*)bstr, blen, rs->c, len, NULL, NULL);
-        rs->c[len] = '\0';
+        utf16_to_utf8(rs->c, (wchar_t*)bstr, blen);
         return vp_Value(rs);
     } else {
         return vp_Value(fs->str_0);
@@ -89,20 +77,10 @@ static Value BSTR_Value(BSTR bstr)
 static Value wstr_Value(const wchar_t *wstr)
 {
     int wlen = wcslen(wstr);
-    int len = WideCharToMultiByte(CP_UTF8, 0, wstr, wlen, NULL, 0, NULL, NULL);
+    int len = utf16_to_utf8(NULL, wstr, wlen);
     RefStr *rs = fs->refstr_new_n(fs->cls_str, len);
-    WideCharToMultiByte(CP_UTF8, 0, wstr, wlen, rs->c, len, NULL, NULL);
-    rs->c[len] = '\0';
+    utf16_to_utf8(rs->c, wstr, wlen);
     return vp_Value(rs);
-}
-static char *wstr_to_cstr(const wchar_t *wstr)
-{
-    int wlen = wcslen(wstr);
-    int len = WideCharToMultiByte(CP_UTF8, 0, wstr, wlen, NULL, 0, NULL, NULL);
-    char *buf = malloc(len + 1);
-    WideCharToMultiByte(CP_UTF8, 0, wstr, wlen, buf, len, NULL, NULL);
-    buf[len] = '\0';
-    return buf;
 }
 static Value oledate_Value(double dt)
 {
@@ -219,10 +197,10 @@ static void throw_ole_error(const char *err_class, EXCEPINFO *excep)
     }
 
     if (excep->bstrSource != NULL) {
-        src = wstr_to_cstr(excep->bstrSource);
+        src = utf16_to_cstr(excep->bstrSource, -1);
     }
     if (excep->bstrDescription != NULL) {
-        desc = wstr_to_cstr(excep->bstrDescription);
+        desc = utf16_to_cstr(excep->bstrDescription, -1);
     }
 
     fs->throw_errorf(mod_windows, err_class, "(%x) %s %s", code, (src != NULL ? src : "<Unknown>"), (desc != NULL ? desc : ""));
@@ -759,7 +737,7 @@ static int regkey_new(Value *vret, Value *v, RefNode *node)
         }
     }
 
-    path_p = cstr_to_wstr(path.p, path.size);
+    path_p = cstr_to_utf16(path.p, path.size);
     if (write_mode) {
         ret = RegCreateKeyExW(hroot, path_p, 0, NULL, REG_OPTION_NON_VOLATILE, KEY_WRITE, NULL, &hkey, NULL);
     } else {
@@ -812,7 +790,7 @@ static int regkey_getvalue(Value *vret, Value *v, RefNode *node)
 {
     RefRegKey *r = Value_vp(*v);
     RefStr *name = Value_vp(v[1]);
-    wchar_t *value_name = cstr_to_wstr(name->c, name->size);
+    wchar_t *value_name = cstr_to_utf16(name->c, name->size);
     DWORD type;
     DWORD data_size;
     uint8_t *buf;
@@ -882,7 +860,7 @@ ERROR_END:
 }
 static int regkey_setvalue_sub(HKEY hkey, RefStr *r_value, DWORD type, const void *buf, int size)
 {
-    wchar_t *value_name = cstr_to_wstr(r_value->c, r_value->size);
+    wchar_t *value_name = cstr_to_utf16(r_value->c, r_value->size);
     int ret = RegSetValueEx(hkey, value_name, 0, type, (const BYTE*)buf, size);
 
     free(value_name);
@@ -925,7 +903,7 @@ static int regkey_setstr(Value *vret, Value *v, RefNode *node)
     RefRegKey *r = Value_vp(*v);
     DWORD type = FUNC_INT(node);
     RefStr *r_value = Value_vp(v[2]);
-    wchar_t *buf = cstr_to_wstr(r_value->c, r_value->size);
+    wchar_t *buf = cstr_to_utf16(r_value->c, r_value->size);
 
     if (!regkey_setvalue_sub(r->hkey, Value_vp(v[1]), type, buf, (wcslen(buf) + 1) * sizeof(wchar_t*))) {
         free(buf);
@@ -982,7 +960,7 @@ static int regiter_next(Value *vret, Value *v, RefNode *node)
                 r2->hkey = r_p->hkey;
                 r2->write_mode = write_mode;
 
-                cbuf = wstr_to_cstr(wbuf);
+                cbuf = utf16_to_cstr(wbuf, -1);
                 r2->path = fs->printf_Value("%r\\%s", path_r, cbuf);
                 free(cbuf);
                 r->v[INDEX_REGITER_CUR] = int32_Value(cur);

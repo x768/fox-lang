@@ -3,6 +3,7 @@
 
 #include "fox.h"
 #include "fox_io.h"
+#include "m_zip.h"
 #include <zlib.h>
 
 
@@ -181,6 +182,9 @@ int write_central_dir(CentralDirEnd *cdir, Value writer);
 int write_end_of_cdir(CentralDirEnd *cdir, Value writer);
 
 int move_next_file_entry(Value reader);
+
+Hash *get_entry_map_static(const char *path);
+int read_entry(char *buf, const ZipEntry *entry);
 
 
 #endif /* _ZIPFILE_H_ */

@@ -253,18 +253,23 @@ void StrBuf_init_refstr(StrBuf *s, int size)
     rs->size = 0;
     s->p = (char*)rs;
 }
-void StrBuf_alloc(StrBuf *s, int size)
+int StrBuf_alloc(StrBuf *s, int size)
 {
     if (size >= s->alloc_size) {
         int alloc_size = 32;
         while (alloc_size <= size) {
             alloc_size *= 2;
         }
+        if (alloc_size >= fs->max_alloc) {
+            throw_error_select(THROW_MAX_ALLOC_OVER__INT, fs->max_alloc);
+            return FALSE;
+        }
 
         s->alloc_size = alloc_size;
         s->p = realloc(s->p, alloc_size);
     }
     s->size = size;
+    return TRUE;
 }
 Value StrBuf_str_Value(StrBuf *s, RefNode *type)
 {

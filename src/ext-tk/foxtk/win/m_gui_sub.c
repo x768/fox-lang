@@ -46,11 +46,10 @@ char *get_toolkit_version()
 Value utf16_str_Value(const wchar_t *src)
 {
     Value v;
-    int len = wcslen(src);
-    int clen = WideCharToMultiByte(CP_UTF8, 0, src, len, NULL, 0, NULL, NULL);
+    int wlen = wcslen(src);
+    int clen = utf16_to_utf8(NULL, src, wlen);
     char *buf = malloc(clen + 1);
-    WideCharToMultiByte(CP_UTF8, 0, src, len, buf, clen + 1, NULL, NULL);
-    buf[clen] = '\0';
+    utf16_to_utf8(buf, src, wlen);
 
     v = fs->cstr_Value_conv(buf, -1, NULL);
     free(buf);

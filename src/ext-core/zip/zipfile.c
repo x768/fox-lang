@@ -200,37 +200,37 @@ static void parse_ext_field(CentralDir *cdir, const char *p, int p_size)
         p += len + 4;
     }
 }
-static int64_t dostime_to_time(int dt, int tm, RefTimeZone *tz)
+static int64_t dostime_to_timestamp(int i_dt, int i_tm, RefTimeZone *tz)
 {
-    RefDateTime d;
+    RefDateTime dt;
 
-    d.dt.d.year = ((dt >> 9) & 0xFFFF) + 1980;
-    d.dt.d.month = (dt >> 5) & 0xF;
-    d.dt.d.day_of_month = dt & 0x1F;
-    d.dt.t.hour = (tm >> 11) & 0x1F;
-    d.dt.t.minute = (tm >> 5) & 0x3F;
-    d.dt.t.second = (tm & 0x1F) * 2;
-    d.dt.t.millisec = 0;
-    d.tz = tz;
+    dt.d.year = ((i_dt >> 9) & 0xFFFF) + 1980;
+    dt.d.month = (i_dt >> 5) & 0xF;
+    dt.d.day_of_month = i_dt & 0x1F;
+    dt.t.hour = (i_tm >> 11) & 0x1F;
+    dt.t.minute = (i_tm >> 5) & 0x3F;
+    dt.t.second = (i_tm & 0x1F) * 2;
+    dt.t.millisec = 0;
+    dt.tz = tz;
 
-    fs->adjust_timezone(&d);
-    return d.tm;
+    fs->adjust_timezone(&dt);
+    return dt.ts;
 }
-static void time_to_dostime(int *dt, int *tm, int64_t tm64, RefTimeZone *tz)
+static void time_to_dostime(int *i_dt, int *i_tm, int64_t ts, RefTimeZone *tz)
 {
-    RefDateTime d;
+    RefDateTime dt;
 
-    d.tm = tm64;
-    d.tz = tz;
-    fs->adjust_datetime(&d);
+    dt.ts = ts;
+    dt.tz = tz;
+    fs->adjust_datetime(&dt);
 
-    if (d.dt.d.year < 1980 || d.dt.d.year > 9999) {
-        *dt = (1 << 5) | 1;  // 1980-01-01
-        *tm = 0;             // 00:00:00
+    if (dt.d.year < 1980 || dt.d.year > 9999) {
+        *i_dt = (1 << 5) | 1;  // 1980-01-01
+        *i_tm = 0;             // 00:00:00
         return;
     }
-    *dt = ((d.dt.d.year - 1980) << 9) | (d.dt.d.month << 5) | d.dt.d.day_of_month;
-    *tm = (d.dt.t.hour << 11) | (d.dt.t.minute << 5) | (d.dt.t.second >> 1);
+    *i_dt = ((dt.d.year - 1980) << 9) | (dt.d.month << 5) | dt.d.day_of_month;
+    *i_tm = (dt.t.hour << 11) | (dt.t.minute << 5) | (dt.t.second >> 1);
 }
 static CentralDir *read_central_dirs(CentralDirEnd *cdir_end, char *cbuf, RefCharset *cs, RefTimeZone *tz)
 {
@@ -273,7 +273,7 @@ static CentralDir *read_central_dirs(CentralDirEnd *cdir_end, char *cbuf, RefCha
             int modified_time = ptr_read_uint16_le(cbuf + offset + 12);
             int modified_date = ptr_read_uint16_le(cbuf + offset + 14);
             if (modified_date != 0) {
-                p->modified = dostime_to_time(modified_date, modified_time, tz);
+                p->modified = dostime_to_timestamp(modified_date, modified_time, tz);
                 p->time_valid = TRUE;
             }
         }
@@ -638,5 +638,22 @@ int move_next_file_entry(Value reader)
     } else {
     }
 
+    return FALSE;
+}
+
+/**
+ * path : zipファイル
+ * return : zipに含まれるファイル一覧 Hash<ZipEntry>
+ */
+Hash *get_entry_map_static(const char *path)
+{
+    return NULL;
+}
+/**
+ * buf : ファイルの内容を取得(entry->size)
+ * return : 成功したらTRUE
+ */
+int read_entry(char *buf, const ZipEntry *entry)
+{
     return FALSE;
 }

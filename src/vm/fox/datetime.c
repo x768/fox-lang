@@ -34,7 +34,7 @@ static char *tzdata_abbr;
 static char *tzdata_line;  // raw data (big endian)
 static char *tzdata_data;  // raw data (big endian)
 
-static const uint16_t mon_yday[2][13] =
+static const int16_t mon_yday[2][13] =
 {
     /* Normal years.  */
     { 0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334, 365 },
@@ -318,71 +318,141 @@ TimeOffset *TimeZone_offset_local(RefTimeZone *tz, int64_t tm)
     }
     return &tz->off[0];
 }
+// i2 > 0
+static int64_t d_div(int64_t i1, int64_t i2)
+{
+    if (i1 < 0) {
+        return (i1 + 1) / i2 - 1;
+    } else {
+        return i1 / i2;
+    }
+}
+// i2 > 0
+static int64_t d_mod(int64_t i1, int64_t i2)
+{
+    int64_t m = i1 % i2;
+    if (m < 0) {
+        return m + i2;
+    }
+    return m;
+}
+// 指定した年の最初のisoweek(月曜)のJulianDay
+static int64_t get_jd_isoweek_begin(int32_t y)
+{
+    enum {
+        JD_1969_1_4 = 719524,
+    };
+    int64_t jd = d_div(36525 * y, 100) + d_div(y, 400) - d_div(y, 100) - JD_1969_1_4;
+    return jd - d_mod(jd + 3, 7);
+}
 
 /////////////////////////////////////////////////////////////////////////////////////////////
 
 // グレゴリオ歴を過去に遡って適用する
-void Timestamp_to_DateTime(DateTime *dt, int64_t timer)
+void Timestamp_to_DateTime(Date *dt, Time *tm, int64_t ts)
+{
+    int64_t jd = d_div(ts, MSECS_PER_DAY);
+    int64_t rem = d_mod(ts, MSECS_PER_DAY);
+
+    JulianDay_to_Date(dt, jd);
+
+    // rem >= 0
+    tm->hour = rem / MSECS_PER_HOUR;
+    rem %= MSECS_PER_HOUR;
+    tm->minute = rem / MSECS_PER_MINUTE;
+    rem %= MSECS_PER_MINUTE;
+    tm->second = rem / MSECS_PER_SECOND;
+    tm->millisec = rem % MSECS_PER_SECOND;
+}
+
+// (year != INT32_MIN) year, month, day_of_month
+// (year == INT32_MIN) isoweek_year, isoweek, day_of_week
+int64_t DateTime_to_Timestamp(const Date *dt, const Time *tm)
+{
+    int64_t days_s;
+    if (dt->year != INT32_MIN) {
+        days_s = Date_ymd_to_JulianDay(dt) * MSECS_PER_DAY;
+    } else {
+        days_s = Date_week_to_JulianDay(dt) * MSECS_PER_DAY;
+    }
+    return days_s + tm->hour * MSECS_PER_HOUR + tm->minute * MSECS_PER_MINUTE + tm->second * MSECS_PER_SECOND + tm->millisec;
+}
+
+void JulianDay_to_Date(Date *dt, int32_t jd)
 {
     int64_t y = 1970;
-    int64_t days = timer / MSECS_PER_DAY;
-    int64_t rem = timer % MSECS_PER_DAY;
-    const uint16_t *ip;
+    const int16_t *ip;
     int month;
+    int64_t jd_a = jd;
+    int64_t jd_week_begin;
 
-    if (rem < 0) {
-        days--;
-        rem += MSECS_PER_DAY;
-    }
-
-    dt->d.day_of_week = (days + 4) % 7;
-    if (dt->d.day_of_week < 0) {
-        dt->d.day_of_week += 7;
-    }
+    dt->day_of_week = d_mod(jd + 4, 7);
     // ISO 8601
-    if (dt->d.day_of_week == 0) {
-        dt->d.day_of_week = 7;
+    if (dt->day_of_week == 0) {
+        dt->day_of_week = 7;
     }
 
-    while (days < 0 || days >= (IS_LEAP_YEAR(y) ? 366 : 365)) {
-        int64_t yg = y + days / 365 - (days % 365 < 0);
-        days -= ((yg - y) * 365
+    while (jd < 0 || jd >= (IS_LEAP_YEAR(y) ? 366 : 365)) {
+        int64_t yg = y + jd / 365 - (jd % 365 < 0);
+        jd -= ((yg - y) * 365
             + LEAPS_THRU_END_OF(yg - 1)
             - LEAPS_THRU_END_OF(y - 1));
         y = yg;
     }
-    dt->d.year = y;
-    dt->d.day_of_year = days + 1;
+    dt->year = y;
+    dt->day_of_year = jd + 1;
 
     ip = mon_yday[IS_LEAP_YEAR(y) ? 1 : 0];
     month = 11;
-    while (days < (int)ip[month]) {
+    while (jd < ip[month]) {
         month--;
     }
 
-    days -= ip[month];
-    dt->d.month = month + 1;
-    dt->d.day_of_month = days + 1;
+    jd -= ip[month];
+    dt->month = month + 1;
+    dt->day_of_month = jd + 1;
 
-    dt->t.hour = rem / MSECS_PER_HOUR;
-    rem %= MSECS_PER_HOUR;
-    dt->t.minute = rem / MSECS_PER_MINUTE;
-    rem %= MSECS_PER_MINUTE;
-    dt->t.second = rem / MSECS_PER_SECOND;
-    dt->t.millisec = rem % MSECS_PER_SECOND;
+    // 1月4日の週の月曜日
+    jd_week_begin = get_jd_isoweek_begin(dt->year);
+    if (jd_a < jd_week_begin) {
+        // 前年
+        jd_week_begin = get_jd_isoweek_begin(dt->year - 1);
+        dt->isoweek = (jd_a - jd_week_begin) / 7 + 1;
+        dt->isoweek_year = dt->year - 1;
+    } else {
+        dt->isoweek = (jd_a - jd_week_begin) / 7 + 1;
+        if (dt->isoweek > 52) {
+            // 翌年の可能性
+            int64_t jd_week_next = get_jd_isoweek_begin(dt->year + 1);
+            if (jd_a >= jd_week_next) {
+                dt->isoweek = (jd_a - jd_week_next) / 7 + 1;
+                dt->isoweek_year = dt->year + 1;
+                return;
+            }
+        }
+        dt->isoweek_year = dt->year;
+    }
 }
-
-// year, month, day_of_month -> int64_t
-void DateTime_to_Timestamp(int64_t *timer, const DateTime *dt)
+/*
+ * in: dt->isoweek_year, dt->isoweek, dt->day_of_week
+ */
+int64_t Date_week_to_JulianDay(const Date *dt)
+{
+    int64_t jd = get_jd_isoweek_begin(dt->isoweek_year);
+    return jd + (dt->isoweek - 1) * 7 + dt->day_of_week - 1;
+}
+/*
+ * in: dt->year, dt->month, dt->day_of_month
+ */
+int64_t Date_ymd_to_JulianDay(const Date *dt)
 {
     enum {
         JD_1969 = 719499,
     };
 
-    int64_t julius;  // ユリウス通日（1969-01-01 == 0）
-    int64_t y = dt->d.year;
-    int64_t m = dt->d.month - 2;
-    int64_t d = dt->d.day_of_month;
+    int64_t y = dt->year;
+    int64_t m = dt->month - 2;
+    int64_t d = dt->day_of_month;
 
     // 1～12 → 11,12(last year), 1, 2, .. 10
     // 月が1～12の範囲外の場合、正規化する
@@ -400,10 +470,8 @@ void DateTime_to_Timestamp(int64_t *timer, const DateTime *dt)
         }
         m++;
     }
-
-    // TODO year < 0
-    julius = (36525 * y / 100) + (y / 400) - (y / 100) + (3059 * m / 100) + d - JD_1969;
-    *timer = julius * MSECS_PER_DAY + dt->t.hour * MSECS_PER_HOUR + dt->t.minute * MSECS_PER_MINUTE + dt->t.second * MSECS_PER_SECOND + dt->t.millisec;
+    // ユリウス通日 (1969-01-01 == 0)
+    return d_div(36525 * y, 100) + d_div(y, 400) - d_div(y, 100) + (3059 * m / 100) + d - JD_1969;
 }
 
 static int get_days_of_month(int year, int month)
@@ -421,11 +489,10 @@ static int get_days_of_month(int year, int month)
         return 31;
     }
 }
-void DateTime_adjust(DateTime *dt)
+void DateTime_adjust(Date *dt, Time *tm)
 {
-    int64_t i_tm;
-    DateTime_to_Timestamp(&i_tm, dt);
-    Timestamp_to_DateTime(dt, i_tm);
+    int64_t ts = DateTime_to_Timestamp(dt, tm);
+    Timestamp_to_DateTime(dt, tm, ts);
 }
 // 2010-01-31 + 1months => 2010-02-28
 void Date_adjust_month(Date *dt)
@@ -447,37 +514,5 @@ void Date_adjust_month(Date *dt)
         if (dt->day_of_month > dom) {
             dt->day_of_month = dom;
         }
-    }
-}
-void Date_set_isoweek(Date *dt, int year, int week, int day_of_week)
-{
-}
-void Date_get_isoweek(int *pyear, int *pweek, const Date *dt)
-{
-    int year = dt->year;
-    int week = 1;
-
-    // 今年の01-04の曜日 (月曜=0)
-    int wod14 = (dt->day_of_week - (dt->day_of_year - 4) + 53*7) % 7;
-    // 今年の01-04を含む週の月曜日(day of year)
-    int mon14 = 4 - wod14;
-
-    if (dt->day_of_year < mon14) {
-        // 前年の01-04の曜日 (月曜=0)
-        int wod14_prev = (wod14 + (IS_LEAP_YEAR(dt->year - 1) ? 5 : 6)) % 7;
-        int mon14_prev = mon14 - (IS_LEAP_YEAR(dt->year - 1) ? 366 : 365) - wod14_prev;
-        
-        year = dt->year - 1;
-        week = (dt->day_of_year - mon14_prev) / 7;
-    } else {
-        if (dt->day_of_year > 51 * 7) {
-        }
-    }
-
-    if (pyear != NULL) {
-        *pyear = year;
-    }
-    if (pweek != NULL) {
-        *pweek = week;
     }
 }

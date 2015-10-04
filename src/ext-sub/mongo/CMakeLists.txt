@@ -1,0 +1,18 @@
+project(m_mongo)
+
+add_library(m_mongo SHARED
+  ${SRC_COMMON}
+  m_json.c
+)
+set_target_properties(m_mongo
+  PROPERTIES
+  LIBRARY_OUTPUT_DIRECTORY ${DEST_DIR}/db
+  RUNTIME_OUTPUT_DIRECTORY ${DEST_DIR}/db
+  OUTPUT_NAME mongo
+  PREFIX ""
+  SUFFIX .so
+  LINK_FLAGS "${LINK_FLAGS}"
+  LINK_FLAGS_DEBUG "${LINK_FLAGS_DEBUG}"
+  LINK_FLAGS_RELEASE "${LINK_FLAGS_RELEASE}"
+)
+

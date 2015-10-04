@@ -223,24 +223,22 @@ typedef int (*NativeFunc)(Value *vret, Value *v, RefNode *node);
 
 
 typedef struct {
-    int year;
-    int month;
-    int day_of_year;
-    int day_of_month;
-    int day_of_week;
+    int32_t year;
+    int32_t month;
+    int32_t day_of_year;
+    int32_t day_of_month;
+    int32_t day_of_week;
+
+    int32_t isoweek_year;
+    int32_t isoweek;
 } Date;
 
 typedef struct {
-    int hour;
-    int minute;
-    int second;
-    int millisec;
+    int32_t hour;
+    int32_t minute;
+    int32_t second;
+    int32_t millisec;
 } Time;
-
-typedef struct {
-    Date d;
-    Time t;
-} DateTime;
 
 
 // 16bytes (ILP32)
@@ -267,8 +265,9 @@ typedef struct {
 typedef struct {
     RefHeader rh;
 
-    int64_t tm;      // *Always* UTC
-    DateTime dt;     // TimeZone adjusted
+    Date d;          // TimeZone adjusted
+    Time t;
+    int64_t ts;      // *Always* UTC
     RefTimeZone *tz;
     TimeOffset *off;
 } RefDateTime;
@@ -471,7 +470,7 @@ struct FoxStatic
     int (*StrBuf_add)(StrBuf *s, const char *p, int size);
     int (*StrBuf_add_c)(StrBuf *s, char c);
     int (*StrBuf_add_r)(StrBuf *s, RefStr *r);
-    void (*StrBuf_alloc)(StrBuf *s, int size);
+    int (*StrBuf_alloc)(StrBuf *s, int size);
     int (*StrBuf_printf)(StrBuf *s, const char *fmt, ...);
     RefStr *(*intern)(const char *p, int size);
     RefStr *(*get_intern)(const char *p, int size);
@@ -500,7 +499,7 @@ struct FoxStatic
     Value (*float_Value)(RefNode *klass, double dval);
     Value (*cstr_Value)(RefNode *klass, const char *p, int size);
     Value (*cstr_Value_conv)(const char *p, int size, RefCharset *cs);
-    Value (*time_Value)(int64_t i_tm, RefTimeZone *tz);
+    Value (*time_Value)(int64_t ts, RefTimeZone *tz);
 
     Value (*printf_Value)(const char *fmt, ...);
 
@@ -542,7 +541,7 @@ struct FoxStatic
     RefTimeZone *(*get_local_tz)(void);
     void (*adjust_timezone)(RefDateTime *dt);
     void (*adjust_datetime)(RefDateTime *dt);
-    void (*DateTime_to_Timestamp)(int64_t *timer, const DateTime *cal);
+    int64_t (*DateTime_to_Timestamp)(const Date *dt, const Time *tm);
     int (*timedelta_parse_string)(int64_t *ret, const char *src_p, int src_size);
 
     int (*is_subclass)(RefNode *klass, RefNode *super);
@@ -629,7 +628,7 @@ struct FoxGlobal
 ////////////////////////////////////////////////////////////////////////////////
 
 #define FOX_VERSION_MAJOR    0
-#define FOX_VERSION_MINOR    14
+#define FOX_VERSION_MINOR    15
 #define FOX_VERSION_REVISION 0
 
 
