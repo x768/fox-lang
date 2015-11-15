@@ -173,7 +173,7 @@ class ExifTag
         m_value = value
     }
     def tag => m_tag
-    def tag_name => _TAG_NAME[m_tag] || "$m_tag"
+    def tag_name => _TAG_NAME.get(m_tag) || "$m_tag"
     def value => m_value.size > 1 ? m_value : m_value.size == 1 ? m_value[0] : null
     def values => m_value
 }
@@ -272,7 +272,7 @@ class ExifReader : Iterable
                 m_tags.push tag
 
                 m_tags_map[tag[0]] = tag
-                let tag_name = _TAG_NAME[tag[0]]
+                let tag_name = _TAG_NAME.get(tag[0])
                 if tag_name {
                     m_tags_map[tag_name] = tag
                 }

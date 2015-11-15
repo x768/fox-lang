@@ -26,6 +26,7 @@ enum {
     MD_CODE_INLINE,   // <code>#hilight:link text</code>
     MD_LINK,          // <a href="link" title="title">child</a>
     MD_CODE,          // title=filename, <pre><code></code></pre>
+    MD_TEXT_COLOR,    // <span class="title">text</span>
     MD_INLINE_PLUGIN, // [%plugin]
 
     MD_LINK_BRAKET,   // [hogehoge]
@@ -118,6 +119,7 @@ typedef struct {
 
     Mem mem;
     SimpleHash *link_map[SIMPLE_HASH_MAX];
+    Hash hilight;
     MDNode *root;
     MDNodeLink *heading;
     MDNodeLink **heading_p;
@@ -125,6 +127,20 @@ typedef struct {
     MDNodeLink **footnote_p;
 } Markdown;
 
+typedef struct {
+    Markdown *md;
+    const char *p;
+    int head;
+    int prev_link;
+    int table_row;
+
+    uint16_t type;
+    uint16_t opt;
+    uint16_t bq_level;
+    uint16_t indent;
+
+    StrBuf val;
+} MDTok;
 
 
 #ifndef DEFINE_GLOBALS
@@ -160,5 +176,7 @@ MDNode *MDNode_new(int type, Markdown *r);
 int parse_markdown(Markdown *r, const char *p);
 int link_markdown(Ref *r);
 
+// hilight.c
+int parse_markdown_code_block(Markdown *r, MDTok *tk, MDNode **ppnode, const char *type);
 
 #endif /* _MARKDOWN_H_ */

@@ -579,14 +579,54 @@ static int complex_polar(Value *vret, Value *v, RefNode *node)
 
     return TRUE;
 }
+static int append_float_tostr(StrBuf *sb, double val, Value *argv, int argc, int add_sign)
+{
+    int i;
+    RefStr *rs;
+    RefNode *ret_type;
+
+    *fg->stk_top++ = fs->float_Value(fs->cls_float, val);
+    for (i = 0; i < argc; i++) {
+        *fg->stk_top++ = fs->Value_cp(argv[i]);
+    }
+    if (!fs->call_member_func(fs->str_tostr, argc, TRUE)) {
+        return FALSE;
+    }
+    ret_type = fs->Value_type(fg->stk_top[-1]);
+    if (ret_type != fs->cls_str) {
+        fs->throw_error_select(THROW_RETURN_TYPE__NODE_NODE, fs->cls_str, ret_type);
+        return FALSE;
+    }
+    rs = Value_vp(fg->stk_top[-1]);
+    if (add_sign) {
+        if (rs->size >= 1 && rs->c[0] != '+' && rs->c[0] != '-') {
+            fs->StrBuf_add_c(sb, '+');
+        }
+    }
+    fs->StrBuf_add(sb, rs->c, rs->size);
+    fs->Value_pop();
+
+    return TRUE;
+}
 static int complex_tostr(Value *vret, Value *v, RefNode *node)
 {
     const RefComplex *rc = Value_vp(*v);
-    char cbuf[128];
+    StrBuf sb;
+    int ret;
 
-    sprintf(cbuf, "(%g%+gi)", rc->re, rc->im);
-    *vret = fs->cstr_Value(fs->cls_str, cbuf, -1);
-
+    fs->StrBuf_init_refstr(&sb, 16);
+    fs->StrBuf_add_c(&sb, '(');
+    ret = append_float_tostr(&sb, rc->re, v + 1, fg->stk_top - v - 1, FALSE);
+    if (ret) {
+        ret = append_float_tostr(&sb, rc->im, v + 1, fg->stk_top - v - 1, TRUE);
+    }
+    if (ret) {
+        fs->StrBuf_add(&sb, "i)", 2);
+        *vret = fs->StrBuf_str_Value(&sb, fs->cls_str);
+    } else {
+        StrBuf_close(&sb);
+        return FALSE;
+    }
     return TRUE;
 }
 static int complex_eq(Value *vret, Value *v, RefNode *node)
@@ -831,6 +871,18 @@ static int c_sqrt(RefComplex *r, const RefComplex *v1)
     double arg = atan2(v1->im, v1->re) / 2.0;
     r->re = re_2 * cos(arg);
     r->im = re_2 * sin(arg);
+/*
+    if (v1->re > 0) {
+        r->re = sqrt(0.5 * re_2 + 0.5 * v1->re);
+        r->im = fabs(0.5 * v1->im / r->re);
+    } else {
+        r->im = sqrt(0.5 * re_2 - 0.5 * v1->re);
+        r->re = fabs(0.5 * v1->im / r->im);
+    }
+    if (v1->im < 0) {
+        r->im = -r->im;
+    }
+*/
     return TRUE;
 }
 static int c_exp(RefComplex *r, const RefComplex *v1)

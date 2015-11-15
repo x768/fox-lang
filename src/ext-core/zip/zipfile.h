@@ -25,6 +25,8 @@ enum {
 enum {
     INDEX_ZIPREADER_READER,
     INDEX_ZIPREADER_CDIR,
+    INDEX_ZIPREADER_CHARSET,
+    INDEX_ZIPREADER_TZ,
     INDEX_ZIPREADER_NUM,
 };
 enum {
@@ -172,7 +174,7 @@ extern RefNode *mod_zip;
 
 
 void CentralDirEnd_free(CentralDirEnd *cdir);
-CentralDir *find_central_dir(Value reader);
+int find_central_dir(CentralDir **cdir, Value reader, RefCharset *cs, RefTimeZone *tz);
 CentralDirEnd *get_central_dir(Value reader, int size, RefCharset *cs, RefTimeZone *tz);
 int get_local_header_size(Value reader, CentralDir *cdir);
 int read_cdir_data(char *dst, int *psize, Value reader, CentralDir *cdir);
@@ -181,9 +183,7 @@ int write_local_data(CentralDirEnd *cdir, Value writer, Ref *r);
 int write_central_dir(CentralDirEnd *cdir, Value writer);
 int write_end_of_cdir(CentralDirEnd *cdir, Value writer);
 
-int move_next_file_entry(Value reader);
-
-Hash *get_entry_map_static(const char *path);
+Hash *get_entry_map_static(const char *path, Mem *mem);
 int read_entry(char *buf, const ZipEntry *entry);
 
 

@@ -1,3 +1,12 @@
+word "0-9A-Za-z_"
+define comment
+define comment_line
+define quot
+define dquot
+define keyword, word
+define keyword2, word
+define typename, word
+
 "/*" = _ comment comment
 "*/" = comment comment _
 "//" = _ comment_line comment_line
@@ -7,7 +16,7 @@
 "L'" = _ quot quot
 '\\' = quot quot quot
 "\\'" = quot quot quot
-"'" = uot uot _
+"'" = quot uot _
 
 '"' = _ dquot dquot
 'L"' = _ dquot dquot
@@ -41,10 +50,14 @@
 "volatile" = _ keyword _
 "while" = _ keyword _
 
+"EOF" = _ keyword2 _
+"FALSE" = _ keyword2 _
+"NULL" = _ keyword2 _
+"TRUE" = _ keyword2 _
+
 "_Bool" = _ typename _
 "_Complex" = _ typename _
 "_Imaginary" = _ typename _
-"bool" = _ typename _
 "char" = _ typename _
 "double" = _ typename _
 "float" = _ typename _

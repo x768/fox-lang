@@ -837,6 +837,8 @@ NORMAL:
 
             if (v1 == v2) {
                 result = !neq;
+                Value_dec(v1);
+                Value_dec(v2);
                 fg->stk_top--;
             } else {
                 RefNode *type = Value_type(v1);
@@ -872,6 +874,7 @@ NORMAL:
                             Value_dec(v1);
                             result = !neq;
                         } else {
+                            // false or null
                             result = neq;
                         }
                     }

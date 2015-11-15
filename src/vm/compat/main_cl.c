@@ -266,9 +266,7 @@ static void show_configure(void)
     if (defs[ENVSET_ERROR]) {
         stream_write_data(fg->v_cio, fv->err_dst, -1);
     } else {
-        stream_write_data(fg->v_cio, "(", 1);
-        stream_write_data(fg->v_cio, fv->err_dst, -1);
-        stream_write_data(fg->v_cio, ")", 1);
+        stream_write_data(fg->v_cio, "(stderr)", -1);
     }
 
     stream_write_data(fg->v_cio, "\nFOX_LANG: ", -1);
@@ -442,7 +440,9 @@ FINALLY:
 
 void print_last_error()
 {
-    if (fv->err_dst == NULL) {
+    if (fs->cgi_mode){
+        fv->err_dst = "stdout";
+    } else {
         fv->err_dst = "stderr";
     }
     if (fg->error != VALUE_NULL && strcmp(fv->err_dst, "null") != 0) {
@@ -452,6 +452,9 @@ void print_last_error()
         if (strcmp(fv->err_dst, "stdout") == 0) {
             fox_error_dump(&sb, FALSE);
             if (fg->v_cio != VALUE_NULL) {
+                if (fs->cgi_mode){
+                    send_headers();
+                }
                 stream_write_data(fg->v_cio, sb.p, sb.size);
             }
         } else if (strcmp(fv->err_dst, "stderr") == 0) {
@@ -491,7 +494,7 @@ int main_fox(int argc, const char **argv)
     // デフォルト値
     fs->max_alloc = 32 * 1024 * 1024; // 32MB
     fs->max_stack = 32768;
-    fv->err_dst = "stderr";
+
     {
         // 実際のカレントディレクトリを取得
         // 末尾に/を付ける

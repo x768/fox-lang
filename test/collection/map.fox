@@ -25,6 +25,9 @@ map.bar = 2
 assert_equal map, {foo = 1, 'bar':2}
 map.delete 'foo'
 assert_equal map, {bar = 2}
+assert_equal map.get('foo'), null
+assert_equal map.get('foo', 'none'), 'none'
+assert_equal map.get('bar', 'none'), 2
 map.clear()
 assert_equal map, {}
 

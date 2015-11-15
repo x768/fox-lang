@@ -12,7 +12,7 @@ typedef struct {
 
 
 typedef struct {
-    Hash *(*get_entry_map_static)(const char *path);
+    Hash *(*get_entry_map_static)(const char *path, Mem *mem);
     int (*read_entry)(char *buf, const ZipEntry *entry);
 } ZipStatic;
 

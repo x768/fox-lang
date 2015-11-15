@@ -38,6 +38,7 @@ import "text/x-csrc"
 "using" = _ keyword _
 "virtual" = _ keyword _
 
+"bool" = _ typename _
 "char16_t" = _ typename _
 "char32_t" = _ typename _
 "nullptr_t" = _ typename _

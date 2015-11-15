@@ -1,0 +1,17 @@
+import util.assert
+import marshal.xml
+
+let doc = XMLDocument.parse_xml(<<<EOS
+<?xml version="1.0"?>
+<doc><a>hoge</a><a>piyo</a><b key="value"/></doc>
+EOS)
+
+assert_equal doc.root, XMLElem("doc", XMLElem("a", XMLText("hoge")), XMLElem("a", XMLText("piyo")), XMLElem("b", {key="value"}))
+assert_equal doc.root.as_text, "hogepiyo"
+assert_equal doc.root.a[0], XMLElem("a", XMLText('hoge'))
+assert_equal doc.root.a[1], XMLElem("a", XMLText('piyo'))
+assert_equal doc.root.b[0], XMLElem("b", {key="value"})
+assert_equal doc.root["b"][0], XMLElem("b", {key="value"})
+assert_equal doc.root.b.attr("key"), "value"
+assert_equal doc.root.b.@key, "value"
+

@@ -24,7 +24,7 @@ def assert_equal(a, b)
     let t1 = typeof(a)
     let t2 = typeof(b)
     if t1 != t2 {
-        throw AssertError("$t1 value expected but $t2")
+        throw AssertError("$t1 type expected but $t2")
     }
     if a != b {
         throw AssertError("$b expected but $a")

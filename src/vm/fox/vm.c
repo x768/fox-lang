@@ -163,6 +163,7 @@ void init_so_func(void)
     fs->stream_write_uint32 = stream_write_uint32;
     fs->stream_seek_sub = stream_seek;
     fs->stream_flush_sub = stream_flush_sub;
+    fs->stream_gets_sub = stream_gets_sub;
 
     fs->get_local_tz = get_local_tz;
     fs->adjust_timezone = adjust_timezone;
@@ -181,6 +182,9 @@ void init_so_func(void)
     fs->refmap_del = refmap_del;
 
     fs->read_from_file = read_from_file;
+    
+    fs->Tok_simple_init = Tok_simple_init;
+    fs->Tok_simple_next = Tok_simple_next;
 }
 
 /**

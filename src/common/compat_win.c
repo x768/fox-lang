@@ -68,10 +68,10 @@ int utf8_to_utf16(wchar_t *dst_p, const char *src, int len)
             } else if ((c & 0xF0) == 0xE0 && p + 2 < end) {
                 p += 3;
             } else if ((c & 0xF8) == 0xF0 && p + 3 < end) {
-                p += 4;
                 if ((c & 0x07) != 0 || (p[1] & 0x30) != 0) {
                     dst++;
                 }
+                p += 4;
             } else {
                 p++;
                 while (p < end && (*p & 0xC0) == 0x80) {
@@ -116,7 +116,7 @@ int utf16_to_utf8(char *dst_p, const wchar_t *src, int len)
                 *dst++ = 0x80 | (c & 0x3F);
             } else if (c < SURROGATE_L_BEGIN) {
                 if (p < end && *p >= SURROGATE_L_BEGIN && *p < SURROGATE_END) {
-                    int code = (((c - SURROGATE_L_BEGIN) << 10) | (*p - SURROGATE_L_BEGIN)) + 0x10000;
+                    int code = (((c - SURROGATE_U_BEGIN) << 10) | (*p - SURROGATE_L_BEGIN)) + 0x10000;
                     *dst++ = 0xF0 | (code >> 18);
                     *dst++ = 0x80 | ((code >> 12) & 0x3F);
                     *dst++ = 0x80 | ((code >> 6) & 0x3F);

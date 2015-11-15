@@ -1982,19 +1982,6 @@ static void define_const(RefNode *m)
     n = fs->define_identifier(m, m, "DTD_HTML5", NODE_CONST, 0);
     n->u.k.val = fs->cstr_Value(fs->cls_str, "html", -1);
 }
-static void define_func(RefNode *m)
-{
-    RefNode *n;
-
-    n = fs->define_identifier(m, m, "parse_xml", NODE_FUNC_N, 0);
-    fs->define_native_func_a(n, parse_xml, 1, 2, (void*) LOAD_XML, NULL, fs->cls_bool);
-    n = fs->define_identifier(m, m, "parse_html", NODE_FUNC_N, 0);
-    fs->define_native_func_a(n, parse_xml, 1, 2, (void*) 0, NULL, fs->cls_charset);
-    n = fs->define_identifier(m, m, "parse_xmlfile", NODE_FUNC_N, 0);
-    fs->define_native_func_a(n, parse_xml, 1, 2, (void*) (LOAD_XML|LOAD_FILE), NULL, fs->cls_bool);
-    n = fs->define_identifier(m, m, "parse_htmlfile", NODE_FUNC_N, 0);
-    fs->define_native_func_a(n, parse_xml, 1, 2, (void*) LOAD_FILE, NULL, fs->cls_charset);
-}
 static void define_class(RefNode *m)
 {
     RefNode *cls;
@@ -2015,6 +2002,14 @@ static void define_class(RefNode *m)
     cls = cls_document;
     n = fs->define_identifier_p(m, cls, fs->str_new, NODE_NEW_N, 0);
     fs->define_native_func_a(n, xml_document_new, 1, 2, NULL, fs->cls_str, cls_elem);
+    n = fs->define_identifier(m, cls, "parse_xml", NODE_NEW_N, 0);
+    fs->define_native_func_a(n, parse_xml, 1, 2, (void*) LOAD_XML, NULL, fs->cls_bool);
+    n = fs->define_identifier(m, cls, "parse_html", NODE_NEW_N, 0);
+    fs->define_native_func_a(n, parse_xml, 1, 2, (void*) 0, NULL, fs->cls_charset);
+    n = fs->define_identifier(m, cls, "load_xml", NODE_NEW_N, 0);
+    fs->define_native_func_a(n, parse_xml, 1, 2, (void*) (LOAD_XML|LOAD_FILE), NULL, fs->cls_bool);
+    n = fs->define_identifier(m, cls, "load_html", NODE_NEW_N, 0);
+    fs->define_native_func_a(n, parse_xml, 1, 2, (void*) LOAD_FILE, NULL, fs->cls_charset);
 
     n = fs->define_identifier(m, cls, "has_dtd", NODE_FUNC_N, NODEOPT_PROPERTY);
     fs->define_native_func_a(n, xml_document_get_property, 0, 0, (void*)INDEX_DOCUMENT_HAS_DTD);
@@ -2187,7 +2182,6 @@ void define_module(RefNode *m, const FoxStatic *a_fs, FoxGlobal *a_fg)
     m->u.m.ext = XMLStatic_new();
 
     define_class(m);
-    define_func(m);
     define_const(m);
 }
 

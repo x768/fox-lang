@@ -97,6 +97,8 @@ int make_path_regularize(char *path, int size)
             }
         } else if (path[1] == ':') {
             path[0] = toupper(path[0]);
+            src = 3;
+            dst = 3;
         }
     }
 #endif
@@ -115,8 +117,6 @@ int make_path_regularize(char *path, int size)
                 if (dir_pos > 0) {
                     dir_pos--;
                     dst = dir[dir_pos];
-                } else {
-                    dst = 0;
                 }
                 if (path[src + 3] == '\0') {
                     break;
@@ -178,8 +178,19 @@ char *path_normalize(Str *ret, RefStr *base_dir, const char *path_p, int path_si
         ptr = str_dup_p(path_p, path_size, mem);
         size = path_size;
 #ifdef WIN32
-//  } else if (path.size > 0 && (path.p[0] == '\\' || path.p[0] == '/')) {
-        //TODO ネットワークドライブがbaseの場合
+    } else if (path_size > 0 && (path_p[0] == '\\' || path_p[0] == '/')) {
+        // ドライブからの相対パス
+        // pwd=C:/test, path=/hoge -> C:/hoge
+        int i = 2;
+        while (i < base_dir->size && (base_dir->c[i] != '\\' && base_dir->c[i] != '/')) {
+            i++;
+        }
+        size = i;
+        ptr = Mem_get(mem, size + path_size);
+        memcpy(ptr, base_dir->c, size);
+        memcpy(ptr + size, path_p, path_size);
+        size += path_size;
+        ptr[size] = '\0';
 #endif
     } else {
         ptr = Mem_get(mem, base_dir->size + path_size + 2);
@@ -191,7 +202,7 @@ char *path_normalize(Str *ret, RefStr *base_dir, const char *path_p, int path_si
             ptr[size++] = SEP_C;
         }
         memcpy(ptr + size, path_p, path_size);
-        size = size + path_size;
+        size += path_size;
         ptr[size] = '\0';
     }
 

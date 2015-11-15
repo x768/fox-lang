@@ -2454,6 +2454,54 @@ static int iterator_sort(Value *vret, Value *v, RefNode *node)
 
     return TRUE;
 }
+static int iterator_group_by(Value *vret, Value *v, RefNode *node)
+{
+    Value *v_fn = v + 1;
+    RefMap *rm = refmap_new(0);
+
+    *vret = vp_Value(rm);
+
+    for (;;) {
+        Value *vval;
+
+        Value_push("v", *v);
+        if (!call_member_func(fs->str_next, 0, TRUE)) {
+            if (Value_type(fg->error) == fs->cls_stopiter) {
+                // throw StopIteration
+                Value_dec(fg->error);
+                fg->error = VALUE_NULL;
+                break;
+            } else {
+                return FALSE;
+            }
+        }
+        vval = fg->stk_top - 1;
+        Value_push("vv", *v_fn, *vval);
+        if (!call_function_obj(1)) {
+            return FALSE;
+        }
+
+        {
+            Value *vkey = fg->stk_top - 1;
+            HashValueEntry *ep = refmap_add(rm, *vkey, FALSE, FALSE);
+            Value *vp;
+
+            if (ep == NULL) {
+                return FALSE;
+            }
+            if (ep->val == VALUE_NULL) {
+                ep->val = vp_Value(refarray_new(0));
+            }
+            vp = refarray_push(Value_vp(ep->val));
+            if (vp != NULL) {
+                *vp = Value_cp(*vval);
+            }
+        }
+        Value_pop();
+        Value_pop();
+    }
+    return TRUE;
+}
 static int itermap_next(Value *vret, Value *v, RefNode *node)
 {
     Ref *r = Value_ref(*v);
@@ -2629,6 +2677,8 @@ void define_lang_col_class(RefNode *m)
     define_native_func_a(n, iterator_sort, 0, 1, intern("sort_by_self", -1), fs->cls_fn);
     n = define_identifier(m, cls, "reverse", NODE_FUNC_N, 0);
     define_native_func_a(n, iterator_sort, 0, 1, intern("reverse_self", -1), fs->cls_fn);
+    n = define_identifier(m, cls, "group_by", NODE_FUNC_N, 0);
+    define_native_func_a(n, iterator_group_by, 1, 1, NULL, fs->cls_fn);
     extends_method(cls, fs->cls_obj);
 
 
@@ -2689,6 +2739,8 @@ void define_lang_col_class(RefNode *m)
     define_native_func_a(n, iterable_invoke, 0, 1, NULL, fs->cls_fn);
     n = define_identifier(m, cls, "reverse", NODE_FUNC_N, 0);
     define_native_func_a(n, iterable_invoke, 0, 0, NULL);
+    n = define_identifier(m, cls, "group_by", NODE_FUNC_N, 0);
+    define_native_func_a(n, iterable_invoke, 1, 1, NULL, fs->cls_fn);
     n = define_identifier(m, cls, "reduce", NODE_FUNC_N, 0);
     define_native_func_a(n, iterable_invoke, 2, 2, NULL, NULL, fs->cls_fn);
     n = define_identifier(m, cls, "all", NODE_FUNC_N, 0);

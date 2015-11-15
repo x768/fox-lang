@@ -349,9 +349,7 @@ static void show_configure(void)
     if (defs[ENVSET_ERROR]) {
         write_html_encode(fv->err_dst, -1);
     } else {
-        stream_write_data(fg->v_cio, "<span class=\"def\">", -1);
-        write_html_encode(fv->err_dst, -1);
-        stream_write_data(fg->v_cio, "</span>", -1);
+        stream_write_data(fg->v_cio, "<span class=\"def\">stdout</span>", -1);
     }
     stream_write_data(fg->v_cio, tlend, -1);
 
@@ -573,7 +571,6 @@ int main_fox(int argc, const char **argv)
     fs->cgi_mode = TRUE;
     fs->max_alloc = 32 * 1024 * 1024; // 32MB
     fs->max_stack = 32768;
-    fv->err_dst = "stdout";
 
     fox_init_compile(FALSE);
 

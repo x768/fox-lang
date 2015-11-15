@@ -684,17 +684,12 @@ static int cookie_delete_value(Value *vret, Value *v, RefNode *node)
 
 static int cgi_session_id(Value *vret, Value *v, RefNode *node)
 {
+    enum {
+        RAND_LEN = 64,
+    };
     static RefNode *func_hash;
-    const char *remote_addr = NULL;
-    char tmp[64];
-    int len;
+    RefStr *rs;
 
-    if (fs->cgi_mode) {
-        remote_addr = Hash_get(&fs->envs, "REMOTE_ADDR", -1);
-    }
-    if (remote_addr == NULL) {
-        remote_addr = "";
-    }
     if (func_hash == NULL) {
         RefNode *mod = get_module_by_name("crypt", -1, TRUE, TRUE);
         if (mod == NULL) {
@@ -706,16 +701,11 @@ static int cgi_session_id(Value *vret, Value *v, RefNode *node)
         }
     }
 
-    len = strlen(remote_addr);
-    if (len < sizeof(tmp)) {
-        strcpy(tmp, remote_addr);
-        get_random(tmp + len, sizeof(tmp) - len - 1);
-    } else {
-        memcpy(tmp, remote_addr, sizeof(tmp) - 1);
-    }
-    tmp[len] = '\0';
+    rs = refstr_new_n(fs->cls_bytes, RAND_LEN);
+    get_random(rs->c, RAND_LEN);
 
-    fs->Value_push("Nss", tmp, "sha256");
+    Value_push("Nrs", rs, "sha256");
+    Value_dec(vp_Value(rs));
     if (!call_function(func_hash, 2)) {
         return FALSE;
     }

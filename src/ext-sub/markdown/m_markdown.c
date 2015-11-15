@@ -397,6 +397,7 @@ static int markdown_new(Value *vret, Value *v, RefNode *node)
 
     md->heading_p = &md->heading;
     md->footnote_p = &md->footnote;
+    fs->Hash_init(&md->hilight, &md->mem, 16);
 
     return TRUE;
 }
@@ -555,7 +556,7 @@ static int md_escape(Value *vret, Value *v, RefNode *node)
         switch (ch) {
         case '[': case ']':
         case '(': case ')':
-        case '`': case '~': case '_': case '*':
+        case '`': case '~': case '*':
         case '&': case '|': case ':':
         case '\\':
             fs->StrBuf_add_c(&buf, '\\');

@@ -414,6 +414,7 @@ int stream_gets_limit(Value v, char *p, int *psize)
 
 /**
  * 文字 sep が出現するか最後まで読む
+ * sb : 文字sepを含んだ1行を追加して返す or NULL
  */
 int stream_gets_sub(StrBuf *sb, Value v, int sep)
 {
@@ -439,7 +440,9 @@ int stream_gets_sub(StrBuf *sb, Value v, int sep)
                 break;
             }
         }
-        StrBuf_add(sb, mb->buf.p + mb->cur, i);
+        if (sb != NULL) {
+            StrBuf_add(sb, mb->buf.p + mb->cur, i);
+        }
         mb->cur += i;
         return TRUE;
     }
@@ -467,28 +470,43 @@ int stream_gets_sub(StrBuf *sb, Value v, int sep)
             buf = mb->buf.p;
         } else {
             // 改行まで読む
-            int top = cur;
             int found = FALSE;
-            int limit = fs->max_alloc - sb->size;  // 改行が見つからない場合はMAX_ALLOCに制限
 
-            if (sep >= 0) {
-                while (cur < max) {
-                    if (cur >= limit) {
-                        found = TRUE;
-                        break;
-                    }
-                    if (buf[cur] == sep) {
-                        found = TRUE;
+            if (sb != NULL) {
+                int top = cur;
+                int limit = fs->max_alloc - sb->size;  // 改行が見つからない場合はMAX_ALLOCに制限
+                if (sep >= 0) {
+                    while (cur < max) {
+                        if (cur >= limit) {
+                            found = TRUE;
+                            break;
+                        }
+                        if (buf[cur] == sep) {
+                            found = TRUE;
+                            cur++;
+                            break;
+                        }
                         cur++;
-                        break;
                     }
-                    cur++;
+                } else {
+                    cur = (max < limit ? max : limit);
+                }
+                if (!StrBuf_add(sb, buf + top, cur - top)) {
+                    return FALSE;
                 }
             } else {
-                cur = (max < limit ? max : limit);
-            }
-            if (!StrBuf_add(sb, buf + top, cur - top)) {
-                return FALSE;
+                if (sep >= 0) {
+                    while (cur < max) {
+                        if (buf[cur] == sep) {
+                            found = TRUE;
+                            cur++;
+                            break;
+                        }
+                        cur++;
+                    }
+                } else {
+                    cur = max;
+                }
             }
             if (found) {
                 break;
@@ -616,6 +634,10 @@ int stream_flush_sub(Value v)
         Value_pop();
         if (wrote_size <= 0) {
             // 書き込み失敗のため中断
+            if (fg->error == VALUE_NULL) {
+                RefNode *v_type = Value_type(v);
+                throw_errorf(fs->mod_io, "WriteError", "Failed to write data (%n)", v_type);
+            }
             return FALSE;
         }
         if (wrote_size < mb->buf.size) {
@@ -2084,6 +2106,13 @@ static int nullio_new(Value *vret, Value *v, RefNode *node)
     return TRUE;
 }
 
+static int nullio_write(Value *vret, Value *v, RefNode *node)
+{
+    RefBytesIO *mb = Value_vp(v[1]);
+    *vret = int32_Value(mb->buf.size);
+    return TRUE;
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 
 static int get_stdio(Value *vret, Value *v, RefNode *node)
@@ -2181,7 +2210,7 @@ static void define_io_class(RefNode *m)
     n = define_identifier_p(m, cls, str__read, NODE_FUNC_N, 0);
     define_native_func_a(n, native_return_null, 2, 2, NULL, fs->cls_bytesio, fs->cls_int);
     n = define_identifier_p(m, cls, str__write, NODE_FUNC_N, 0);
-    define_native_func_a(n, native_return_null, 1, 1, NULL, fs->cls_bytesio);
+    define_native_func_a(n, nullio_write, 1, 1, NULL, fs->cls_bytesio);
     cls->u.c.n_memb = fs->cls_streamio->u.c.n_memb;
     extends_method(cls, fs->cls_streamio);
 

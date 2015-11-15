@@ -218,6 +218,7 @@ typedef struct TimeOffset TimeOffset;
 typedef struct IconvIO IconvIO;
 
 typedef uint64_t Value;
+typedef struct Tok Tok;
 
 typedef int (*NativeFunc)(Value *vret, Value *v, RefNode *node);
 
@@ -581,6 +582,7 @@ struct FoxStatic
     int (*stream_write_uint32)(Value w, uint32_t val);
     int (*stream_seek_sub)(Value v, int64_t pos);
     int (*stream_flush_sub)(Value v);
+    int (*stream_gets_sub)(StrBuf *sb, Value v, int sep);
 
     int (*get_loader_function)(RefNode **fn, const char *type_p, int type_size, const char *prefix, Hash *hash);
     int (*load_aliases_file)(Hash *ret, const char *filename);
@@ -607,6 +609,9 @@ struct FoxStatic
     int (*refmap_del)(Value *val, RefMap *rm, Value key);
 
     char *(*read_from_file)(int *psize, const char *path, Mem *mem);
+
+    void (*Tok_simple_init)(Tok *tk, char *buf);
+    void (*Tok_simple_next)(Tok *tk);
 };
 
 // 外部モジュールに公開
@@ -628,7 +633,7 @@ struct FoxGlobal
 ////////////////////////////////////////////////////////////////////////////////
 
 #define FOX_VERSION_MAJOR    0
-#define FOX_VERSION_MINOR    15
+#define FOX_VERSION_MINOR    16
 #define FOX_VERSION_REVISION 0
 
 

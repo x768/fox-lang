@@ -442,6 +442,26 @@ int map_index(Value *vret, Value *v, RefNode *node)
 
     return TRUE;
 }
+// a.get("hoge", "Not Exist") -> "Not Exist"
+int map_get(Value *vret, Value *v, RefNode *node)
+{
+    RefMap *rm = Value_vp(*v);
+    HashValueEntry *ep = NULL;
+    Value key = v[1];
+
+    if (!refmap_get(&ep, rm, key)) {
+        return FALSE;
+    }
+    if (ep != NULL) {
+        // 一致
+        *vret = Value_cp(ep->val);
+    } else {
+        if (v + 2 < fg->stk_top) {
+            *vret = Value_cp(v[2]);
+        }
+    }
+    return TRUE;
+}
 // a["hoge"] = 10
 static int map_index_set(Value *vret, Value *v, RefNode *node)
 {
@@ -955,6 +975,8 @@ void define_lang_map_class(RefNode *m)
     define_native_func_a(n, map_index, 1, 1, NULL, NULL);
     n = define_identifier_p(m, cls, fs->str_missing_set, NODE_FUNC_N, 0);
     define_native_func_a(n, map_index_set, 2, 2, NULL, NULL, NULL);
+    n = define_identifier(m, cls, "get", NODE_FUNC_N, 0);
+    define_native_func_a(n, map_get, 1, 2, NULL, NULL, NULL);
     n = define_identifier_p(m, cls, empty, NODE_FUNC_N, NODEOPT_PROPERTY);
     define_native_func_a(n, map_empty, 0, 0, NULL);
     n = define_identifier_p(m, cls, size, NODE_FUNC_N, NODEOPT_PROPERTY);

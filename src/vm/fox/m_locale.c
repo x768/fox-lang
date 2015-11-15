@@ -1120,21 +1120,23 @@ static int resource_locale(Value *vret, Value *v, RefNode *node)
 
 ////////////////////////////////////////////////////////////////////////////
 
-static void get_resource_sub(Value *vret, const char *path, int is_stream)
+static int get_resource_sub(Value *vret, const char *path, RefNode *type)
 {
     int64_t size;
     FileHandle fd = open_fox(path, O_RDONLY, DEFAULT_PERMISSION);
 
     if (fd == -1) {
-        return;
+        throw_error_select(THROW_CANNOT_OPEN_FILE__STR, Str_new(path, -1));
+        return FALSE;
     }
     size = get_file_size(fd);
     if (size == -1 || size >= fs->max_alloc) {
         close_fox(fd);
-        return;
+        throw_error_select(THROW_CANNOT_OPEN_FILE__STR, Str_new(path, -1));
+        return FALSE;
     }
 
-    if (is_stream) {
+    if (type == fs->cls_streamio) {
         RefBytesIO *bio = bytesio_new_sub(NULL, 0);
         StrBuf_alloc(&bio->buf, size);
         *vret = vp_Value(bio);
@@ -1145,23 +1147,30 @@ static void get_resource_sub(Value *vret, const char *path, int is_stream)
             }
         }
     } else {
-        RefStr *rs = refstr_new_n(fs->cls_bytes, size);
+        RefStr *rs = refstr_new_n(type, size);
         *vret = vp_Value(rs);
         if (size > 0) {
             int rd = read_fox(fd, rs->c, size);
             if (rd >= 0) {
                 rs->c[rd] = '\0';
                 rs->size = rd;
+                if (type == fs->cls_str) {
+                    if (invalid_utf8_pos(rs->c, rs->size) >= 0) {
+                        throw_error_select(THROW_INVALID_UTF8);
+                        return FALSE;
+                    }
+                }
             } else {
                 rs->c[0] = '\0';
                 rs->size = 0;
             }
         }
     }
+    return TRUE;
 }
 static int get_resource_data(Value *vret, Value *v, RefNode *node)
 {
-    int is_stream = FUNC_INT(node);
+    RefNode *type = FUNC_VP(node);
     char *path;
     RefStr *name_s = Value_vp(v[1]);
     RefStr *ext_s = Value_vp(v[2]);
@@ -1175,7 +1184,9 @@ static int get_resource_data(Value *vret, Value *v, RefNode *node)
     if (path == NULL) {
         return FALSE;
     }
-    get_resource_sub(vret, path, is_stream);
+    if (!get_resource_sub(vret, path, type)) {
+        return FALSE;
+    }
 
     return TRUE;
 }
@@ -1224,10 +1235,13 @@ static void define_locale_func(RefNode *m)
     RefNode *n;
 
     n = define_identifier(m, m, "resource_bytes", NODE_FUNC_N, 0);
-    define_native_func_a(n, get_resource_data, 2, 2, (void*)FALSE, fs->cls_str, fs->cls_str);
+    define_native_func_a(n, get_resource_data, 2, 2, fs->cls_bytes, fs->cls_str, fs->cls_str);
+
+    n = define_identifier(m, m, "resource_str", NODE_FUNC_N, 0);
+    define_native_func_a(n, get_resource_data, 2, 2, fs->cls_str, fs->cls_str, fs->cls_str);
 
     n = define_identifier(m, m, "resource_stream", NODE_FUNC_N, 0);
-    define_native_func_a(n, get_resource_data, 2, 2, (void*)TRUE, fs->cls_str, fs->cls_str);
+    define_native_func_a(n, get_resource_data, 2, 2, fs->cls_streamio, fs->cls_str, fs->cls_str);
 }
 static void define_locale_class(RefNode *m)
 {

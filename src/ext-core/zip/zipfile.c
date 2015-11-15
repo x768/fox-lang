@@ -87,71 +87,6 @@ static int align_pow2(int sz, int min)
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#define MAKE_2C(c1, c2) ((c1) | ((c2) << 8))
-
-static CentralDir *read_local_dir(Value reader)
-{
-    return NULL;
-}
-
-/**
- * 前からLOCAL_MAGICを検索する
- */
-CentralDir *find_central_dir(Value reader)
-{
-    if (fs->Value_type(reader) == fs->cls_bytesio) {
-        RefBytesIO *bio = Value_vp(reader);
-        int i = bio->cur;
-        while (i < bio->buf.size - 4) {
-            if (memcmp(&bio->buf.p[i], LOCAL_MAGIC, 4) == 0) {
-                bio->cur = i + 4;
-                return read_local_dir(reader);
-            }
-            i++;
-        }
-    } else {
-    }
-
-    return NULL;
-}
-
-/**
- * 末尾から22バイトより、遡って探す
- * 最初に見つかったヘッダのオフセットを返す
- */
-static CentralDirEnd *find_central_dir_end(char *buf, int size, int offset)
-{
-    int i;
-
-    if (size < EOCD_SIZE) {
-        return NULL;
-    }
-    for (i = size - EOCD_SIZE; i >= 0; i--) {
-        if (memcmp(buf + i, EOCD_MAGIC, 4) == 0) {
-            // コメントの長さと末尾の長さが(ほぼ)同じ
-            int com_end = i + EOCD_SIZE + ptr_read_uint16_le(buf + i + 20);
-
-            if (com_end <= size && com_end + 4 > size) {
-                // 分割書庫には対応しないため、0になる
-                if (ptr_read_uint32_le(buf + i + 4) == 0) {
-                    // オフセットがだいたい合っているか調べる
-                    int cdir_size = ptr_read_uint32_le(buf + i + 12);
-                    int cdir_offset = ptr_read_uint32_le(buf + i + 16);
-                    if (cdir_size < MAX_ALLOC && cdir_offset + cdir_size <= offset + i && cdir_offset + cdir_size + 4 > offset + i) {
-                        CentralDirEnd *cd = malloc(sizeof(CentralDirEnd));
-                        cd->offset_of_cdir = cdir_offset;
-                        cd->size_of_cdir = cdir_size;
-                        cd->cdir_size = ptr_read_uint16_le(buf + i + 10);
-                        cd->cdir_max = align_pow2(cd->cdir_size, 16);
-                        cd->cdir = NULL;
-                        return cd;
-                    }
-                }
-            }
-        }
-    }
-    return NULL;
-}
 static void parse_ntfs_field(CentralDir *cdir, const char *p, int p_size, int *time_ntfs)
 {
     const char *end = p + p_size;
@@ -183,7 +118,7 @@ static void parse_ext_field(CentralDir *cdir, const char *p, int p_size)
         int len = ptr_read_uint16_le(p + 2);
 
         switch (p[0] | (p[1] << 8)) {
-        case MAKE_2C('U', 'T'):
+        case 'U' | ('T' << 8):
             if (len >= 5 && !time_ntfs) {
                 // 更新時刻(Unix epoch UTC)
                 cdir->modified = (int64_t)ptr_read_uint32_le(p + 5) * 1000LL;
@@ -231,6 +166,165 @@ static void time_to_dostime(int *i_dt, int *i_tm, int64_t ts, RefTimeZone *tz)
     }
     *i_dt = ((dt.d.year - 1980) << 9) | (dt.d.month << 5) | dt.d.day_of_month;
     *i_tm = (dt.t.hour << 11) | (dt.t.minute << 5) | (dt.t.second >> 1);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+static int move_next_file_entry(int *result, Value reader)
+{
+    // PK\003\004 を探す
+    RefNode *type = fs->Value_type(reader);
+    
+    *result = FALSE;
+
+    if (type == fs->cls_bytesio) {
+        RefBytesIO *mb = Value_vp(reader);
+        StrBuf *sb = &mb->buf;
+        int pos;
+        for (pos = mb->cur; pos + 4 <= sb->size; pos++) {
+            if (sb->p[pos] == 'P' && memcmp(sb->p + 1, "K\x03\x04", 3) == 0) {
+                *result = TRUE;
+                mb->cur = pos + 4;
+                break;
+            }
+        }
+        if (!*result) {
+            mb->cur = sb->size;
+        }
+    } else {
+        // 'P'を探す
+        for (;;) {
+            char cbuf[3];
+            int size = 3;
+
+            if (!fs->stream_gets_sub(NULL, reader, 'P')) {
+                return FALSE;
+            }
+            if (!fs->stream_read_data(reader, NULL, cbuf, &size, FALSE, FALSE)) {
+                return FALSE;
+            }
+            if (size < 3) {
+                break;
+            }
+            if (memcmp(cbuf, "K\x03\x04", 3) == 0) {
+                *result = TRUE;
+                break;
+            }
+        }
+    }
+    return TRUE;
+}
+
+static int read_local_dir(CentralDir **cdir, Value reader, RefCharset *cs, RefTimeZone *tz)
+{
+    CentralDir *p;
+    char cbuf[LOCAL_SIZE - 4];
+    int size = LOCAL_SIZE - 4;
+    int filename_len, ext_len;
+    StrBuf ext_field;
+
+    if (!fs->stream_read_data(reader, NULL, cbuf, &size, FALSE, TRUE)) {
+        return FALSE;
+    }
+
+    p = malloc(sizeof(CentralDir));
+    memset(p, 0, sizeof(CentralDir));
+
+    // ファイル名
+    filename_len = ptr_read_uint16_le(cbuf + 26 - 4);
+    fs->StrBuf_init(&p->filename, filename_len);
+    if (!fs->stream_read_data(reader, &p->filename, NULL, &filename_len, FALSE, TRUE)) {
+        StrBuf_close(&p->filename);
+        free(p);
+        return FALSE;
+    }
+    // 拡張フィールド
+    ext_len = ptr_read_uint16_le(cbuf + 28 - 4);
+    fs->StrBuf_init(&ext_field, ext_len);
+    if (!fs->stream_read_data(reader, &ext_field, NULL, &ext_len, FALSE, TRUE)) {
+        StrBuf_close(&ext_field);
+        StrBuf_close(&p->filename);
+        free(p);
+        return FALSE;
+    }
+
+    p->flags = ptr_read_uint16_le(cbuf + 6 - 4);
+    p->method = ptr_read_uint16_le(cbuf + 8 - 4);
+
+    p->crc32 = ptr_read_uint32_le(cbuf + 14 - 4);
+    p->size_compressed = ptr_read_uint32_le(cbuf + 18 - 4);
+    p->size = ptr_read_uint32_le(cbuf + 22 - 4);
+
+    parse_ext_field(p, ext_field.p, ext_len);
+    if (!p->time_valid) {
+        int modified_time = ptr_read_uint16_le(cbuf + 10 - 4);
+        int modified_date = ptr_read_uint16_le(cbuf + 12 - 4);
+        if (modified_date != 0) {
+            p->modified = dostime_to_timestamp(modified_date, modified_time, tz);
+            p->time_valid = TRUE;
+        }
+    }
+    p->cs = cs;
+
+    *cdir = p;
+    StrBuf_close(&ext_field);
+    return TRUE;
+}
+
+/**
+ * 前からLOCAL_MAGICを検索して、見つかったCentralDirを返す
+ * 繰り返し呼び出すことを想定
+ */
+int find_central_dir(CentralDir **cdir, Value reader, RefCharset *cs, RefTimeZone *tz)
+{
+    int result;
+    if (!move_next_file_entry(&result, reader)) {
+        return FALSE;
+    }
+    if (result) {
+        return read_local_dir(cdir, reader, cs, tz);
+    } else {
+        *cdir = NULL;
+        return TRUE;
+    }
+}
+
+/**
+ * 末尾から22バイトより、遡って探す
+ * 最初に見つかったヘッダのオフセットを返す
+ */
+static CentralDirEnd *find_central_dir_end(char *buf, int size, int offset)
+{
+    int i;
+
+    if (size < EOCD_SIZE) {
+        return NULL;
+    }
+    for (i = size - EOCD_SIZE; i >= 0; i--) {
+        if (memcmp(buf + i, EOCD_MAGIC, 4) == 0) {
+            // コメントの長さと末尾の長さが(ほぼ)同じ
+            int com_end = i + EOCD_SIZE + ptr_read_uint16_le(buf + i + 20);
+
+            if (com_end <= size && com_end + 4 > size) {
+                // 分割書庫には対応しないため、0になる
+                if (ptr_read_uint32_le(buf + i + 4) == 0) {
+                    // オフセットがだいたい合っているか調べる
+                    int cdir_size = ptr_read_uint32_le(buf + i + 12);
+                    int cdir_offset = ptr_read_uint32_le(buf + i + 16);
+                    if (cdir_size < MAX_ALLOC && cdir_offset + cdir_size <= offset + i && cdir_offset + cdir_size + 4 > offset + i) {
+                        CentralDirEnd *cd = malloc(sizeof(CentralDirEnd));
+                        cd->offset_of_cdir = cdir_offset;
+                        cd->size_of_cdir = cdir_size;
+                        cd->cdir_size = ptr_read_uint16_le(buf + i + 10);
+                        cd->cdir_max = align_pow2(cd->cdir_size, 16);
+                        cd->cdir = NULL;
+                        return cd;
+                    }
+                }
+            }
+        }
+    }
+    return NULL;
 }
 static CentralDir *read_central_dirs(CentralDirEnd *cdir_end, char *cbuf, RefCharset *cs, RefTimeZone *tz)
 {
@@ -614,39 +708,20 @@ int write_end_of_cdir(CentralDirEnd *cdir, Value writer)
     return TRUE;
 }
 
-
-int move_next_file_entry(Value reader)
-{
-    // PK\003\004 を探す
-    RefNode *type = fs->Value_type(reader);
-    if (type == fs->cls_bytesio) {
-        RefBytesIO *mb = Value_vp(reader);
-        StrBuf *sb = &mb->buf;
-        int pos;
-        int found = FALSE;
-        for (pos = mb->cur; pos + 4 <= sb->size; pos++) {
-            if (sb->p[pos] == 'P' && memcmp(sb->p + 1, "K\x03\x04", 3) == 0) {
-                found = TRUE;
-                mb->cur = pos + 4;
-                break;
-            }
-        }
-        if (!found) {
-            mb->cur = sb->size;
-        }
-        return found;
-    } else {
-    }
-
-    return FALSE;
-}
+////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /**
  * path : zipファイル
  * return : zipに含まれるファイル一覧 Hash<ZipEntry>
  */
-Hash *get_entry_map_static(const char *path)
+Hash *get_entry_map_static(const char *path, Mem *mem)
 {
+    FileHandle fh = open_fox(path, O_RDONLY, DEFAULT_PERMISSION);
+    if (fh == -1) {
+        return NULL;
+    }
+
+    close_fox(fh);
     return NULL;
 }
 /**

@@ -4,22 +4,6 @@
 #include <stdlib.h>
 
 
-typedef struct {
-    Markdown *md;
-    const char *p;
-    int head;
-    int prev_link;
-    int table_row;
-
-    uint16_t type;
-    uint16_t opt;
-    uint16_t bq_level;
-    uint16_t indent;
-
-    StrBuf val;
-} MDTok;
-
-
 
 #ifndef NO_DEBUG
 
@@ -655,13 +639,6 @@ static int MDTok_is_next_colon(MDTok *tk)
 
 ////////////////////////////////////////////////////////////////////////////////////
 
-static int parse_markdown_code_block(Markdown *r, MDTok *tk, MDNode **ppnode, const char *type)
-{
-    MDNode *node = MDNode_new(MD_TEXT, r);
-    node->cstr = fs->str_dup_p(tk->val.p, tk->val.size, &r->mem);
-    *ppnode = node;
-    return TRUE;
-}
 static int parse_markdown_line(Markdown *r, MDTok *tk, MDNode **ppnode, int term)
 {
     MDNode *node = NULL;

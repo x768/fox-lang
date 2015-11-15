@@ -386,9 +386,10 @@ static int zip_randomreader_new(Value *vret, Value *v, RefNode *node)
         fs->Value_dec(reader);
         return FALSE;
     }
-    // move
     r->v[INDEX_ZIPREADER_READER] = reader;
     r->v[INDEX_ZIPREADER_CDIR] = ptr_Value(cdir);
+    r->v[INDEX_ZIPREADER_CHARSET] = vp_Value(cs);
+    r->v[INDEX_ZIPREADER_TZ] = vp_Value(tz);
 
     return TRUE;
 }
@@ -515,13 +516,12 @@ static int zip_randomreader_list(Value *vret, Value *v, RefNode *node)
 static int zipreader_new(Value *vret, Value *v, RefNode *node)
 {
     Value reader;
-    //RefCharset *cs;
-    //RefTimeZone *tz;
+    RefCharset *cs;
+    RefTimeZone *tz;
     RefNode *cls_zipreader = FUNC_VP(node);
     Ref *r = fs->ref_new(cls_zipreader);
     *vret = vp_Value(r);
 
-/*
     if (fg->stk_top > v + 2) {
         cs = Value_vp(v[2]);
     } else {
@@ -532,13 +532,13 @@ static int zipreader_new(Value *vret, Value *v, RefNode *node)
     } else {
         tz = NULL;
     }
-*/
 
     if (!fs->value_to_streamio(&reader, v[1], FALSE, 0)) {
         return FALSE;
     }
-    // move
     r->v[INDEX_ZIPREADER_READER] = reader;
+    r->v[INDEX_ZIPREADER_CHARSET] = vp_Value(cs);
+    r->v[INDEX_ZIPREADER_TZ] = vp_Value(tz);
 
     return TRUE;
 }
@@ -549,12 +549,26 @@ static int zipreader_close(Value *vret, Value *v, RefNode *node)
 static int zipreader_next(Value *vret, Value *v, RefNode *node)
 {
     Ref *r = Value_ref(*v);
-    Value reader = r->v[INDEX_ZIPREADER_READER];
+    CentralDir *cd;
+    RefCharset *cs = Value_vp(r->v[INDEX_ZIPREADER_CHARSET]);
+    RefTimeZone *tz = Value_vp(r->v[INDEX_ZIPREADER_TZ]);
 
-    if (!move_next_file_entry(reader)) {
+    if (!find_central_dir(&cd, r->v[INDEX_ZIPREADER_READER], cs, tz)) {
+        return FALSE;
+    }
+    if (cd != NULL) {
+        zipentry_new_sub(vret, VALUE_NULL, cd);
+    } else {
         fs->throw_stopiter();
         return FALSE;
     }
+    return TRUE;
+}
+static int zipreader_get(Value *vret, Value *v, RefNode *node)
+{
+    Ref *r = Value_ref(*v);
+    int idx = FUNC_INT(node);
+    *vret = fs->Value_cp(r->v[idx]);
     return TRUE;
 }
 
@@ -831,7 +845,7 @@ static int zipentry_read(Value *vret, Value *v, RefNode *node)
     CentralDir *cd = Value_ptr(r->v[INDEX_ZIPENTRY_CDIR]);
     Ref *zr = Value_ref(r->v[INDEX_ZIPENTRY_REF]);
     RefBytesIO *mb = Value_vp(v[1]);
-    int size_read = fs->Value_int64(v[2], NULL);
+    int size_read = fs->Value_int32(v[2]);
 
     if (zr == NULL) {
         fs->throw_error_select(THROW_NOT_OPENED_FOR_READ);
@@ -1108,33 +1122,21 @@ static int zipentryiter_next(Value *vret, Value *v, RefNode *node)
 {
     Ref *r = Value_ref(*v);
     Ref *rref = Value_ref(r->v[INDEX_ZIPENTRYITER_REF]);
-    Value v_idx = r->v[INDEX_ZIPENTRYITER_INDEX];
 
-    if (v_idx == VALUE_NULL) {
-        // ZipReader
-        CentralDir *cd = find_central_dir(rref->v[INDEX_ZIPREADER_READER]);
-        if (cd != NULL) {
-        } else {
-            fs->throw_stopiter();
-            return FALSE;
-        }
+    CentralDirEnd *cdir = Value_vp(rref->v[INDEX_ZIPREADER_CDIR]);
+    int32_t idx = Value_integral(r->v[INDEX_ZIPENTRYITER_INDEX]);
+
+    if (cdir == NULL) {
+        fs->throw_errorf(mod_zip, "ZipError", "Already closed");
+        return FALSE;
+    }
+    idx++;
+    r->v[INDEX_ZIPENTRYITER_INDEX] = int32_Value(idx);
+    if (idx < cdir->cdir_size) {
+        zipentry_new_sub(vret, r->v[INDEX_ZIPENTRYITER_REF], &cdir->cdir[idx]);
     } else {
-        // ZipRandomReader
-        CentralDirEnd *cdir = Value_vp(rref->v[INDEX_ZIPREADER_CDIR]);
-        int32_t idx = Value_integral(r->v[INDEX_ZIPENTRYITER_INDEX]);
-
-        if (cdir == NULL) {
-            fs->throw_errorf(mod_zip, "ZipError", "Already closed");
-            return FALSE;
-        }
-        idx++;
-        r->v[INDEX_ZIPENTRYITER_INDEX] = int32_Value(idx);
-        if (idx < cdir->cdir_size) {
-            zipentry_new_sub(vret, r->v[INDEX_ZIPENTRYITER_REF], &cdir->cdir[idx]);
-        } else {
-            fs->throw_stopiter();
-            return FALSE;
-        }
+        fs->throw_stopiter();
+        return FALSE;
     }
 
     return TRUE;
@@ -1178,6 +1180,10 @@ static void define_class(RefNode *m)
     fs->define_native_func_a(n, zip_randomreader_index, 1, 1, NULL, NULL);
     n = fs->define_identifier(m, cls, "list", NODE_FUNC_N, NODEOPT_PROPERTY);
     fs->define_native_func_a(n, zip_randomreader_list, 0, 0, NULL);
+    n = fs->define_identifier(m, cls, "charset", NODE_FUNC_N, NODEOPT_PROPERTY);
+    fs->define_native_func_a(n, zipreader_get, 0, 0, (void*)INDEX_ZIPREADER_CHARSET);
+    n = fs->define_identifier(m, cls, "timezone", NODE_FUNC_N, NODEOPT_PROPERTY);
+    fs->define_native_func_a(n, zipreader_get, 0, 0, (void*)INDEX_ZIPREADER_TZ);
 
     cls->u.c.n_memb = INDEX_ZIPREADER_NUM;
     fs->extends_method(cls, fs->cls_obj);
@@ -1192,6 +1198,10 @@ static void define_class(RefNode *m)
     fs->define_native_func_a(n, zipreader_close, 0, 0, NULL);
     n = fs->define_identifier(m, cls, "next", NODE_FUNC_N, NODEOPT_PROPERTY);
     fs->define_native_func_a(n, zipreader_next, 0, 0, NULL);
+    n = fs->define_identifier(m, cls, "charset", NODE_FUNC_N, NODEOPT_PROPERTY);
+    fs->define_native_func_a(n, zipreader_get, 0, 0, (void*)INDEX_ZIPREADER_CHARSET);
+    n = fs->define_identifier(m, cls, "timezone", NODE_FUNC_N, NODEOPT_PROPERTY);
+    fs->define_native_func_a(n, zipreader_get, 0, 0, (void*)INDEX_ZIPREADER_TZ);
 
     cls->u.c.n_memb = INDEX_ZIPREADER_NUM;
     fs->extends_method(cls, fs->cls_obj);
