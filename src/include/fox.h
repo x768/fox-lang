@@ -145,6 +145,11 @@ enum {
 	BIGINT_DIGIT_BITS = 16,
     BIGINT_MASK_BITS = 0xFFFF,
 };
+enum {
+    RUNNING_MODE_CL,
+    RUNNING_MODE_CGI,
+    RUNNING_MODE_GUI,
+};
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -388,7 +393,7 @@ struct HashValueEntry {
 struct FoxStatic
 {
     RefStr *fox_home;
-    int cgi_mode;
+    int running_mode;
     Hash envs;
     int max_stack;
     int max_alloc;
@@ -543,7 +548,7 @@ struct FoxStatic
     void (*adjust_timezone)(RefDateTime *dt);
     void (*adjust_datetime)(RefDateTime *dt);
     int64_t (*DateTime_to_Timestamp)(const Date *dt, const Time *tm);
-    int (*timedelta_parse_string)(int64_t *ret, const char *src_p, int src_size);
+    int (*timedelta_parse_string)(double *ret, const char *src_p, int src_size);
 
     int (*is_subclass)(RefNode *klass, RefNode *super);
     RefNode *(*get_module_by_name)(const char *name_p, int name_size, int syslib, int initialize);
@@ -633,7 +638,7 @@ struct FoxGlobal
 ////////////////////////////////////////////////////////////////////////////////
 
 #define FOX_VERSION_MAJOR    0
-#define FOX_VERSION_MINOR    16
+#define FOX_VERSION_MINOR    17
 #define FOX_VERSION_REVISION 0
 
 

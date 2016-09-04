@@ -774,12 +774,13 @@ int BigInt_int64(const BigInt *bi, int64_t *value)
     case 0:
         break;
     case 4:
-        if (bi->d[0] == 0 && bi->d[1] == 0 && bi->d[2] == 0 && bi->d[3] == 0x8000) {
+        if (bi->sign < 0 && bi->d[0] == 0 && bi->d[1] == 0 && bi->d[2] == 0 && bi->d[3] == 0x8000) {
             *value = INT64_MIN;
             return 1;
         }
         if ((bi->d[3] & 0x8000) != 0) {
-            return 1;
+            *value = bi->sign < 0 ? INT64_MIN : INT64_MAX;
+            return 0;
         }
         // fall through
     case 1:

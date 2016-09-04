@@ -43,8 +43,6 @@
  *
  ***************************************************************************/
 
-#include "mmtypes.h"
-
 /* -------------------------------------------------------------------------
 Program id
 -------------------------------------------------------------------------- */
@@ -135,7 +133,7 @@ macros to get/clear/set a single 4-bit nibble (in rasters)
       { unsetlongbit((rp)->pixmap,PIXDEX(rp,(irow),(icol))); }      \
     else                /* set 8-bit bytemap pixel value */ \
       if ( (rp)->pixsz == 8 )   /* check pixsz=8 for bytemap */     \
-         ((rp)->pixmap)[PIXDEX(rp,(irow),(icol))]=(pixbyte)(value);     \
+         ((rp)->pixmap)[PIXDEX(rp,(irow),(icol))]=(pixbyte_t)(value);     \
       else              /* let user supply final ; */
 
 /* --------------------------------------------------------------------------
@@ -188,22 +186,7 @@ aspect ratio is width/height of the displayed image of a pixel
  * -------------------------------------------------------------------------- */
 #define make_raster(expression,size)    ((rasterize(expression,size))->image)
 
-/* --- dummy font table (for contexts requiring const) --- */
-#define dummyfonttable \
-  { \
-   {   -999, {  NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL  } } \
-  }
 
 
-/* -------------------------------------------------------------------------
-S t a t i c   F o n t   D a t a   u s e d   b y   M i m e t e x
--------------------------------------------------------------------------- */
-
-/* =========================================================================== */
-
-extern fontfamily aafonttable[];
-extern fontfamily ssfonttable[];
-
-/* ======================= END-OF-FILE MIMETEX.H ========================= */
 #endif
 

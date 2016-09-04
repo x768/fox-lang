@@ -12,6 +12,66 @@ enum {
     UNRESOLVED_CATCH,
 };
 
+enum {
+    OP_NONE,        // EOS
+    OP_LET_UNRES,   // 未解決の変数代入(Str*)
+
+    OP_SIZE_1,
+
+    OP_RETURN,      // nullを返す
+    OP_RETURN_VAL,  // 現在のstktopの値を戻り値として返す
+    OP_SUSPEND,     // 実行を中断(evalを継続する場合)
+    OP_YIELD_VAL,   // 現在のstktopの値をyieldとして返す
+    OP_INIT_GENR,   // ジェネレーター初期化
+    OP_RETURN_THRU, // thisをそのまま返す
+    OP_END,         // catch,finallyの終端から復帰
+    OP_DUP,         // スタックトップからi個の値をpush
+    OP_GET_LOCAL,   // ローカル変数をstk_topにpush(let)
+    OP_GET_LOCAL_V, // ローカル変数をstk_topにpush(var)
+    OP_SET_LOCAL,   // スタック変数代入(stack index)
+    OP_NOT,         // stktopの値がnull,falseならtrue else false
+
+    OP_SIZE_2,
+
+    OP_JMP,         // 無条件ジャンプ
+    OP_JIF,         // pop ならジャンプ
+    OP_JIF_N,       // !pop ならジャンプ
+    OP_IF_P,        // !=null ならジャンプ else pop
+    OP_IF_NP,       // ==null ならジャンプ else pop
+    OP_IFP,         // !=null ならpop,jmp
+    OP_IFP_N,       // ==null ならpop,jmp
+    OP_GET_FIELD,   // フィールド取得
+    OP_SET_FIELD,   // フィールド設定
+    OP_THROW,       // stk_topをthrow
+    OP_LITERAL,     // 即値(リテラル)
+    OP_FUNC,        // 関数
+    OP_CLASS,       // クラス
+    OP_MODULE,      // モジュール
+    OP_NEW_REF,     // コンストラクタの最初でrefを作成
+    OP_NEW_FN,      // 関数オブジェクトを作成
+    OP_LOCAL_FN,    // ローカル変数をクロージャの内部にコピー
+    OP_RANGE_NEW,   // 0..10
+    OP_CALL_ITER,   // iter()があれば呼び出し、無ければ何もしない
+    OP_CALL_IN,     // in演算子
+    OP_CALL,        // stk_topの関数呼び出し
+    OP_CALL_POP,    // stk_topの関数呼び出し、戻り値を捨てる
+    OP_EQUAL,       // 型比較とop_cmpの呼び出し(型不一致はTypeError)
+    OP_EQUAL2,      // 型比較とop_cmpの呼び出し(型不一致はfalse)
+    OP_CMP,         // stktopの値の大小をboolに変換(型不一致はTypeError)
+    OP_POP,         // スタックを下げてrefcount--
+
+    OP_SIZE_3,
+
+    OP_LITERAL_P,   // 即値(定数シンボル)
+    OP_PUSH_CATCH,  // スタックにcatchハンドラを積む
+    OP_GET_PROP,    // プロパティ取得(Str*)
+    OP_CALL_M,      // メソッド呼び出し(Str*)
+    OP_CALL_M_POP,  // メソッド呼び出し(Str*)、戻り値を捨てる
+    OP_CALL_INIT,   // super constructor呼び出し
+    OP_CALL_NEXT,   // next()を呼び出し、StopIterationならjmp
+    OP_CATCH_JMP,   // catch節の型を比較し、違った場合ジャンプ
+};
+
 #ifdef DEBUGGER
 
 enum {

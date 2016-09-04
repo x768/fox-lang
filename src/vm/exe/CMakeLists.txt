@@ -12,19 +12,19 @@ file(GLOB LIST_SRC ../fox/*.c)
 
 add_executable(fox_cl
   ../compat/c_${TARGET_OS}_cl.${TARGET_EXT}
-  ../compat/main_cl.c
+  main_cl.c
 )
 add_executable(fox_cgi
   ../compat/c_${TARGET_OS}_cgi.${TARGET_EXT}
-  ../compat/main_cgi.c
+  main_cgi.c
 )
 add_executable(fox_gui
   ../compat/c_${TARGET_OS}_gui.${TARGET_EXT}
-  ../compat/main_gui.c
+  main_gui.c
 )
 add_executable(fox_dbg
   ../compat/c_${TARGET_OS}_cl.${TARGET_EXT}
-  ../compat/main_cl.c
+  main_cl.c
   interactive.c
 )
 

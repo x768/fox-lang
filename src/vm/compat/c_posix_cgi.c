@@ -18,7 +18,7 @@ int main(int argc, char **argv, char **envp)
 {
     const char *argv_fox[3];
 
-    init_fox_vm();
+    init_fox_vm(RUNNING_MODE_CGI);
     init_env(envp);
 
     argv_fox[0] = argv[0];

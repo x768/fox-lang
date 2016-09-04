@@ -3,9 +3,9 @@ define comment
 define comment_line
 define quot
 define dquot
-define keyword, word
-define keyword2, word
-define typename, word
+define keyword word
+define keyword2 word
+define typename word
 
 "/*" = _ comment comment
 "*/" = comment comment _
@@ -16,7 +16,7 @@ define typename, word
 "L'" = _ quot quot
 '\\' = quot quot quot
 "\\'" = quot quot quot
-"'" = quot uot _
+"'" = quot quot _
 
 '"' = _ dquot dquot
 'L"' = _ dquot dquot

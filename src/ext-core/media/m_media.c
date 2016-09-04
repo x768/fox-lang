@@ -423,17 +423,18 @@ static int audio_sub(Value *vret, Value *v, RefNode *node)
     if (fg->stk_top > v + 1) {
         RefNode *type = fs->Value_type(v[1]);
 
-        begin = fs->Value_int64(v[1], NULL);
         if (type == fs->cls_int) {
+            begin = fs->Value_int64(v[1], NULL);
         } else if (type == cls_timedelta) {
-            begin = begin * snd->samples / 1000;
+            begin = (int64_t)(fs->Value_float(v[1]) * snd->samples / 1000.0);
         } else if (type == fs->cls_str) {
             RefStr *rs = Value_vp(v[1]);
-            if (!fs->timedelta_parse_string(&begin, rs->c, rs->size)) {
+            double dbegin;
+            if (!fs->timedelta_parse_string(&dbegin, rs->c, rs->size)) {
                 fs->throw_errorf(fs->mod_lang, "ValueError", "Invalid time format");
                 return FALSE;
             }
-            begin = begin * snd->samples / 1000;
+            begin = (int64_t)(dbegin * snd->samples / 1000.0);
         } else {
             fs->throw_errorf(fs->mod_lang, "TypeError", "Int, Str or TimeDelta expected but %n (argument #1)", type);
             return FALSE;
@@ -452,17 +453,18 @@ static int audio_sub(Value *vret, Value *v, RefNode *node)
     if (fg->stk_top > v + 2) {
         RefNode *type = fs->Value_type(v[2]);
 
-        end = fs->Value_int64(v[2], NULL);
         if (type == fs->cls_int) {
+            end = fs->Value_int64(v[2], NULL);
         } else if (type == cls_timedelta) {
-            end = end * snd->samples / 1000;
+            end = (int64_t)(fs->Value_float(v[2]) * snd->samples / 1000.0);
         } else if (type == fs->cls_str) {
             RefStr *rs = Value_vp(v[2]);
-            if (!fs->timedelta_parse_string(&end, rs->c, rs->size)) {
+            double dend;
+            if (!fs->timedelta_parse_string(&dend, rs->c, rs->size)) {
                 fs->throw_errorf(fs->mod_lang, "ValueError", "Invalid time format");
                 return FALSE;
             }
-            end = end * snd->samples / 1000;
+            end = (int64_t)(dend * snd->samples / 1000.0);
         } else {
             fs->throw_errorf(fs->mod_lang, "TypeError", "Int, Str or TimeDelta expected but %n (argument #2)", type);
             return FALSE;

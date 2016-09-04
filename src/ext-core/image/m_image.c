@@ -379,7 +379,7 @@ static int color_parse_name(uint32_t *ret, const char *name_p, int name_size)
             return TRUE;
         }
     }
-    if (strcmp(buf, "transparent") == 0) {
+    if (strcmp(buf, "TRANSPARENT") == 0) {
         *ret = 0x000000;
         return TRUE;
     }
@@ -948,6 +948,36 @@ static int palette_dup(Value *vret, Value *v, RefNode *node)
 
     memcpy(ra->p, r->p, sizeof(Value) * PALETTE_NUM);
     ra->rh.type = cls_palette;
+
+    return TRUE;
+}
+static int palette_color_index(Value *vret, Value *v, RefNode *node)
+{
+    RefArray *ra = Value_vp(*v);
+    uint32_t c = Value_integral(v[1]);
+
+    double r = (double)((c & COLOR_R_MASK) >> COLOR_R_SHIFT);
+    double g = (double)((c & COLOR_G_MASK) >> COLOR_G_SHIFT);
+    double b = (double)((c & COLOR_B_MASK) >> COLOR_B_SHIFT);
+    double a = (double)((c & COLOR_A_MASK) >> COLOR_A_SHIFT);
+
+    double min = 4294967296.0;
+    int idx = -1;
+    int i;
+
+    for (i = 0; i < PALETTE_NUM; i++) {
+        uint32_t cp = Value_integral(ra->p[i]);
+        double dr = r - (double)((cp & COLOR_R_MASK) >> COLOR_R_SHIFT);
+        double dg = g - (double)((cp & COLOR_G_MASK) >> COLOR_G_SHIFT);
+        double db = b - (double)((cp & COLOR_B_MASK) >> COLOR_B_SHIFT);
+        double da = (a - (double)((cp & COLOR_A_MASK) >> COLOR_A_SHIFT)) * 4.0;
+        double d = dr*dr + dg*dg + db*db + da*da;
+        if (d < min) {
+            d = min;
+            idx = i;
+        }
+    }
+    *vret = int32_Value(idx);
 
     return TRUE;
 }
@@ -2153,6 +2183,8 @@ static void define_class(RefNode *m, RefNode *mod_math)
     fs->define_native_func_a(n, get_function_ptr(fs->cls_list, fs->intern("has_key", -1)), 1, 1, NULL, fs->cls_int);
     n = fs->define_identifier(m, cls, "has_value", NODE_FUNC_N, 0);
     fs->define_native_func_a(n, fn_array_indexof, 1, 1, (void*)FALSE, cls_color);
+    n = fs->define_identifier(m, cls, "color_index", NODE_FUNC_N, 0);
+    fs->define_native_func_a(n, palette_color_index, 1, 1, NULL, cls_color);
     n = fs->define_identifier(m, cls, "dup", NODE_FUNC_N, 0);
     fs->define_native_func_a(n, palette_dup, 0, 0, cls_palette);
     n = fs->define_identifier(m, cls, "to_array", NODE_FUNC_N, 0);

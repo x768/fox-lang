@@ -65,7 +65,7 @@ int main()
 {
     const char *argv[3];
 
-    init_fox_vm();
+    init_fox_vm(RUNNING_MODE_CGI);
     init_env();
 
     argv[0] = "fox.cgi";

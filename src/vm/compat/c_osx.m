@@ -35,16 +35,19 @@ const char *get_fox_home()
     enum {
         FOX_PATH_MAX = 512,
     };
-    char *path = Mem_get(&fg->st_mem, FOX_PATH_MAX);
+
     char *p;
-#ifdef FOX_WINDOW
-    int n = 5;
-#else
-    int n = 2;
-#endif
+    int n;
     int len;
+    char *path = Mem_get(&fg->st_mem, FOX_PATH_MAX);
     uint32_t size = FOX_PATH_MAX;
     
+    if (fs->running_mode == RUNNING_MODE_GUI) {
+        n = 5;
+    } else {
+        n = 2;
+    }
+
     memset(path, 0, size);
     if (_NSGetExecutablePath(path, &size) != 0) {
         return "./";

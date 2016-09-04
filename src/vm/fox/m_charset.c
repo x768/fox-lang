@@ -453,6 +453,76 @@ static int charset_iana(Value *vret, Value *v, RefNode *node)
     return TRUE;
 }
 
+// 指定した文字コードでエンコードできるか調べる
+static int charset_is_valid_encoding(Value *vret, Value *v, RefNode *node)
+{
+    int str = FUNC_INT(node);
+    RefCharset *cs = Value_vp(*v);
+    const RefStr *rs = Value_vp(v[1]);
+    int result;
+
+    if (cs == fs->cs_utf8) {
+        if (str) {
+            result = TRUE;
+        } else {
+            result = (invalid_utf8_pos(rs->c, rs->size) < 0);
+        }
+    } else {
+        IconvIO ic;
+        RefCharset *cs_from;
+        RefCharset *cs_to;
+
+        if (str) {
+            cs_from = fs->cs_utf8;
+            cs_to = cs;
+        } else {
+            cs_from = cs;
+            cs_to = fs->cs_utf8;
+        }
+
+        // エラーがないかどうか調べるだけ
+        if (IconvIO_open(&ic, cs_from, cs_to, NULL)) {
+            char *tmp_buf = malloc(BUFFER_SIZE);
+            result = TRUE;
+
+            ic.inbuf = rs->c;
+            ic.inbytesleft = rs->size;
+            ic.outbuf = tmp_buf;
+            ic.outbytesleft = BUFFER_SIZE;
+
+            for (;;) {
+                switch (IconvIO_next(&ic)) {
+                case ICONV_OK:
+                    if (ic.inbuf != NULL) {
+                        ic.inbuf = NULL;
+                    } else {
+                        goto BREAK;
+                    }
+                    break;
+                case ICONV_OUTBUF:
+                    ic.outbuf = tmp_buf;
+                    ic.outbytesleft = BUFFER_SIZE;
+                    break;
+                case ICONV_INVALID:
+                    result = FALSE;
+                    goto BREAK;
+                }
+            }
+        BREAK:
+            free(tmp_buf);
+            if (ic.inbytesleft > 0) {
+                result = FALSE;
+            }
+            IconvIO_close(&ic);
+        } else {
+            return FALSE;
+        }
+    }
+    *vret = bool_Value(result);
+
+    return TRUE;
+}
+
 //////////////////////////////////////////////////////////////////////////////////////////////////////
 
 static void RefStr_copy(char *dst, RefStr *src, int max)
@@ -677,6 +747,10 @@ void define_charset_class(RefNode *m)
     define_native_func_a(n, charset_name, 0, 0, NULL);
     n = define_identifier(m, cls, "iana", NODE_FUNC_N, NODEOPT_PROPERTY);
     define_native_func_a(n, charset_iana, 0, 0, NULL);
+    n = define_identifier(m, cls, "representable", NODE_FUNC_N, 0);
+    define_native_func_a(n, charset_is_valid_encoding, 1, 1, (void*) TRUE, fs->cls_str);
+    n = define_identifier(m, cls, "is_valid_encoding", NODE_FUNC_N, 0);
+    define_native_func_a(n, charset_is_valid_encoding, 1, 1, (void*) FALSE, fs->cls_bytes);
 
     n = define_identifier(m, cls, "UTF8", NODE_CONST, 0);
     n->u.k.val = vp_Value(fs->cs_utf8);

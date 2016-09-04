@@ -44,7 +44,7 @@ int main()
 
     SetUnhandledExceptionFilter(exception_filter);
 
-    init_fox_vm();
+    init_fox_vm(RUNNING_MODE_CL);
     init_env();
     argv = get_cmd_args(&argc);
     return main_fox(argc, argv);

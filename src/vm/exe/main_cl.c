@@ -440,7 +440,7 @@ FINALLY:
 
 void print_last_error()
 {
-    if (fs->cgi_mode){
+    if (fs->running_mode == RUNNING_MODE_CGI){
         fv->err_dst = "stdout";
     } else {
         fv->err_dst = "stderr";
@@ -452,7 +452,7 @@ void print_last_error()
         if (strcmp(fv->err_dst, "stdout") == 0) {
             fox_error_dump(&sb, FALSE);
             if (fg->v_cio != VALUE_NULL) {
-                if (fs->cgi_mode){
+                if (fs->running_mode == RUNNING_MODE_CGI){
                     send_headers();
                 }
                 stream_write_data(fg->v_cio, sb.p, sb.size);
@@ -538,7 +538,7 @@ int main_fox(int argc, const char **argv)
 #endif
     }
     // ソースを読み込んだ後で実行
-    if (fs->cgi_mode) {
+    if (fs->running_mode == RUNNING_MODE_CGI) {
         cgi_init_responce();
     }
     init_fox_stack();

@@ -121,7 +121,7 @@ int main_fox(int argc, const char **argv)
     }
 
     // ソースを読み込んだ後で実行
-    if (fs->cgi_mode) {
+    if (fs->running_mode == RUNNING_MODE_CGI) {
         throw_errorf(fs->mod_lang, "CompileError", "CGI mode is not supported");
         goto ERROR_END;
     }

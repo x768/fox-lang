@@ -677,7 +677,7 @@ int stream_write_data(Value v, const char *s_p, int s_size)
         max = BUFFER_SIZE;
         r->v[INDEX_WRITE_MAX] = int32_Value(BUFFER_SIZE);
         // STDOUTだけ特別扱い
-        if (fs->cgi_mode){
+        if (fs->running_mode == RUNNING_MODE_CGI){
             if (r == Value_vp(fg->v_cio)) {
                 send_headers();
                 stream_write_data(v, s_p, s_size);
@@ -751,7 +751,7 @@ static int stream_write_stream_sub(Value v, Value v1, int64_t last)
         *vmb = vp_Value(bytesio_new_sub(NULL, BUFFER_SIZE));
         r->v[INDEX_WRITE_MAX] = int32_Value(BUFFER_SIZE);
         // STDOUTだけ特別扱い
-        if (fs->cgi_mode) {
+        if (fs->running_mode == RUNNING_MODE_CGI) {
             if (r == Value_vp(fg->v_cio)) {
                 send_headers();
             }

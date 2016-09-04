@@ -2041,7 +2041,7 @@ static int float_parse(Value *vret, Value *v, RefNode *node)
 
     return TRUE;
 }
-static int float_marshal_read(Value *vret, Value *v, RefNode *node)
+int float_marshal_read(Value *vret, Value *v, RefNode *node)
 {
     union {
         uint64_t i;
@@ -2071,7 +2071,7 @@ static int float_marshal_read(Value *vret, Value *v, RefNode *node)
     rd->d = u.d;
     return TRUE;
 }
-static int float_marshal_write(Value *vret, Value *v, RefNode *node)
+int float_marshal_write(Value *vret, Value *v, RefNode *node)
 {
     union {
         uint64_t i;
@@ -2194,9 +2194,12 @@ static int float_tostr(Value *vret, Value *v, RefNode *node)
         *vret = cstr_Value(fs->cls_str, c_buf, -1);
         return TRUE;
     }
-    // 最大16桁
-    sprintf(c_buf, "%.15e", rd->d);
-
+    // 精度は16桁
+    if (nf.width_f > 15) {
+        sprintf(c_buf, "%.*e", nf.width_f, rd->d);
+    } else {
+        sprintf(c_buf, "%.15e", rd->d);
+    }
     // 指数部と仮数部に分ける
     for (i = 0; c_buf[i] != '\0'; i++) {
         if (c_buf[i] == 'e') {
@@ -2278,7 +2281,7 @@ static int float_tostr(Value *vret, Value *v, RefNode *node)
 
     return TRUE;
 }
-static int float_hash(Value *vret, Value *v, RefNode *node)
+int float_hash(Value *vret, Value *v, RefNode *node)
 {
     union {
         int32_t i[2];
@@ -2293,14 +2296,14 @@ static int float_hash(Value *vret, Value *v, RefNode *node)
 
     return TRUE;
 }
-static int float_eq(Value *vret, Value *v, RefNode *node)
+int float_eq(Value *vret, Value *v, RefNode *node)
 {
     RefFloat *d1 = Value_vp(*v);
     RefFloat *d2 = Value_vp(v[1]);
     *vret = bool_Value(d1->d == d2->d);
     return TRUE;
 }
-static int float_cmp(Value *vret, Value *v, RefNode *node)
+int float_cmp(Value *vret, Value *v, RefNode *node)
 {
     RefFloat *d1 = Value_vp(*v);
     RefFloat *d2 = Value_vp(v[1]);
@@ -2344,6 +2347,10 @@ static int float_addsubmul(Value *vret, Value *v, RefNode *node)
         break;
     case T_MUL:
         rd->d = d1->d * d2->d;
+        if (isnan(rd->d)) {
+            throw_error_select(THROW_FLOAT_DOMAIN_ERROR);
+            return FALSE;
+        }
         break;
     }
 
@@ -2671,6 +2678,7 @@ static int base58decode(Value *vret, Value *v, RefNode *node)
         BigInt_mul_sd(&ri->bi, 58);
         BigInt_add_d(&ri->bi, n);
     }
+    *vret = vp_Value(ri);
     fix_bigint(vret, &ri->bi);
 
     return TRUE;

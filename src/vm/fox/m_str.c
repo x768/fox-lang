@@ -1071,76 +1071,6 @@ static int sequence_count(Value *vret, Value *v, RefNode *node)
     return TRUE;
 }
 
-// 指定した文字コードでエンコードできるか調べる
-static int sequence_is_valid_encoding(Value *vret, Value *v, RefNode *node)
-{
-    int str = FUNC_INT(node);
-    RefCharset *cs = Value_vp(v[1]);
-    const RefStr *rs = Value_vp(*v);
-    int result;
-
-    if (cs == fs->cs_utf8) {
-        if (str) {
-            result = TRUE;
-        } else {
-            result = (invalid_utf8_pos(rs->c, rs->size) < 0);
-        }
-    } else {
-        IconvIO ic;
-        RefCharset *cs_from;
-        RefCharset *cs_to;
-
-        if (str) {
-            cs_from = fs->cs_utf8;
-            cs_to = cs;
-        } else {
-            cs_from = cs;
-            cs_to = fs->cs_utf8;
-        }
-
-        // エラーがないかどうか調べるだけ
-        if (IconvIO_open(&ic, cs_from, cs_to, NULL)) {
-            char *tmp_buf = malloc(BUFFER_SIZE);
-            result = TRUE;
-
-            ic.inbuf = rs->c;
-            ic.inbytesleft = rs->size;
-            ic.outbuf = tmp_buf;
-            ic.outbytesleft = BUFFER_SIZE;
-
-            for (;;) {
-                switch (IconvIO_next(&ic)) {
-                case ICONV_OK:
-                    if (ic.inbuf != NULL) {
-                        ic.inbuf = NULL;
-                    } else {
-                        goto BREAK;
-                    }
-                    break;
-                case ICONV_OUTBUF:
-                    ic.outbuf = tmp_buf;
-                    ic.outbytesleft = BUFFER_SIZE;
-                    break;
-                case ICONV_INVALID:
-                    result = FALSE;
-                    goto BREAK;
-                }
-            }
-        BREAK:
-            free(tmp_buf);
-            if (ic.inbytesleft > 0) {
-                result = FALSE;
-            }
-            IconvIO_close(&ic);
-        } else {
-            return FALSE;
-        }
-    }
-    *vret = bool_Value(result);
-
-    return TRUE;
-}
-
 static int seqiter_next(Value *vret, Value *v, RefNode *node)
 {
     Ref *r = Value_ref(*v);
@@ -2197,8 +2127,6 @@ void define_lang_str_class(RefNode *m)
     define_native_func_a(n, bytes_size, 0, 0, NULL);
     n = define_identifier(m, cls, "sub", NODE_FUNC_N, 0);
     define_native_func_a(n, bytes_substr, 1, 2, NULL, fs->cls_int, fs->cls_int);
-    n = define_identifier(m, cls, "is_valid_encoding", NODE_FUNC_N, 0);
-    define_native_func_a(n, sequence_is_valid_encoding, 1, 1, (void*) FALSE, fs->cls_charset);
     extends_method(cls, fs->cls_sequence);
 
     // Str
@@ -2226,8 +2154,6 @@ void define_lang_str_class(RefNode *m)
     define_native_func_a(n, string_substr, 1, 2, NULL, fs->cls_int, fs->cls_int);
     n = define_identifier(m, cls, "to_bytes", NODE_FUNC_N, 0);
     define_native_func_a(n, string_tobytes, 1, 2, NULL, fs->cls_charset, fs->cls_bool);
-    n = define_identifier(m, cls, "representable", NODE_FUNC_N, 0);
-    define_native_func_a(n, sequence_is_valid_encoding, 1, 1, (void*) TRUE, fs->cls_charset);
     extends_method(cls, fs->cls_sequence);
 
     // SequenceIter

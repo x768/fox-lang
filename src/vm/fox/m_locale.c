@@ -175,7 +175,7 @@ RefStr **get_best_locale_list()
         return list;
     }
 
-    if (fs->cgi_mode) {
+    if (fs->running_mode == RUNNING_MODE_CGI) {
         const char *lang = Hash_get(&fs->envs, "HTTP_ACCEPT_LANGUAGE", -1);
         if (lang != NULL) {
             return get_best_locale_cgi(lang);

@@ -28,7 +28,7 @@ void show_error_message(const char *msg, int msg_size, int warn)
 
 int main(int argc, char **argv, char **envp)
 {
-    init_fox_vm();
+    init_fox_vm(RUNNING_MODE_GUI);
     init_env(envp);
     return main_fox(argc, (const char**)argv) ? 0 : 1;
 }

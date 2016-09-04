@@ -568,7 +568,6 @@ int main_fox(int argc, const char **argv)
     init_stdio();
 
     // デフォルト値
-    fs->cgi_mode = TRUE;
     fs->max_alloc = 32 * 1024 * 1024; // 32MB
     fs->max_stack = 32768;
 

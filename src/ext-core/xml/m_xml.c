@@ -1122,6 +1122,32 @@ static int xml_elem_new(Value *vret, Value *v, RefNode *node)
 
     return TRUE;
 }
+static int xml_elem_parse(Value *vret, Value *v, RefNode *node)
+{
+    XMLTok tk;
+    RefStr *src = Value_vp(v[1]);
+
+    XMLTok_init(&tk, src->c, src->c + src->size, TRUE, FALSE);
+    XMLTok_skip_next(&tk);
+    if (!parse_xml_body(vret, &tk)) {
+        return FALSE;
+    }
+    if (tk.type != TK_EOS) {
+        goto PARSE_ERROR;
+    }
+    {
+        RefNode *type = fs->Value_type(*vret);
+        if (type != cls_elem) {
+            goto PARSE_ERROR;
+        }
+    }
+
+    return TRUE;
+
+PARSE_ERROR:
+    fs->throw_errorf(mod_xml, "XMLParseError", "Unexpected token at line %d", tk.line);
+    return FALSE;
+}
 static int xml_elem_index_key(Value *vret, Value *v, RefNode *node)
 {
     int i;
@@ -2100,6 +2126,8 @@ static void define_class(RefNode *m)
     cls = cls_elem;
     n = fs->define_identifier_p(m, cls, fs->str_new, NODE_NEW_N, 0);
     fs->define_native_func_a(n, xml_elem_new, 1, -1, NULL, fs->cls_str);
+    n = fs->define_identifier(m, cls, "parse", NODE_NEW_N, 0);
+    fs->define_native_func_a(n, xml_elem_parse, 1, 1, NULL, fs->cls_str);
 
     n = fs->define_identifier_p(m, cls, fs->symbol_stock[T_LB], NODE_FUNC_N, 0);
     fs->define_native_func_a(n, xml_elem_index, 1, 1, NULL, NULL);

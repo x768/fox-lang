@@ -73,7 +73,7 @@ static int stream_write_sub_s(Value v, StrBuf *sb, const char *s_p, int s_size, 
                 max = BUFFER_SIZE;
                 r->v[INDEX_WRITE_MAX] = int32_Value(max);
                 // STDOUTだけ特別扱い
-                if (fs->cgi_mode) {
+                if (fs->running_mode == RUNNING_MODE_CGI) {
                     if (r == Value_vp(fg->v_cio)) {
                         send_headers();
                     }

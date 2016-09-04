@@ -49,7 +49,7 @@ int is_content_type_html()
     return FALSE;
 }
 
-static const char *get_cookie_cfg(const char *key)
+static const char *get_env_value_ascii(const char *key)
 {
     const char *p = Hash_get(&fs->envs, key, -1);
     if (p != NULL && is_string_only_ascii(p, -1, " =;,")) {
@@ -58,7 +58,7 @@ static const char *get_cookie_cfg(const char *key)
         return NULL;
     }
 }
-static int get_cookie_cfg_bool(const char *key)
+static int get_env_value_bool(const char *key)
 {
     const char *p = Hash_get(&fs->envs, key, -1);
     if (p != NULL) {
@@ -115,7 +115,7 @@ static void write_http_cookie(
 
 void send_headers()
 {
-    if (fs->cgi_mode && !fv->headers_sent) {
+    if (fs->running_mode == RUNNING_MODE_CGI && !fv->headers_sent) {
         RefMap *rm;
         int i;
         StrBuf buf;
@@ -153,10 +153,10 @@ void send_headers()
             }
         }
         if (ref_set_cookie != VALUE_NULL) {
-            const char *cookie_path = get_cookie_cfg("FOX_COOKIE_PATH");
-            const char *cookie_domain = get_cookie_cfg("FOX_COOKIE_DOMAIN");
-            int cookie_secure = get_cookie_cfg_bool("FOX_COOKIE_SECURE");
-            int cookie_httponly = get_cookie_cfg_bool("FOX_COOKIE_HTTPONLY");
+            const char *cookie_path = get_env_value_ascii("FOX_COOKIE_PATH");
+            const char *cookie_domain = get_env_value_ascii("FOX_COOKIE_DOMAIN");
+            int cookie_secure = get_env_value_bool("FOX_COOKIE_SECURE");
+            int cookie_httponly = get_env_value_bool("FOX_COOKIE_HTTPONLY");
             int64_t now = get_now_time();
             rm = Value_vp(ref_set_cookie);
 
@@ -358,7 +358,7 @@ static int http_header_string_to_hash(RefMap *v_map, const char *p, int keys)
 
 static int cgi_req_param(Value *vret, Value *v, RefNode *node)
 {
-    if (fs->cgi_mode) {
+    if (fs->running_mode == RUNNING_MODE_CGI) {
         int i;
         RefMap *rm = refmap_new(32);
         *vret = vp_Value(rm);
@@ -414,7 +414,7 @@ static int cgi_req_param(Value *vret, Value *v, RefNode *node)
 }
 static int cgi_res_param(Value *vret, Value *v, RefNode *node)
 {
-    if (fs->cgi_mode) {
+    if (fs->running_mode == RUNNING_MODE_CGI) {
         *vret = Value_cp(v_res);
         return TRUE;
     } else {
@@ -717,7 +717,7 @@ static int cgi_session_id(Value *vret, Value *v, RefNode *node)
 
 static int cgi_get_param(Value *vret, Value *v, RefNode *node)
 {
-    if (fs->cgi_mode) {
+    if (fs->running_mode == RUNNING_MODE_CGI) {
         const char *src = Hash_get(&fs->envs, "QUERY_STRING", -1);
         RefMap *rm = refmap_new(32);
         RefCharset *cs = (fg->stk_top > v + 2 ? Value_vp(v[2]) : fs->cs_utf8);
@@ -742,7 +742,7 @@ static int cgi_get_param(Value *vret, Value *v, RefNode *node)
 }
 static int cgi_post_param(Value *vret, Value *v, RefNode *node)
 {
-    if (fs->cgi_mode) {
+    if (fs->running_mode == RUNNING_MODE_CGI) {
         RefCharset *cs = (fg->stk_top > v + 2 ? Value_vp(v[2]) : fs->cs_utf8);
         if (!cgi_stdin_param(v[1], cs)) {
             return FALSE;
@@ -756,7 +756,7 @@ static int cgi_post_param(Value *vret, Value *v, RefNode *node)
 }
 static int cgi_cookie_param(Value *vret, Value *v, RefNode *node)
 {
-    if (fs->cgi_mode) {
+    if (fs->running_mode == RUNNING_MODE_CGI) {
         if (ref_map_cookie == VALUE_NULL) {
             const char *p = Hash_get(&fs->envs, "HTTP_COOKIE", -1);
             RefMap *rm = refmap_new(0);

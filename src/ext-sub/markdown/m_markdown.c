@@ -313,8 +313,10 @@ static int xml_from_markdown(Ref *root, Markdown *r, MDNode *node)
             Ref *code = xmlelem_new("code");
             xmlelem_add(root, pre);
             xmlelem_add(pre, code);
-            if (!xml_source_code(code, node->child->cstr, node->cstr)) {
-                return FALSE;
+            if (node->child != NULL) {
+                if (!xml_source_code(code, node->child->cstr, node->cstr)) {
+                    return FALSE;
+                }
             }
             break;
         }

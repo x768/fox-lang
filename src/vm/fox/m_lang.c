@@ -678,6 +678,53 @@ static int lang_argv(Value *vret, Value *v, RefNode *node)
     }
     return TRUE;
 }
+static void refmap_add_str(RefMap *rm, const char *key, Value val)
+{
+    HashValueEntry *ve = refmap_add(rm, vp_Value(intern(key, -1)), FALSE, FALSE);
+    if (ve != NULL) {
+        ve->val = val;
+    }
+}
+static int lang_prop(Value *vret, Value *v, RefNode *node)
+{
+    RefMap *rm = refmap_new(5);
+    *vret = vp_Value(rm);
+
+#ifdef WIN32
+    refmap_add_str(rm, "platform", vp_Value(intern("WIN", -1)));
+#elif defined(APPLE)
+    refmap_add_str(rm, "platform", vp_Value(intern("OSX", -1)));
+#else
+    refmap_add_str(rm, "platform", vp_Value(intern("POSIX", -1)));
+#endif
+    refmap_add_str(rm, "path_separator", vp_Value(intern(SEP_S, -1)));
+
+    switch (fs->running_mode) {
+    case RUNNING_MODE_CL:
+        refmap_add_str(rm, "mode", vp_Value(intern("CL", -1)));
+        break;
+    case RUNNING_MODE_CGI:
+        refmap_add_str(rm, "mode", vp_Value(intern("CGI", -1)));
+        break;
+    case RUNNING_MODE_GUI:
+        refmap_add_str(rm, "mode", vp_Value(intern("GUI", -1)));
+        break;
+    }
+
+    refmap_add_str(rm, "home", vp_Value(fs->fox_home));
+
+    {
+        RefArray *ra = refarray_new(3);
+        ra->p[0] = int32_Value(FOX_VERSION_MAJOR);
+        ra->p[1] = int32_Value(FOX_VERSION_MINOR);
+        ra->p[2] = int32_Value(FOX_VERSION_REVISION);
+        refmap_add_str(rm, "version", vp_Value(ra));
+    }
+
+    refmap_add_str(rm, "arch_bits", int32_Value((int)sizeof(void*) * 8));
+
+    return TRUE;
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -719,6 +766,9 @@ static void define_lang_const(RefNode *m)
 
     n = define_identifier(m, m, "ARGV", NODE_CONST_U_N, 0);
     define_native_func_a(n, lang_argv, 0, 0, NULL);
+
+    n = define_identifier(m, m, "PROP", NODE_CONST_U_N, 0);
+    define_native_func_a(n, lang_prop, 0, 0, NULL);
 }
 
 static void define_lang_class(RefNode *m)

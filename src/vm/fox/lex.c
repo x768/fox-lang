@@ -195,7 +195,6 @@ static void Tok_parse_ident(TokValue *v, Tok *tk)
     } else {
         v->type = TL_VAR;
     }
-    tk->p++;
 
     while (isalnumu_fox(*tk->p)) {
         if (v->type == TL_CONST && islower_fox(*tk->p)) {

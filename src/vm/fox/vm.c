@@ -18,20 +18,6 @@ static void ambiguous_reference(RefNode *module, int line, RefNode *n1, RefNode 
     add_stack_trace(module, NULL, line);
 }
 
-#if 0
-void put_log(const char *msg, int msg_size)
-{
-    FileHandle fd = open_fox("/home/frog/Public/logs/log.txt", O_CREAT|O_WRONLY|O_APPEND, DEFAULT_PERMISSION);
-    if (fd != -1) {
-        if (msg_size < 0) {
-            msg_size = strlen(msg);
-        }
-        write_fox(fd, msg, msg_size);
-        close_fox(fd);
-    }
-}
-#endif
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /**
@@ -199,7 +185,7 @@ static void init_first_classes()
     fs->cls_locale = Mem_get(&fg->st_mem, sizeof(RefNode));
     fs->cls_file = Mem_get(&fg->st_mem, sizeof(RefNode));
 }
-void init_fox_vm()
+void init_fox_vm(int running_mode)
 {
     RefNode *mod_time;
     RefNode *mod_marshal;
@@ -218,6 +204,8 @@ void init_fox_vm()
     fs->max_alloc = 32 * 1024 * 1024;  // 一時的
     init_first_classes();
     g_intern_init();
+
+    fs->running_mode = running_mode;
     fs->fox_home = Value_vp(cstr_Value(fs->cls_file, get_fox_home(), -1));
 
     fs->symbol_stock[T_EQ] = intern("op_eq", -1);
@@ -686,7 +674,7 @@ FileHandle open_errorlog_file()
 
 void fox_close()
 {
-    if (fs->cgi_mode) {
+    if (fs->running_mode == RUNNING_MODE_CGI) {
         send_headers();
     }
     if (Value_isref(fg->v_cio)) {

@@ -4,6 +4,8 @@ add_library(m_image_formula SHARED
   ${SRC_COMMON}
   m_formula.c
   mimetex.c
+  symtable.c
+  aa.c
   texfonts.c
 )
 set_target_properties(m_image_formula

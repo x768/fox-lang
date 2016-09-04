@@ -177,6 +177,6 @@ int parse_markdown(Markdown *r, const char *p);
 int link_markdown(Ref *r);
 
 // hilight.c
-int parse_markdown_code_block(Markdown *r, MDTok *tk, MDNode **ppnode, const char *type);
+int parse_markdown_code_block(Markdown *r, MDTok *tk, MDNode **ppnode, RefStr *type);
 
 #endif /* _MARKDOWN_H_ */

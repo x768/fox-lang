@@ -272,10 +272,10 @@ E#myid  IDセレクタ  E[id="myid"]
  */
 static int parse_css_selector_sub(XMLPattern **pp, int *pnum, SelectorTok *tk, Mem *mem)
 {
-    XMLPattern *pat;
-    XMLPattern **ppat;
-    XMLAttrPattern *attr;
-    XMLAttrPattern **pattr;
+    XMLPattern *pat = NULL;
+    XMLPattern **ppat = NULL;
+    XMLAttrPattern *attr = NULL;
+    XMLAttrPattern **pattr = NULL;
     int subnode = TRUE;
 
     // 空白を除外

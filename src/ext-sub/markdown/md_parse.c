@@ -953,7 +953,18 @@ static int parse_markdown_block(Markdown *r, MDTok *tk, MDNode **ppnode, int bq_
             ppnode = &node->next;
             MDTok_next_code(tk);
 
-            parse_markdown_code_block(r, tk, &node->child, node->cstr);
+            {
+                RefStr *type = NULL;
+                if (node->cstr != NULL) {
+                    char cbuf[16];
+                    sprintf(cbuf, ".%.14s", node->cstr);
+                    // 拡張子->MimeType
+                    type = fs->mimetype_from_suffix(cbuf, -1);
+                }
+                if (!parse_markdown_code_block(r, tk, &node->child, type)) {
+                    return FALSE;
+                }
+            }
             MDTok_next(tk);
             break;
         case MD_LINK_BRAKET:
@@ -1234,7 +1245,9 @@ static int link_markdown_sub(Ref *ref, Markdown *r, MDNode *node)
             }
         }
         if (node->child != NULL) {
-            link_markdown_sub(ref, r, node->child);
+            if (!link_markdown_sub(ref, r, node->child)) {
+                return FALSE;
+            }
         }
     }
     return TRUE;

@@ -97,8 +97,8 @@ int make_path_regularize(char *path, int size)
             }
         } else if (path[1] == ':') {
             path[0] = toupper(path[0]);
-            src = 3;
-            dst = 3;
+            src = 2;
+            dst = 2;
         }
     }
 #endif

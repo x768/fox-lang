@@ -13,67 +13,9 @@
 
 
 enum {
-    T_RP = T_INDEX_NUM, // )
-    T_LC,    // {
-    T_RC,    // }
-    T_RB,    // ]
-    T_LP_C,  // f (
-    T_LB_C,  // a [
-    T_COMMA,
-    T_SEMICL,
-    T_MEMB,
-    T_LAMBDA,// (a)=>
-
-    TL_PRAGMA,
-    TL_INT,
-    TL_BIGINT,
-    TL_FLOAT,
-    TL_FRAC,
-    TL_STR,
-    TL_BYTES,
-    TL_REGEX,
-    TL_CLASS,
-    TL_VAR,
-    TL_CONST,
-
-    TL_STRCAT_BEGIN,
-    TL_STRCAT_MID,
-    TL_STRCAT_END,
-    TL_FORMAT,
-
-    TT_ABSTRACT,
-    TT_BREAK,
-    TT_CASE,
-    TT_CATCH,
-    TT_CLASS,
-    TT_CONTINUE,
-    TT_DEF,
-    TT_DEFAULT,
-    TT_ELSE,
-    TT_ELIF,
-    TT_FALSE,
-    TT_FOR,
-    TT_IF,
-    TT_IMPORT,
-    TT_IN,
-    TT_LET,
-    TT_NULL,
-    TT_RETURN,
-    TT_SUPER,
-    TT_SWITCH,
-    TT_THIS,
-    TT_THROW,
-    TT_TRUE,
-    TT_TRY,
-    TT_VAR,
-    TT_WHILE,
-    TT_YIELD,
-};
-enum {
     MAX_EXPR_STACK = 1024,
     MAX_CALLFUNC_NUM = 1024,
     MAX_STACKTRACE_NUM = 64,
-    PREFETCH_MAX = 4, // 高々4の先読みで解析できる
 
     MAX_UNRSLV_NUM = 256,
 
@@ -368,7 +310,7 @@ int load_aliases_file(Hash *ret, const char *filename);
 
 // vm.c
 void extends_method(RefNode *klass, RefNode *base);
-void init_fox_vm(void);
+void init_fox_vm(int running_mode);
 void init_fox_stack(void);
 void fox_init_compile(int dynamic);
 int fox_link(void);
@@ -558,6 +500,11 @@ void init_mime_module_1(void);
 
 // m_number.c
 void fix_bigint(Value *v, BigInt *bi);
+int float_hash(Value *vret, Value *v, RefNode *node);
+int float_eq(Value *vret, Value *v, RefNode *node);
+int float_cmp(Value *vret, Value *v, RefNode *node);
+int float_marshal_read(Value *vret, Value *v, RefNode *node);
+int float_marshal_write(Value *vret, Value *v, RefNode *node);
 char *frac_tostr_sub(int sign, BigInt *mi, BigInt *rem, int width_f);
 void define_lang_number_func(RefNode *m);
 void define_lang_number_class(RefNode *m);
@@ -583,7 +530,7 @@ Value time_Value(int64_t ts, RefTimeZone *tz);
 RefTimeZone *get_local_tz(void);
 void adjust_timezone(RefDateTime *dt);
 void adjust_datetime(RefDateTime *dt);
-int timedelta_parse_string(int64_t *ret, const char *src_p, int src_size);
+int timedelta_parse_string(double *ret, const char *src_p, int src_size);
 void timestamp_to_RFC2822_UTC(int64_t ts, char *dst);
 void timestamp_to_cookie_date(int64_t ts, char *dst);
 RefNode *init_time_module_stubs(void);

@@ -1006,7 +1006,7 @@ RefStr *mimetype_from_magic(const char *p, int size)
 static int mimetype_new_from_magic(Value *vret, Value *v, RefNode *node)
 {
     RefNode *v1_type = Value_type(v[1]);
-    char buf[16];
+    char buf[MAGIC_MAX];
     int size = sizeof(buf);
 
     if (v1_type == fs->cls_bytes) {
@@ -2018,7 +2018,9 @@ static int uri_tofile(Value *vret, Value *v, RefNode *node)
 #ifdef WIN32
     if (p < end) {
         if (*p == '/') {
-            p += 1;
+            if (isalpha(p[1] & 0xFF) && p[2] == ':') {
+                p += 1;
+            }
         } else {
             p -= 2;
         }

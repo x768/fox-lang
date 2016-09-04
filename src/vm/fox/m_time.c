@@ -55,6 +55,9 @@ static RefNode *cls_timedelta;
 
 #define VALUE_INT64(v) (((RefInt64*)(intptr_t)(v))->u.i)
 
+#define TIMESTAMP_MIN (-100000000.0 * 31557600000.0)
+#define TIMESTAMP_MAX (100000000.0 * 31557600000.0)
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void timestamp_to_RFC2822_UTC(int64_t ts, char *dst)
@@ -1229,14 +1232,20 @@ static int timestamp_add(Value *vret, Value *v, RefNode *node)
     int neg = FUNC_INT(node);
 
     if (v1_type == cls_timedelta) {
-        int64_t tm2 = VALUE_INT64(v[1]);
+        double ret;
+        double tm2 = Value_float2(v[1]);
         RefInt64 *rt = buf_new(fs->cls_timestamp, sizeof(RefInt64));
         *vret = vp_Value(rt);
         if (neg) {
-            rt->u.i = tm1 - tm2;
+            ret = (double)tm1 - tm2;
         } else {
-            rt->u.i = tm1 + tm2;
+            ret = (double)tm1 + tm2;
         }
+        if (ret < TIMESTAMP_MIN || ret > TIMESTAMP_MAX) {
+            throw_errorf(fs->mod_lang, "ValueError", "Timestamp overfloat");
+            return FALSE;
+        }
+        rt->u.i = (int64_t)ret;
     } else if (v1_type == fs->cls_str) {
         RefDateTime dt;
         RefInt64 *rt;
@@ -1259,10 +1268,9 @@ static int timestamp_add(Value *vret, Value *v, RefNode *node)
         throw_errorf(fs->mod_lang, "TypeError", "TimeDelta or Str required but %n", v1_type);
         return FALSE;
     } else if (v1_type == fs->cls_timestamp) {
+        // TimeStamp - TimeStamp
         int64_t tm2 = VALUE_INT64(v[1]);
-        RefInt64 *rt = buf_new(cls_timedelta, sizeof(RefInt64));
-        *vret = vp_Value(rt);
-        rt->u.i = tm1 - tm2;
+        *vret = float_Value(cls_timedelta, (double)tm1 - (double)tm2);
     } else {
         throw_errorf(fs->mod_lang, "TypeError", "TimeDelta, TimeStamp or Str required but %n", v1_type);
         return FALSE;
@@ -1334,27 +1342,27 @@ static int timestamp_tostr(Value *vret, Value *v, RefNode *node)
 
 static int timedelta_new(Value *vret, Value *v, RefNode *node)
 {
-    int64_t num[] = {
-        0, 0, 0, 0, 0,
+    double num[] = {
+        0.0, 0.0, 0.0, 0.0, 0.0,
     };
     int i;
-    RefInt64 *rt = buf_new(cls_timedelta, sizeof(RefInt64));
+    RefFloat *rt = buf_new(cls_timedelta, sizeof(RefFloat));
     *vret = vp_Value(rt);
 
     for (i = 1; v + i < fg->stk_top; i++) {
-        num[i - 1] = Value_int64(v[i], NULL);
+        num[i - 1] = Value_float(v[i]);
     }
-    rt->u.i = num[0] * MSECS_PER_DAY + num[1] * MSECS_PER_HOUR + num[2] * MSECS_PER_MINUTE + num[3] * MSECS_PER_SECOND + num[4];
+    rt->d = num[0] * MSECS_PER_DAY + num[1] * MSECS_PER_HOUR + num[2] * MSECS_PER_MINUTE + num[3] * MSECS_PER_SECOND + num[4];
 
     return TRUE;
 }
 
 static int word_parse_time(RefDateTime *dt, const char *src_p, int src_size, int parse_type);
 
-int timedelta_parse_string(int64_t *ret, const char *src_p, int src_size)
+int timedelta_parse_string(double *ret, const char *src_p, int src_size)
 {
     RefDateTime dt;
-    int64_t ts;
+    double ts;
 
     if (src_size < 0) {
         src_size = strlen(src_p);
@@ -1362,11 +1370,12 @@ int timedelta_parse_string(int64_t *ret, const char *src_p, int src_size)
 
     DateTime_init(&dt.d, &dt.t);
     dt.d.day_of_month = 0;
+    // TODO:timedelta専用にする
     if (!word_parse_time(&dt, src_p, src_size, PARSE_DELTA)) {
         return FALSE;
     }
 
-    ts = (int64_t)dt.d.day_of_month * MSECS_PER_DAY + (int64_t)dt.t.hour * MSECS_PER_HOUR;
+    ts = (double)dt.d.day_of_month * MSECS_PER_DAY + (double)dt.t.hour * MSECS_PER_HOUR;
     ts += dt.t.minute * MSECS_PER_MINUTE + dt.t.second * MSECS_PER_SECOND + dt.t.millisec;
     *ret = ts;
 
@@ -1375,10 +1384,10 @@ int timedelta_parse_string(int64_t *ret, const char *src_p, int src_size)
 static int timedelta_parse(Value *vret, Value *v, RefNode *node)
 {
     RefStr *fmt = Value_vp(v[1]);
-    RefInt64 *rt = buf_new(cls_timedelta, sizeof(RefInt64));
+    RefFloat *rt = buf_new(cls_timedelta, sizeof(RefFloat));
     *vret = vp_Value(rt);
 
-    if (!timedelta_parse_string(&rt->u.i, fmt->c, fmt->size)) {
+    if (!timedelta_parse_string(&rt->d, fmt->c, fmt->size)) {
         throw_errorf(fs->mod_lang, "ParseError", "Invalid time format %Q", fmt);
         return FALSE;
     }
@@ -1387,63 +1396,52 @@ static int timedelta_parse(Value *vret, Value *v, RefNode *node)
 }
 static int timedelta_empty(Value *vret, Value *v, RefNode *node)
 {
-    RefInt64 *rt = Value_vp(*v);
-    *vret = bool_Value(rt->u.i == 0LL);
+    RefFloat *rt = Value_vp(*v);
+    *vret = bool_Value(rt->d == 0.0);
     return TRUE;
 }
 static int timedelta_negative(Value *vret, Value *v, RefNode *node)
 {
-    RefInt64 *src = Value_vp(*v);
-    RefInt64 *rt = buf_new(cls_timedelta, sizeof(RefInt64));
-    *vret = vp_Value(rt);
-    rt->u.i = -src->u.i;
+    double src = Value_float2(*v);
+    *vret = float_Value(cls_timedelta, -src);
     return TRUE;
 }
 static int timedelta_add(Value *vret, Value *v, RefNode *node)
 {
     int sign = FUNC_INT(node);
-    int64_t r1 = VALUE_INT64(*v);
-    int64_t r2 = VALUE_INT64(v[1]);
+    double r1 = Value_float2(*v);
+    double r2 = Value_float2(v[1]);
 
-    RefInt64 *rt = buf_new(cls_timedelta, sizeof(RefInt64));
-    *vret = vp_Value(rt);
-    rt->u.i = r1 + r2 * sign;
+    *vret = float_Value(cls_timedelta, r1 + r2 * sign);
 
     return TRUE;
 }
 static int timedelta_mul(Value *vret, Value *v, RefNode *node)
 {
-    int64_t r1 = VALUE_INT64(*v);
+    double r1 = Value_float2(*v);
     double d2 = Value_float(v[1]);
-    RefInt64 *rt = buf_new(cls_timedelta, sizeof(RefInt64));
-    *vret = vp_Value(rt);
-    rt->u.i = (int64_t)((double)r1 * d2);
+
+    *vret = float_Value(cls_timedelta, r1 * d2);
 
     return TRUE;
 }
 static int timedelta_div(Value *vret, Value *v, RefNode *node)
 {
-    int64_t r1 = VALUE_INT64(*v);
+    double r1 = Value_float2(*v);
     RefNode *v1_type = Value_type(v[1]);
 
     if (v1_type == fs->cls_float) {
-        RefInt64 *rt;
-        double d2 = Value_float(v[1]);
+        double d2 = Value_float2(v[1]);
         double d = r1 / d2;
 
         if (isinf(d)) {
             throw_errorf(fs->mod_lang, "ZeroDivisionError", "TimeDelta / 0.0");
             return FALSE;
         }
-        rt = buf_new(cls_timedelta, sizeof(RefInt64));
-        *vret = vp_Value(rt);
-        rt->u.i = (int64_t)d;
+        *vret = float_Value(cls_timedelta, d);
     } else if (v1_type == cls_timedelta) {
-        RefFloat *rd;
-        int64_t r2 = VALUE_INT64(v[1]);
-        rd = buf_new(fs->cls_float, sizeof(RefFloat));
-        *vret = vp_Value(rd);
-        rd->d = (double)r1 / (double)r2;
+        double r2 = Value_float(v[1]);
+        *vret = float_Value(fs->cls_float, r1 / r2);
     } else {
         throw_error_select(THROW_ARGMENT_TYPE2__NODE_NODE_NODE_INT, fs->cls_float, cls_timedelta, v1_type, 1);
         return FALSE;
@@ -1453,7 +1451,7 @@ static int timedelta_div(Value *vret, Value *v, RefNode *node)
 }
 static int timedelta_get(Value *vret, Value *v, RefNode *node)
 {
-    int64_t ret = VALUE_INT64(*v);
+    int64_t ret = (int64_t)Value_float2(*v);
 
     switch (FUNC_INT(node)) {
     case GET_DAY_OF_YEAR:
@@ -1477,10 +1475,7 @@ static int timedelta_get(Value *vret, Value *v, RefNode *node)
 }
 static int timedelta_get_float(Value *vret, Value *v, RefNode *node)
 {
-    int64_t r1 = VALUE_INT64(*v);
-    double ret = (double)r1;
-    RefFloat *rd = buf_new(fs->cls_float, sizeof(RefFloat));
-    *vret = vp_Value(rd);
+    double ret = Value_float2(*v);
 
     switch (FUNC_INT(node)) {
     case GET_DAY_OF_YEAR:
@@ -1489,8 +1484,10 @@ static int timedelta_get_float(Value *vret, Value *v, RefNode *node)
     case GET_SECOND:
         ret /= (double)MSECS_PER_SECOND;
         break;
+    case GET_MILLISEC:
+        break;
     }
-    rd->d = ret;
+    *vret = float_Value(fs->cls_float, ret);
 
     return TRUE;
 }
@@ -1645,7 +1642,7 @@ static void timedelta_tostr_sub(StrBuf *sbuf, const char *fmt_p, int fmt_size, i
 }
 static int timedelta_tostr(Value *vret, Value *v, RefNode *node)
 {
-    int64_t diff = VALUE_INT64(*v);
+    double diff = Value_float2(*v);
     StrBuf buf;
 
     StrBuf_init_refstr(&buf, 0);
@@ -2058,9 +2055,7 @@ static int datetime_is_dst(Value *vret, Value *v, RefNode *node)
 static int datetime_offset(Value *vret, Value *v, RefNode *node)
 {
     RefDateTime *dt = Value_vp(*v);
-    RefInt64 *rt = buf_new(cls_timedelta, sizeof(RefInt64));
-    *vret = vp_Value(rt);
-    rt->u.i = dt->off->offset;
+        *vret = float_Value(cls_timedelta, dt->off->offset);
     return TRUE;
 }
 static int datetime_date(Value *vret, Value *v, RefNode *node)
@@ -2131,12 +2126,18 @@ static int datetime_add(Value *vret, Value *v, RefNode *node)
         dt2->tz = dt1->tz;
         adjust_timezone(dt2);
     } else if (v1_type == cls_timedelta) {
-        int64_t delta = VALUE_INT64(v[1]);
+        double delta = Value_float2(v[1]);
+        double ts;
         if (neg) {
-            dt2->ts = dt1->ts - delta;
+            ts = (double)dt1->ts - delta;
         } else {
-            dt2->ts = dt1->ts + delta;
+            ts = (double)dt1->ts + delta;
         }
+        if (ts < TIMESTAMP_MIN || ts > TIMESTAMP_MAX) {
+            throw_errorf(fs->mod_lang, "ValueError", "Timestamp overfloat");
+            return FALSE;
+        }
+        dt2->ts = (int64_t)ts;
         dt2->tz = dt1->tz;
         dt2->off = TimeZone_offset_local(dt2->tz, dt2->ts);
         Timestamp_to_DateTime(&dt2->d, &dt2->t, dt2->ts + dt2->off->offset);
@@ -2407,20 +2408,20 @@ static void define_time_class(RefNode *m)
     // TimeDelta
     cls = cls_timedelta;
     n = define_identifier_p(m, cls, fs->str_new, NODE_NEW_N, 0);
-    define_native_func_a(n, timedelta_new, 0, 5, NULL, fs->cls_int, fs->cls_int, fs->cls_int, fs->cls_int, fs->cls_int);
+    define_native_func_a(n, timedelta_new, 0, 5, NULL, fs->cls_number, fs->cls_number, fs->cls_number, fs->cls_number, fs->cls_number);
     n = define_identifier(m, cls, "parse", NODE_NEW_N, 0);
     define_native_func_a(n, timedelta_parse, 1, 1, NULL, fs->cls_str);
     n = define_identifier_p(m, cls, fs->str_tostr, NODE_FUNC_N, 0);
     define_native_func_a(n, timedelta_tostr, 0, 2, NULL, fs->cls_str, fs->cls_locale);
     n = define_identifier_p(m, cls, fs->str_hash, NODE_FUNC_N, NODEOPT_PROPERTY);
-    define_native_func_a(n, int64_hash, 0, 0, NULL);
+    define_native_func_a(n, float_hash, 0, 0, NULL);
     n = define_identifier_p(m, cls, fs->str_marshal_read, NODE_NEW_N, 0);
-    define_native_func_a(n, int64_marshal_read, 1, 1, cls_timedelta, fs->cls_marshaldumper);
+    define_native_func_a(n, float_marshal_read, 1, 1, cls_timedelta, fs->cls_marshaldumper);
 
     n = define_identifier_p(m, cls, fs->symbol_stock[T_EQ], NODE_FUNC_N, 0);
-    define_native_func_a(n, int64_eq, 1, 1, NULL, cls_timedelta);
+    define_native_func_a(n, float_eq, 1, 1, NULL, cls_timedelta);
     n = define_identifier_p(m, cls, fs->symbol_stock[T_CMP], NODE_FUNC_N, 0);
-    define_native_func_a(n, int64_cmp, 1, 1, NULL, cls_timedelta);
+    define_native_func_a(n, float_cmp, 1, 1, NULL, cls_timedelta);
     n = define_identifier_p(m, cls, fs->symbol_stock[T_ADD], NODE_FUNC_N, 0);
     define_native_func_a(n, timedelta_add, 1, 1, (void*) 1, cls_timedelta);
     n = define_identifier_p(m, cls, fs->symbol_stock[T_SUB], NODE_FUNC_N, 0);
@@ -2451,6 +2452,8 @@ static void define_time_class(RefNode *m)
     define_native_func_a(n, timedelta_get_float, 0, 0, (void*) GET_DAY_OF_YEAR);
     n = define_identifier(m, cls, "seconds_float", NODE_FUNC_N, NODEOPT_PROPERTY);
     define_native_func_a(n, timedelta_get_float, 0, 0, (void*) GET_SECOND);
+    n = define_identifier(m, cls, "milliseconds_float", NODE_FUNC_N, NODEOPT_PROPERTY);
+    define_native_func_a(n, timedelta_get_float, 0, 0, (void*) GET_MILLISEC);
     extends_method(cls, fs->cls_obj);
 
     // TimeZone
@@ -2523,7 +2526,7 @@ static void define_time_class(RefNode *m)
     define_native_func_a(n, datetime_get, 0, 0, (void*) GET_MINUTE);
     n = define_identifier(m, cls, "second", NODE_FUNC_N, NODEOPT_PROPERTY);
     define_native_func_a(n, datetime_get, 0, 0, (void*) GET_SECOND);
-    n = define_identifier(m, cls, "millisec", NODE_FUNC_N, NODEOPT_PROPERTY);
+    n = define_identifier(m, cls, "millisecond", NODE_FUNC_N, NODEOPT_PROPERTY);
     define_native_func_a(n, datetime_get, 0, 0, (void*) GET_MILLISEC);
 
     n = define_identifier(m, cls, "timestamp", NODE_FUNC_N, NODEOPT_PROPERTY);

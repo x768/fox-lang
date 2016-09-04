@@ -69,7 +69,7 @@
  *      new_subraster(width,height,pixsz)allocation (and constructor)
  *      new_chardef()                         allocate chardef struct
  *      delete_raster(rp)        deallocate raster (rp =  raster ptr)
- *      delete_subraster(sp)  deallocate subraster (sp=subraster ptr)
+ *      delete_subraster(sp)  deallocate subraster_t (sp=subraster_t ptr)
  *      delete_chardef(cp)      deallocate chardef (cp = chardef ptr)
  *      --- primitive (sub)raster functions ---
  *      rastcpy(rp)                           allocate new copy of rp
@@ -113,8 +113,8 @@
  *      get_symdef(symbol)              return mathchardef for symbol
  *      get_ligature(expr,family)  return symtable index for ligature
  *      get_chardef(symdef,size)       return chardef for symdef,size
- *      get_charsubraster(symdef,size)  wrap subraster around chardef
- *      get_symsubraster(symbol,size)    returns subraster for symbol
+ *      get_charsubraster(symdef,size)  wrap subraster_t around chardef
+ *      get_symsubraster(symbol,size)    returns subraster_t for symbol
  *      --- ancillary font functions ---
  *      get_baseline(gfdata)       determine baseline (in our coords)
  *      get_delim(symbol,height,family) delim just larger than height
@@ -399,6 +399,7 @@
  *
  ****************************************************************************/
 
+#include "smalltex_pri.h"
 #include "mimetex.h"
 
 
@@ -409,208 +410,80 @@
 #include <math.h>
 
 
-/* ---
- * check for supersampling or low-pass anti-aliasing
- * ------------------------------------------------- */
-#ifdef SS
-#define ISSUPERSAMPLING 1
-#ifndef AAALGORITHM
-#define AAALGORITHM 1           /* default supersampling algorithm */
-#endif
-#ifndef AA                      /* anti-aliasing not explicitly set */
-#define AA                      /* so define it ourselves */
-#endif
-#ifndef SSFONTS                 /* need supersampling fonts */
-#define SSFONTS
-#endif
-#else
-#define ISSUPERSAMPLING 0
-#ifndef AAALGORITHM
-#define AAALGORITHM 3 /*2*/     /* default lowpass algorithm */
-#endif
-#endif
-#ifndef MAXFOLLOW
-#define MAXFOLLOW 8             /* aafollowline() maxturn default */
-#endif
-#ifndef ISSUPERSAMPLING
-#define ISSUPERSAMPLING 0
-#endif
-
-
-
-/* -------------------------------------------------------------------------
-adjustable default values
--------------------------------------------------------------------------- */
-/* ---
- * anti-aliasing parameters
- * ------------------------ */
-#ifndef CENTERWT
-/*#define CENTERWT 32 *//* anti-aliasing centerwt default */
-/*#define CENTERWT 10 *//* anti-aliasing centerwt default */
-#define CENTERWT 8              /* anti-aliasing centerwt default */
-#endif
-#ifndef ADJACENTWT
-/*#define ADJACENTWT 3 *//* anti-aliasing adjacentwt default */
-#define ADJACENTWT 2            /* anti-aliasing adjacentwt default */
-#endif
-#ifndef CORNERWT
-#define CORNERWT 1              /* anti-aliasing cornerwt default */
-#endif
-#ifndef MINADJACENT
-#define MINADJACENT 6           /*anti-aliasing minadjacent default */
-#endif
-#ifndef MAXADJACENT
-#define MAXADJACENT 8           /*anti-aliasing maxadjacent default */
-#endif
-
-/* --- variables for anti-aliasing parameters --- */
-static int centerwt = CENTERWT; /*lowpass matrix center pixel wt */
-static int adjacentwt = ADJACENTWT;     /*lowpass matrix adjacent pixel wt */
-static int cornerwt = CORNERWT; /*lowpass matrix corner pixel wt */
-static int minadjacent = MINADJACENT;   /* darken if>=adjacent pts black */
-static int maxadjacent = MAXADJACENT;   /* darken if<=adjacent pts black */
-static int weightnum = 1;       /* font wt, */
-static int maxaaparams = 4;     /* #entries in table */
-
-/* --- anti-aliasing parameter values by font weight --- */
-static aaparameters aaparams[]  /* set params by weight */
-    = {                         /* ----------------------------------------------------
-                                   centerwt adj corner minadj max  fgalias,only,bgalias,only
-                                   ------------------------------------------------------- */
-    {64, 1, 1, 6, 8, 1, 0, 0, 0},       /* 0 = light */
-    {CENTERWT, ADJACENTWT, CORNERWT, MINADJACENT, MAXADJACENT, 1, 0, 0, 0},
-    {8, 1, 1, 5, 8, 1, 0, 0, 0},        /* 2 = semibold */
-    {8, 2, 1, 4, 9, 1, 0, 0, 0} /* 3 = bold */
-};
-
-/* --- anti-aliasing diagnostics (to help improve algorithm) --- */
-static int patternnumcount0[99];
-static int patternnumcount1[99];        /*aalookup() counts */
-static int ispatternnumcount = 1;       /* true to accumulate counts */
-
-/* -------------------------------------------------------------------------
-other variables
--------------------------------------------------------------------------- */
-/* --- black on white background (default), or white on black --- */
-#ifdef WHITE
-#define ISBLACKONWHITE 0        /* white on black background */
-#else
-#define ISBLACKONWHITE 1        /* black on white background */
-#endif
-/* --- advertisement
-   one image in every ADFREQUENCY is wrapped in "advertisement" --- */
-#if !defined(ADFREQUENCY)
-#define ADFREQUENCY 0           /* never show advertisement if 0 */
-#endif
-#ifndef HOST_SHOWAD
-#define HOST_SHOWAD "\0"      /* show ads on all hosts */
-#endif
-/* --- "smash" margin (0 means no smashing) --- */
-#ifndef SMASHMARGIN
-#ifdef NOSMASH
-#define SMASHMARGIN 0
-#else
-#define SMASHMARGIN 3
-#endif
-#endif
-#ifndef SMASHCHECK
-#define SMASHCHECK 0
-#endif
-/* --- textwidth --- */
-#ifndef TEXTWIDTH
-#define TEXTWIDTH (400)
-#endif
-/* --- font "combinations" --- */
-#define CMSYEX (109)            /*select CMSY10, CMEX10 or STMARY10 */
-
-/* -------------------------------------------------------------------------
-debugging and logging / error reporting
--------------------------------------------------------------------------- */
-/* --- debugging and error reporting --- */
-#ifndef MSGLEVEL
-#define MSGLEVEL 1
-#endif
-#define DBGLEVEL 9              /* debugging if msglevel>=DBGLEVEL */
-#define LOGLEVEL 3              /* logging if msglevel>=LOGLEVEL */
-#ifndef FORMLEVEL
-#define FORMLEVEL LOGLEVEL      /*msglevel if called from html form */
-#endif
-#ifndef ERRORSTATUS             /* exit(ERRORSTATUS) for any error */
-#define ERRORSTATUS 0           /* default doesn't signal errors */
-#endif
-/* --- embed warnings in rendered expressions, [\xxx?] if \xxx unknown --- */
-#ifdef WARNINGS
-#define WARNINGLEVEL WARNINGS
-#else
-#ifdef NOWARNINGS
-#define WARNINGLEVEL 0
-#else
-#define WARNINGLEVEL 1
-#endif
-#endif
-
-static int warninglevel = WARNINGLEVEL; /* warning level */
-static int msglevel = MSGLEVEL; /* message level for verbose/debug */
-static FILE *msgfp;             /* output in command-line mode */
 
 /* -------------------------------------------------------------------------
 control flags and values
 -------------------------------------------------------------------------- */
-static int daemonlevel = 0;     /* incremented in main() */
-static int recurlevel = 0;      /* inc/decremented in rasterize() */
-static int scriptlevel = 0;     /* inc/decremented in rastlimits() */
-static int isstring = 0;        /*pixmap is ascii string, not raster */
-static int isligature = 0;      /* true if ligature found */
-static const char *subexprptr = NULL;   /* ptr within expression to subexpr */
+
+int daemonlevel = 0;     /* incremented in main() */
+int recurlevel = 0;      /* inc/decremented in rasterize() */
+int scriptlevel = 0;     /* inc/decremented in rastlimits() */
+int isligature = 0;      /* true if ligature found */
+const char *subexprptr = NULL;   /* ptr within expression to subexpr */
+int fraccenterline = NOVALUE;   /* baseline for punct. after \frac */
+
 /*SHARED(int,imageformat,1); *//* image is 1=bitmap, 2=.gf-like */
-static int isdisplaystyle = 1;  /* displaystyle mode (forced if 2) */
-static int ispreambledollars = 0;       /* displaystyle mode set by $$...$$ */
-static int fontnum = 0;         /* cal=1,scr=2,rm=3,it=4,bb=5,bf=6 */
-static int fontsize = NORMALSIZE;       /* current size */
-static int magstep = 1;         /* magstep (1=no change) */
-static int displaysize = DISPLAYSIZE;   /* use \displaystyle when fontsize>= */
-static int shrinkfactor = 3;    /* shrinkfactors[fontsize] */
-static int rastlift = 0;        /* rastraise() lift parameter */
-static int rastlift1 = 0;       /* rastraise() lift for base exprssn */
-static double unitlength = 1.0; /* #pixels per unit (may be <1.0) */
-static int iunitlength = 1;     /* #pixels per unit as int for store */
-/*static int,textwidth = TEXTWIDTH; *//* #pixels across line */
-//static int, adfrequency, ADFREQUENCY;    /* advertisement frequency */
-static int isnocatspace = 0;   /* >0 to not add space in rastcat() */
-static int smashmargin = SMASHMARGIN;  /* minimum "smash" margin */
-static int mathsmashmargin = SMASHMARGIN;      /* needed for \text{if $n-m$ even} */
-static int issmashdelta = 1;   /* true if smashmargin is a delta */
-static int isexplicitsmash = 0;        /* true if \smash explicitly given */
-static int smashcheck = SMASHCHECK;    /* check if terms safe to smash */
-//static int, isnomath = 0;     /* true to inhibit math mode */
-static int isscripted = 0;     /* is (lefthand) term text-scripted */
-static int isdelimscript = 0;  /* is \right delim text-scripted */
-static int issmashokay = 0;    /*is leading char okay for smashing */
-#define BLANKSIGNAL (-991234)   /*rastsmash signal right-hand blank */
-static int blanksignal = BLANKSIGNAL;  /*rastsmash signal right-hand blank */
-static int blanksymspace = 0;  /* extra (or too much) space wanted */
-static int aaalgorithm = AAALGORITHM;  /* for lp, 1=aalowpass, 2 =aapnm */
-static int maxfollow = MAXFOLLOW;      /* aafollowline() maxturn parameter */
-static int fgalias = 1;
-static int fgonly = 0;
-static int bgalias = 0;
-static int bgonly = 0;         /* aapnm() params */
-static int issupersampling = ISSUPERSAMPLING;  /*1=supersampling 0=lowpass */
-static int isss = ISSUPERSAMPLING;     /* supersampling flag for main() */
-static int *workingparam = NULL;       /* working parameter */
-static subraster *workingbox = NULL;   /*working subraster box */
-static int isreplaceleft = 0;  /* true to replace leftexpression */
-static subraster *leftexpression = NULL;       /*rasterized so far */
-static mathchardef *leftsymdef = NULL; /* mathchardef for preceding symbol */
-static int fraccenterline = NOVALUE;   /* baseline for punct. after \frac */
-/*static int,currentcharclass = NOVALUE; *//*primarily to check for PUNCTION */
+int isdisplaystyle = 1; /* displaystyle mode (forced if 2) */
+int ispreambledollars = 0;      /* displaystyle mode set by $$...$$ */
+int fontnum = 0;        /* cal=1,scr=2,rm=3,it=4,bb=5,bf=6 */
+int fontsize = NORMALSIZE;      /* current size */
+int magstep = 1;        /* magstep (1=no change) */
+int displaysize = DISPLAYSIZE;  /* use \displaystyle when fontsize>= */
+int shrinkfactor = 3;   /* shrinkfactors[fontsize] */
+int rastlift = 0;       /* rastraise() lift parameter */
+int rastlift1 = 0;      /* rastraise() lift for base exprssn */
+double unitlength = 1.0;        /* #pixels per unit (may be <1.0) */
+int iunitlength = 1;    /* #pixels per unit as int for store */
+/*GLOBAL(int,textwidth,TEXTWIDTH); *//* #pixels across line */
+//GLOBAL(int, adfrequency, ADFREQUENCY);    /* advertisement frequency */
+int isnocatspace = 0;   /* >0 to not add space in rastcat() */
+int smashmargin = SMASHMARGIN;  /* minimum "smash" margin */
+int mathsmashmargin = SMASHMARGIN;      /* needed for \text{if $n-m$ even} */
+int issmashdelta = 1;   /* true if smashmargin is a delta */
+int isexplicitsmash = 0;        /* true if \smash explicitly given */
+int smashcheck = SMASHCHECK;    /* check if terms safe to smash */
+//GLOBAL(int, isnomath, 0);     /* true to inhibit math mode */
+int isscripted = 0;     /* is (lefthand) term text-scripted */
+int isdelimscript = 0;  /* is \right delim text-scripted */
+int issmashokay = 0;    /*is leading char okay for smashing */
+int blanksignal = BLANKSIGNAL;  /*rastsmash signal right-hand blank */
+int blanksymspace = 0;  /* extra (or too much) space wanted */
+int aaalgorithm = AAALGORITHM;  /* for lp, 1=aalowpass, 2 =aapnm */
+int maxfollow = MAXFOLLOW;      /* aafollowline() maxturn parameter */
+int fgalias = 1;
+int fgonly = 0;
+int bgalias = 0;
+int bgonly = 0;         /* aapnm() params */
+int issupersampling = ISSUPERSAMPLING;  /*1=supersampling 0=lowpass */
+int isss = ISSUPERSAMPLING;     /* supersampling flag for main() */
+int *workingparam = NULL;       /* working parameter */
+subraster_t *workingbox = NULL;   /*working subraster_t box */
+int isreplaceleft = 0;  /* true to replace leftexpression */
+subraster_t *leftexpression = NULL;       /*rasterized so far */
+const mathchardef_t *leftsymdef = NULL; /* mathchardef for preceding symbol */
+/*GLOBAL(int,currentcharclass,NOVALUE); *//*primarily to check for PUNCTION */
+
+/* --- variables for anti-aliasing parameters --- */
+int centerwt = CENTERWT;        /*lowpass matrix center pixel wt */
+int adjacentwt = ADJACENTWT;    /*lowpass matrix adjacent pixel wt */
+int cornerwt = CORNERWT;        /*lowpass matrix corner pixel wt */
+int minadjacent = MINADJACENT;  /* darken if>=adjacent pts black */
+int maxadjacent = MAXADJACENT;  /* darken if<=adjacent pts black */
+int weightnum = 1;              /* font wt, */
+int maxaaparams = 4;            /* #entries in table */
+
+int nfontinfo = 11;             /* legal font#'s are 1...nfontinfo */
+fontfamily_t *fonttable = (ISSUPERSAMPLING ? ssfonttable : aafonttable);
+
+/* -------------------------------------------------------------------------
+control flags and values
+-------------------------------------------------------------------------- */
 
 /* -------------------------------------------------------------------------
 store for evalterm() [n.b., these are stripped-down funcs from nutshell]
 -------------------------------------------------------------------------- */
 
-#define MAXSTORE 100            /* max 100 identifiers */
-static STORE mimestore[MAXSTORE] = {
+const store_t mimestore[MAXSTORE] = {
     {"fontsize", &fontsize}, {"fs", &fontsize}, /* font size */
     {"fontnum", &fontnum}, {"fn", &fontnum},    /* font number */
     {"unitlength", &iunitlength},       /* unitlength */
@@ -619,2031 +492,195 @@ static STORE mimestore[MAXSTORE] = {
 };
 
 /* --- supersampling shrink factors corresponding to displayed sizes --- */
-static int shrinkfactors[] =    /*supersampling shrinkfactor by size */
+const int shrinkfactors[] =    /*supersampling shrinkfactor by size */
 { 3, 3, 3, 3, 3, 3, 3, 3, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1 };
 
 /* ---
  * space between adjacent symbols, e.g., symspace[RELATION][VARIABLE]
  * ------------------------------------------------------------------ */
-static int symspace[11][11] = { /* -----------------------------------------------------------------------
-                                   Right... ORD OPER  BIN  REL OPEN CLOS PUNC  VAR DISP SPACE unused
-                                   Left... -------------------------------------------------------------- */
+const int symspace[11][11] = {
+/* -----------------------------------------------------------------------
+ * Right... ORD OPER  BIN  REL OPEN CLOS PUNC  VAR DISP SPACE unused
+ * Left...
+ * --------------------------------------------------------------------- */
+
      /*ORDINARY*/ {2, 3, 3, 5, 3, 2, 2, 2, 3, 0, 0},
      /*OPERATOR*/ {3, 1, 1, 5, 3, 2, 2, 2, 3, 0, 0},
      /*BINARYOP*/ {2, 1, 1, 5, 3, 2, 2, 2, 3, 0, 0},
      /*RELATION*/ {5, 5, 5, 2, 5, 5, 2, 5, 5, 0, 0},
-     /*OPENING*/ {2, 2, 2, 5, 2, 4, 2, 2, 3, 0, 0},
-     /*CLOSING*/ {2, 3, 3, 5, 4, 2, 1, 2, 3, 0, 0},
+     /*OPENING*/  {2, 2, 2, 5, 2, 4, 2, 2, 3, 0, 0},
+     /*CLOSING*/  {2, 3, 3, 5, 4, 2, 1, 2, 3, 0, 0},
      /*PUNCTION*/ {2, 2, 2, 5, 2, 2, 1, 2, 2, 0, 0},
      /*VARIABLE*/ {2, 2, 2, 5, 2, 2, 1, 2, 2, 0, 0},
      /*DISPOPER*/ {2, 3, 3, 5, 2, 3, 2, 2, 2, 0, 0},
-     /*SPACEOPER*/ {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-    /*unused */ {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
+     /*SPACEOPER*/{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    /*unused */   {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
 };
-
-/* --- select current font table (for lowpass or supersampling) --- */
-static fontfamily *fonttable =
-    (ISSUPERSAMPLING ? ssfonttable : aafonttable);
 
 
 /* ---
  * font family information
  * ----------------------- */
-static int nfontinfo = 11;      /* legal font#'s are 1...nfontinfo */
-
-static struct {
-    const char *name;
-    int family;
-    int istext;
-    int class;
-}
-  /* note: class(1=upper,2=alpha,3=alnum,4=lower,5=digit,9=all) now unused */
-    fontinfo[]
-    = {                         /* --- name family istext class --- */
-    {
-    "\\math", 0, 0, 0},         /*(0) default math mode */
-    {
-    "\\mathcal", CMSY10, 0, 1}, /*(1) calligraphic, uppercase */
-    {
-    "\\mathscr", RSFS10, 0, 1}, /*(2) rsfs/script, uppercase */
-    {
-    "\\textrm", CMR10, 1, -1},  /*(3) \rm,\text{abc} --> {\textrm~abc} */
-    {
-    "\\textit", CMMI10, 1, -1}, /*(4) \it,\textit{abc}-->{\textit~abc} */
-    {
-    "\\mathbb", BBOLD10, 0, -1},        /*(5) \bb,\mathbb{abc}-->{\mathbb~abc} */
-    {
-    "\\mathbf", CMMIB10, 0, -1},        /*(6) \bf,\mathbf{abc}-->{\mathbf~abc} */
-    {
-    "\\mathrm", CMR10, 0, -1},  /*(7) \mathrm */
-    {
-    "\\cyr", CYR10, 1, -1},     /*(8) \cyr (defaults as text mode) */
-    {
-    "\\textgreek", CMMI10GR, 1, -1},    /*(9) \textgreek{ab}-->\alpha\beta */
-    {
-    "\\textbfgreek", CMMI10BGR, 1, -1}, /*(10)\textbfgreek{ab}-->\alpha\beta */
-    {
-    "\\textbbgreek", BBOLD10GR, 1, -1}, /*(11)\textbbgreek{ab}-->\alpha\beta */
-    {
-NULL, 0, 0, 0}};
-
-
-/* --- sqrt --- */
-#define SQRTACCENT  (1)         /* \sqrt */
-/* --- accents --- */
-#define BARACCENT   (11)        /* \bar \overline */
-#define UNDERBARACCENT  (12)    /* \underline */
-#define HATACCENT   (13)        /* \hat */
-#define DOTACCENT   (14)        /* \dot */
-#define DDOTACCENT  (15)        /* \ddot */
-#define VECACCENT   (16)        /* \vec */
-#define TILDEACCENT (17)        /* \tilde */
-#define OVERBRACE   (18)        /* \overbrace */
-#define UNDERBRACE  (19)        /* \underbrace */
-/* --- flags/modes --- */
-#define ISFONTFAM   (1)         /* set font family */
-#define ISDISPLAYSTYLE  (2)     /* set isdisplaystyle */
-#define ISDISPLAYSIZE   (21)    /* set displaysize */
-#define ISFONTSIZE  (3)         /* set fontsize */
-#define ISMAGSTEP   (31)        /* set magstep */
-#define ISWEIGHT    (4)         /* set aa params */
-//#define   ISOPAQUE    (5)     /* set background opaque */
-#define ISSUPER     (6)         /* set supersampling/lowpass */
-#define ISAAALGORITHM   (61)    /* set anti-aliasing algorithm */
-#define ISCENTERWT  (62)        /* set anti-aliasing center weight */
-#define ISADJACENTWT    (63)    /* set anti-aliasing adjacent weight */
-#define ISCORNERWT  (64)        /* set anti-aliasing adjacent weight */
-//#define   PNMPARAMS   (65)        /* set fgalias,fgonly,bgalias,bgonly*/
-//#define   ISGAMMA     (66)        /* set gamma correction */
-#define ISSHRINK    (7)         /* set supersampling shrinkfactor */
-#define UNITLENGTH  (8)         /* set unitlength */
-//#define   ISCOLOR     (9)     /* set color */
-#define ISREVERSE   (10)        /* set reverse video colors */
-#define ISSTRING    (11)        /* set ascii string mode */
-#define ISSMASH     (12)        /* set (minimum) "smash" margin */
-//#define   ISCONTENTTYPE   (13)        /*enable/disable Content-type lines*/
-//#define   ISCONTENTCACHED (14)        /* write Content-type to cache file*/
-//#define   ISPBMPGM    (15)        /* write pbm/pgm (instead of gif) */
-
-/* ---
- * handler functions for math operations
- * ------------------------------------- */
-static subraster *rastflags(const char **expression, int size, subraster * basesp, int flag, int value, int arg3);      /* set flags, e.g., for \rm */
-static subraster *rastfrac(const char **expression, int size, subraster * basesp, int flag, int value, int arg3);       /* handle \frac \atop expressions */
-static subraster *rastackrel(const char **expression, int size, subraster * basesp, int flag, int value, int arg3);     /* handle \stackrel expressions */
-static subraster *rastmathfunc(const char **expression, int size, subraster * basesp, int flag, int value, int arg3);   /* handle \lim,\log,etc expressions */
-static subraster *rastoverlay(const char **expression, int size, subraster * basesp, int flag, int value, int arg3);    /* handle \not */
-static subraster *rastspace(const char **expression, int size, subraster * basesp, int flag, int value, int arg3);      /* handle math space, \hspace,\hfill */
-static subraster *rastnewline(const char **expression, int size, subraster * basesp, int flag, int value, int arg3);    /* handle \\ newline */
-static subraster *rastarrow(const char **expression, int size, subraster * basesp, int flag, int value, int arg3);      /* handle \longrightarrow, etc */
-static subraster *rastuparrow(const char **expression, int size, subraster * basesp, int flag, int value, int arg3);    /* handle \longuparrow, etc */
-static subraster *rastsqrt(const char **expression, int size, subraster * basesp, int flag, int value, int arg3);       /* handle \sqrt */
-static subraster *rastaccent(const char **expression, int size, subraster * basesp, int flag, int value, int arg3);     /* handle \hat \vec \braces, etc */
-static subraster *rastfont(const char **expression, int size, subraster * basesp, int flag, int value, int arg3);       /* handle \cal{} \scr{}, etc */
-static subraster *rastbegin(const char **expression, int size, subraster * basesp, int flag, int value, int arg3);      /* handle \begin{}...\end{} */
-static subraster *rastleft(const char **expression, int size, subraster * basesp, int flag, int value, int arg3);       /* handle \left...\right */
-static subraster *rastmiddle(const char **expression, int size, subraster * basesp, int flag, int value, int arg3);     /* handle \left...\middle...\right */
-static subraster *rastarray(const char **expression, int size, subraster * basesp, int flag, int value, int arg3);      /* handle \array{...} */
-static subraster *rastpicture(const char **expression, int size, subraster * basesp, int flag, int value, int arg3);    /* handle \picture(,){...} */
-static subraster *rastline(const char **expression, int size, subraster * basesp, int flag, int value, int arg3);       /* handle \line(xinc,yinc){xlen} */
-static subraster *rastrule(const char **expression, int size, subraster * basesp, int flag, int value, int arg3);       /* handle \rule[lift]{width}{height} */
-static subraster *rastcircle(const char **expression, int size, subraster * basesp, int flag, int value, int arg3);     /* handle \circle(xdiam[,ydiam]) */
-static subraster *rastbezier(const char **expression, int size, subraster * basesp, int flag, int value, int arg3);     /*handle\bezier(c0,r0)(c1,r1)(ct,rt) */
-static subraster *rastraise(const char **expression, int size, subraster * basesp, int flag, int value, int arg3);      /* handle \raisebox{lift}{expr} */
-static subraster *rastrotate(const char **expression, int size, subraster * basesp, int flag, int value, int arg3);     /* handle \rotatebox{degs}{expr} */
-static subraster *rastmagnify(const char **expression, int size, subraster * basesp, int flag, int value, int arg3);    /* handle \magnify{magstep}{expr} */
-static subraster *rastreflect(const char **expression, int size, subraster * basesp, int flag, int value, int arg3);    /* handle \reflectbox[axis]{expr} */
-static subraster *rastfbox(const char **expression, int size, subraster * basesp, int flag, int value, int arg3);       /* handle \fbox{expr} */
-//static subraster *rastinput(const char **expression, int size, subraster * basesp, int flag, int value, int arg3);            /* handle \input{filename} */
-//static subraster *rastcounter(const char **expression, int size, subraster * basesp, int flag, int value, int arg3);      /* handle \counter{filename} */
-static subraster *rasteval(const char **expression, int size, subraster * basesp, int flag, int value, int arg3);       /* handle \eval{expression} */
-//static subraster *rasttoday(const char **expression, int size, subraster * basesp, int flag, int value, int arg3);            /* handle \today[+/-tzdelta,ifmt] */
-//static subraster *rastcalendar(const char **expression, int size, subraster * basesp, int flag, int value, int arg3);     /* handle \calendar[yaer,month] */
-//static subraster *rastenviron(const char **expression, int size, subraster * basesp, int flag, int value, int arg3);      /* handle \environment */
-//static subraster *rastmessage(const char **expression, int size, subraster * basesp, int flag, int value, int arg3);      /* handle \message */
-static subraster *rastnoop(const char **expression, int size, subraster * basesp, int flag, int value, int arg3);       /* handle \escape's to be flushed */
-
-/* ---
- * mathchardefs for symbols recognized by mimetex
- * ---------------------------------------------- */
-static mathchardef symtable[] = {
-    /* ---------- c o m m a n d  h a n d l e r s --------------
-       symbol    arg1     arg2     arg3       function
-       -------------------------------------------------------- */
-    /* --- commands --- */
-    {"\\left", NOVALUE, NOVALUE, NOVALUE, rastleft},
-    {"\\middle", NOVALUE, NOVALUE, NOVALUE, rastmiddle},
-    {"\\frac", 1, NOVALUE, NOVALUE, rastfrac},
-    {"\\over", 1, NOVALUE, NOVALUE, rastfrac},
-    {"\\atop", 0, NOVALUE, NOVALUE, rastfrac},
-    {"\\choose", 0, NOVALUE, NOVALUE, rastfrac},
-    {"\\not", 1, 0, NOVALUE, rastoverlay},
-    {"\\Not", 2, 0, NOVALUE, rastoverlay},
-    {"\\widenot", 2, 0, NOVALUE, rastoverlay},
-    {"\\sout", 3, NOVALUE, NOVALUE, rastoverlay},
-    {"\\strikeout", 3, NOVALUE, NOVALUE, rastoverlay},
-    {"\\compose", NOVALUE, NOVALUE, NOVALUE, rastoverlay},
-    {"\\stackrel", 2, NOVALUE, NOVALUE, rastackrel},
-    {"\\relstack", 1, NOVALUE, NOVALUE, rastackrel},
-    {"\\sqrt", NOVALUE, NOVALUE, NOVALUE, rastsqrt},
-    {"\\overbrace", OVERBRACE, 1, 1, rastaccent},
-    {"\\underbrace", UNDERBRACE, 0, 1, rastaccent},
-    {"\\overline", BARACCENT, 1, 0, rastaccent},
-    {"\\underline", UNDERBARACCENT, 0, 0, rastaccent},
-    {"\\begin", NOVALUE, NOVALUE, NOVALUE, rastbegin},
-    {"\\array", NOVALUE, NOVALUE, NOVALUE, rastarray},
-    {"\\matrix", NOVALUE, NOVALUE, NOVALUE, rastarray},
-    {"\\tabular", NOVALUE, NOVALUE, NOVALUE, rastarray},
-    {"\\picture", NOVALUE, NOVALUE, NOVALUE, rastpicture},
-    {"\\line", NOVALUE, NOVALUE, NOVALUE, rastline},
-    {"\\rule", NOVALUE, NOVALUE, NOVALUE, rastrule},
-    {"\\circle", NOVALUE, NOVALUE, NOVALUE, rastcircle},
-    {"\\bezier", NOVALUE, NOVALUE, NOVALUE, rastbezier},
-    {"\\qbezier", NOVALUE, NOVALUE, NOVALUE, rastbezier},
-    {"\\raisebox", NOVALUE, NOVALUE, NOVALUE, rastraise},
-    {"\\rotatebox", NOVALUE, NOVALUE, NOVALUE, rastrotate},
-    {"\\magnify", NOVALUE, NOVALUE, NOVALUE, rastmagnify},
-    {"\\magbox", NOVALUE, NOVALUE, NOVALUE, rastmagnify},
-    {"\\reflectbox", NOVALUE, NOVALUE, NOVALUE, rastreflect},
-    {"\\fbox", NOVALUE, NOVALUE, NOVALUE, rastfbox},
-    {"\\boxed", NOVALUE, NOVALUE, NOVALUE, rastfbox},
-//    { "\\input",NOVALUE,NOVALUE,NOVALUE,  rastinput },
-    {"\\evaluate", NOVALUE, NOVALUE, NOVALUE, rasteval},
-//    { "\\today",NOVALUE,NOVALUE,NOVALUE,  rasttoday },
-//    { "\\calendar",NOVALUE,NOVALUE,NOVALUE,rastcalendar },
-//    { "\\environment",NOVALUE,NOVALUE,NOVALUE,rastenviron },
-//    { "\\message",NOVALUE,NOVALUE,NOVALUE,rastmessage },
-//    { "\\counter",NOVALUE,NOVALUE,NOVALUE,rastcounter },
-    /* --- spaces --- */
-    {"\\/", 1, NOVALUE, NOVALUE, rastspace},
-    {"\\,", 2, NOVALUE, NOVALUE, rastspace},
-    {"\\:", 4, NOVALUE, NOVALUE, rastspace},
-    {"\\;", 6, NOVALUE, NOVALUE, rastspace},
-    {"\\\n", 3, NOVALUE, NOVALUE, rastspace},
-    {"\\\r", 3, NOVALUE, NOVALUE, rastspace},
-    {"\\\t", 3, NOVALUE, NOVALUE, rastspace},
-    /*{ "\\~",5,NOVALUE,NOVALUE,rastspace }, */
-    {"~", 5, NOVALUE, NOVALUE, rastspace},
-    {"\\ ", 5, NOVALUE, NOVALUE, rastspace},
-    {" ", 5, NOVALUE, NOVALUE, rastspace},
-    {"\\!", -2, NOVALUE, NOVALUE, rastspace},
-    /*{ "\\!*", -2,      99,NOVALUE,  rastspace }, */
-    {"\\quad", 6, NOVALUE, NOVALUE, rastspace},
-    {"\\qquad", 10, NOVALUE, NOVALUE, rastspace},
-    {"\\hspace", 0, NOVALUE, NOVALUE, rastspace},
-    {"\\hspace*", 0, 99, NOVALUE, rastspace},
-    {"\\vspace", 0, NOVALUE, 1, rastspace},
-    {"\\hfill", 0, 1, NOVALUE, rastspace},
-    /* --- newline --- */
-    {"\\\\", NOVALUE, NOVALUE, NOVALUE, rastnewline},
-    /* --- arrows --- */
-    {"\\longrightarrow", 1, 0, NOVALUE, rastarrow},
-    {"\\Longrightarrow", 1, 1, NOVALUE, rastarrow},
-    {"\\longleftarrow", -1, 0, NOVALUE, rastarrow},
-    {"\\Longleftarrow", -1, 1, NOVALUE, rastarrow},
-    {"\\longleftrightarrow", 0, 0, NOVALUE, rastarrow},
-    {"\\Longleftrightarrow", 0, 1, NOVALUE, rastarrow},
-    {"\\longuparrow", 1, 0, NOVALUE, rastuparrow},
-    {"\\Longuparrow", 1, 1, NOVALUE, rastuparrow},
-    {"\\longdownarrow", -1, 0, NOVALUE, rastuparrow},
-    {"\\Longdownarrow", -1, 1, NOVALUE, rastuparrow},
-    {"\\longupdownarrow", 0, 0, NOVALUE, rastuparrow},
-    {"\\Longupdownarrow", 0, 1, NOVALUE, rastuparrow},
-    /* --- modes and values --- */
-    {"\\cal", 1, NOVALUE, NOVALUE, rastfont},
-    {"\\mathcal", 1, NOVALUE, NOVALUE, rastfont},
-    {"\\scr", 2, NOVALUE, NOVALUE, rastfont},
-    {"\\mathscr", 2, NOVALUE, NOVALUE, rastfont},
-    {"\\mathfrak", 2, NOVALUE, NOVALUE, rastfont},
-    {"\\mathbb", 5, NOVALUE, NOVALUE, rastfont},
-    {"\\rm", 3, NOVALUE, NOVALUE, rastfont},
-    {"\\text", 3, NOVALUE, NOVALUE, rastfont},
-    {"\\textbf", 3, NOVALUE, NOVALUE, rastfont},
-    {"\\textrm", 3, NOVALUE, NOVALUE, rastfont},
-    {"\\mathrm", 7, NOVALUE, NOVALUE, rastfont},
-    {"\\cyr", 8, NOVALUE, NOVALUE, rastfont},
-    {"\\textgreek", 9, NOVALUE, NOVALUE, rastfont},
-    {"\\textbfgreek", 10, NOVALUE, NOVALUE, rastfont},
-    {"\\textbbgreek", 11, NOVALUE, NOVALUE, rastfont},
-    {"\\mathbf", 6, NOVALUE, NOVALUE, rastfont},
-    {"\\bf", 6, NOVALUE, NOVALUE, rastfont},
-    {"\\mathtt", 3, NOVALUE, NOVALUE, rastfont},
-    {"\\mathsf", 3, NOVALUE, NOVALUE, rastfont},
-    {"\\mbox", 3, NOVALUE, NOVALUE, rastfont},
-    {"\\operatorname", 3, NOVALUE, NOVALUE, rastfont},
-    {"\\it", 4, NOVALUE, NOVALUE, rastfont},
-    {"\\textit", 4, NOVALUE, NOVALUE, rastfont},
-    {"\\mathit", 4, NOVALUE, NOVALUE, rastfont},
-    {"\\rm", ISFONTFAM, 3, NOVALUE, rastflags},
-    {"\\it", ISFONTFAM, 4, NOVALUE, rastflags},
-    {"\\sl", ISFONTFAM, 4, NOVALUE, rastflags},
-    {"\\bb", ISFONTFAM, 5, NOVALUE, rastflags},
-    {"\\bf", ISFONTFAM, 6, NOVALUE, rastflags},
-    {"\\text", ISFONTFAM, 3, NOVALUE, rastflags},
-    {"\\math", ISFONTFAM, 0, NOVALUE, rastflags},
-    {"\\ascii", ISSTRING, 1, NOVALUE, rastflags},
-    {"\\image", ISSTRING, 0, NOVALUE, rastflags},
-    {"\\limits", ISDISPLAYSTYLE, 2, NOVALUE, rastflags},
-    {"\\nolimits", ISDISPLAYSTYLE, 0, NOVALUE, rastflags},
-    {"\\displaystyle", ISDISPLAYSTYLE, 2, NOVALUE, rastflags},
-    {"\\textstyle", ISDISPLAYSTYLE, 0, NOVALUE, rastflags},
-    {"\\displaysize", ISDISPLAYSIZE, NOVALUE, NOVALUE, rastflags},
-    {"\\tiny", ISFONTSIZE, 0, NOVALUE, rastflags},
-    {"\\scriptsize", ISFONTSIZE, 1, NOVALUE, rastflags},
-    {"\\footnotesize", ISFONTSIZE, 2, NOVALUE, rastflags},
-    {"\\small", ISFONTSIZE, 3, NOVALUE, rastflags},
-    {"\\normalsize", ISFONTSIZE, 4, NOVALUE, rastflags},
-    {"\\large", ISFONTSIZE, 5, NOVALUE, rastflags},
-    {"\\Large", ISFONTSIZE, 6, NOVALUE, rastflags},
-    {"\\LARGE", ISFONTSIZE, 7, NOVALUE, rastflags},
-    {"\\huge", ISFONTSIZE, 8, NOVALUE, rastflags},
-    {"\\Huge", ISFONTSIZE, 9, NOVALUE, rastflags},
-    {"\\HUGE", ISFONTSIZE, 10, NOVALUE, rastflags},
-    {"\\fontsize", ISFONTSIZE, NOVALUE, NOVALUE, rastflags},
-    {"\\fs", ISFONTSIZE, NOVALUE, NOVALUE, rastflags},
-    {"\\magstep", ISMAGSTEP, NOVALUE, NOVALUE, rastflags},
-    {"\\shrinkfactor", ISSHRINK, NOVALUE, NOVALUE, rastflags},
-    {"\\sf", ISSHRINK, NOVALUE, NOVALUE, rastflags},
-    {"\\light", ISWEIGHT, 0, NOVALUE, rastflags},
-    {"\\regular", ISWEIGHT, 1, NOVALUE, rastflags},
-    {"\\semibold", ISWEIGHT, 2, NOVALUE, rastflags},
-    {"\\bold", ISWEIGHT, 3, NOVALUE, rastflags},
-    {"\\fontweight", ISWEIGHT, NOVALUE, NOVALUE, rastflags},
-    {"\\fw", ISWEIGHT, NOVALUE, NOVALUE, rastflags},
-    {"\\centerwt", ISCENTERWT, NOVALUE, NOVALUE, rastflags},
-    {"\\adjacentwt", ISADJACENTWT, NOVALUE, NOVALUE, rastflags},
-    {"\\cornerwt", ISCORNERWT, NOVALUE, NOVALUE, rastflags},
-    {"\\ssampling", ISSUPER, 1, NOVALUE, rastflags},
-    {"\\lowpass", ISSUPER, 0, NOVALUE, rastflags},
-    {"\\aaalg", ISAAALGORITHM, NOVALUE, NOVALUE, rastflags},
-//    { "\\pnmparams",PNMPARAMS,   NOVALUE,NOVALUE, rastflags },
-//    { "\\pbmpgm",    ISPBMPGM,   NOVALUE,NOVALUE, rastflags },
-//    { "\\gammacorrection",ISGAMMA,NOVALUE,NOVALUE,rastflags },
-//    { "\\nocontenttype",ISCONTENTTYPE, 0,NOVALUE, rastflags },
-//    { "\\nodepth",   ISCONTENTCACHED,  0,NOVALUE, rastflags },
-//    { "\\depth",     ISCONTENTCACHED,  1,NOVALUE, rastflags },
-//    { "\\opaque",    ISOPAQUE,         0,NOVALUE, rastflags },
-//    { "\\transparent",ISOPAQUE,        1,NOVALUE, rastflags },
-    {"\\squash", ISSMASH, 3, 1, rastflags},
-    {"\\smash", ISSMASH, 3, 1, rastflags},
-    {"\\nosquash", ISSMASH, 0, NOVALUE, rastflags},
-    {"\\nosmash", ISSMASH, 0, NOVALUE, rastflags},
-    {"\\squashmargin", ISSMASH, NOVALUE, NOVALUE, rastflags},
-    {"\\smashmargin", ISSMASH, NOVALUE, NOVALUE, rastflags},
-    {"\\unitlength", UNITLENGTH, NOVALUE, NOVALUE, rastflags},
-    {"\\reverse", ISREVERSE, NOVALUE, NOVALUE, rastflags},
-    {"\\reversefg", ISREVERSE, 1, NOVALUE, rastflags},
-    {"\\reversebg", ISREVERSE, 2, NOVALUE, rastflags},
-//    { "\\color",     ISCOLOR,    NOVALUE,NOVALUE, rastflags },
-//    { "\\red",       ISCOLOR,          1,NOVALUE, rastflags },
-//    { "\\green",     ISCOLOR,          2,NOVALUE, rastflags },
-//    { "\\blue",      ISCOLOR,          3,NOVALUE, rastflags },
-//    { "\\black",     ISCOLOR,          0,NOVALUE, rastflags },
-//    { "\\white",     ISCOLOR,          7,NOVALUE, rastflags },
-    /* --- accents --- */
-    {"\\vec", VECACCENT, 1, 1, rastaccent},
-    {"\\widevec", VECACCENT, 1, 1, rastaccent},
-    {"\\overarrow", VECACCENT, 1, 1, rastaccent},
-    {"\\overrightarrow", VECACCENT, 1, 1, rastaccent},
-    {"\\Overrightarrow", VECACCENT, 1, 11, rastaccent},
-    {"\\underarrow", VECACCENT, 0, 1, rastaccent},
-    {"\\underrightarrow", VECACCENT, 0, 1, rastaccent},
-    {"\\Underrightarrow", VECACCENT, 0, 11, rastaccent},
-    {"\\overleftarrow", VECACCENT, 1, -1, rastaccent},
-    {"\\Overleftarrow", VECACCENT, 1, 9, rastaccent},
-    {"\\underleftarrow", VECACCENT, 0, -1, rastaccent},
-    {"\\Underleftarrow", VECACCENT, 0, 9, rastaccent},
-    {"\\overleftrightarrow", VECACCENT, 1, 0, rastaccent},
-    {"\\Overleftrightarrow", VECACCENT, 1, 10, rastaccent},
-    {"\\underleftrightarrow", VECACCENT, 0, 0, rastaccent},
-    {"\\Underleftrightarrow", VECACCENT, 0, 10, rastaccent},
-    {"\\bar", BARACCENT, 1, 0, rastaccent},
-    {"\\widebar", BARACCENT, 1, 0, rastaccent},
-    {"\\hat", HATACCENT, 1, 0, rastaccent},
-    {"\\widehat", HATACCENT, 1, 0, rastaccent},
-    {"\\tilde", TILDEACCENT, 1, 0, rastaccent},
-    {"\\widetilde", TILDEACCENT, 1, 0, rastaccent},
-    {"\\dot", DOTACCENT, 1, 0, rastaccent},
-    {"\\widedot", DOTACCENT, 1, 0, rastaccent},
-    {"\\ddot", DDOTACCENT, 1, 0, rastaccent},
-    {"\\wideddot", DDOTACCENT, 1, 0, rastaccent},
-    /* --- math functions --- */
-    {"\\arccos", 1, 0, NOVALUE, rastmathfunc},
-    {"\\arcsin", 2, 0, NOVALUE, rastmathfunc},
-    {"\\arctan", 3, 0, NOVALUE, rastmathfunc},
-    {"\\arg", 4, 0, NOVALUE, rastmathfunc},
-    {"\\cos", 5, 0, NOVALUE, rastmathfunc},
-    {"\\cosh", 6, 0, NOVALUE, rastmathfunc},
-    {"\\cot", 7, 0, NOVALUE, rastmathfunc},
-    {"\\coth", 8, 0, NOVALUE, rastmathfunc},
-    {"\\csc", 9, 0, NOVALUE, rastmathfunc},
-    {"\\deg", 10, 0, NOVALUE, rastmathfunc},
-    {"\\det", 11, 1, NOVALUE, rastmathfunc},
-    {"\\dim", 12, 0, NOVALUE, rastmathfunc},
-    {"\\exp", 13, 0, NOVALUE, rastmathfunc},
-    {"\\gcd", 14, 1, NOVALUE, rastmathfunc},
-    {"\\hom", 15, 0, NOVALUE, rastmathfunc},
-    {"\\inf", 16, 1, NOVALUE, rastmathfunc},
-    {"\\ker", 17, 0, NOVALUE, rastmathfunc},
-    {"\\lg", 18, 0, NOVALUE, rastmathfunc},
-    {"\\lim", 19, 1, NOVALUE, rastmathfunc},
-    {"\\liminf", 20, 1, NOVALUE, rastmathfunc},
-    {"\\limsup", 21, 1, NOVALUE, rastmathfunc},
-    {"\\ln", 22, 0, NOVALUE, rastmathfunc},
-    {"\\log", 23, 0, NOVALUE, rastmathfunc},
-    {"\\max", 24, 1, NOVALUE, rastmathfunc},
-    {"\\min", 25, 1, NOVALUE, rastmathfunc},
-    {"\\Pr", 26, 1, NOVALUE, rastmathfunc},
-    {"\\sec", 27, 0, NOVALUE, rastmathfunc},
-    {"\\sin", 28, 0, NOVALUE, rastmathfunc},
-    {"\\sinh", 29, 0, NOVALUE, rastmathfunc},
-    {"\\sup", 30, 1, NOVALUE, rastmathfunc},
-    {"\\tan", 31, 0, NOVALUE, rastmathfunc},
-    {"\\tanh", 32, 0, NOVALUE, rastmathfunc},
-    {"\\tr", 33, 0, NOVALUE, rastmathfunc},
-    {"\\pmod", 34, 0, NOVALUE, rastmathfunc},
-    /* --- flush -- recognized but not yet handled by mimeTeX --- */
-    {"\\nooperation", 0, NOVALUE, NOVALUE, rastnoop},
-    {"\\bigskip", 0, NOVALUE, NOVALUE, rastnoop},
-    {"\\phantom", 1, NOVALUE, NOVALUE, rastnoop},
-    {"\\nocaching", 0, NOVALUE, NOVALUE, rastnoop},
-    {"\\noconten", 0, NOVALUE, NOVALUE, rastnoop},
-    {"\\nonumber", 0, NOVALUE, NOVALUE, rastnoop},
-    /* { "\\!",      0, NOVALUE,NOVALUE,  rastnoop }, */
-    {"\\cydot", 0, NOVALUE, NOVALUE, rastnoop},
-    /* --------------------- C M M I --------------------------
-       symbol     charnum    family    class     function
-       -------------------------------------------------------- */
-    /* --- uppercase greek letters --- */
-    {"\\Gamma", 0, CMMI10, VARIABLE, NULL},
-    {"\\Delta", 1, CMMI10, VARIABLE, NULL},
-    {"\\Theta", 2, CMMI10, VARIABLE, NULL},
-    {"\\Lambda", 3, CMMI10, VARIABLE, NULL},
-    {"\\Xi", 4, CMMI10, VARIABLE, NULL},
-    {"\\Pi", 5, CMMI10, VARIABLE, NULL},
-    {"\\Sigma", 6, CMMI10, VARIABLE, NULL},
-    {"\\smallsum", 6, CMMI10, OPERATOR, NULL},
-    {"\\Upsilon", 7, CMMI10, VARIABLE, NULL},
-    {"\\Phi", 8, CMMI10, VARIABLE, NULL},
-    {"\\Psi", 9, CMMI10, VARIABLE, NULL},
-    {"\\Omega", 10, CMMI10, VARIABLE, NULL},
-    /* --- lowercase greek letters --- */
-    {"\\alpha", 11, CMMI10, VARIABLE, NULL},
-    {"\\beta", 12, CMMI10, VARIABLE, NULL},
-    {"\\gamma", 13, CMMI10, VARIABLE, NULL},
-    {"\\delta", 14, CMMI10, VARIABLE, NULL},
-    {"\\epsilon", 15, CMMI10, VARIABLE, NULL},
-    {"\\zeta", 16, CMMI10, VARIABLE, NULL},
-    {"\\eta", 17, CMMI10, VARIABLE, NULL},
-    {"\\theta", 18, CMMI10, VARIABLE, NULL},
-    {"\\iota", 19, CMMI10, VARIABLE, NULL},
-    {"\\kappa", 20, CMMI10, VARIABLE, NULL},
-    {"\\lambda", 21, CMMI10, VARIABLE, NULL},
-    {"\\mu", 22, CMMI10, VARIABLE, NULL},
-    {"\\nu", 23, CMMI10, VARIABLE, NULL},
-    {"\\xi", 24, CMMI10, VARIABLE, NULL},
-    {"\\pi", 25, CMMI10, VARIABLE, NULL},
-    {"\\rho", 26, CMMI10, VARIABLE, NULL},
-    {"\\sigma", 27, CMMI10, VARIABLE, NULL},
-    {"\\tau", 28, CMMI10, VARIABLE, NULL},
-    {"\\upsilon", 29, CMMI10, VARIABLE, NULL},
-    {"\\phi", 30, CMMI10, VARIABLE, NULL},
-    {"\\chi", 31, CMMI10, VARIABLE, NULL},
-    {"\\psi", 32, CMMI10, VARIABLE, NULL},
-    {"\\omega", 33, CMMI10, VARIABLE, NULL},
-    {"\\varepsilon", 34, CMMI10, VARIABLE, NULL},
-    {"\\vartheta", 35, CMMI10, VARIABLE, NULL},
-    {"\\varpi", 36, CMMI10, VARIABLE, NULL},
-    {"\\varrho", 37, CMMI10, VARIABLE, NULL},
-    {"\\varsigma", 38, CMMI10, VARIABLE, NULL},
-    {"\\varphi", 39, CMMI10, VARIABLE, NULL},
-    /* --- arrow relations --- */
-    {"\\leftharpoonup", 40, CMMI10, ARROW, NULL},
-    {"\\leftharpoondown", 41, CMMI10, ARROW, NULL},
-    {"\\rightharpoonup", 42, CMMI10, ARROW, NULL},
-    {"\\rightharpoondown", 43, CMMI10, ARROW, NULL},
-    /* --- punctuation --- */
-    {"`", 44, CMMI10, PUNCTION, NULL},
-    {"\'", 45, CMMI10, PUNCTION, NULL},
-    /* --- triangle binary relations --- */
-    {"\\triangleright", 46, CMMI10, RELATION, NULL},
-    {"\\triangleleft", 47, CMMI10, RELATION, NULL},
-    /* --- digits 0-9 --- */
-    {"\\0", 48, CMMI10, ORDINARY, NULL},
-    {"\\1", 49, CMMI10, ORDINARY, NULL},
-    {"\\2", 50, CMMI10, ORDINARY, NULL},
-    {"\\3", 51, CMMI10, ORDINARY, NULL},
-    {"\\4", 52, CMMI10, ORDINARY, NULL},
-    {"\\5", 53, CMMI10, ORDINARY, NULL},
-    {"\\6", 54, CMMI10, ORDINARY, NULL},
-    {"\\7", 55, CMMI10, ORDINARY, NULL},
-    {"\\8", 56, CMMI10, ORDINARY, NULL},
-    {"\\9", 57, CMMI10, ORDINARY, NULL},
-    /* --- punctuation --- */
-    {".", 58, CMMI10, PUNCTION, NULL},
-    {",", 59, CMMI10, PUNCTION, NULL},
-    /* --- operations (some ordinary) --- */
-    {"<", 60, CMMI10, OPENING, NULL},
-    {"\\<", 60, CMMI10, OPENING, NULL},
-    {"\\lt", 60, CMMI10, OPENING, NULL},
-    {"/", 61, CMMI10, BINARYOP, NULL},
-    {">", 62, CMMI10, CLOSING, NULL},
-    {"\\>", 62, CMMI10, CLOSING, NULL},
-    {"\\gt", 62, CMMI10, CLOSING, NULL},
-    {"\\star", 63, CMMI10, BINARYOP, NULL},
-    {"\\partial", 64, CMMI10, VARIABLE, NULL},
-    /* --- uppercase letters --- */
-    {"A", 65, CMMI10, VARIABLE, NULL},
-    {"B", 66, CMMI10, VARIABLE, NULL},
-    {"C", 67, CMMI10, VARIABLE, NULL},
-    {"D", 68, CMMI10, VARIABLE, NULL},
-    {"E", 69, CMMI10, VARIABLE, NULL},
-    {"F", 70, CMMI10, VARIABLE, NULL},
-    {"G", 71, CMMI10, VARIABLE, NULL},
-    {"H", 72, CMMI10, VARIABLE, NULL},
-    {"I", 73, CMMI10, VARIABLE, NULL},
-    {"J", 74, CMMI10, VARIABLE, NULL},
-    {"K", 75, CMMI10, VARIABLE, NULL},
-    {"L", 76, CMMI10, VARIABLE, NULL},
-    {"M", 77, CMMI10, VARIABLE, NULL},
-    {"N", 78, CMMI10, VARIABLE, NULL},
-    {"O", 79, CMMI10, VARIABLE, NULL},
-    {"P", 80, CMMI10, VARIABLE, NULL},
-    {"Q", 81, CMMI10, VARIABLE, NULL},
-    {"R", 82, CMMI10, VARIABLE, NULL},
-    {"S", 83, CMMI10, VARIABLE, NULL},
-    {"T", 84, CMMI10, VARIABLE, NULL},
-    {"U", 85, CMMI10, VARIABLE, NULL},
-    {"V", 86, CMMI10, VARIABLE, NULL},
-    {"W", 87, CMMI10, VARIABLE, NULL},
-    {"X", 88, CMMI10, VARIABLE, NULL},
-    {"Y", 89, CMMI10, VARIABLE, NULL},
-    {"Z", 90, CMMI10, VARIABLE, NULL},
-    /* --- miscellaneous symbols and relations --- */
-    {"\\flat", 91, CMMI10, ORDINARY, NULL},
-    {"\\natural", 92, CMMI10, ORDINARY, NULL},
-    {"\\sharp", 93, CMMI10, ORDINARY, NULL},
-    {"\\smile", 94, CMMI10, RELATION, NULL},
-    {"\\frown", 95, CMMI10, RELATION, NULL},
-    {"\\ell", 96, CMMI10, ORDINARY, NULL},
-    /* --- lowercase letters --- */
-    {"a", 97, CMMI10, VARIABLE, NULL},
-    {"b", 98, CMMI10, VARIABLE, NULL},
-    {"c", 99, CMMI10, VARIABLE, NULL},
-    {"d", 100, CMMI10, VARIABLE, NULL},
-    {"e", 101, CMMI10, VARIABLE, NULL},
-    {"f", 102, CMMI10, VARIABLE, NULL},
-    {"g", 103, CMMI10, VARIABLE, NULL},
-    {"h", 104, CMMI10, VARIABLE, NULL},
-    {"i", 105, CMMI10, VARIABLE, NULL},
-    {"j", 106, CMMI10, VARIABLE, NULL},
-    {"k", 107, CMMI10, VARIABLE, NULL},
-    {"l", 108, CMMI10, VARIABLE, NULL},
-    {"m", 109, CMMI10, VARIABLE, NULL},
-    {"n", 110, CMMI10, VARIABLE, NULL},
-    {"o", 111, CMMI10, VARIABLE, NULL},
-    {"p", 112, CMMI10, VARIABLE, NULL},
-    {"q", 113, CMMI10, VARIABLE, NULL},
-    {"r", 114, CMMI10, VARIABLE, NULL},
-    {"s", 115, CMMI10, VARIABLE, NULL},
-    {"t", 116, CMMI10, VARIABLE, NULL},
-    {"u", 117, CMMI10, VARIABLE, NULL},
-    {"v", 118, CMMI10, VARIABLE, NULL},
-    {"w", 119, CMMI10, VARIABLE, NULL},
-    {"x", 120, CMMI10, VARIABLE, NULL},
-    {"y", 121, CMMI10, VARIABLE, NULL},
-    {"z", 122, CMMI10, VARIABLE, NULL},
-    /* --- miscellaneous symbols and relations --- */
-    {"\\imath", 123, CMMI10, VARIABLE, NULL},
-    {"\\jmath", 124, CMMI10, VARIABLE, NULL},
-    {"\\wp", 125, CMMI10, ORDINARY, NULL},
-    {"\\vec", 126, CMMI10, ORDINARY, NULL},
-    /* --------------------- C M M I B ------------------------
-       symbol     charnum    family    class     function
-       -------------------------------------------------------- */
-    /* --- uppercase greek letters --- */
-    {"\\Gamma", 0, CMMIB10, VARIABLE, NULL},
-    {"\\Delta", 1, CMMIB10, VARIABLE, NULL},
-    {"\\Theta", 2, CMMIB10, VARIABLE, NULL},
-    {"\\Lambda", 3, CMMIB10, VARIABLE, NULL},
-    {"\\Xi", 4, CMMIB10, VARIABLE, NULL},
-    {"\\Pi", 5, CMMIB10, VARIABLE, NULL},
-    {"\\Sigma", 6, CMMIB10, VARIABLE, NULL},
-    {"\\smallsum", 6, CMMIB10, OPERATOR, NULL},
-    {"\\Upsilon", 7, CMMIB10, VARIABLE, NULL},
-    {"\\Phi", 8, CMMIB10, VARIABLE, NULL},
-    {"\\Psi", 9, CMMIB10, VARIABLE, NULL},
-    {"\\Omega", 10, CMMIB10, VARIABLE, NULL},
-    /* --- lowercase greek letters --- */
-    {"\\alpha", 11, CMMIB10, VARIABLE, NULL},
-    {"\\beta", 12, CMMIB10, VARIABLE, NULL},
-    {"\\gamma", 13, CMMIB10, VARIABLE, NULL},
-    {"\\delta", 14, CMMIB10, VARIABLE, NULL},
-    {"\\epsilon", 15, CMMIB10, VARIABLE, NULL},
-    {"\\zeta", 16, CMMIB10, VARIABLE, NULL},
-    {"\\eta", 17, CMMIB10, VARIABLE, NULL},
-    {"\\theta", 18, CMMIB10, VARIABLE, NULL},
-    {"\\iota", 19, CMMIB10, VARIABLE, NULL},
-    {"\\kappa", 20, CMMIB10, VARIABLE, NULL},
-    {"\\lambda", 21, CMMIB10, VARIABLE, NULL},
-    {"\\mu", 22, CMMIB10, VARIABLE, NULL},
-    {"\\nu", 23, CMMIB10, VARIABLE, NULL},
-    {"\\xi", 24, CMMIB10, VARIABLE, NULL},
-    {"\\pi", 25, CMMIB10, VARIABLE, NULL},
-    {"\\rho", 26, CMMIB10, VARIABLE, NULL},
-    {"\\sigma", 27, CMMIB10, VARIABLE, NULL},
-    {"\\tau", 28, CMMIB10, VARIABLE, NULL},
-    {"\\upsilon", 29, CMMIB10, VARIABLE, NULL},
-    {"\\phi", 30, CMMIB10, VARIABLE, NULL},
-    {"\\chi", 31, CMMIB10, VARIABLE, NULL},
-    {"\\psi", 32, CMMIB10, VARIABLE, NULL},
-    {"\\omega", 33, CMMIB10, VARIABLE, NULL},
-    {"\\varepsilon", 34, CMMIB10, VARIABLE, NULL},
-    {"\\vartheta", 35, CMMIB10, VARIABLE, NULL},
-    {"\\varpi", 36, CMMIB10, VARIABLE, NULL},
-    {"\\varrho", 37, CMMIB10, VARIABLE, NULL},
-    {"\\varsigma", 38, CMMIB10, VARIABLE, NULL},
-    {"\\varphi", 39, CMMIB10, VARIABLE, NULL},
-    /* --- arrow relations --- */
-    {"\\bfleftharpoonup", 40, CMMIB10, ARROW, NULL},
-    {"\\bfleftharpoondown", 41, CMMIB10, ARROW, NULL},
-    {"\\bfrightharpoonup", 42, CMMIB10, ARROW, NULL},
-    {"\\bfrightharpoondown", 43, CMMIB10, ARROW, NULL},
-    /* --- punctuation --- */
-    {"`", 44, CMMIB10, PUNCTION, NULL},
-    {"\'", 45, CMMIB10, PUNCTION, NULL},
-    /* --- triangle binary relations --- */
-    {"\\triangleright", 46, CMMIB10, RELATION, NULL},
-    {"\\triangleleft", 47, CMMIB10, RELATION, NULL},
-    /* --- digits 0-9 --- */
-    {"\\0", 48, CMMIB10, ORDINARY, NULL},
-    {"\\1", 49, CMMIB10, ORDINARY, NULL},
-    {"\\2", 50, CMMIB10, ORDINARY, NULL},
-    {"\\3", 51, CMMIB10, ORDINARY, NULL},
-    {"\\4", 52, CMMIB10, ORDINARY, NULL},
-    {"\\5", 53, CMMIB10, ORDINARY, NULL},
-    {"\\6", 54, CMMIB10, ORDINARY, NULL},
-    {"\\7", 55, CMMIB10, ORDINARY, NULL},
-    {"\\8", 56, CMMIB10, ORDINARY, NULL},
-    {"\\9", 57, CMMIB10, ORDINARY, NULL},
-    /* --- punctuation --- */
-    {".", 58, CMMIB10, PUNCTION, NULL},
-    {",", 59, CMMIB10, PUNCTION, NULL},
-    /* --- operations (some ordinary) --- */
-    {"<", 60, CMMIB10, OPENING, NULL},
-    {"\\lt", 60, CMMIB10, OPENING, NULL},
-    {"/", 61, CMMIB10, BINARYOP, NULL},
-    {">", 62, CMMIB10, CLOSING, NULL},
-    {"\\gt", 62, CMMIB10, CLOSING, NULL},
-    {"\\star", 63, CMMIB10, BINARYOP, NULL},
-    {"\\partial", 64, CMMIB10, VARIABLE, NULL},
-    /* --- uppercase letters --- */
-    {"A", 65, CMMIB10, VARIABLE, NULL},
-    {"B", 66, CMMIB10, VARIABLE, NULL},
-    {"C", 67, CMMIB10, VARIABLE, NULL},
-    {"D", 68, CMMIB10, VARIABLE, NULL},
-    {"E", 69, CMMIB10, VARIABLE, NULL},
-    {"F", 70, CMMIB10, VARIABLE, NULL},
-    {"G", 71, CMMIB10, VARIABLE, NULL},
-    {"H", 72, CMMIB10, VARIABLE, NULL},
-    {"I", 73, CMMIB10, VARIABLE, NULL},
-    {"J", 74, CMMIB10, VARIABLE, NULL},
-    {"K", 75, CMMIB10, VARIABLE, NULL},
-    {"L", 76, CMMIB10, VARIABLE, NULL},
-    {"M", 77, CMMIB10, VARIABLE, NULL},
-    {"N", 78, CMMIB10, VARIABLE, NULL},
-    {"O", 79, CMMIB10, VARIABLE, NULL},
-    {"P", 80, CMMIB10, VARIABLE, NULL},
-    {"Q", 81, CMMIB10, VARIABLE, NULL},
-    {"R", 82, CMMIB10, VARIABLE, NULL},
-    {"S", 83, CMMIB10, VARIABLE, NULL},
-    {"T", 84, CMMIB10, VARIABLE, NULL},
-    {"U", 85, CMMIB10, VARIABLE, NULL},
-    {"V", 86, CMMIB10, VARIABLE, NULL},
-    {"W", 87, CMMIB10, VARIABLE, NULL},
-    {"X", 88, CMMIB10, VARIABLE, NULL},
-    {"Y", 89, CMMIB10, VARIABLE, NULL},
-    {"Z", 90, CMMIB10, VARIABLE, NULL},
-    /* --- miscellaneous symbols and relations --- */
-    {"\\flat", 91, CMMIB10, ORDINARY, NULL},
-    {"\\natural", 92, CMMIB10, ORDINARY, NULL},
-    {"\\sharp", 93, CMMIB10, ORDINARY, NULL},
-    {"\\smile", 94, CMMIB10, RELATION, NULL},
-    {"\\frown", 95, CMMIB10, RELATION, NULL},
-    {"\\ell", 96, CMMIB10, ORDINARY, NULL},
-    /* --- lowercase letters --- */
-    {"a", 97, CMMIB10, VARIABLE, NULL},
-    {"b", 98, CMMIB10, VARIABLE, NULL},
-    {"c", 99, CMMIB10, VARIABLE, NULL},
-    {"d", 100, CMMIB10, VARIABLE, NULL},
-    {"e", 101, CMMIB10, VARIABLE, NULL},
-    {"f", 102, CMMIB10, VARIABLE, NULL},
-    {"g", 103, CMMIB10, VARIABLE, NULL},
-    {"h", 104, CMMIB10, VARIABLE, NULL},
-    {"i", 105, CMMIB10, VARIABLE, NULL},
-    {"j", 106, CMMIB10, VARIABLE, NULL},
-    {"k", 107, CMMIB10, VARIABLE, NULL},
-    {"l", 108, CMMIB10, VARIABLE, NULL},
-    {"m", 109, CMMIB10, VARIABLE, NULL},
-    {"n", 110, CMMIB10, VARIABLE, NULL},
-    {"o", 111, CMMIB10, VARIABLE, NULL},
-    {"p", 112, CMMIB10, VARIABLE, NULL},
-    {"q", 113, CMMIB10, VARIABLE, NULL},
-    {"r", 114, CMMIB10, VARIABLE, NULL},
-    {"s", 115, CMMIB10, VARIABLE, NULL},
-    {"t", 116, CMMIB10, VARIABLE, NULL},
-    {"u", 117, CMMIB10, VARIABLE, NULL},
-    {"v", 118, CMMIB10, VARIABLE, NULL},
-    {"w", 119, CMMIB10, VARIABLE, NULL},
-    {"x", 120, CMMIB10, VARIABLE, NULL},
-    {"y", 121, CMMIB10, VARIABLE, NULL},
-    {"z", 122, CMMIB10, VARIABLE, NULL},
-    /* --- miscellaneous symbols and relations --- */
-    {"\\imath", 123, CMMIB10, VARIABLE, NULL},
-    {"\\jmath", 124, CMMIB10, VARIABLE, NULL},
-    {"\\wp", 125, CMMIB10, ORDINARY, NULL},
-    {"\\bfvec", 126, CMMIB10, ORDINARY, NULL},
-    /* --------------------- C M S Y --------------------------
-       symbol     charnum    family    class     function
-       -------------------------------------------------------- */
-    /* --- operations --- */
-    {"-", 0, CMSY10, BINARYOP, NULL},
-    {"\\cdot", 1, CMSY10, BINARYOP, NULL},
-    {"\\times", 2, CMSY10, BINARYOP, NULL},
-    {"\\ast", 3, CMSY10, BINARYOP, NULL},
-    {"\\div", 4, CMSY10, BINARYOP, NULL},
-    {"\\diamond", 5, CMSY10, BINARYOP, NULL},
-    {"\\pm", 6, CMSY10, BINARYOP, NULL},
-    {"\\mp", 7, CMSY10, BINARYOP, NULL},
-    {"\\oplus", 8, CMSY10, BINARYOP, NULL},
-    {"\\ominus", 9, CMSY10, BINARYOP, NULL},
-    {"\\otimes", 10, CMSY10, BINARYOP, NULL},
-    {"\\oslash", 11, CMSY10, BINARYOP, NULL},
-    {"\\odot", 12, CMSY10, BINARYOP, NULL},
-    {"\\bigcirc", 13, CMSY10, BINARYOP, NULL},
-    {"\\circ", 14, CMSY10, BINARYOP, NULL},
-    {"\\bullet", 15, CMSY10, BINARYOP, NULL},
-    /* --- relations --- */
-    {"\\asymp", 16, CMSY10, RELATION, NULL},
-    {"\\equiv", 17, CMSY10, RELATION, NULL},
-    {"\\subseteq", 18, CMSY10, RELATION, NULL},
-    {"\\supseteq", 19, CMSY10, RELATION, NULL},
-    {"\\leq", 20, CMSY10, RELATION, NULL},
-    {"\\geq", 21, CMSY10, RELATION, NULL},
-    {"\\preceq", 22, CMSY10, RELATION, NULL},
-    {"\\succeq", 23, CMSY10, RELATION, NULL},
-    {"\\sim", 24, CMSY10, RELATION, NULL},
-    {"\\approx", 25, CMSY10, RELATION, NULL},
-    {"\\subset", 26, CMSY10, RELATION, NULL},
-    {"\\supset", 27, CMSY10, RELATION, NULL},
-    {"\\ll", 28, CMSY10, RELATION, NULL},
-    {"\\gg", 29, CMSY10, RELATION, NULL},
-    {"\\prec", 30, CMSY10, RELATION, NULL},
-    {"\\succ", 31, CMSY10, RELATION, NULL},
-    /* --- (mostly) arrows --- */
-    {"\\leftarrow", 32, CMSY10, ARROW, NULL},
-    {"\\rightarrow", 33, CMSY10, ARROW, NULL},
-    {"\\to", 33, CMSY10, ARROW, NULL},
-    {"\\mapsto", 33, CMSY10, ARROW, NULL},
-    {"\\uparrow", 34, CMSY10, ARROW, NULL},
-    {"\\downarrow", 35, CMSY10, ARROW, NULL},
-    {"\\leftrightarrow", 36, CMSY10, ARROW, NULL},
-    {"\\nearrow", 37, CMSY10, ARROW, NULL},
-    {"\\searrow", 38, CMSY10, ARROW, NULL},
-    {"\\simeq", 39, CMSY10, RELATION, NULL},
-    {"\\Leftarrow", 40, CMSY10, ARROW, NULL},
-    {"\\Rightarrow", 41, CMSY10, ARROW, NULL},
-    {"\\Uparrow", 42, CMSY10, ARROW, NULL},
-    {"\\Downarrow", 43, CMSY10, ARROW, NULL},
-    {"\\Leftrightarrow", 44, CMSY10, ARROW, NULL},
-    {"\\nwarrow", 45, CMSY10, ARROW, NULL},
-    {"\\swarrow", 46, CMSY10, ARROW, NULL},
-    {"\\propto", 47, CMSY10, RELATION, NULL},
-    /* --- symbols --- */
-    {"\\prime", 48, CMSY10, ORDINARY, NULL},
-    {"\\infty", 49, CMSY10, ORDINARY, NULL},
-    /* --- relations --- */
-    {"\\in", 50, CMSY10, RELATION, NULL},
-    {"\\ni", 51, CMSY10, RELATION, NULL},
-    /* --- symbols --- */
-    {"\\triangle", 52, CMSY10, ORDINARY, NULL},
-    {"\\bigtriangleup", 52, CMSY10, ORDINARY, NULL},
-    {"\\bigtriangledown", 53, CMSY10, ORDINARY, NULL},
-    {"\\boldslash", 54, CMSY10, BINARYOP, NULL},
-    {"\\'", 55, CMSY10, ORDINARY, NULL},
-    {"\\forall", 56, CMSY10, OPERATOR, NULL},
-    {"\\exists", 57, CMSY10, OPERATOR, NULL},
-    {"\\neg", 58, CMSY10, OPERATOR, NULL},
-    {"\\emptyset", 59, CMSY10, ORDINARY, NULL},
-    {"\\Re", 60, CMSY10, ORDINARY, NULL},
-    {"\\Im", 61, CMSY10, ORDINARY, NULL},
-    {"\\top", 62, CMSY10, ORDINARY, NULL},
-    {"\\bot", 63, CMSY10, ORDINARY, NULL},
-    {"\\perp", 63, CMSY10, BINARYOP, NULL},
-    {"\\aleph", 64, CMSY10, ORDINARY, NULL},
-    /* --- calligraphic letters (we use \\calA...\\calZ --- */
-    {"\\calA", 65, CMSY10, VARIABLE, NULL},
-    {"\\calB", 66, CMSY10, VARIABLE, NULL},
-    {"\\calC", 67, CMSY10, VARIABLE, NULL},
-    {"\\calD", 68, CMSY10, VARIABLE, NULL},
-    {"\\calE", 69, CMSY10, VARIABLE, NULL},
-    {"\\calF", 70, CMSY10, VARIABLE, NULL},
-    {"\\calG", 71, CMSY10, VARIABLE, NULL},
-    {"\\calH", 72, CMSY10, VARIABLE, NULL},
-    {"\\calI", 73, CMSY10, VARIABLE, NULL},
-    {"\\calJ", 74, CMSY10, VARIABLE, NULL},
-    {"\\calK", 75, CMSY10, VARIABLE, NULL},
-    {"\\calL", 76, CMSY10, VARIABLE, NULL},
-    {"\\calM", 77, CMSY10, VARIABLE, NULL},
-    {"\\calN", 78, CMSY10, VARIABLE, NULL},
-    {"\\calO", 79, CMSY10, VARIABLE, NULL},
-    {"\\calP", 80, CMSY10, VARIABLE, NULL},
-    {"\\calQ", 81, CMSY10, VARIABLE, NULL},
-    {"\\calR", 82, CMSY10, VARIABLE, NULL},
-    {"\\calS", 83, CMSY10, VARIABLE, NULL},
-    {"\\calT", 84, CMSY10, VARIABLE, NULL},
-    {"\\calU", 85, CMSY10, VARIABLE, NULL},
-    {"\\calV", 86, CMSY10, VARIABLE, NULL},
-    {"\\calW", 87, CMSY10, VARIABLE, NULL},
-    {"\\calX", 88, CMSY10, VARIABLE, NULL},
-    {"\\calY", 89, CMSY10, VARIABLE, NULL},
-    {"\\calZ", 90, CMSY10, VARIABLE, NULL},
-    {"A", 65, CMSY10, VARIABLE, NULL},
-    {"B", 66, CMSY10, VARIABLE, NULL},
-    {"C", 67, CMSY10, VARIABLE, NULL},
-    {"D", 68, CMSY10, VARIABLE, NULL},
-    {"E", 69, CMSY10, VARIABLE, NULL},
-    {"F", 70, CMSY10, VARIABLE, NULL},
-    {"G", 71, CMSY10, VARIABLE, NULL},
-    {"H", 72, CMSY10, VARIABLE, NULL},
-    {"I", 73, CMSY10, VARIABLE, NULL},
-    {"J", 74, CMSY10, VARIABLE, NULL},
-    {"K", 75, CMSY10, VARIABLE, NULL},
-    {"L", 76, CMSY10, VARIABLE, NULL},
-    {"M", 77, CMSY10, VARIABLE, NULL},
-    {"N", 78, CMSY10, VARIABLE, NULL},
-    {"O", 79, CMSY10, VARIABLE, NULL},
-    {"P", 80, CMSY10, VARIABLE, NULL},
-    {"Q", 81, CMSY10, VARIABLE, NULL},
-    {"R", 82, CMSY10, VARIABLE, NULL},
-    {"S", 83, CMSY10, VARIABLE, NULL},
-    {"T", 84, CMSY10, VARIABLE, NULL},
-    {"U", 85, CMSY10, VARIABLE, NULL},
-    {"V", 86, CMSY10, VARIABLE, NULL},
-    {"W", 87, CMSY10, VARIABLE, NULL},
-    {"X", 88, CMSY10, VARIABLE, NULL},
-    {"Y", 89, CMSY10, VARIABLE, NULL},
-    {"Z", 90, CMSY10, VARIABLE, NULL},
-    /* --- operations and relations --- */
-    {"\\cup", 91, CMSY10, OPERATOR, NULL},
-    {"\\cap", 92, CMSY10, OPERATOR, NULL},
-    {"\\uplus", 93, CMSY10, OPERATOR, NULL},
-    {"\\wedge", 94, CMSY10, OPERATOR, NULL},
-    {"\\vee", 95, CMSY10, OPERATOR, NULL},
-    {"\\vdash", 96, CMSY10, RELATION, NULL},
-    {"\\dashv", 97, CMSY10, RELATION, NULL},
-    /* --- brackets --- */
-    {"\\lfloor", 98, CMSY10, OPENING, NULL},
-    {"\\rfloor", 99, CMSY10, CLOSING, NULL},
-    {"\\lceil", 100, CMSY10, OPENING, NULL},
-    {"\\rceil", 101, CMSY10, CLOSING, NULL},
-    {"\\lbrace", 102, CMSY10, OPENING, NULL},
-    {"{", 102, CMSY10, OPENING, NULL},
-    {"\\{", 102, CMSY10, OPENING, NULL},
-    {"\\rbrace", 103, CMSY10, CLOSING, NULL},
-    {"}", 103, CMSY10, CLOSING, NULL},
-    {"\\}", 103, CMSY10, CLOSING, NULL},
-    {"\\langle", 104, CMSY10, OPENING, NULL},
-    {"\\rangle", 105, CMSY10, CLOSING, NULL},
-    {"\\mid", 106, CMSY10, ORDINARY, NULL},
-    {"|", 106, CMSY10, BINARYOP, NULL},
-    {"\\parallel", 107, CMSY10, BINARYOP, NULL},
-    {"\\|", 107, CMSY10, BINARYOP, NULL},
-    /* --- arrows --- */
-    {"\\updownarrow", 108, CMSY10, ARROW, NULL},
-    {"\\Updownarrow", 109, CMSY10, ARROW, NULL},
-    /* --- symbols and operations and relations --- */
-    {"\\setminus", 110, CMSY10, BINARYOP, NULL},
-    {"\\backslash", 110, CMSY10, BINARYOP, NULL},
-    {"\\wr", 111, CMSY10, BINARYOP, NULL},
-    {"\\surd", 112, CMSY10, OPERATOR, NULL},
-    {"\\amalg", 113, CMSY10, BINARYOP, NULL},
-    {"\\nabla", 114, CMSY10, VARIABLE, NULL},
-    {"\\smallint", 115, CMSY10, OPERATOR, NULL},
-    {"\\sqcup", 116, CMSY10, OPERATOR, NULL},
-    {"\\sqcap", 117, CMSY10, OPERATOR, NULL},
-    {"\\sqsubseteq", 118, CMSY10, RELATION, NULL},
-    {"\\sqsupseteq", 119, CMSY10, RELATION, NULL},
-    /* --- special characters --- */
-    {"\\S", 120, CMSY10, ORDINARY, NULL},
-    {"\\dag", 121, CMSY10, ORDINARY, NULL},
-    {"\\dagger", 121, CMSY10, ORDINARY, NULL},
-    {"\\ddag", 122, CMSY10, ORDINARY, NULL},
-    {"\\ddagger", 122, CMSY10, ORDINARY, NULL},
-    {"\\P", 123, CMSY10, ORDINARY, NULL},
-    {"\\clubsuit", 124, CMSY10, ORDINARY, NULL},
-    {"\\Diamond", 125, CMSY10, ORDINARY, NULL},
-    {"\\Heart", 126, CMSY10, ORDINARY, NULL},
-    {"\\spadesuit", 127, CMSY10, ORDINARY, NULL},
-    /* ---------------------- C M R ---------------------------
-       symbol     charnum    family    class     function
-       -------------------------------------------------------- */
-    /* --- uppercase greek letters --- */
-    {"\\Gamma", 0, CMR10, VARIABLE, NULL},
-    {"\\Delta", 1, CMR10, VARIABLE, NULL},
-    {"\\Theta", 2, CMR10, VARIABLE, NULL},
-    {"\\Lambda", 3, CMR10, VARIABLE, NULL},
-    {"\\Xi", 4, CMR10, VARIABLE, NULL},
-    {"\\Pi", 5, CMR10, VARIABLE, NULL},
-    {"\\Sigma", 6, CMR10, VARIABLE, NULL},
-    {"\\smallsum", 6, CMR10, OPERATOR, NULL},
-    {"\\Upsilon", 7, CMR10, VARIABLE, NULL},
-    {"\\Phi", 8, CMR10, VARIABLE, NULL},
-    {"\\Psi", 9, CMR10, VARIABLE, NULL},
-    {"\\Omega", 10, CMR10, VARIABLE, NULL},
-    /* ---  --- */
-    {"\\ff", 11, CMR10, ORDINARY, NULL},
-    {"\\fi", 12, CMR10, ORDINARY, NULL},
-    {"\\fl", 13, CMR10, ORDINARY, NULL},
-    {"\\ffi", 14, CMR10, ORDINARY, NULL},
-    {"\\ffl", 15, CMR10, ORDINARY, NULL},
-    {"\\imath", 16, CMR10, ORDINARY, NULL},
-    {"\\jmath", 17, CMR10, ORDINARY, NULL},
-    /* --- foreign letters --- */
-    {"\\ss", 25, CMR10, ORDINARY, NULL},
-    {"\\ae", 26, CMR10, ORDINARY, NULL},
-    {"\\oe", 27, CMR10, ORDINARY, NULL},
-    {"\\AE", 29, CMR10, ORDINARY, NULL},
-    {"\\OE", 30, CMR10, ORDINARY, NULL},
-    /* --- digits 0-9 --- */
-    {"0", 48, CMR10, ORDINARY, NULL},
-    {"1", 49, CMR10, ORDINARY, NULL},
-    {"2", 50, CMR10, ORDINARY, NULL},
-    {"3", 51, CMR10, ORDINARY, NULL},
-    {"4", 52, CMR10, ORDINARY, NULL},
-    {"5", 53, CMR10, ORDINARY, NULL},
-    {"6", 54, CMR10, ORDINARY, NULL},
-    {"7", 55, CMR10, ORDINARY, NULL},
-    {"8", 56, CMR10, ORDINARY, NULL},
-    {"9", 57, CMR10, ORDINARY, NULL},
-    /* --- symbols, relations, etc --- */
-    {"\\gravesym", 18, CMR10, ORDINARY, NULL},
-    {"\\acutesym", 19, CMR10, ORDINARY, NULL},
-    {"\\checksym", 20, CMR10, ORDINARY, NULL},
-    {"\\brevesym", 21, CMR10, ORDINARY, NULL},
-    {"!", 33, CMR10, BINARYOP, NULL},
-    {"\"", 34, CMR10, ORDINARY, NULL},
-    {"\\quote", 34, CMR10, ORDINARY, NULL},
-    {"#", 35, CMR10, BINARYOP, NULL},
-    {"\\#", 35, CMR10, BINARYOP, NULL},
-    {"$", 36, CMR10, BINARYOP, NULL},
-    {"\\$", 36, CMR10, BINARYOP, NULL},
-    {"%", 37, CMR10, BINARYOP, NULL},
-    {"\\%", 37, CMR10, BINARYOP, NULL},
-    {"\\percent", 37, CMR10, BINARYOP, NULL},
-    {"&", 38, CMR10, BINARYOP, NULL},
-    {"\\&", 38, CMR10, BINARYOP, NULL},
-    {"\'", 39, CMR10, BINARYOP, NULL},
-    {"\\\'", 39, CMR10, BINARYOP, NULL},
-    {"\\apostrophe", 39, CMR10, ORDINARY, NULL},
-    {"(", 40, CMR10, OPENING, NULL},
-    {"\\(", 40, CMR10, OPENING, NULL},
-    {")", 41, CMR10, CLOSING, NULL},
-    {"\\)", 41, CMR10, CLOSING, NULL},
-    {"*", 42, CMR10, BINARYOP, NULL},
-    {"+", 43, CMR10, BINARYOP, NULL},
-    {"/", 47, CMR10, BINARYOP, NULL},
-    {":", 58, CMR10, ORDINARY, NULL},
-    {"\\colon", 58, CMR10, OPERATOR, NULL},
-    {";", 59, CMR10, ORDINARY, NULL},
-    {"\\semicolon", 59, CMR10, ORDINARY, NULL},
-    {"=", 61, CMR10, RELATION, NULL},
-    {"?", 63, CMR10, BINARYOP, NULL},
-    {"@", 64, CMR10, BINARYOP, NULL},
-    {"[", 91, CMR10, OPENING, NULL},
-    {"\\[", 91, CMR10, OPENING, NULL},
-    {"]", 93, CMR10, CLOSING, NULL},
-    {"\\]", 93, CMR10, CLOSING, NULL},
-    {"\\^", 94, CMR10, BINARYOP, NULL},
-    {"\\~", 126, CMR10, OPERATOR, NULL},
-    /* --- uppercase letters --- */
-    {"A", 65, CMR10, VARIABLE, NULL},
-    {"B", 66, CMR10, VARIABLE, NULL},
-    {"C", 67, CMR10, VARIABLE, NULL},
-    {"D", 68, CMR10, VARIABLE, NULL},
-    {"E", 69, CMR10, VARIABLE, NULL},
-    {"F", 70, CMR10, VARIABLE, NULL},
-    {"G", 71, CMR10, VARIABLE, NULL},
-    {"H", 72, CMR10, VARIABLE, NULL},
-    {"I", 73, CMR10, VARIABLE, NULL},
-    {"J", 74, CMR10, VARIABLE, NULL},
-    {"K", 75, CMR10, VARIABLE, NULL},
-    {"L", 76, CMR10, VARIABLE, NULL},
-    {"M", 77, CMR10, VARIABLE, NULL},
-    {"N", 78, CMR10, VARIABLE, NULL},
-    {"O", 79, CMR10, VARIABLE, NULL},
-    {"P", 80, CMR10, VARIABLE, NULL},
-    {"Q", 81, CMR10, VARIABLE, NULL},
-    {"R", 82, CMR10, VARIABLE, NULL},
-    {"S", 83, CMR10, VARIABLE, NULL},
-    {"T", 84, CMR10, VARIABLE, NULL},
-    {"U", 85, CMR10, VARIABLE, NULL},
-    {"V", 86, CMR10, VARIABLE, NULL},
-    {"W", 87, CMR10, VARIABLE, NULL},
-    {"X", 88, CMR10, VARIABLE, NULL},
-    {"Y", 89, CMR10, VARIABLE, NULL},
-    {"Z", 90, CMR10, VARIABLE, NULL},
-    /* --- lowercase letters --- */
-    {"a", 97, CMR10, VARIABLE, NULL},
-    {"b", 98, CMR10, VARIABLE, NULL},
-    {"c", 99, CMR10, VARIABLE, NULL},
-    {"d", 100, CMR10, VARIABLE, NULL},
-    {"e", 101, CMR10, VARIABLE, NULL},
-    {"f", 102, CMR10, VARIABLE, NULL},
-    {"g", 103, CMR10, VARIABLE, NULL},
-    {"h", 104, CMR10, VARIABLE, NULL},
-    {"i", 105, CMR10, VARIABLE, NULL},
-    {"j", 106, CMR10, VARIABLE, NULL},
-    {"k", 107, CMR10, VARIABLE, NULL},
-    {"l", 108, CMR10, VARIABLE, NULL},
-    {"m", 109, CMR10, VARIABLE, NULL},
-    {"n", 110, CMR10, VARIABLE, NULL},
-    {"o", 111, CMR10, VARIABLE, NULL},
-    {"p", 112, CMR10, VARIABLE, NULL},
-    {"q", 113, CMR10, VARIABLE, NULL},
-    {"r", 114, CMR10, VARIABLE, NULL},
-    {"s", 115, CMR10, VARIABLE, NULL},
-    {"t", 116, CMR10, VARIABLE, NULL},
-    {"u", 117, CMR10, VARIABLE, NULL},
-    {"v", 118, CMR10, VARIABLE, NULL},
-    {"w", 119, CMR10, VARIABLE, NULL},
-    {"x", 120, CMR10, VARIABLE, NULL},
-    {"y", 121, CMR10, VARIABLE, NULL},
-    {"z", 122, CMR10, VARIABLE, NULL},
-    /* --------------------- C M E X --------------------------
-       symbol     charnum    family    class     function
-       -------------------------------------------------------- */
-    /* --- parens ()'s --- */
-    {"\\big(", 0, CMEX10, OPENING, NULL},
-    {"\\big)", 1, CMEX10, CLOSING, NULL},
-    {"\\Big(", 16, CMEX10, OPENING, NULL},
-    {"\\Big)", 17, CMEX10, CLOSING, NULL},
-    {"\\bigg(", 18, CMEX10, OPENING, NULL},
-    {"\\bigg)", 19, CMEX10, CLOSING, NULL},
-    {"\\Bigg(", 32, CMEX10, OPENING, NULL},
-    {"\\Bigg)", 33, CMEX10, CLOSING, NULL},
-    {"\\bigl(", 0, CMEX10, OPENING, NULL},
-    {"\\bigr)", 1, CMEX10, CLOSING, NULL},
-    {"\\Bigl(", 16, CMEX10, OPENING, NULL},
-    {"\\Bigr)", 17, CMEX10, CLOSING, NULL},
-    {"\\biggl(", 18, CMEX10, OPENING, NULL},
-    {"\\biggr)", 19, CMEX10, CLOSING, NULL},
-    {"\\Biggl(", 32, CMEX10, OPENING, NULL},
-    {"\\Biggr)", 33, CMEX10, CLOSING, NULL},
-    /* --- brackets []'s --- */
-    {"\\big[", 2, CMEX10, OPENING, NULL},
-    {"\\big]", 3, CMEX10, CLOSING, NULL},
-    {"\\bigg[", 20, CMEX10, OPENING, NULL},
-    {"\\bigg]", 21, CMEX10, CLOSING, NULL},
-    {"\\Bigg[", 34, CMEX10, OPENING, NULL},
-    {"\\Bigg]", 35, CMEX10, CLOSING, NULL},
-    {"\\Big[", 104, CMEX10, OPENING, NULL},
-    {"\\Big]", 105, CMEX10, CLOSING, NULL},
-    {"\\bigl[", 2, CMEX10, OPENING, NULL},
-    {"\\bigr]", 3, CMEX10, CLOSING, NULL},
-    {"\\biggl[", 20, CMEX10, OPENING, NULL},
-    {"\\biggr]", 21, CMEX10, CLOSING, NULL},
-    {"\\Biggl[", 34, CMEX10, OPENING, NULL},
-    {"\\Biggr]", 35, CMEX10, CLOSING, NULL},
-    {"\\Bigl[", 104, CMEX10, OPENING, NULL},
-    {"\\Bigr]", 105, CMEX10, CLOSING, NULL},
-    /* --- braces {}'s --- */
-    {"\\big{", 8, CMEX10, OPENING, NULL},
-    {"\\big}", 9, CMEX10, CLOSING, NULL},
-    {"\\bigg{", 26, CMEX10, OPENING, NULL},
-    {"\\bigg}", 27, CMEX10, CLOSING, NULL},
-    {"\\Bigg{", 40, CMEX10, OPENING, NULL},
-    {"\\Bigg}", 41, CMEX10, CLOSING, NULL},
-    {"\\Big{", 110, CMEX10, OPENING, NULL},
-    {"\\Big}", 111, CMEX10, CLOSING, NULL},
-    {"\\bigl{", 8, CMEX10, OPENING, NULL},
-    {"\\bigr}", 9, CMEX10, CLOSING, NULL},
-    {"\\biggl{", 26, CMEX10, OPENING, NULL},
-    {"\\biggr}", 27, CMEX10, CLOSING, NULL},
-    {"\\Biggl{", 40, CMEX10, OPENING, NULL},
-    {"\\Biggr}", 41, CMEX10, CLOSING, NULL},
-    {"\\Bigl{", 110, CMEX10, OPENING, NULL},
-    {"\\Bigr}", 111, CMEX10, CLOSING, NULL},
-    {"\\big\\{", 8, CMEX10, OPENING, NULL},
-    {"\\big\\}", 9, CMEX10, CLOSING, NULL},
-    {"\\bigg\\{", 26, CMEX10, OPENING, NULL},
-    {"\\bigg\\}", 27, CMEX10, CLOSING, NULL},
-    {"\\Bigg\\{", 40, CMEX10, OPENING, NULL},
-    {"\\Bigg\\}", 41, CMEX10, CLOSING, NULL},
-    {"\\Big\\{", 110, CMEX10, OPENING, NULL},
-    {"\\Big\\}", 111, CMEX10, CLOSING, NULL},
-    {"\\bigl\\{", 8, CMEX10, OPENING, NULL},
-    {"\\bigr\\}", 9, CMEX10, CLOSING, NULL},
-    {"\\biggl\\{", 26, CMEX10, OPENING, NULL},
-    {"\\biggr\\}", 27, CMEX10, CLOSING, NULL},
-    {"\\Biggl\\{", 40, CMEX10, OPENING, NULL},
-    {"\\Biggr\\}", 41, CMEX10, CLOSING, NULL},
-    {"\\Bigl\\{", 110, CMEX10, OPENING, NULL},
-    {"\\Bigr\\}", 111, CMEX10, CLOSING, NULL},
-    {"\\big\\lbrace", 8, CMEX10, OPENING, NULL},
-    {"\\big\\rbrace", 9, CMEX10, CLOSING, NULL},
-    {"\\bigg\\lbrace", 26, CMEX10, OPENING, NULL},
-    {"\\bigg\\rbrace", 27, CMEX10, CLOSING, NULL},
-    {"\\Bigg\\lbrace", 40, CMEX10, OPENING, NULL},
-    {"\\Bigg\\rbrace", 41, CMEX10, CLOSING, NULL},
-    {"\\Big\\lbrace", 110, CMEX10, OPENING, NULL},
-    {"\\Big\\rbrace", 111, CMEX10, CLOSING, NULL},
-    /* --- angles <>'s --- */
-    {"\\big<", 10, CMEX10, OPENING, NULL},
-    {"\\big>", 11, CMEX10, CLOSING, NULL},
-    {"\\bigg<", 28, CMEX10, OPENING, NULL},
-    {"\\bigg>", 29, CMEX10, CLOSING, NULL},
-    {"\\Bigg<", 42, CMEX10, OPENING, NULL},
-    {"\\Bigg>", 43, CMEX10, CLOSING, NULL},
-    {"\\Big<", 68, CMEX10, OPENING, NULL},
-    {"\\Big>", 69, CMEX10, CLOSING, NULL},
-    {"\\bigl<", 10, CMEX10, OPENING, NULL},
-    {"\\bigr>", 11, CMEX10, CLOSING, NULL},
-    {"\\biggl<", 28, CMEX10, OPENING, NULL},
-    {"\\biggr>", 29, CMEX10, CLOSING, NULL},
-    {"\\Biggl<", 42, CMEX10, OPENING, NULL},
-    {"\\Biggr>", 43, CMEX10, CLOSING, NULL},
-    {"\\Bigl<", 68, CMEX10, OPENING, NULL},
-    {"\\Bigr>", 69, CMEX10, CLOSING, NULL},
-    {"\\big\\langle", 10, CMEX10, OPENING, NULL},
-    {"\\big\\rangle", 11, CMEX10, CLOSING, NULL},
-    {"\\bigg\\langle", 28, CMEX10, OPENING, NULL},
-    {"\\bigg\\rangle", 29, CMEX10, CLOSING, NULL},
-    {"\\Bigg\\langle", 42, CMEX10, OPENING, NULL},
-    {"\\Bigg\\rangle", 43, CMEX10, CLOSING, NULL},
-    {"\\Big\\langle", 68, CMEX10, OPENING, NULL},
-    {"\\Big\\rangle", 69, CMEX10, CLOSING, NULL},
-    /* --- hats ^ --- */
-    {"^", 98, CMEX10, OPERATOR, NULL},
-    {"^", 99, CMEX10, OPERATOR, NULL},
-    {"^", 100, CMEX10, OPERATOR, NULL},
-    /* --- tildes --- */
-    {"~", 101, CMEX10, OPERATOR, NULL},
-    {"~", 102, CMEX10, OPERATOR, NULL},
-    {"~", 103, CMEX10, OPERATOR, NULL},
-    /* --- /'s --- */
-    {"/", 44, CMEX10, OPENING, NULL},
-    {"/", 46, CMEX10, OPENING, NULL},
-    {"\\", 45, CMEX10, OPENING, NULL},
-    {"\\", 47, CMEX10, OPENING, NULL},
-    /* --- \sum, \int and other (displaymath) symbols --- */
-    {"\\bigsqcup", 70, CMEX10, LOWERBIG, NULL},
-    {"\\Bigsqcup", 71, CMEX10, UPPERBIG, NULL},
-    {"\\oint", 72, CMEX10, OPERATOR, NULL},
-    {"\\bigoint", 72, CMEX10, LOWERBIG, NULL},
-    {"\\Bigoint", 73, CMEX10, UPPERBIG, NULL},
-    {"\\bigodot", 74, CMEX10, LOWERBIG, NULL},
-    {"\\Bigodot", 75, CMEX10, UPPERBIG, NULL},
-    {"\\bigoplus", 76, CMEX10, LOWERBIG, NULL},
-    {"\\Bigoplus", 77, CMEX10, UPPERBIG, NULL},
-    {"\\bigotimes", 78, CMEX10, LOWERBIG, NULL},
-    {"\\Bigotimes", 79, CMEX10, UPPERBIG, NULL},
-    {"\\sum", 80, CMEX10, OPERATOR, NULL},
-    {"\\bigsum", 80, CMEX10, LOWERBIG, NULL},
-    {"\\prod", 81, CMEX10, OPERATOR, NULL},
-    {"\\bigprod", 81, CMEX10, LOWERBIG, NULL},
-    {"\\int", 82, CMEX10, OPERATOR, NULL},
-    {"\\bigint", 82, CMEX10, LOWERBIG, NULL},
-    {"\\bigcup", 83, CMEX10, LOWERBIG, NULL},
-    {"\\bigcap", 84, CMEX10, LOWERBIG, NULL},
-    {"\\biguplus", 85, CMEX10, LOWERBIG, NULL},
-    {"\\bigwedge", 86, CMEX10, LOWERBIG, NULL},
-    {"\\bigvee", 87, CMEX10, LOWERBIG, NULL},
-    {"\\Bigsum", 88, CMEX10, UPPERBIG, NULL},
-    {"\\big\\sum", 88, CMEX10, UPPERBIG, NULL},
-    {"\\Big\\sum", 88, CMEX10, UPPERBIG, NULL},
-    {"\\bigg\\sum", 88, CMEX10, UPPERBIG, NULL},
-    {"\\Bigg\\sum", 88, CMEX10, UPPERBIG, NULL},
-    {"\\Bigprod", 89, CMEX10, UPPERBIG, NULL},
-    {"\\Bigint", 90, CMEX10, UPPERBIG, NULL},
-    {"\\big\\int", 90, CMEX10, UPPERBIG, NULL},
-    {"\\Big\\int", 90, CMEX10, UPPERBIG, NULL},
-    {"\\bigg\\int", 90, CMEX10, UPPERBIG, NULL},
-    {"\\Bigg\\int", 90, CMEX10, UPPERBIG, NULL},
-    {"\\Bigcup", 91, CMEX10, UPPERBIG, NULL},
-    {"\\Bigcap", 92, CMEX10, UPPERBIG, NULL},
-    {"\\Biguplus", 93, CMEX10, UPPERBIG, NULL},
-    {"\\Bigwedge", 94, CMEX10, UPPERBIG, NULL},
-    {"\\Bigvee", 95, CMEX10, UPPERBIG, NULL},
-    {"\\coprod", 96, CMEX10, LOWERBIG, NULL},
-    {"\\bigcoprod", 96, CMEX10, LOWERBIG, NULL},
-    {"\\Bigcoprod", 97, CMEX10, UPPERBIG, NULL},
-    /* --- symbol pieces (see TeXbook page 432) --- */
-    {"\\leftbracetop", 56, CMEX10, OPENING, NULL},
-    {"\\rightbracetop", 57, CMEX10, CLOSING, NULL},
-    {"\\leftbracebot", 58, CMEX10, OPENING, NULL},
-    {"\\rightbracebot", 59, CMEX10, CLOSING, NULL},
-    {"\\leftbracemid", 60, CMEX10, OPENING, NULL},
-    {"\\rightbracemid", 61, CMEX10, CLOSING, NULL},
-    {"\\leftbracebar", 62, CMEX10, OPENING, NULL},
-    {"\\rightbracebar", 62, CMEX10, CLOSING, NULL},
-    {"\\leftparentop", 48, CMEX10, OPENING, NULL},
-    {"\\rightparentop", 49, CMEX10, CLOSING, NULL},
-    {"\\leftparenbot", 64, CMEX10, OPENING, NULL},
-    {"\\rightparenbot", 65, CMEX10, CLOSING, NULL},
-    {"\\leftparenbar", 66, CMEX10, OPENING, NULL},
-    {"\\rightparenbar", 67, CMEX10, CLOSING, NULL},
-    /* --------------------- R S F S --------------------------
-       symbol     charnum    family    class     function
-       -------------------------------------------------------- */
-    /* --- rsfs script letters (written as \scr{A...Z}) --- */
-    {"A", 0, RSFS10, VARIABLE, NULL},
-    {"B", 1, RSFS10, VARIABLE, NULL},
-    {"C", 2, RSFS10, VARIABLE, NULL},
-    {"D", 3, RSFS10, VARIABLE, NULL},
-    {"E", 4, RSFS10, VARIABLE, NULL},
-    {"F", 5, RSFS10, VARIABLE, NULL},
-    {"G", 6, RSFS10, VARIABLE, NULL},
-    {"H", 7, RSFS10, VARIABLE, NULL},
-    {"I", 8, RSFS10, VARIABLE, NULL},
-    {"J", 9, RSFS10, VARIABLE, NULL},
-    {"K", 10, RSFS10, VARIABLE, NULL},
-    {"L", 11, RSFS10, VARIABLE, NULL},
-    {"M", 12, RSFS10, VARIABLE, NULL},
-    {"N", 13, RSFS10, VARIABLE, NULL},
-    {"O", 14, RSFS10, VARIABLE, NULL},
-    {"P", 15, RSFS10, VARIABLE, NULL},
-    {"Q", 16, RSFS10, VARIABLE, NULL},
-    {"R", 17, RSFS10, VARIABLE, NULL},
-    {"S", 18, RSFS10, VARIABLE, NULL},
-    {"T", 19, RSFS10, VARIABLE, NULL},
-    {"U", 20, RSFS10, VARIABLE, NULL},
-    {"V", 21, RSFS10, VARIABLE, NULL},
-    {"W", 22, RSFS10, VARIABLE, NULL},
-    {"X", 23, RSFS10, VARIABLE, NULL},
-    {"Y", 24, RSFS10, VARIABLE, NULL},
-    {"Z", 25, RSFS10, VARIABLE, NULL},
-    /* --- rsfs script letters (written as \scrA...\scrZ) --- */
-    {"\\scrA", 0, RSFS10, VARIABLE, NULL},
-    {"\\scrB", 1, RSFS10, VARIABLE, NULL},
-    {"\\scrC", 2, RSFS10, VARIABLE, NULL},
-    {"\\scrD", 3, RSFS10, VARIABLE, NULL},
-    {"\\scrE", 4, RSFS10, VARIABLE, NULL},
-    {"\\scrF", 5, RSFS10, VARIABLE, NULL},
-    {"\\scrG", 6, RSFS10, VARIABLE, NULL},
-    {"\\scrH", 7, RSFS10, VARIABLE, NULL},
-    {"\\scrI", 8, RSFS10, VARIABLE, NULL},
-    {"\\scrJ", 9, RSFS10, VARIABLE, NULL},
-    {"\\scrK", 10, RSFS10, VARIABLE, NULL},
-    {"\\scrL", 11, RSFS10, VARIABLE, NULL},
-    {"\\scrM", 12, RSFS10, VARIABLE, NULL},
-    {"\\scrN", 13, RSFS10, VARIABLE, NULL},
-    {"\\scrO", 14, RSFS10, VARIABLE, NULL},
-    {"\\scrP", 15, RSFS10, VARIABLE, NULL},
-    {"\\scrQ", 16, RSFS10, VARIABLE, NULL},
-    {"\\scrR", 17, RSFS10, VARIABLE, NULL},
-    {"\\scrS", 18, RSFS10, VARIABLE, NULL},
-    {"\\scrT", 19, RSFS10, VARIABLE, NULL},
-    {"\\scrU", 20, RSFS10, VARIABLE, NULL},
-    {"\\scrV", 21, RSFS10, VARIABLE, NULL},
-    {"\\scrW", 22, RSFS10, VARIABLE, NULL},
-    {"\\scrX", 23, RSFS10, VARIABLE, NULL},
-    {"\\scrY", 24, RSFS10, VARIABLE, NULL},
-    {"\\scrZ", 25, RSFS10, VARIABLE, NULL},
-    /* -------------------- B B O L D -------------------------
-       symbol     charnum    family    class     function
-       -------------------------------------------------------- */
-    /* --- uppercase greek letters --- */
-    {"\\Gamma", 0, BBOLD10, VARIABLE, NULL},
-    {"\\Delta", 1, BBOLD10, VARIABLE, NULL},
-    {"\\Theta", 2, BBOLD10, VARIABLE, NULL},
-    {"\\Lambda", 3, BBOLD10, VARIABLE, NULL},
-    {"\\Xi", 4, BBOLD10, VARIABLE, NULL},
-    {"\\Pi", 5, BBOLD10, VARIABLE, NULL},
-    {"\\Sigma", 6, BBOLD10, VARIABLE, NULL},
-    {"\\smallsum", 6, BBOLD10, OPERATOR, NULL},
-    {"\\Upsilon", 7, BBOLD10, VARIABLE, NULL},
-    {"\\Phi", 8, BBOLD10, VARIABLE, NULL},
-    {"\\Psi", 9, BBOLD10, VARIABLE, NULL},
-    {"\\Omega", 10, BBOLD10, VARIABLE, NULL},
-    /* --- lowercase greek letters --- */
-    {"\\alpha", 11, BBOLD10, VARIABLE, NULL},
-    {"\\beta", 12, BBOLD10, VARIABLE, NULL},
-    {"\\gamma", 13, BBOLD10, VARIABLE, NULL},
-    {"\\delta", 14, BBOLD10, VARIABLE, NULL},
-    {"\\epsilon", 15, BBOLD10, VARIABLE, NULL},
-    {"\\zeta", 16, BBOLD10, VARIABLE, NULL},
-    {"\\eta", 17, BBOLD10, VARIABLE, NULL},
-    {"\\theta", 18, BBOLD10, VARIABLE, NULL},
-    {"\\iota", 19, BBOLD10, VARIABLE, NULL},
-    {"\\kappa", 20, BBOLD10, VARIABLE, NULL},
-    {"\\lambda", 21, BBOLD10, VARIABLE, NULL},
-    {"\\mu", 22, BBOLD10, VARIABLE, NULL},
-    {"\\nu", 23, BBOLD10, VARIABLE, NULL},
-    {"\\xi", 24, BBOLD10, VARIABLE, NULL},
-    {"\\pi", 25, BBOLD10, VARIABLE, NULL},
-    {"\\rho", 26, BBOLD10, VARIABLE, NULL},
-    {"\\sigma", 27, BBOLD10, VARIABLE, NULL},
-    {"\\tau", 28, BBOLD10, VARIABLE, NULL},
-    {"\\upsilon", 29, BBOLD10, VARIABLE, NULL},
-    {"\\phi", 30, BBOLD10, VARIABLE, NULL},
-    {"\\chi", 31, BBOLD10, VARIABLE, NULL},
-    {"\\psi", 32, BBOLD10, VARIABLE, NULL},
-    {"\\omega", 127, BBOLD10, VARIABLE, NULL},
-    /* --- digits 0-9 --- */
-    {"0", 48, BBOLD10, ORDINARY, NULL},
-    {"1", 49, BBOLD10, ORDINARY, NULL},
-    {"2", 50, BBOLD10, ORDINARY, NULL},
-    {"3", 51, BBOLD10, ORDINARY, NULL},
-    {"4", 52, BBOLD10, ORDINARY, NULL},
-    {"5", 53, BBOLD10, ORDINARY, NULL},
-    {"6", 54, BBOLD10, ORDINARY, NULL},
-    {"7", 55, BBOLD10, ORDINARY, NULL},
-    {"8", 56, BBOLD10, ORDINARY, NULL},
-    {"9", 57, BBOLD10, ORDINARY, NULL},
-    {"\\0", 48, BBOLD10, ORDINARY, NULL},
-    {"\\1", 49, BBOLD10, ORDINARY, NULL},
-    {"\\2", 50, BBOLD10, ORDINARY, NULL},
-    {"\\3", 51, BBOLD10, ORDINARY, NULL},
-    {"\\4", 52, BBOLD10, ORDINARY, NULL},
-    {"\\5", 53, BBOLD10, ORDINARY, NULL},
-    {"\\6", 54, BBOLD10, ORDINARY, NULL},
-    {"\\7", 55, BBOLD10, ORDINARY, NULL},
-    {"\\8", 56, BBOLD10, ORDINARY, NULL},
-    {"\\9", 57, BBOLD10, ORDINARY, NULL},
-    /* --- uppercase letters --- */
-    {"A", 65, BBOLD10, VARIABLE, NULL},
-    {"B", 66, BBOLD10, VARIABLE, NULL},
-    {"C", 67, BBOLD10, VARIABLE, NULL},
-    {"D", 68, BBOLD10, VARIABLE, NULL},
-    {"E", 69, BBOLD10, VARIABLE, NULL},
-    {"F", 70, BBOLD10, VARIABLE, NULL},
-    {"G", 71, BBOLD10, VARIABLE, NULL},
-    {"H", 72, BBOLD10, VARIABLE, NULL},
-    {"I", 73, BBOLD10, VARIABLE, NULL},
-    {"J", 74, BBOLD10, VARIABLE, NULL},
-    {"K", 75, BBOLD10, VARIABLE, NULL},
-    {"L", 76, BBOLD10, VARIABLE, NULL},
-    {"M", 77, BBOLD10, VARIABLE, NULL},
-    {"N", 78, BBOLD10, VARIABLE, NULL},
-    {"O", 79, BBOLD10, VARIABLE, NULL},
-    {"P", 80, BBOLD10, VARIABLE, NULL},
-    {"Q", 81, BBOLD10, VARIABLE, NULL},
-    {"R", 82, BBOLD10, VARIABLE, NULL},
-    {"S", 83, BBOLD10, VARIABLE, NULL},
-    {"T", 84, BBOLD10, VARIABLE, NULL},
-    {"U", 85, BBOLD10, VARIABLE, NULL},
-    {"V", 86, BBOLD10, VARIABLE, NULL},
-    {"W", 87, BBOLD10, VARIABLE, NULL},
-    {"X", 88, BBOLD10, VARIABLE, NULL},
-    {"Y", 89, BBOLD10, VARIABLE, NULL},
-    {"Z", 90, BBOLD10, VARIABLE, NULL},
-    /* --- lowercase letters --- */
-    {"a", 97, BBOLD10, VARIABLE, NULL},
-    {"b", 98, BBOLD10, VARIABLE, NULL},
-    {"c", 99, BBOLD10, VARIABLE, NULL},
-    {"d", 100, BBOLD10, VARIABLE, NULL},
-    {"e", 101, BBOLD10, VARIABLE, NULL},
-    {"f", 102, BBOLD10, VARIABLE, NULL},
-    {"g", 103, BBOLD10, VARIABLE, NULL},
-    {"h", 104, BBOLD10, VARIABLE, NULL},
-    {"i", 105, BBOLD10, VARIABLE, NULL},
-    {"j", 106, BBOLD10, VARIABLE, NULL},
-    {"k", 107, BBOLD10, VARIABLE, NULL},
-    {"l", 108, BBOLD10, VARIABLE, NULL},
-    {"m", 109, BBOLD10, VARIABLE, NULL},
-    {"n", 110, BBOLD10, VARIABLE, NULL},
-    {"o", 111, BBOLD10, VARIABLE, NULL},
-    {"p", 112, BBOLD10, VARIABLE, NULL},
-    {"q", 113, BBOLD10, VARIABLE, NULL},
-    {"r", 114, BBOLD10, VARIABLE, NULL},
-    {"s", 115, BBOLD10, VARIABLE, NULL},
-    {"t", 116, BBOLD10, VARIABLE, NULL},
-    {"u", 117, BBOLD10, VARIABLE, NULL},
-    {"v", 118, BBOLD10, VARIABLE, NULL},
-    {"w", 119, BBOLD10, VARIABLE, NULL},
-    {"x", 120, BBOLD10, VARIABLE, NULL},
-    {"y", 121, BBOLD10, VARIABLE, NULL},
-    {"z", 122, BBOLD10, VARIABLE, NULL},
-    /* --- symbols, relations, etc --- */
-    {"!", 33, BBOLD10, BINARYOP, NULL},
-    {"#", 35, BBOLD10, BINARYOP, NULL},
-    {"\\#", 35, BBOLD10, BINARYOP, NULL},
-    {"$", 36, BBOLD10, BINARYOP, NULL},
-    {"\\$", 36, BBOLD10, BINARYOP, NULL},
-    {"%", 37, BBOLD10, BINARYOP, NULL},
-    {"\\%", 37, BBOLD10, BINARYOP, NULL},
-    {"\\percent", 37, BBOLD10, BINARYOP, NULL},
-    {"&", 38, BBOLD10, BINARYOP, NULL},
-    {"\\&", 38, BBOLD10, BINARYOP, NULL},
-    {"\'", 39, BBOLD10, BINARYOP, NULL},
-    {"\\apostrophe", 39, BBOLD10, ORDINARY, NULL},
-    {"(", 40, BBOLD10, OPENING, NULL},
-    {"\\(", 40, BBOLD10, OPENING, NULL},
-    {")", 41, BBOLD10, CLOSING, NULL},
-    {"\\)", 41, BBOLD10, CLOSING, NULL},
-    {"*", 42, BBOLD10, BINARYOP, NULL},
-    {"+", 43, BBOLD10, BINARYOP, NULL},
-    {",", 44, BBOLD10, PUNCTION, NULL},
-    {"-", 45, BBOLD10, BINARYOP, NULL},
-    {".", 46, BBOLD10, PUNCTION, NULL},
-    {"/", 47, BBOLD10, BINARYOP, NULL},
-    {":", 58, BBOLD10, ORDINARY, NULL},
-    {";", 59, BBOLD10, ORDINARY, NULL},
-    {"<", 60, BBOLD10, RELATION, NULL},
-    {"\\<", 60, BBOLD10, RELATION, NULL},
-    {"\\cdot", 61, BBOLD10, BINARYOP, NULL},
-    {">", 62, BBOLD10, RELATION, NULL},
-    {"\\>", 62, BBOLD10, RELATION, NULL},
-    {"?", 63, BBOLD10, BINARYOP, NULL},
-    {"@", 64, BBOLD10, BINARYOP, NULL},
-    {"[", 91, BBOLD10, OPENING, NULL},
-    {"\\[", 91, BBOLD10, OPENING, NULL},
-    {"\\\\", 92, BBOLD10, OPENING, NULL},
-    {"\\backslash", 92, BBOLD10, OPENING, NULL},
-    {"]", 93, BBOLD10, CLOSING, NULL},
-    {"\\]", 93, BBOLD10, CLOSING, NULL},
-    {"|", 124, BBOLD10, BINARYOP, NULL},
-    {"\\-", 123, BBOLD10, BINARYOP, NULL},
-    /* ------------------- S T M A R Y ------------------------
-       symbol     charnum    family    class     function
-       -------------------------------------------------------- */
-    /* --- stmaryrd symbols (see stmaryrd.sty for defs) --- */
-    {"\\shortleftarrow", 0, STMARY10, ARROW, NULL},
-    {"\\shortrightarrow", 1, STMARY10, ARROW, NULL},
-    {"\\shortuparrow", 2, STMARY10, ARROW, NULL},
-    {"\\shortdownarrow", 3, STMARY10, ARROW, NULL},
-    {"\\Yup", 4, STMARY10, BINARYOP, NULL},
-    {"\\Ydown", 5, STMARY10, BINARYOP, NULL},
-    {"\\Yleft", 6, STMARY10, BINARYOP, NULL},
-    {"\\Yright", 7, STMARY10, BINARYOP, NULL},
-    {"\\varcurlyvee", 8, STMARY10, BINARYOP, NULL},
-    {"\\varcurlywedge", 9, STMARY10, BINARYOP, NULL},
-    {"\\minuso", 10, STMARY10, BINARYOP, NULL},
-    {"\\baro", 11, STMARY10, BINARYOP, NULL},
-    {"\\sslash", 12, STMARY10, BINARYOP, NULL},
-    {"\\bblash", 13, STMARY10, BINARYOP, NULL},
-    {"\\moo", 14, STMARY10, BINARYOP, NULL},
-    {"\\varotimes", 15, STMARY10, BINARYOP, NULL},
-    {"\\varoast", 16, STMARY10, BINARYOP, NULL},
-    {"\\varobar", 17, STMARY10, BINARYOP, NULL},
-    {"\\varodot", 18, STMARY10, BINARYOP, NULL},
-    {"\\varoslash", 19, STMARY10, BINARYOP, NULL},
-    {"\\varobslash", 20, STMARY10, BINARYOP, NULL},
-    {"\\varocircle", 21, STMARY10, BINARYOP, NULL},
-    {"\\varoplus", 22, STMARY10, BINARYOP, NULL},
-    {"\\varominus", 23, STMARY10, BINARYOP, NULL},
-    {"\\boxast", 24, STMARY10, BINARYOP, NULL},
-    {"\\boxbar", 25, STMARY10, BINARYOP, NULL},
-    {"\\boxdot", 26, STMARY10, BINARYOP, NULL},
-    {"\\boxslash", 27, STMARY10, BINARYOP, NULL},
-    {"\\boxbslash", 28, STMARY10, BINARYOP, NULL},
-    {"\\boxcircle", 29, STMARY10, BINARYOP, NULL},
-    {"\\boxbox", 30, STMARY10, BINARYOP, NULL},
-    {"\\boxempty", 31, STMARY10, BINARYOP, NULL},
-    {"\\qed", 31, STMARY10, BINARYOP, NULL},
-    {"\\lightning", 32, STMARY10, ORDINARY, NULL},
-    {"\\merge", 33, STMARY10, BINARYOP, NULL},
-    {"\\vartimes", 34, STMARY10, BINARYOP, NULL},
-    {"\\fatsemi", 35, STMARY10, BINARYOP, NULL},
-    {"\\sswarrow", 36, STMARY10, ARROW, NULL},
-    {"\\ssearrow", 37, STMARY10, ARROW, NULL},
-    {"\\curlywedgeuparrow", 38, STMARY10, ARROW, NULL},
-    {"\\curlywedgedownarrow", 39, STMARY10, ARROW, NULL},
-    {"\\fatslash", 40, STMARY10, BINARYOP, NULL},
-    {"\\fatbslash", 41, STMARY10, BINARYOP, NULL},
-    {"\\lbag", 42, STMARY10, BINARYOP, NULL},
-    {"\\rbag", 43, STMARY10, BINARYOP, NULL},
-    {"\\varbigcirc", 44, STMARY10, BINARYOP, NULL},
-    {"\\leftrightarroweq", 45, STMARY10, ARROW, NULL},
-    {"\\curlyveedownarrow", 46, STMARY10, ARROW, NULL},
-    {"\\curlyveeuparrow", 47, STMARY10, ARROW, NULL},
-    {"\\nnwarrow", 48, STMARY10, ARROW, NULL},
-    {"\\nnearrow", 49, STMARY10, ARROW, NULL},
-    {"\\leftslice", 50, STMARY10, BINARYOP, NULL},
-    {"\\rightslice", 51, STMARY10, BINARYOP, NULL},
-    {"\\varolessthan", 52, STMARY10, BINARYOP, NULL},
-    {"\\varogreaterthan", 53, STMARY10, BINARYOP, NULL},
-    {"\\varovee", 54, STMARY10, BINARYOP, NULL},
-    {"\\varowedge", 55, STMARY10, BINARYOP, NULL},
-    {"\\talloblong", 56, STMARY10, BINARYOP, NULL},
-    {"\\interleave", 57, STMARY10, BINARYOP, NULL},
-    {"\\obar", 58, STMARY10, BINARYOP, NULL},
-    {"\\oslash", 59, STMARY10, BINARYOP, NULL},
-    {"\\olessthan", 60, STMARY10, BINARYOP, NULL},
-    {"\\ogreaterthan", 61, STMARY10, BINARYOP, NULL},
-    {"\\ovee", 62, STMARY10, BINARYOP, NULL},
-    {"\\owedge", 63, STMARY10, BINARYOP, NULL},
-    {"\\oblong", 64, STMARY10, BINARYOP, NULL},
-    {"\\inplus", 65, STMARY10, RELATION, NULL},
-    {"\\niplus", 66, STMARY10, RELATION, NULL},
-    {"\\nplus", 67, STMARY10, BINARYOP, NULL},
-    {"\\subsetplus", 68, STMARY10, RELATION, NULL},
-    {"\\supsetplus", 69, STMARY10, RELATION, NULL},
-    {"\\subsetpluseq", 70, STMARY10, RELATION, NULL},
-    {"\\supsetpluseq", 71, STMARY10, RELATION, NULL},
-    {"\\Lbag", 72, STMARY10, OPENING, NULL},
-    {"\\Rbag", 73, STMARY10, CLOSING, NULL},
-    {"\\llbracket", 74, STMARY10, OPENING, NULL},
-    {"\\rrbracket", 75, STMARY10, CLOSING, NULL},
-    {"\\llparenthesis", 76, STMARY10, OPENING, NULL},
-    {"\\rrparenthesis", 77, STMARY10, CLOSING, NULL},
-    {"\\binampersand", 78, STMARY10, OPENING, NULL},
-    {"\\bindnasrepma", 79, STMARY10, CLOSING, NULL},
-    {"\\trianglelefteqslant", 80, STMARY10, RELATION, NULL},
-    {"\\trianglerighteqslant", 81, STMARY10, RELATION, NULL},
-    {"\\ntrianglelefteqslant", 82, STMARY10, RELATION, NULL},
-    {"\\ntrianglerighteqslant", 83, STMARY10, RELATION, NULL},
-    {"\\llfloor", 84, STMARY10, OPENING, NULL},
-    {"\\rrfloor", 85, STMARY10, CLOSING, NULL},
-    {"\\llceil", 86, STMARY10, OPENING, NULL},
-    {"\\rrceil", 87, STMARY10, CLOSING, NULL},
-    {"\\arrownot", 88, STMARY10, RELATION, NULL},
-    {"\\Arrownot", 89, STMARY10, RELATION, NULL},
-    {"\\Mapstochar", 90, STMARY10, RELATION, NULL},
-    {"\\mapsfromchar", 91, STMARY10, RELATION, NULL},
-    {"\\Mapsfromchar", 92, STMARY10, RELATION, NULL},
-    {"\\leftrightarrowtriangle", 93, STMARY10, BINARYOP, NULL},
-    {"\\leftarrowtriangle", 94, STMARY10, RELATION, NULL},
-    {"\\rightarrowtriangle", 95, STMARY10, RELATION, NULL},
-    {"\\bigtriangledown", 96, STMARY10, OPERATOR, NULL},
-    {"\\bigtriangleup", 97, STMARY10, OPERATOR, NULL},
-    {"\\bigcurlyvee", 98, STMARY10, OPERATOR, NULL},
-    {"\\bigcurlywedge", 99, STMARY10, OPERATOR, NULL},
-    {"\\bigsqcap", 100, STMARY10, OPERATOR, NULL},
-    {"\\Bigsqcap", 100, STMARY10, OPERATOR, NULL},
-    {"\\bigbox", 101, STMARY10, OPERATOR, NULL},
-    {"\\bigparallel", 102, STMARY10, OPERATOR, NULL},
-    {"\\biginterleave", 103, STMARY10, OPERATOR, NULL},
-    {"\\bignplus", 112, STMARY10, OPERATOR, NULL},
-    /* ---------------------- C Y R ---------------------------
-       symbol     charnum    family    class     function
-       -------------------------------------------------------- */
-    /* ---
-     * undefined: 20,21,28,29,33-59,61,63,64,91,92,93,96,123,124
-     * ---------------------------------------------------------- */
-    /* --- special characters --- */
-    {"\\cyddot", 32, CYR10, VARIABLE, NULL},
-    /* ---See amsfndoc.dvi Figure 1 Input Conventions for AMS cyrillic--- */
-    {"A", 65, CYR10, VARIABLE, NULL},
-    {"a", 97, CYR10, VARIABLE, NULL},
-    {"B", 66, CYR10, VARIABLE, NULL},
-    {"b", 98, CYR10, VARIABLE, NULL},
-    {"V", 86, CYR10, VARIABLE, NULL},
-    {"v", 118, CYR10, VARIABLE, NULL},
-    {"G", 71, CYR10, VARIABLE, NULL},
-    {"g", 103, CYR10, VARIABLE, NULL},
-    {"D", 68, CYR10, VARIABLE, NULL},
-    {"d", 100, CYR10, VARIABLE, NULL},
-    {"Dj", 6, CYR10, VARIABLE, NULL},
-    {"DJ", 6, CYR10, VARIABLE, NULL},
-    {"dj", 14, CYR10, VARIABLE, NULL},
-    {"E", 69, CYR10, VARIABLE, NULL},
-    {"e", 101, CYR10, VARIABLE, NULL},
-    {"\\\"E", 19, CYR10, VARIABLE, NULL},
-    {"\\\"e", 27, CYR10, VARIABLE, NULL},
-    {"\\=E", 5, CYR10, VARIABLE, NULL},
-    {"\\=e", 13, CYR10, VARIABLE, NULL},
-    {"Zh", 17, CYR10, VARIABLE, NULL},
-    {"ZH", 17, CYR10, VARIABLE, NULL},
-    {"zh", 25, CYR10, VARIABLE, NULL},
-    {"Z", 90, CYR10, VARIABLE, NULL},
-    {"z", 122, CYR10, VARIABLE, NULL},
-    {"I", 73, CYR10, VARIABLE, NULL},
-    {"i", 105, CYR10, VARIABLE, NULL},
-    {"\\=I", 4, CYR10, VARIABLE, NULL},
-    {"\\=\\i", 12, CYR10, VARIABLE, NULL},
-    {"J", 74, CYR10, VARIABLE, NULL},
-    {"j", 106, CYR10, VARIABLE, NULL},
-    {"\\u I", 18, CYR10, VARIABLE, NULL},
-    {"\\u\\i", 26, CYR10, VARIABLE, NULL},
-    {"K", 75, CYR10, VARIABLE, NULL},
-    {"k", 107, CYR10, VARIABLE, NULL},
-    {"L", 76, CYR10, VARIABLE, NULL},
-    {"l", 108, CYR10, VARIABLE, NULL},
-    {"Lj", 1, CYR10, VARIABLE, NULL},
-    {"LJ", 1, CYR10, VARIABLE, NULL},
-    {"lj", 9, CYR10, VARIABLE, NULL},
-    {"M", 77, CYR10, VARIABLE, NULL},
-    {"m", 109, CYR10, VARIABLE, NULL},
-    {"N", 78, CYR10, VARIABLE, NULL},
-    {"n", 110, CYR10, VARIABLE, NULL},
-    {"Nj", 0, CYR10, VARIABLE, NULL},
-    {"NJ", 0, CYR10, VARIABLE, NULL},
-    {"nj", 8, CYR10, VARIABLE, NULL},
-    {"O", 79, CYR10, VARIABLE, NULL},
-    {"o", 111, CYR10, VARIABLE, NULL},
-    {"P", 80, CYR10, VARIABLE, NULL},
-    {"p", 112, CYR10, VARIABLE, NULL},
-    {"R", 82, CYR10, VARIABLE, NULL},
-    {"r", 114, CYR10, VARIABLE, NULL},
-    {"S", 83, CYR10, VARIABLE, NULL},
-    {"s", 115, CYR10, VARIABLE, NULL},
-    {"T", 84, CYR10, VARIABLE, NULL},
-    {"t", 116, CYR10, VARIABLE, NULL},
-    {"\\\'C", 7, CYR10, VARIABLE, NULL},
-    {"\\\'c", 15, CYR10, VARIABLE, NULL},
-    {"U", 85, CYR10, VARIABLE, NULL},
-    {"u", 117, CYR10, VARIABLE, NULL},
-    {"F", 70, CYR10, VARIABLE, NULL},
-    {"f", 102, CYR10, VARIABLE, NULL},
-    {"Kh", 72, CYR10, VARIABLE, NULL},
-    {"KH", 72, CYR10, VARIABLE, NULL},
-    {"kh", 104, CYR10, VARIABLE, NULL},
-    {"Ts", 67, CYR10, VARIABLE, NULL},
-    {"TS", 67, CYR10, VARIABLE, NULL},
-    {"ts", 99, CYR10, VARIABLE, NULL},
-    {"Ch", 81, CYR10, VARIABLE, NULL},
-    {"CH", 81, CYR10, VARIABLE, NULL},
-    {"ch", 113, CYR10, VARIABLE, NULL},
-    {"Dzh", 2, CYR10, VARIABLE, NULL},
-    {"DZH", 2, CYR10, VARIABLE, NULL},
-    {"dzh", 10, CYR10, VARIABLE, NULL},
-    {"Sh", 88, CYR10, VARIABLE, NULL},
-    {"SH", 88, CYR10, VARIABLE, NULL},
-    {"sh", 120, CYR10, VARIABLE, NULL},
-    {"Shch", 87, CYR10, VARIABLE, NULL},
-    {"SHCH", 87, CYR10, VARIABLE, NULL},
-    {"shch", 119, CYR10, VARIABLE, NULL},
-    {"\\Cdprime", 95, CYR10, VARIABLE, NULL},
-    {"\\cdprime", 127, CYR10, VARIABLE, NULL},
-    {"Y", 89, CYR10, VARIABLE, NULL},
-    {"y", 121, CYR10, VARIABLE, NULL},
-    {"\\Cprime", 94, CYR10, VARIABLE, NULL},
-    {"\\cprime", 126, CYR10, VARIABLE, NULL},
-    {"\\`E", 3, CYR10, VARIABLE, NULL},
-    {"\\`e", 11, CYR10, VARIABLE, NULL},
-    {"Yu", 16, CYR10, VARIABLE, NULL},
-    {"YU", 16, CYR10, VARIABLE, NULL},
-    {"yu", 24, CYR10, VARIABLE, NULL},
-    {"Ya", 23, CYR10, VARIABLE, NULL},
-    {"YA", 23, CYR10, VARIABLE, NULL},
-    {"ya", 31, CYR10, VARIABLE, NULL},
-    {"\\Dz", 22, CYR10, VARIABLE, NULL},
-    {"\\dz", 30, CYR10, VARIABLE, NULL},
-    {"N0", 125, CYR10, VARIABLE, NULL},
-    {"<", 60, CYR10, VARIABLE, NULL},
-    {">", 62, CYR10, VARIABLE, NULL},
-
-    /* ------------------- C M M I G R ------------------------
-       Using "Beta code" <http://en.wikipedia.org/wiki/Beta_code>
-       to represent Greek characters in latin, e.g., type a to get
-       \alpha, etc.
-       symbol     charnum    family    class     function
-       -------------------------------------------------------- */
-    /* --- uppercase greek letters --- */
-    {"G" /*\Gamma */ , 0, CMMI10GR, VARIABLE, NULL},
-    {"D" /*\Delta */ , 1, CMMI10GR, VARIABLE, NULL},
-    {"Q" /*\Theta */ , 2, CMMI10GR, VARIABLE, NULL},
-    {"L" /*\Lambda */ , 3, CMMI10GR, VARIABLE, NULL},
-    {"C" /*\Xi */ , 4, CMMI10GR, VARIABLE, NULL},
-    {"P" /*\Pi */ , 5, CMMI10GR, VARIABLE, NULL},
-    {"S" /*\Sigma */ , 6, CMMI10GR, VARIABLE, NULL},
-    {"U" /*\Upsilon */ , 7, CMMI10GR, VARIABLE, NULL},
-    {"F" /*\Phi */ , 8, CMMI10GR, VARIABLE, NULL},
-    {"Y" /*\Psi */ , 9, CMMI10GR, VARIABLE, NULL},
-    {"W" /*\Omega */ , 10, CMMI10GR, VARIABLE, NULL},
-    /* --- lowercase greek letters --- */
-    {"a" /*\alpha */ , 11, CMMI10GR, VARIABLE, NULL},
-    {"b" /*\beta */ , 12, CMMI10GR, VARIABLE, NULL},
-    {"g" /*\gamma */ , 13, CMMI10GR, VARIABLE, NULL},
-    {"d" /*\delta */ , 14, CMMI10GR, VARIABLE, NULL},
-    {"e" /*\epsilon */ , 15, CMMI10GR, VARIABLE, NULL},
-    {"z" /*\zeta */ , 16, CMMI10GR, VARIABLE, NULL},
-    {"h" /*\eta */ , 17, CMMI10GR, VARIABLE, NULL},
-    {"q" /*\theta */ , 18, CMMI10GR, VARIABLE, NULL},
-    {"i" /*\iota */ , 19, CMMI10GR, VARIABLE, NULL},
-    {"k" /*\kappa */ , 20, CMMI10GR, VARIABLE, NULL},
-    {"l" /*\lambda */ , 21, CMMI10GR, VARIABLE, NULL},
-    {"m" /*\mu */ , 22, CMMI10GR, VARIABLE, NULL},
-    {"n" /*\nu */ , 23, CMMI10GR, VARIABLE, NULL},
-    {"c" /*\xi */ , 24, CMMI10GR, VARIABLE, NULL},
-    {"p" /*\pi */ , 25, CMMI10GR, VARIABLE, NULL},
-    {"r" /*\rho */ , 26, CMMI10GR, VARIABLE, NULL},
-    {"s" /*\sigma */ , 27, CMMI10GR, VARIABLE, NULL},
-    {"t" /*\tau */ , 28, CMMI10GR, VARIABLE, NULL},
-    {"u" /*\upsilon */ , 29, CMMI10GR, VARIABLE, NULL},
-    {"f" /*\phi */ , 30, CMMI10GR, VARIABLE, NULL},
-    {"x" /*\chi */ , 31, CMMI10GR, VARIABLE, NULL},
-    {"y" /*\psi */ , 32, CMMI10GR, VARIABLE, NULL},
-    {"w" /*\omega */ , 33, CMMI10GR, VARIABLE, NULL},
-#if 0
-    {"?" /*\varepsilon */ , 34, CMMI10GR, VARIABLE, NULL},
-    {"?" /*\vartheta */ , 35, CMMI10GR, VARIABLE, NULL},
-    {"?" /*\varpi */ , 36, CMMI10GR, VARIABLE, NULL},
-    {"?" /*\varrho */ , 37, CMMI10GR, VARIABLE, NULL},
-    {"?" /*\varsigma */ , 38, CMMI10GR, VARIABLE, NULL},
-    {"?" /*\varphi */ , 39, CMMI10GR, VARIABLE, NULL},
-#endif
-    /* ------------------- C M M I B G R ----------------------
-       Using "Beta code" <http://en.wikipedia.org/wiki/Beta_code>
-       to represent Greek characters in latin, e.g., type a to get
-       \alpha, etc.
-       symbol     charnum    family    class     function
-       -------------------------------------------------------- */
-    /* --- uppercase greek letters --- */
-    {"G" /*\Gamma */ , 0, CMMI10BGR, VARIABLE, NULL},
-    {"D" /*\Delta */ , 1, CMMI10BGR, VARIABLE, NULL},
-    {"Q" /*\Theta */ , 2, CMMI10BGR, VARIABLE, NULL},
-    {"L" /*\Lambda */ , 3, CMMI10BGR, VARIABLE, NULL},
-    {"C" /*\Xi */ , 4, CMMI10BGR, VARIABLE, NULL},
-    {"P" /*\Pi */ , 5, CMMI10BGR, VARIABLE, NULL},
-    {"S" /*\Sigma */ , 6, CMMI10BGR, VARIABLE, NULL},
-    {"U" /*\Upsilon */ , 7, CMMI10BGR, VARIABLE, NULL},
-    {"F" /*\Phi */ , 8, CMMI10BGR, VARIABLE, NULL},
-    {"Y" /*\Psi */ , 9, CMMI10BGR, VARIABLE, NULL},
-    {"W" /*\Omega */ , 10, CMMI10BGR, VARIABLE, NULL},
-    /* --- lowercase greek letters --- */
-    {"a" /*\alpha */ , 11, CMMI10BGR, VARIABLE, NULL},
-    {"b" /*\beta */ , 12, CMMI10BGR, VARIABLE, NULL},
-    {"g" /*\gamma */ , 13, CMMI10BGR, VARIABLE, NULL},
-    {"d" /*\delta */ , 14, CMMI10BGR, VARIABLE, NULL},
-    {"e" /*\epsilon */ , 15, CMMI10BGR, VARIABLE, NULL},
-    {"z" /*\zeta */ , 16, CMMI10BGR, VARIABLE, NULL},
-    {"h" /*\eta */ , 17, CMMI10BGR, VARIABLE, NULL},
-    {"q" /*\theta */ , 18, CMMI10BGR, VARIABLE, NULL},
-    {"i" /*\iota */ , 19, CMMI10BGR, VARIABLE, NULL},
-    {"k" /*\kappa */ , 20, CMMI10BGR, VARIABLE, NULL},
-    {"l" /*\lambda */ , 21, CMMI10BGR, VARIABLE, NULL},
-    {"m" /*\mu */ , 22, CMMI10BGR, VARIABLE, NULL},
-    {"n" /*\nu */ , 23, CMMI10BGR, VARIABLE, NULL},
-    {"c" /*\xi */ , 24, CMMI10BGR, VARIABLE, NULL},
-    {"p" /*\pi */ , 25, CMMI10BGR, VARIABLE, NULL},
-    {"r" /*\rho */ , 26, CMMI10BGR, VARIABLE, NULL},
-    {"s" /*\sigma */ , 27, CMMI10BGR, VARIABLE, NULL},
-    {"t" /*\tau */ , 28, CMMI10BGR, VARIABLE, NULL},
-    {"u" /*\upsilon */ , 29, CMMI10BGR, VARIABLE, NULL},
-    {"f" /*\phi */ , 30, CMMI10BGR, VARIABLE, NULL},
-    {"x" /*\chi */ , 31, CMMI10BGR, VARIABLE, NULL},
-    {"y" /*\psi */ , 32, CMMI10BGR, VARIABLE, NULL},
-    {"w" /*\omega */ , 33, CMMI10BGR, VARIABLE, NULL},
-#if 0
-    {"?" /*\varepsilon */ , 34, CMMI10BGR, VARIABLE, NULL},
-    {"?" /*\vartheta */ , 35, CMMI10BGR, VARIABLE, NULL},
-    {"?" /*\varpi */ , 36, CMMI10BGR, VARIABLE, NULL},
-    {"?" /*\varrho */ , 37, CMMI10BGR, VARIABLE, NULL},
-    {"?" /*\varsigma */ , 38, CMMI10BGR, VARIABLE, NULL},
-    {"?" /*\varphi */ , 39, CMMI10BGR, VARIABLE, NULL},
-#endif
-    /* ------------------ B B O L D G R -----------------------
-       Using "Beta code" <http://en.wikipedia.org/wiki/Beta_code>
-       to represent Greek characters in latin, e.g., type a to get
-       \alpha, etc.
-       symbol     charnum    family    class     function
-       -------------------------------------------------------- */
-    /* --- uppercase greek letters --- */
-    {"G" /*\Gamma */ , 0, BBOLD10GR, VARIABLE, NULL},
-    {"D" /*\Delta */ , 1, BBOLD10GR, VARIABLE, NULL},
-    {"Q" /*\Theta */ , 2, BBOLD10GR, VARIABLE, NULL},
-    {"L" /*\Lambda */ , 3, BBOLD10GR, VARIABLE, NULL},
-    {"C" /*\Xi */ , 4, BBOLD10GR, VARIABLE, NULL},
-    {"P" /*\Pi */ , 5, BBOLD10GR, VARIABLE, NULL},
-    {"S" /*\Sigma */ , 6, BBOLD10GR, VARIABLE, NULL},
-    {"U" /*\Upsilon */ , 7, BBOLD10GR, VARIABLE, NULL},
-    {"F" /*\Phi */ , 8, BBOLD10GR, VARIABLE, NULL},
-    {"Y" /*\Psi */ , 9, BBOLD10GR, VARIABLE, NULL},
-    {"W" /*\Omega */ , 10, BBOLD10GR, VARIABLE, NULL},
-    /* --- lowercase greek letters --- */
-    {"a" /*\alpha */ , 11, BBOLD10GR, VARIABLE, NULL},
-    {"b" /*\beta */ , 12, BBOLD10GR, VARIABLE, NULL},
-    {"g" /*\gamma */ , 13, BBOLD10GR, VARIABLE, NULL},
-    {"d" /*\delta */ , 14, BBOLD10GR, VARIABLE, NULL},
-    {"e" /*\epsilon */ , 15, BBOLD10GR, VARIABLE, NULL},
-    {"z" /*\zeta */ , 16, BBOLD10GR, VARIABLE, NULL},
-    {"h" /*\eta */ , 17, BBOLD10GR, VARIABLE, NULL},
-    {"q" /*\theta */ , 18, BBOLD10GR, VARIABLE, NULL},
-    {"i" /*\iota */ , 19, BBOLD10GR, VARIABLE, NULL},
-    {"k" /*\kappa */ , 20, BBOLD10GR, VARIABLE, NULL},
-    {"l" /*\lambda */ , 21, BBOLD10GR, VARIABLE, NULL},
-    {"m" /*\mu */ , 22, BBOLD10GR, VARIABLE, NULL},
-    {"n" /*\nu */ , 23, BBOLD10GR, VARIABLE, NULL},
-    {"c" /*\xi */ , 24, BBOLD10GR, VARIABLE, NULL},
-    {"p" /*\pi */ , 25, BBOLD10GR, VARIABLE, NULL},
-    {"r" /*\rho */ , 26, BBOLD10GR, VARIABLE, NULL},
-    {"s" /*\sigma */ , 27, BBOLD10GR, VARIABLE, NULL},
-    {"t" /*\tau */ , 28, BBOLD10GR, VARIABLE, NULL},
-    {"u" /*\upsilon */ , 29, BBOLD10GR, VARIABLE, NULL},
-    {"f" /*\phi */ , 30, BBOLD10GR, VARIABLE, NULL},
-    {"x" /*\chi */ , 31, BBOLD10GR, VARIABLE, NULL},
-    {"y" /*\psi */ , 32, BBOLD10GR, VARIABLE, NULL},
-    {"w" /*\omega */ , 127, BBOLD10GR, VARIABLE, NULL},
-    /* --- trailer record --- */
-    {NULL, -999, -999, -999, NULL}
+/* note: class(1=upper,2=alpha,3=alnum,4=lower,5=digit,9=all) now unused */
+const fontinfo_t fontinfo[] = {
+    { "\\math", 0, 0, 0},         /*(0) default math mode */
+    { "\\mathcal", CMSY10, 0, 1}, /*(1) calligraphic, uppercase */
+    { "\\mathscr", RSFS10, 0, 1}, /*(2) rsfs/script, uppercase */
+    { "\\textrm", CMR10, 1, -1},  /*(3) \rm,\text{abc} --> {\textrm~abc} */
+    { "\\textit", CMMI10, 1, -1}, /*(4) \it,\textit{abc}-->{\textit~abc} */
+    { "\\mathbb", BBOLD10, 0, -1},        /*(5) \bb,\mathbb{abc}-->{\mathbb~abc} */
+    { "\\mathbf", CMMIB10, 0, -1},        /*(6) \bf,\mathbf{abc}-->{\mathbf~abc} */
+    { "\\mathrm", CMR10, 0, -1},  /*(7) \mathrm */
+    { "\\cyr", CYR10, 1, -1},     /*(8) \cyr (defaults as text mode) */
+    { "\\textgreek", CMMI10GR, 1, -1},    /*(9) \textgreek{ab}-->\alpha\beta */
+    { "\\textbfgreek", CMMI10BGR, 1, -1}, /*(10)\textbfgreek{ab}-->\alpha\beta */
+    { "\\textbbgreek", BBOLD10GR, 1, -1}, /*(11)\textbbgreek{ab}-->\alpha\beta */
+    { NULL, 0, 0, 0}
 };
 
 
-/* -------------------------------------------------------------------------
-miscellaneous macros
--------------------------------------------------------------------------- */
-#define compress(s,c) if((s)!=NULL) /* remove embedded c's from s */ \
-    { char *p; while((p=strchr((s),(c)))!=NULL) {strsqueeze(p,1);} } else
-#define slower(s)  if ((s)!=NULL)   /* lowercase all chars in s */ \
-    { char *p=(s); while(*p!='\0'){*p=tolower(*p); p++;} } else
-                                                                /*subraster *subrastcpy(); *//* need global module declaration */
-/*#define spnosmash(sp) if (sp->type==CHARASTER) sp=subrastcpy(sp); \ */
-/*  sp->type=blanksignal */
-/* ---evaluate \directive[arg] or \directive{arg} scaled by unitlength--- */
-#define eround(arg) (iround(unitlength*((double)evalterm(mimestore,(arg)))))
-/* --- check if a string is empty --- */
-#define isempty(s)  ((s)==NULL?1:(*(s)=='\0'?1:0))
-/* --- last char of a string --- */
-#define lastchar(s) (isempty(s)?'\0':*((s)+(strlen(s)-1)))
-/* --- lowercase a string --- */
-#define strlower(s) strnlower((s),0)    /* lowercase an entire string */
-/* --- strip leading and trailing whitespace (including ~) --- */
-#define trimwhite(thisstr) if ( (thisstr) != NULL ) { \
-    int thislen_m = strlen(thisstr); \
-    while ( --thislen_m >= 0 ) \
-      if ( isthischar((thisstr)[thislen_m]," \t\n\r\f\v") ) \
-        (thisstr)[thislen_m] = '\0'; \
-      else break; \
-    if ( (thislen_m = strspn((thisstr)," \t\n\r\f\v")) > 0 ) \
-      {strsqueeze((thisstr),thislen_m);} } else
-/* --- strncpy() n bytes and make sure it's null-terminated --- */
-#define strninit(target,source,n) if( (target)!=NULL && (n)>=0 ) { \
-      const char *thissource = (source); \
-      (target)[0] = '\0'; \
-      if ( (n)>0 && thissource!=NULL ) { \
-        strncpy((target),thissource,(n)); \
-        (target)[(n)] = '\0'; } }
-/* --- strcpy(s,s+n) using memmove() (also works for negative n) --- */
-#define strsqueeze(s,n) if((n)!=0) { if(!isempty((s))) { \
-    int thislen3=strlen(s); \
-    if ((n) >= thislen3) *(s) = '\0'; \
-    else memmove(s,s+(n),1+thislen3-(n)); }} else       /*user supplies final; */
-/* --- strsqueeze(s,t) with two pointers --- */
-#define strsqueezep(s,t) if(!isempty((s))&&!isempty((t))) { \
-    int sqlen=strlen((s))-strlen((t)); \
-    if (sqlen>0 && sqlen<=999) {strsqueeze((s),sqlen);} } else
 
 /* ============================================================================= */
 
-static int aagridnum(raster * rp, int irow, int icol);
-static int aapattern1124(raster * rp, int irow, int icol, int gridnum,
-                         int grayscale);
-static int aapattern19(raster * rp, int irow, int icol, int gridnum,
-                       int grayscale);
-static int aapattern20(raster * rp, int irow, int icol, int gridnum,
-                       int grayscale);
-static int aapattern39(raster * rp, int irow, int icol, int gridnum,
-                       int grayscale);
-static int aapatternnum(int gridnum);
-static int aapatterns(raster * rp, int irow, int icol, int gridnum,
-                      int patternum, int grayscale);
-static int aasupsamp(raster * rp, raster ** aa, int sf, int grayscale);
-static raster *aaweights(int width, int height);
-
-static subraster *arrow_subraster(int width, int height, int pixsz,
-                                  int drctn, int isBig);
-static int circle_recurse(raster * rp, int row0, int col0, int row1,
-                          int col1, int thickness, double theta0,
-                          double theta1);
-int delete_raster(raster * rp);
-int delete_subraster(subraster * sp);
 static char *findbraces(const char *expression, const char *command);
-static int get_baseline(chardef * gfdata);
-static subraster *get_delim(const char *symbol, int height, int family);
+static int get_baseline(const chardef_t * gfdata);
 static int get_ligature(const char *expression, int family);
-static int getstore(STORE * store, const char *identifier);
-static raster *gftobitmap(raster * gf);
-static int isbrace(const char *expression, const char *braces,
-                   int isescape);
-static int line_raster(raster * rp, int row0, int col0, int row1, int col1,
-                       int thickness);
-static int line_recurse(raster * rp, double row0, double col0, double row1,
+static int getstore(const store_t * store, const char *identifier);
+static raster_t *gftobitmap(const raster_t * gf);
+static int isbrace(const char *expression, const char *braces, int isescape);
+static int line_recurse(raster_t * rp, double row0, double col0, double row1,
                         double col1, int thickness);
-subraster *make_delim(const char *symbol, int height);
-static subraster *rastdispmath(const char **expression, int size,
-                               subraster * sp);
-static subraster *rastlimits(const char **expression, int size,
-                             subraster * basesp);
-static int rastsmash(subraster * sp1, subraster * sp2);
-static subraster *rastparen(const char **subexpr, int size,
-                            subraster * basesp);
-static subraster *rastscripts(const char **expression, int size,
-                              subraster * basesp);
-static int rule_raster(raster * rp, int top, int left, int width,
-                       int height, int type);
-static char *strchange(int nfirst, char *from, const char *to);
-int strreplace(char *string, const char *from, const char *to,
-               int nreplace);
-char *strtexchr(const char *string, const char *texchr);
-char *strwrap(const char *s, int linelen, int tablen);
-char *strwstr(const char *string, const char *substr, const char *white,
-              int *sublen);
-char *texleft(const char *expression, char *subexpr, int maxsubsz,
-              char *ldelim, char *rdelim);
-int type_raster(raster * rp, FILE * fp);
+subraster_t *make_delim(const char *symbol, int height);
+static subraster_t *rastdispmath(const char **expression, int size,
+                               subraster_t * sp);
+static int rastsmash(subraster_t * sp1, subraster_t * sp2);
 
 /* ============================================================================= */
 
-#if 1
-/* ==========================================================================
- * Function:    new_raster ( width, height, pixsz )
- * Purpose: Allocation and constructor for raster.
- *      mallocs and initializes memory for width*height pixels,
- *      and returns raster struct ptr to caller.
- * --------------------------------------------------------------------------
- * Arguments:   width (I)   int containing width, in bits,
- *              of raster pixmap to be allocated
- *      height (I)  int containing height, in bits/scans,
- *              of raster pixmap to be allocated
- *      pixsz (I)   int containing #bits per pixel, 1 or 8
- * --------------------------------------------------------------------------
- * Returns: ( raster * )    ptr to allocated and initialized
- *              raster struct, or NULL for any error.
- * --------------------------------------------------------------------------
- * Notes:
- * ======================================================================= */
-
-raster *new_raster(int width, int height, int pixsz)
+/* ============================================================================
+ * Allocation and constructor for raster.
+ * 
+ * @width: containing width, in bits.
+ * @height: containing height, in bits/scans.
+ * @pixsz: containing #bits per pixel, 1 or 8
+ * 
+ * @returns: ptr to allocated and initialized, or NULL for any error.
+ * ===========================================================================*/
+raster_t *new_raster(int width, int height, int pixsz)
 {
-    raster *rp = NULL;          /* raster ptr returned to caller */
-    pixbyte *pixmap = NULL;     /* raster pixel map to be malloced */
+    raster_t *rp = NULL;
+    pixbyte_t *pixmap = NULL;
     int nbytes = pixsz * bitmapsz(width, height);       /* #bytes needed for pixmap */
-    int filler = (isstring ? ' ' : 0);  /* pixmap filler */
     int npadding = (0 && issupersampling ? 8 + 256 : 0);        /* padding bytes */
 
-    if (msgfp != NULL && msglevel >= 9999) {
-        fprintf(msgfp, "new_raster(%d,%d,%d)> entry point\n",
-                width, height, pixsz);
-        fflush(msgfp);
+#if DEBUG_LOG_LEVEL >= 9999
+    fprintf(msgfp, "new_raster(%d,%d,%d)> entry point\n",
+            width, height, pixsz);
+#endif
+
+    rp = malloc(sizeof(raster_t));
+
+    if (rp == NULL) {
+        goto end_of_job;
     }
-/* --- allocate and initialize raster struct --- */
-    rp = (raster *) malloc(sizeof(raster));     /* malloc raster struct */
-    if (msgfp != NULL && msglevel >= 9999) {
-        fprintf(msgfp, "new_raster> rp=malloc(%d) returned (%s)\n",
-                (int)sizeof(raster), (rp == NULL ? "null ptr" : "success"));
-        fflush(msgfp);
-    }
-    if (rp == NULL) {  /* malloc failed */
-        goto end_of_job;        /* return error to caller */
-    }
-    rp->width = width;          /* store width in raster struct */
-    rp->height = height;        /* and store height */
+
+    rp->width = width;
+    rp->height = height;
     rp->format = 1;             /* initialize as bitmap format */
     rp->pixsz = pixsz;          /* store #bits per pixel */
-    rp->pixmap = NULL;      /* init bitmap as null ptr */
-/* --- allocate and initialize bitmap array --- */
-    if (msgfp != NULL && msglevel >= 9999) {
-        fprintf(msgfp, "new_raster> calling pixmap=malloc(%d)\n", nbytes);
-        fflush(msgfp);
+    rp->pixmap = NULL;
+
+    if (nbytes > 0 && nbytes <= pixsz * maxraster) {    /* fail if width*height too big */
+        pixmap = malloc(nbytes + npadding);
     }
-    if (nbytes > 0 && nbytes <= pixsz * maxraster)      /* fail if width*height too big */
-        pixmap = (pixbyte *) malloc(nbytes + npadding); /*bytes for width*height bits */
-    if (msgfp != NULL && msglevel >= 9999) {
-        fprintf(msgfp, "new_raster> pixmap=malloc(%d) returned (%s)\n",
-                nbytes, (pixmap == NULL ? "null ptr" : "success"));
-        fflush(msgfp);
-    }
-    if (pixmap == NULL) {   /* malloc failed */
-        delete_raster(rp);      /* so free everything */
-        rp = NULL;   /* reset pointer */
+
+    if (pixmap == NULL) {
+        delete_raster(rp);
+        rp = NULL;
         goto end_of_job;
-    }                           /* and return error to caller */
-    memset((void *) pixmap, filler, nbytes);    /* init bytes to binary 0's or ' 's */
-    *pixmap = 0;      /* and first byte alwasy 0 */
-    rp->pixmap = pixmap;        /* store ptr to malloced memory */
-/* -------------------------------------------------------------------------
-Back to caller with address of raster struct, or NULL ptr for any error.
--------------------------------------------------------------------------- */
-  end_of_job:
-    if (msgfp != NULL && msglevel >= 9999) {
-        fprintf(msgfp, "new_raster(%d,%d,%d)> returning (%s)\n",
-                width, height, pixsz,
-                (rp == NULL ? "null ptr" : "success"));
-        fflush(msgfp);
     }
+    memset(pixmap, 0, nbytes);    /* init bytes to binary 0's */
+    *pixmap = 0;                /* and first byte always 0 */
+    rp->pixmap = pixmap;
+
+end_of_job:
+#if DEBUG_LOG_LEVEL >= 9999
+    fprintf(msgfp, "new_raster(%d,%d,%d)> returning (%s)\n",
+            width, height, pixsz,
+            (rp == NULL ? "null ptr" : "success"));
+#endif
+
     return rp;
 }
 
 
-/* ==========================================================================
- * Function:    new_subraster ( width, height, pixsz )
- * Purpose: Allocate a new subraster along with
- *      an embedded raster of width x height.
- * --------------------------------------------------------------------------
- * Arguments:   width (I)   int containing width of embedded raster
- *      height (I)  int containing height of embedded raster
- *      pixsz (I)   int containing #bits per pixel, 1 or 8
- * --------------------------------------------------------------------------
- * Returns: ( subraster * ) ptr to newly-allocated subraster,
- *              or NULL for any error.
- * --------------------------------------------------------------------------
- * Notes:     o if width or height <=0, embedded raster not allocated
- * ======================================================================= */
-subraster *new_subraster(int width, int height, int pixsz)
+/* ============================================================================
+ * Allocate a new subraster_t along with an embedded raster of width x height.
+ * if width or height <=0, embedded raster not allocated.
+ * 
+ * @width: containing width, in bits.
+ * @height: containing height, in bits/scans.
+ * @pixsz: containing #bits per pixel, 1 or 8
+ * 
+ * @returns: ptr to newly-allocated subraster_t, or NULL for any error.
+ * ===========================================================================*/
+subraster_t *new_subraster(int width, int height, int pixsz)
 {
-    subraster *sp = NULL;       /* subraster returned to caller */
-    raster *rp = NULL;          /* image raster embedded in sp */
+    subraster_t *sp = NULL;       /* subraster_t returned to caller */
+    raster_t *rp = NULL;          /* image raster embedded in sp */
     int size = NORMALSIZE;      /* default size */
     int baseline = height - 1;  /* and baseline */
-/* -------------------------------------------------------------------------
-allocate and initialize subraster struct
--------------------------------------------------------------------------- */
-    if (msgfp != NULL && msglevel >= 9999) {
-        fprintf(msgfp, "new_subraster(%d,%d,%d)> entry point\n",
-                width, height, pixsz);
-        fflush(msgfp);
-    }
-/* --- allocate subraster struct --- */
-    sp = (subraster *) malloc(sizeof(subraster));       /* malloc subraster struct */
-    if (sp == NULL)             /* malloc failed */
-        goto end_of_job;        /* return error to caller */
-/* --- initialize subraster struct --- */
+
+#if DEBUG_LOG_LEVEL >= 9999
+    fprintf(msgfp, "new_subraster(%d,%d,%d)> entry point\n",
+            width, height, pixsz);
+#endif
+
+    sp = malloc(sizeof(subraster_t));
+    if (sp == NULL)
+        goto end_of_job;
+
     sp->type = NOVALUE;         /* character or image raster */
     sp->symdef = NULL;          /* mathchardef identifying image */
     sp->baseline = baseline;    /*0 if image is entirely descending */
     sp->size = size;            /* font size 0-4 */
-    sp->toprow = sp->leftcol = (-1);    /* upper-left corner of subraster */
-    sp->image = NULL;           /*ptr to bitmap image of subraster */
-/* -------------------------------------------------------------------------
-allocate raster and embed it in subraster, and return to caller
--------------------------------------------------------------------------- */
-/* --- allocate raster struct if desired --- */
-    if (width > 0 && height > 0 && pixsz > 0) { /* caller wants raster */
-        if ((rp = new_raster(width, height, pixsz))     /* allocate embedded raster */
-            !=NULL)             /* if allocate succeeded */
-            sp->image = rp;     /* embed raster in subraster */
-        else {                  /* or if allocate failed */
-            delete_subraster(sp);       /* free non-unneeded subraster */
+    sp->toprow = sp->leftcol = (-1);    /* upper-left corner of subraster_t */
+    sp->image = NULL;           /*ptr to bitmap image of subraster_t */
+
+    /* --- allocate raster struct if desired --- */
+    if (width > 0 && height > 0 && pixsz > 0) {
+        rp = new_raster(width, height, pixsz);
+        if (rp != NULL) {
+            sp->image = rp;
+        } else {
+            delete_subraster(sp);
             sp = NULL;
         }
     }
-    /* signal error */
-    /* --- back to caller with new subraster or NULL --- */
-  end_of_job:
-    if (msgfp != NULL && msglevel >= 9999) {
-        fprintf(msgfp, "new_subraster(%d,%d,%d)> returning (%s)\n",
-                width, height, pixsz,
-                (sp == NULL ? "null ptr" : "success"));
-        fflush(msgfp);
-    }
+
+end_of_job:
+#if DEBUG_LOG_LEVEL >= 9999
+    fprintf(msgfp, "new_subraster(%d,%d,%d)> returning (%s)\n",
+            width, height, pixsz,
+            (sp == NULL ? "null ptr" : "success"));
+#endif
+
     return sp;
 }
 
-/* ==========================================================================
- * Function:    new_chardef (  )
- * Purpose: Allocates and initializes a chardef struct,
- *      but _not_ the embedded raster struct.
- * --------------------------------------------------------------------------
- * Arguments:   none
- * --------------------------------------------------------------------------
- * Returns: ( chardef * )   ptr to allocated and initialized
- *              chardef struct, or NULL for any error.
- * --------------------------------------------------------------------------
- * Notes:
- * ======================================================================= */
-/* --- entry point --- */
-chardef *new_chardef(void)
+/* ============================================================================
+ * Allocates and initializes a chardef struct,
+ * but _not_ the embedded raster struct.
+ * 
+ * @returns: ptr to allocated and initialized, or NULL for any error.
+ * ===========================================================================*/
+chardef_t *new_chardef(void)
 {
-    chardef *cp = NULL;         /* chardef ptr returned to caller */
-/* -------------------------------------------------------------------------
-allocate and initialize chardef struct
--------------------------------------------------------------------------- */
-    cp = (chardef *) malloc(sizeof(chardef));   /* malloc chardef struct */
-    if (cp == NULL)             /* malloc failed */
-        goto end_of_job;        /* return error to caller */
+    chardef_t *cp = malloc(sizeof(chardef_t));
+
+    if (cp == NULL)
+        goto end_of_job;
+
     cp->charnum = cp->location = 0;     /* init character description */
     cp->toprow = cp->topleftcol = 0;    /* init upper-left corner */
     cp->botrow = cp->botleftcol = 0;    /* init lower-left corner */
@@ -2651,154 +688,113 @@ allocate and initialize chardef struct
     cp->image.format = 0;       /* init raster format */
     cp->image.pixsz = 0;        /* and #bits per pixel */
     cp->image.pixmap = NULL;    /* init raster pixmap as null */
-/* -------------------------------------------------------------------------
-Back to caller with address of chardef struct, or NULL ptr for any error.
--------------------------------------------------------------------------- */
-  end_of_job:
+
+end_of_job:
     return cp;
 }
 
-/* ==========================================================================
- * Function:    delete_raster ( rp )
- * Purpose: Destructor for raster.
- *      Frees memory for raster bitmap and struct.
- * --------------------------------------------------------------------------
- * Arguments:   rp (I)      ptr to raster struct to be deleted.
- * --------------------------------------------------------------------------
- * Returns: ( int )     1 if completed successfully,
- *              or 0 otherwise (for any error).
- * --------------------------------------------------------------------------
- * Notes:
- * ======================================================================= */
-int delete_raster(raster * rp)
+/* ============================================================================
+ * Frees memory for raster bitmap and struct.
+ * 
+ * @rp: ptr to raster struct to be deleted.
+ * ===========================================================================*/
+void delete_raster(raster_t *rp)
 {
-    if (rp != NULL) {           /* can't free null ptr */
-        if (rp->pixmap != NULL) {       /* can't free null ptr */
-            free((void *) rp->pixmap);  /* free pixmap within raster */
-        }
-        free((void *) rp);      /* lastly, free raster struct */
+    if (rp != NULL) {
+        free(rp->pixmap);   /* ignored if (rp->pixmap == NULL) */
+        free(rp);
     }
-    return 1;
 }
 
-/* ==========================================================================
- * Function:    delete_subraster ( sp )
- * Purpose: Deallocates a subraster (and embedded raster)
- * --------------------------------------------------------------------------
- * Arguments:   sp (I)      ptr to subraster struct to be deleted.
- * --------------------------------------------------------------------------
- * Returns: ( int )     1 if completed successfully,
- *              or 0 otherwise (for any error).
- * --------------------------------------------------------------------------
- * Notes:
- * ======================================================================= */
-int delete_subraster(subraster * sp)
+/* ============================================================================
+ * Deallocates a subraster_t (and embedded raster).
+ * 
+ * @rp: ptr to subraster_t struct to be deleted.
+ * ===========================================================================*/
+void delete_subraster(subraster_t *sp)
 {
-    if (sp != (subraster *) NULL) {     /* can't free null ptr */
+    if (sp != NULL) {
         if (sp->type != CHARASTER) {    /* not static character data */
-            if (sp->image != NULL) {    /*raster allocated within subraster */
-                delete_raster(sp->image);       /* so free embedded raster */
-            }
+            delete_raster(sp->image);   /* ignored if (sp->image == NULL) */
         }
-        free((void *) sp);      /* and free subraster struct itself */
+        free(sp);
     }
-    return 1;
 }
 
-#if 0
-/* ==========================================================================
- * Function:    delete_chardef ( cp )
- * Purpose: Deallocates a chardef (and bitmap of embedded raster)
- * --------------------------------------------------------------------------
- * Arguments:   cp (I)      ptr to chardef struct to be deleted.
- * --------------------------------------------------------------------------
- * Returns: ( int )     1 if completed successfully,
- *              or 0 otherwise (for any error).
- * --------------------------------------------------------------------------
- * Notes:
- * ======================================================================= */
-static int delete_chardef(chardef * cp)
+/* ============================================================================
+ * Deallocates a chardef (and bitmap of embedded raster).
+ * 
+ * @rp: ptr to chardef struct to be deleted.
+ * ===========================================================================*/
+void delete_chardef(chardef_t *cp)
 {
-    if (cp != NULL) {           /* can't free null ptr */
-        if (cp->image.pixmap != NULL) { /* pixmap allocated within raster */
-            free((void *) cp->image.pixmap);    /* so free embedded pixmap */
-        }
-        free((void *) cp);      /* and free chardef struct itself */
+    if (cp != NULL) {
+        free(cp->image.pixmap);     /* ignored if (cp->image.pixmap == NULL) */
+        free(cp);
     }
-    return 1;
 }
-#endif
 
-/* ==========================================================================
- * Function:    rastcpy ( rp )
- * Purpose: makes duplicate copy of rp
- * --------------------------------------------------------------------------
- * Arguments:   rp (I)      ptr to raster struct to be copied
- * --------------------------------------------------------------------------
- * Returns: ( raster * )    ptr to new copy rp,
- *              or NULL for any error.
- * --------------------------------------------------------------------------
- * Notes:     o
- * ======================================================================= */
-/* --- entry point --- */
-raster *rastcpy(raster * rp)
+/* ============================================================================
+ * makes duplicate copy of rp.
+ * 
+ * @rp: ptr to raster struct to be copied.
+ * 
+ * @returns: ptr to new copy rp, or NULL for any error.
+ * ===========================================================================*/
+raster_t *rastcpy(const raster_t *rp)
 {
-    raster *newrp = NULL;       /*copied raster returned to caller */
-    int height = (rp == NULL ? 0 : rp->height); /* original and copied height */
-    int width = (rp == NULL ? 0 : rp->width);   /* original and copied width */
-    int pixsz = (rp == NULL ? 0 : rp->pixsz);   /* #bits per pixel */
-    int nbytes = (rp == NULL ? 0 : (pixmapsz(rp)));     /* #bytes in rp's pixmap */
-/* -------------------------------------------------------------------------
-allocate rotated raster and fill it
--------------------------------------------------------------------------- */
-/* --- allocate copied raster with same width,height, and copy bitmap --- */
-    if (rp != NULL) {           /* nothing to copy if ptr null */
-        if ((newrp = new_raster(width, height, pixsz)) != NULL) {
-            memcpy(newrp->pixmap, rp->pixmap, nbytes);  /* fill copied raster pixmap */
+    raster_t *newrp = NULL;
+
+    if (rp != NULL) {
+        int height = rp->height;
+        int width = rp->width;
+        int pixsz = rp->pixsz;
+        int nbytes = pixmapsz(rp);
+
+        newrp = new_raster(width, height, pixsz);
+        if (newrp != NULL) {
+            memcpy(newrp->pixmap, rp->pixmap, nbytes);
         }
     }
+
     return newrp;
 }
 
-/* ==========================================================================
- * Function:    subrastcpy ( sp )
- * Purpose: makes duplicate copy of sp
- * --------------------------------------------------------------------------
- * Arguments:   sp (I)      ptr to subraster struct to be copied
- * --------------------------------------------------------------------------
- * Returns: ( subraster * ) ptr to new copy sp,
- *              or NULL for any error.
- * --------------------------------------------------------------------------
- * Notes:     o
- * ======================================================================= */
-subraster *subrastcpy(subraster * sp)
+/* ============================================================================
+ * makes duplicate copy of rp.
+ * 
+ * @rp: ptr to subraster_t struct to be copied.
+ * 
+ * @returns: ptr to new copy rp, or NULL for any error.
+ * ===========================================================================*/
+subraster_t *subrastcpy(const subraster_t *sp)
 {
-    subraster *newsp = NULL;    /* allocate new subraster */
-    raster *newrp = NULL;       /* and new raster image within it */
-/* -------------------------------------------------------------------------
-make copy, and return it to caller
--------------------------------------------------------------------------- */
+    subraster_t *newsp = NULL;    /* allocate new subraster_t */
+    raster_t *newrp = NULL;       /* and new raster image within it */
+
     if (sp == NULL) {
-        goto end_of_job;        /* nothing to copy */
+        goto end_of_job;
     }
-/* --- allocate new subraster "envelope" for copy --- */
-    if ((newsp = new_subraster(0, 0, 0)) == NULL) {
-        goto end_of_job;        /* and quit if we fail to allocate */
+/* --- allocate new subraster_t "envelope" for copy --- */
+    newsp = new_subraster(0, 0, 0);
+    if (newsp == NULL) {
+        goto end_of_job;
     }
 /* --- transparently copy original envelope to new one --- */
-    memcpy((void *) newsp, (void *) sp, sizeof(subraster));     /* copy envelope */
-/* --- make a copy of the rasterized image itself, if there is one --- */
-    if (sp->image != NULL) {    /* there's an image embedded in sp */
-        if ((newrp = rastcpy(sp->image)) == NULL) {     /* failed to copy successfully */
-            delete_subraster(newsp);    /* won't need newsp any more */
-            newsp = NULL;       /* because we're returning error */
+    memcpy(newsp, sp, sizeof(subraster_t));
+
+    if (sp->image != NULL) {
+        newrp = rastcpy(sp->image);
+        if (newrp == NULL) {
+            delete_subraster(newsp);
+            newsp = NULL;
             goto end_of_job;
         }
     }
     /* back to caller with error signal */
     /* --- set new params in new envelope --- */
-    newsp->image = newrp;       /* new raster image we just copied */
-    switch (sp->type) {         /* set new raster image type */
+    newsp->image = newrp;
+    switch (sp->type) {
     case STRINGRASTER:
     case CHARASTER:
         newsp->type = STRINGRASTER;
@@ -2817,40 +813,35 @@ make copy, and return it to caller
         newsp->type = IMAGERASTER;
         break;
     }
-/* --- return copy of sp to caller --- */
-  end_of_job:
+
+end_of_job:
     return newsp;
 }
 
-/* ==========================================================================
- * Function:    rastrot ( rp )
- * Purpose: rotates rp image 90 degrees right/clockwise
- * --------------------------------------------------------------------------
- * Arguments:   rp (I)      ptr to raster struct to be rotated
- * --------------------------------------------------------------------------
- * Returns: ( raster * )    ptr to new raster rotated relative to rp,
- *              or NULL for any error.
- * --------------------------------------------------------------------------
- * Notes:     o An underbrace is } rotated 90 degrees clockwise,
- *      a hat is <, etc.
- * ======================================================================= */
-raster *rastrot(raster * rp)
+/* ============================================================================
+ * rotates rp image 90 degrees right/clockwise
+ * Notes: An underbrace is } rotated 90 degrees clockwise,
+ *        a hat is <, etc.
+ * 
+ * @rp: ptr to raster struct to be rotated
+ * 
+ * @returns: ptr to new raster rotated relative to rp, or NULL for any error.
+ * ===========================================================================*/
+raster_t *rastrot(const raster_t *rp)
 {
-    raster *rotated = NULL;     /*rotated raster returned to caller */
+    raster_t *rotated = NULL;             /*rotated raster returned to caller */
     int height = rp->height, irow;      /* original height, row index */
     int width = rp->width, icol;        /* original width, column index */
-    int pixsz = rp->pixsz;      /* #bits per pixel */
-/* -------------------------------------------------------------------------
-allocate rotated raster and fill it
--------------------------------------------------------------------------- */
-/* --- allocate rotated raster with flipped width<-->height --- */
-    if ((rotated = new_raster(height, width, pixsz)) != NULL) { /* flip width,height */
-        /* check that allocation succeeded */
+    int pixsz = rp->pixsz;              /* #bits per pixel */
+
+    /* --- allocate rotated raster with flipped width<-->height --- */
+    rotated = new_raster(height, width, pixsz);
+    if (rotated  != NULL) {
         /* --- fill rotated raster --- */
         for (irow = 0; irow < height; irow++) { /* for each row of rp */
             for (icol = 0; icol < width; icol++) {      /* and each column of rp */
                 int value = getpixel(rp, irow, icol);
-                /* setpixel(rotated,icol,irow,value); } */
+                /* setpixel(rotated,icol,irow,value); */
                 setpixel(rotated, icol, (height - 1 - irow), value);
             }
         }
@@ -2858,85 +849,69 @@ allocate rotated raster and fill it
     return rotated;
 }
 
-/* ==========================================================================
- * Purpose: magnifies rp by integer magstep,
- *      e.g., double-height and double-width if magstep=2
- * --------------------------------------------------------------------------
- * Arguments:   rp (I)      ptr to raster struct to be "magnified"
- *      magstep (I) int containing magnification scale,
- *              e.g., 2 to double the width and height of rp
- * --------------------------------------------------------------------------
- * Returns: ( raster * )    ptr to new raster magnified relative to rp,
- *              or NULL for any error.
- * --------------------------------------------------------------------------
- * Notes:     o
- * ======================================================================= */
-raster *rastmag(raster * rp, int a_magstep)
+/* ============================================================================
+ * magnifies rp by integer magstep,
+ * e.g., double-height and double-width if magstep=2
+ * 
+ * @rp: ptr to raster struct to be magnified
+ * @a_magstep: magnification scale, e.g., 2 to double the width and height of rp
+ * 
+ * @returns: ptr to new raster magnified relative to rp, or NULL for any error.
+ * ===========================================================================*/
+raster_t *rastmag(const raster_t *rp, int a_magstep)
 {
-    raster *magnified = NULL;   /* magnified raster back to caller */
+    raster_t *magnified = NULL;
     int height = rp->height, irow,      /* height, row index */
         width = rp->width, icol,        /* width, column index */
         mrow = 0, mcol = 0,     /* dup pixels magstep*magstep times */
         pixsz = rp->pixsz;      /* #bits per pixel */
-/* -------------------------------------------------------------------------
-check args
--------------------------------------------------------------------------- */
+
     if (rp == NULL) {
-        goto end_of_job;        /* no input raster supplied */
+        goto end_of_job;
     }
     if (a_magstep < 1 || a_magstep > 10) {
-        goto end_of_job;        /* sanity check */
+        goto end_of_job;
     }
-/* -------------------------------------------------------------------------
-allocate magnified raster and fill it
--------------------------------------------------------------------------- */
-/* --- allocate magnified raster with magstep*width, magstep*height --- */
-    if ((magnified =
-         new_raster(a_magstep * width, a_magstep * height,
-                    pixsz)) != NULL) {
-        /* check that allocation succeeded */
-        /* --- fill reflected raster --- */
-        for (irow = 0; irow < height; irow++) { /* for each row of rp */
-            for (mrow = 0; mrow < a_magstep; mrow++) {  /* dup row magstep times */
-                for (icol = 0; icol < width; icol++) {  /* and for each column of rp */
-                    for (mcol = 0; mcol < a_magstep; mcol++) {  /* dup col magstep times */
-                        int value = getpixel(rp, irow, icol);
-                        int row1 = irow * a_magstep;
-                        int col1 = icol * a_magstep;
-                        setpixel(magnified, (row1 + mrow), (col1 + mcol),
-                                 value);
-                    }
+
+    magnified = new_raster(a_magstep * width, a_magstep * height, pixsz);
+    if (magnified == NULL)
+        goto end_of_job;
+
+    /* --- fill reflected raster --- */
+    for (irow = 0; irow < height; irow++) { /* for each row of rp */
+        for (mrow = 0; mrow < a_magstep; mrow++) {  /* dup row magstep times */
+            for (icol = 0; icol < width; icol++) {  /* and for each column of rp */
+                for (mcol = 0; mcol < a_magstep; mcol++) {  /* dup col magstep times */
+                    int value = getpixel(rp, irow, icol);
+                    int row1 = irow * a_magstep;
+                    int col1 = icol * a_magstep;
+                    setpixel(magnified, (row1 + mrow), (col1 + mcol), value);
                 }
             }
         }
     }
 
-  end_of_job:
+end_of_job:
     return magnified;
 }
 
-/* ==========================================================================
- * Function:    bytemapmag ( bytemap, width, height, magstep )
- * Purpose: magnifies a bytemap by integer magstep,
- *      e.g., double-height and double-width if magstep=2
- * --------------------------------------------------------------------------
- * Arguments:   bytemap (I) intbyte * ptr to byte map to be "magnified"
- *      width (I)   int containing #cols in original bytemap
- *      height (I)  int containing #rows in original bytemap
- *      magstep (I) int containing magnification scale,
- *              e.g., 2 to double the width and height of rp
- * --------------------------------------------------------------------------
- * Returns: ( intbyte * )   ptr to new bytemap magnified relative to
- *              original bytemap, or NULL for any error.
- * --------------------------------------------------------------------------
+/* ============================================================================
+ * magnifies a bytemap by magstep,
+ * e.g., double-height and double-width if magstep=2
  * Notes:     o Apply EPX/Scale2x/AdvMAME2x  for magstep 2,
  *      and Scale3x/AdvMAME3x  for magstep 3,
  *      as described by http://en.wikipedia.org/wiki/2xSaI
- * ======================================================================= */
-intbyte *bytemapmag(intbyte * bytemap, int width, int height,
-                    int a_magstep)
+ * 
+ * @bytemap: pixbyte_t * ptr to byte map to be magnified
+ * @width: cols in original bytemap
+ * @height: rows in original bytemap
+ * @magstep: magnification scale
+ * 
+ * @returns: ptr to new bytemap magnified, or NULL for any error.
+ * ===========================================================================*/
+pixbyte_t *bytemapmag(const pixbyte_t *bytemap, int width, int height, int a_magstep)
 {
-    intbyte *magnified = NULL;  /* magnified bytemap back to caller */
+    pixbyte_t *magnified = NULL;  /* magnified bytemap back to caller */
     int irow, icol;             /* original height, width indexes */
     int mrow = 0, mcol = 0;     /* dup bytes magstep*magstep times */
     int imap = -1;              /* original bytemap[] index */
@@ -2945,285 +920,212 @@ intbyte *bytemapmag(intbyte * bytemap, int width, int height,
     int icell[10];              /* bytemap[] nearest neighbors */
     int bmmdiff = 64;           /* nearest neighbor diff allowed */
 #define bmmeq(i,j) ((absval((icell[i]-icell[j]))<=bmmdiff))     /*approx equal */
-/* -------------------------------------------------------------------------
-check args
--------------------------------------------------------------------------- */
-    if (bytemap == NULL) {
-        goto end_of_job;        /* no input bytemap supplied */
-    }
-    if (width < 1 || height < 1) {
-        goto end_of_job;        /* invalid bytemap dimensions */
-    }
-    if (width * height > 100000) {
-        goto end_of_job;        /* sanity check */
-    }
-    if (a_magstep < 1 || a_magstep > 10) {
-        goto end_of_job;        /* sanity check */
-    }
-/* -------------------------------------------------------------------------
-allocate magnified bytemap and fill it
--------------------------------------------------------------------------- */
-/* --- allocate bytemap for magstep*width, magstep*height --- */
-    if ((magnified =
-         (intbyte *) (malloc(a_magstep * width * a_magstep * height))) !=
-        NULL) {
-        /* check that allocation succeeded */
-        /* --- fill reflected raster --- */
-        for (irow = 0; irow < height; irow++) { /* for each row of bytemap */
-            for (icol = 0; icol < width; icol++) {      /* and for each column of bytemap */
-                int imag1 = (icol + irow * (width * a_magstep)) * a_magstep;    /*upper-left corner */
-                imap++;         /* bump bytemap[] index */
-                byteval = (int) (bytemap[imap]);        /* grayscale value at this pixel */
-                for (mrow = 0; mrow < a_magstep; mrow++) {      /* dup row magstep times */
-                    for (mcol = 0; mcol < a_magstep; mcol++) {  /* dup col magstep times */
-                        int idup = mcol + mrow * (width * a_magstep);   /* offset from imag1 */
-                        int imag = imag1 + idup;        /* adjust magnified[imag] */
-                        magnified[imag] = (intbyte) (byteval);
-                        /* --- apply AdvMAME2x and 3x (if desired) --- */
-                        if (isAdvMAME) {        /* AdvMAME2x and 3x wanted */
-                            int mcell = 1 + mcol + a_magstep * mrow;    /*1,2,3,4 or 1,2,3,4,5,6,7,8,9 */
-                            icell[5] = byteval; /* center cell of 3x3 bytemap[] */
-                            icell[4] = (icol > 0 ? (int) (bytemap[imap - 1]) : byteval);        /*left of center */
-                            icell[6] = (icol < width ? (int) (bytemap[imap + 1]) : byteval);    /*right */
-                            icell[2] = (irow > 0 ? (int) (bytemap[imap - width]) : byteval);    /*above center */
-                            icell[8] = (irow < height ? (int) (bytemap[imap + width]) : byteval);       /*below */
-                            icell[1] = (irow > 0
-                                        && icol >
-                                        0
-                                        ? (int) (bytemap[imap - width - 1])
-                                        : byteval);
-                            icell[3] = (irow > 0
-                                        && icol <
-                                        width
-                                        ? (int) (bytemap[imap - width + 1])
-                                        : byteval);
-                            icell[7] = (irow < height
-                                        && icol >
-                                        0
-                                        ? (int) (bytemap[imap + width - 1])
-                                        : byteval);
-                            icell[9] = (irow < height
-                                        && icol <
-                                        width
-                                        ? (int) (bytemap[imap + width + 1])
-                                        : byteval);
-                            switch (a_magstep) {        /* 2x magstep=2, 3x magstep=3 */
-                            default:
-                                break;  /* no AdvMAME at other magsteps */
-                            case 2:    /* AdvMAME2x */
-                                if (mcell == 1)
-                                    if (bmmeq(4, 2) && !bmmeq(4, 8)
-                                        && !bmmeq(2, 6))
-                                        magnified[imag] = icell[2];
-                                if (mcell == 2)
-                                    if (bmmeq(2, 6) && !bmmeq(2, 4)
-                                        && !bmmeq(6, 8))
-                                        magnified[imag] = icell[6];
-                                if (mcell == 4)
-                                    if (bmmeq(6, 8) && !bmmeq(6, 2)
-                                        && !bmmeq(8, 4))
-                                        magnified[imag] = icell[8];
-                                if (mcell == 3)
-                                    if (bmmeq(8, 4) && !bmmeq(8, 6)
-                                        && !bmmeq(4, 2))
-                                        magnified[imag] = icell[4];
-                                break;
-                            case 3:    /* AdvMAME3x */
-                                if (mcell == 1)
-                                    if (bmmeq(4, 2) && !bmmeq(4, 8)
-                                        && !bmmeq(2, 6))
-                                        magnified[imag] = icell[4];
-                                if (mcell == 2)
-                                    if ((bmmeq(4, 2) && !bmmeq(4, 8)
-                                         && !bmmeq(2, 6) && !bmmeq(5, 3))
-                                        || (bmmeq(2, 6) && !bmmeq(2, 4)
-                                            && !bmmeq(6, 8)
-                                            && !bmmeq(5, 1)))
-                                        magnified[imag] = icell[2];
-                                if (mcell == 3)
-                                    if (bmmeq(2, 6) && !bmmeq(2, 4)
-                                        && !bmmeq(6, 8))
-                                        magnified[imag] = icell[6];
-                                if (mcell == 4)
-                                    if ((bmmeq(8, 4) && !bmmeq(8, 6)
-                                         && !bmmeq(4, 2) && !bmmeq(5, 1))
-                                        || (bmmeq(4, 2) && !bmmeq(4, 8)
-                                            && !bmmeq(2, 6)
-                                            && !bmmeq(5, 7)))
-                                        magnified[imag] = icell[4];
-                                if (mcell == 6)
-                                    if ((bmmeq(2, 6) && !bmmeq(2, 4)
-                                         && !bmmeq(6, 8) && !bmmeq(5, 9))
-                                        || (bmmeq(6, 8) && !bmmeq(6, 2)
-                                            && !bmmeq(8, 4)
-                                            && !bmmeq(5, 3)))
-                                        magnified[imag] = icell[6];
-                                if (mcell == 7)
-                                    if (bmmeq(8, 4) && !bmmeq(8, 6)
-                                        && !bmmeq(4, 2))
-                                        magnified[imag] = icell[4];
-                                if (mcell == 8)
-                                    if ((bmmeq(6, 8) && !bmmeq(6, 2)
-                                         && !bmmeq(8, 4) && !bmmeq(5, 7))
-                                        || (bmmeq(8, 4) && !bmmeq(8, 6)
-                                            && !bmmeq(4, 2)
-                                            && !bmmeq(5, 9)))
-                                        magnified[imag] = icell[8];
-                                if (mcell == 9)
-                                    if (bmmeq(6, 8) && !bmmeq(6, 2)
-                                        && !bmmeq(8, 4))
-                                        magnified[imag] = icell[6];
-                                break;
-                            }
+
+    if (bytemap == NULL)
+        goto end_of_job;
+    if (width < 1 || height < 1)
+        goto end_of_job;
+    if (width * height > 100000)
+        goto end_of_job;
+    if (a_magstep < 1 || a_magstep > 10)
+        goto end_of_job;
+    
+    magnified = malloc(a_magstep * width * a_magstep * height);
+    if (magnified == NULL)
+        goto end_of_job;
+
+    /* --- fill reflected raster --- */
+    for (irow = 0; irow < height; irow++) { /* for each row of bytemap */
+        for (icol = 0; icol < width; icol++) {      /* and for each column of bytemap */
+            int imag1 = (icol + irow * (width * a_magstep)) * a_magstep;    /*upper-left corner */
+            imap++;         /* bump bytemap[] index */
+            byteval = (int) (bytemap[imap]);        /* grayscale value at this pixel */
+            for (mrow = 0; mrow < a_magstep; mrow++) {      /* dup row magstep times */
+                for (mcol = 0; mcol < a_magstep; mcol++) {  /* dup col magstep times */
+                    int idup = mcol + mrow * (width * a_magstep);   /* offset from imag1 */
+                    int imag = imag1 + idup;        /* adjust magnified[imag] */
+                    magnified[imag] = (pixbyte_t) (byteval);
+                    /* --- apply AdvMAME2x and 3x (if desired) --- */
+                    if (isAdvMAME) {        /* AdvMAME2x and 3x wanted */
+                        int mcell = 1 + mcol + a_magstep * mrow;    /*1,2,3,4 or 1,2,3,4,5,6,7,8,9 */
+
+                        icell[5] = byteval; /* center cell of 3x3 bytemap[] */
+                        icell[4] = (icol > 0 ? (int) (bytemap[imap - 1]) : byteval);        /*left of center */
+                        icell[6] = (icol < width ? (int) (bytemap[imap + 1]) : byteval);    /*right */
+                        icell[2] = (irow > 0 ? (int) (bytemap[imap - width]) : byteval);    /*above center */
+                        icell[8] = (irow < height ? (int) (bytemap[imap + width]) : byteval);       /*below */
+                        icell[1] = (irow > 0 && icol > 0 ? (int) (bytemap[imap - width - 1]) : byteval);
+                        icell[3] = (irow > 0 && icol < width ? (int) (bytemap[imap - width + 1]) : byteval);
+                        icell[7] = (irow < height && icol > 0 ? (int) (bytemap[imap + width - 1]) : byteval);
+                        icell[9] = (irow < height && icol < width ? (int) (bytemap[imap + width + 1]) : byteval);
+
+                        switch (a_magstep) {        /* 2x magstep=2, 3x magstep=3 */
+                        default:
+                            break;  /* no AdvMAME at other magsteps */
+                        case 2:    /* AdvMAME2x */
+                            if (mcell == 1)
+                                if (bmmeq(4, 2) && !bmmeq(4, 8) && !bmmeq(2, 6))
+                                    magnified[imag] = icell[2];
+                            if (mcell == 2)
+                                if (bmmeq(2, 6) && !bmmeq(2, 4) && !bmmeq(6, 8))
+                                    magnified[imag] = icell[6];
+                            if (mcell == 4)
+                                if (bmmeq(6, 8) && !bmmeq(6, 2) && !bmmeq(8, 4))
+                                    magnified[imag] = icell[8];
+                            if (mcell == 3)
+                                if (bmmeq(8, 4) && !bmmeq(8, 6) && !bmmeq(4, 2))
+                                    magnified[imag] = icell[4];
+                            break;
+                        case 3:    /* AdvMAME3x */
+                            if (mcell == 1)
+                                if (bmmeq(4, 2) && !bmmeq(4, 8) && !bmmeq(2, 6))
+                                    magnified[imag] = icell[4];
+                            if (mcell == 2)
+                                if ((bmmeq(4, 2) && !bmmeq(4, 8) && !bmmeq(2, 6) && !bmmeq(5, 3)) || (bmmeq(2, 6) && !bmmeq(2, 4) && !bmmeq(6, 8) && !bmmeq(5, 1)))
+                                    magnified[imag] = icell[2];
+                            if (mcell == 3)
+                                if (bmmeq(2, 6) && !bmmeq(2, 4) && !bmmeq(6, 8))
+                                    magnified[imag] = icell[6];
+                            if (mcell == 4)
+                                if ((bmmeq(8, 4) && !bmmeq(8, 6) && !bmmeq(4, 2) && !bmmeq(5, 1)) || (bmmeq(4, 2) && !bmmeq(4, 8) && !bmmeq(2, 6) && !bmmeq(5, 7)))
+                                    magnified[imag] = icell[4];
+                            if (mcell == 6)
+                                if ((bmmeq(2, 6) && !bmmeq(2, 4) && !bmmeq(6, 8) && !bmmeq(5, 9)) || (bmmeq(6, 8) && !bmmeq(6, 2) && !bmmeq(8, 4) && !bmmeq(5, 3)))
+                                    magnified[imag] = icell[6];
+                            if (mcell == 7)
+                                if (bmmeq(8, 4) && !bmmeq(8, 6) && !bmmeq(4, 2))
+                                    magnified[imag] = icell[4];
+                            if (mcell == 8)
+                                if ((bmmeq(6, 8) && !bmmeq(6, 2) && !bmmeq(8, 4) && !bmmeq(5, 7)) || (bmmeq(8, 4) && !bmmeq(8, 6) && !bmmeq(4, 2) && !bmmeq(5, 9)))
+                                    magnified[imag] = icell[8];
+                            if (mcell == 9)
+                                if (bmmeq(6, 8) && !bmmeq(6, 2) && !bmmeq(8, 4))
+                                    magnified[imag] = icell[6];
+                            break;
                         }
                     }
                 }
             }
         }
     }
-  end_of_job:
+end_of_job:
     return magnified;
 #undef bmmeq
 }
 
-/* ==========================================================================
- * Function:    rastref ( rp, axis )
- * Purpose: reflects rp, horizontally about y-axis |_ becomes _| if axis=1
- *      or vertically about x-axis M becomes W if axis=2.
- * --------------------------------------------------------------------------
- * Arguments:   rp (I)      ptr to raster struct to be reflected
- *      axis (I)    int containing 1 for horizontal reflection,
- *              or 2 for vertical
- * --------------------------------------------------------------------------
- * Returns: ( raster * )    ptr to new raster reflected relative to rp,
- *              or NULL for any error.
- * --------------------------------------------------------------------------
- * Notes:     o
- * ======================================================================= */
-static raster *rastref(raster * rp, int axis)
+/* ============================================================================
+ * reflects rp.
+ * 
+ * @rp: ptr to raster struct to be reflected
+ * @axis: 1 for horizontal reflection, or 2 for vertical
+ * 
+ * @returns: ptr to new raster reflected, or NULL for any error.
+ * ===========================================================================*/
+raster_t *rastref(const raster_t * rp, int axis)
 {
-    raster *reflected = NULL;   /* reflected raster back to caller */
+    raster_t *reflected = NULL;   /* reflected raster back to caller */
     int height = rp->height, irow,      /* height, row index */
         width = rp->width, icol,        /* width, column index */
         pixsz = rp->pixsz;      /* #bits per pixel */
-/* -------------------------------------------------------------------------
-allocate reflected raster and fill it
--------------------------------------------------------------------------- */
-/* --- allocate reflected raster with same width, height --- */
-    if (axis == 1 || axis == 2) {       /* first validate axis arg */
-        if ((reflected = new_raster(width, height, pixsz)) != NULL) {
-            /* check that allocation succeeded */
-            /* --- fill reflected raster --- */
-            for (irow = 0; irow < height; irow++) {     /* for each row of rp */
-                for (icol = 0; icol < width; icol++) {  /* and each column of rp */
-                    int value = getpixel(rp, irow, icol);
-                    if (axis == 1) {
-                        setpixel(reflected, irow, width - 1 - icol, value);
-                    }
-                    if (axis == 2) {
-                        setpixel(reflected, height - 1 - irow, icol,
-                                 value);
-                    }
+
+    reflected = new_raster(width, height, pixsz);
+    if (reflected != NULL) {
+        /* --- fill reflected raster --- */
+        for (irow = 0; irow < height; irow++) {     /* for each row of rp */
+            for (icol = 0; icol < width; icol++) {  /* and each column of rp */
+                int value = getpixel(rp, irow, icol);
+                if (axis == 1) {
+                    setpixel(reflected, irow, width - 1 - icol, value);
+                }
+                if (axis == 2) {
+                    setpixel(reflected, height - 1 - irow, icol, value);
                 }
             }
         }
     }
+
     return reflected;
 }
 
-/* ==========================================================================
- * Function:    rastput ( target, source, top, left, isopaque )
- * Purpose: Overlays source onto target,
- *      with the 0,0-bit of source onto the top,left-bit of target.
- * --------------------------------------------------------------------------
- * Arguments:   target (I)  ptr to target raster struct
- *      source (I)  ptr to source raster struct
- *      top (I)     int containing 0 ... target->height - 1
- *      left (I)    int containing 0 ... target->width - 1
- *      isopaque (I)    int containing false (zero) to allow
- *              original 1-bits of target to "show through"
- *              0-bits of source.
- * --------------------------------------------------------------------------
- * Returns: ( int )     1 if completed successfully,
- *              or 0 otherwise (for any error).
- * --------------------------------------------------------------------------
- * Notes:
- * ======================================================================= */
-static int rastput(raster * target, raster * source, int top, int left,
-                   int isopaque)
+/* ============================================================================
+ * Overlays source onto target,
+ * with the 0,0-bit of source onto the top,left-bit of target.
+ * 
+ * @target: ptr to target raster struct
+ * @source: ptr to source raster struct
+ * @top: 0 ... target->height - 1
+ * @lert: 0 ... target->width - 1
+ * @isopaque: false (zero) to allow original 1-bits of target to
+ *            "show through" 0-bits of source.
+ * 
+ * @returns: 1 if completed successfully, or 0 for any error.
+ * ===========================================================================*/
+int rastput(raster_t *target, const raster_t *source, int top, int left, int isopaque)
 {
     int irow, icol,             /* indexes over source raster */
      twidth = target->width, theight = target->height,  /*target width,height */
         tpix, ntpix = twidth * theight; /* #pixels in target */
     int isfatal = 0,            /* true to abend on out-of-bounds error */
-        isstrict = 0 /*1 */ ,   /* true for strict bounds check - no "wrap" */
         isokay = 1;             /* true if no pixels out-of-bounds */
+
 /* -------------------------------------------------------------------------
 superimpose source onto target, one bit at a time
 -------------------------------------------------------------------------- */
-    if (isstrict && (top < 0 || left < 0)) {    /* args fail strict test */
-        isokay = 0;             /* so just return error */
-    } else {
-        for (irow = 0; irow < source->height; irow++) { /* for each scan line */
-            tpix = (top + irow) * target->width + left - 1;     /*first target pixel (-1) */
-            for (icol = 0; icol < source->width; icol++) {      /* each pixel in scan line */
-                int svalue = getpixel(source, irow, icol);      /* source pixel value */
-                ++tpix;         /* bump target pixel */
-                if (msgfp != NULL && msglevel >= 9999) {        /* debugging output */
-                    fprintf(msgfp,
-                            "rastput> tpix,ntpix=%d,%d top,irow,theight=%d,%d,%d "
-                            "left,icol,twidth=%d,%d,%d\n", tpix, ntpix,
-                            top, irow, theight, left, icol, twidth);
-                    fflush(msgfp);
+    if (top < 0 || left < 0) {
+        isokay = 0;
+        goto end_of_job;
+    }
+
+    for (irow = 0; irow < source->height; irow++) { /* for each scan line */
+        tpix = (top + irow) * target->width + left - 1;     /*first target pixel (-1) */
+        for (icol = 0; icol < source->width; icol++) {      /* each pixel in scan line */
+            int svalue = getpixel(source, irow, icol);      /* source pixel value */
+            ++tpix;         /* bump target pixel */
+
+#if DEBUG_LOG_LEVEL >= 9999
+            fprintf(msgfp,
+                    "rastput> tpix,ntpix=%d,%d top,irow,theight=%d,%d,%d "
+                    "left,icol,twidth=%d,%d,%d\n", tpix, ntpix,
+                    top, irow, theight, left, icol, twidth);
+#endif
+
+            if (tpix >= ntpix || (irow + top >= theight || icol + left >= twidth)) {
+                /* bounds check failed */
+                isokay = 0; /* reset okay flag */
+                if (isfatal) {
+                    goto end_of_job;        /* abort if error is fatal */
+                } else {
+                    break;
                 }
-                if (tpix >= ntpix
-                    || (isstrict
-                        && (irow + top >= theight
-                            || icol + left >= twidth))) {
-                    /* bounds check failed */
-                    isokay = 0; /* reset okay flag */
-                    if (isfatal) {
-                        goto end_of_job;        /* abort if error is fatal */
-                    } else {
-                        break;
-                    }
-                }               /*or just go on to next row */
-                if (tpix >= 0) {        /* bounds check okay */
-                    if (svalue != 0 || isopaque) {      /*got dark or opaque source */
-                        setpixel(target, irow + top, icol + left, svalue);
-                    }           /*overlay source on targ */
-                }
+            }
+            if (tpix >= 0) {        /* bounds check okay */
+                if (svalue != 0 || isopaque) {      /*got dark or opaque source */
+                    setpixel(target, irow + top, icol + left, svalue);
+                }           /*overlay source on targ */
             }
         }
     }
-  end_of_job:
+end_of_job:
     return isokay;
 }
 
-/* ==========================================================================
- * Function:    rastcompose ( sp1, sp2, offset2, isalign, isfree )
- * Purpose: Overlays sp2 on top of sp1, leaving both unchanged
- *      and returning a newly-allocated composite subraster.
+/* ============================================================================
+ * Overlays sp2 on top of sp1, leaving both unchanged
+ *      and returning a newly-allocated composite subraster_t.
  *      Frees/deletes input sp1 and/or sp2 depending on value
  *      of isfree (0=none, 1=sp1, 2=sp2, 3=both).
  * --------------------------------------------------------------------------
- * Arguments:   sp1 (I)     subraster *  to "underneath" subraster,
- *              whose baseline is preserved
- *      sp2 (I)     subraster *  to "overlaid" subraster
- *      offset2 (I) int containing 0 or number of pixels
- *              to horizontally shift sp2 relative to sp1,
- *              either positive (right) or negative
- *      isalign (I) int containing 1 to align baselines,
- *              or 0 to vertically center sp2 over sp1.
- *              For isalign=2, images are vertically
- *              centered, but then adjusted by \raisebox
- *              lifts, using global variables rastlift1
- *              for sp1 and rastlift for sp2.
- *      isfree (I)  int containing 1=free sp1 before return,
- *              2=free sp2, 3=free both, 0=free none.
- * --------------------------------------------------------------------------
- * Returns: ( subraster * ) pointer to constructed subraster
- *              or  NULL for any error
+ * @sp1: "underneath" subraster_t, whose baseline is preserved
+ * @sp2: "overlaid" subraster_t
+ * @offset2: 0 or number of pixels to horizontally shift sp2 relative to sp1,
+ *           either positive (right) or negative
+ * @isalign: 1 to align baselines, or 0 to vertically center sp2 over sp1.
+ *           For isalign=2, images are vertically centered,
+ *           but then adjusted by \raisebox lifts,
+ *           using global variables rastlift1 for sp1 and rastlift for sp2.
+ * @isfree:  1=free sp1 before return, 2=free sp2, 3=free both, 0=free none.
+ * 
+ * @returns: pointer to constructed subraster_t or  NULL for any error
  * --------------------------------------------------------------------------
  * Notes:     o The top-left corner of each raster box has coords (0,0),
  *      down to (h-1,w-1) for a box of height h and width w.
@@ -3238,50 +1140,47 @@ superimpose source onto target, one bit at a time
  *        o The composite raster is constructed as follows...
  *      The base image is labelled height h1 and baseline b1,
  *      the overlay h2 and b2, and the composite H and B.
- *           base       overlay
- *      --- +------------------------+ ---   For the overlay to be
- *       ^  |   ^        +----------+|  ^    vertically centered with
- *       |  |   |        |          ||  |    respect to the base,
- *       |  |   |B-b1    |          ||  |      B - b1 = H-B -(h1-b1), so
- *       |  |   v        |          ||  |      2*B = H-h1 + 2*b1
- *       |  |+----------+|          ||  |      B = b1 + (H-h1)/2
- *       B  ||  ^    ^  ||          ||  |    And when the base image is
- *       |  ||  |    |  ||          ||  |    bigger, H=h1 and B=b1 is
- *       |  ||  b1   |  ||          ||  |    the obvious correct answer.
- *       |  ||  |    h1 ||          || H=h2
- *       v  ||  v    |  ||          ||  |
- *    ----------||-------|--||          ||--|--------
- *    baseline  || h1-b1 v  || overlay  ||  |
- *    for base  |+----------+| baseline ||  |
- *    and com-  |   ^        | ignored  ||  |
- *    posite    |   |H-B-    |----------||  |
- *      |   | (h1-b1)|          ||  |
- *      |   v        +----------+|  v
- *      +------------------------+ ---
+ *            base       overlay
+ *       --- +------------------------+ ---   For the overlay to be
+ *        ^  |   ^        +----------+|  ^    vertically centered with
+ *        |  |   |        |          ||  |    respect to the base,
+ *        |  |   |B-b1    |          ||  |      B - b1 = H-B -(h1-b1), so
+ *        |  |   v        |          ||  |      2*B = H-h1 + 2*b1
+ *        |  |+----------+|          ||  |      B = b1 + (H-h1)/2
+ *        B  ||  ^    ^  ||          ||  |    And when the base image is
+ *        |  ||  |    |  ||          ||  |    bigger, H=h1 and B=b1 is
+ *        |  ||  b1   |  ||          ||  |    the obvious correct answer.
+ *        |  ||  |    h1 ||          || H=h2
+ *        v  ||  v    |  ||          ||  |
+ * ----------||-------|--||          ||--|--------
+ * baseline  || h1-b1 v  || overlay  ||  |
+ * for base  |+----------+| baseline ||  |
+ * and com-  |   ^        | ignored  ||  |
+ * posite    |   |H-B-    |----------||  |
+ *           |   | (h1-b1)|          ||  |
+ *           |   v        +----------+|  v
+ *           +------------------------+ ---
  * ======================================================================= */
-static subraster *rastcompose(subraster * sp1, subraster * sp2,
-                              int offset2, int isalign, int isfree)
+subraster_t *rastcompose(subraster_t *sp1, subraster_t *sp2, int offset2, int isalign, int isfree)
 {
-    subraster *sp = NULL;       /* returned subraster */
-    raster *rp = NULL;          /* new composite raster in sp */
-    int base1 = sp1->baseline,  /*baseline for underlying subraster */
-        height1 = (sp1->image)->height, /* height for underlying subraster */
-        width1 = (sp1->image)->width,   /* width for underlying subraster */
-        pixsz1 = (sp1->image)->pixsz,   /* pixsz for underlying subraster */
-        base2 = sp2->baseline,  /*baseline for overlaid subraster */
-        height2 = (sp2->image)->height, /* height for overlaid subraster */
-        width2 = (sp2->image)->width,   /* width for overlaid subraster */
-        pixsz2 = (sp2->image)->pixsz;   /* pixsz for overlaid subraster */
+    subraster_t *sp = NULL;       /* returned subraster_t */
+    raster_t *rp = NULL;          /* new composite raster in sp */
+    int base1 = sp1->baseline,  /*baseline for underlying subraster_t */
+        height1 = (sp1->image)->height, /* height for underlying subraster_t */
+        width1 = (sp1->image)->width,   /* width for underlying subraster_t */
+        pixsz1 = (sp1->image)->pixsz,   /* pixsz for underlying subraster_t */
+        base2 = sp2->baseline,  /*baseline for overlaid subraster_t */
+        height2 = (sp2->image)->height, /* height for overlaid subraster_t */
+        width2 = (sp2->image)->width,   /* width for overlaid subraster_t */
+        pixsz2 = (sp2->image)->pixsz;   /* pixsz for overlaid subraster_t */
     int height = max2(height1, height2),        /*composite height if sp2 centered */
         base = base1 + (height - height1) / 2,  /* and composite baseline */
         tlc2 = (height - height2) / 2,  /* top-left corner for overlay */
         width = 0, pixsz = 0;   /* other params for composite */
     int lift1 = rastlift1,      /* vertical \raisebox lift for sp1 */
         lift2 = rastlift;       /* vertical \raisebox lift for sp2 */
-/* -------------------------------------------------------------------------
-Initialization
--------------------------------------------------------------------------- */
-/* --- determine height, width and baseline of composite raster --- */
+
+
     switch (isalign) {
     default:
     case 0:                    /* centered, baselines not aligned */
@@ -3306,21 +1205,19 @@ Initialization
     }
     width = max2(width1, width2 + abs(offset2));        /* max width */
     pixsz = max2(pixsz1, pixsz2);       /* bitmap,bytemap becomes bytemap */
-/* -------------------------------------------------------------------------
-allocate concatted composite subraster
--------------------------------------------------------------------------- */
-/* --- allocate returned subraster (and then initialize it) --- */
-    if ((sp = new_subraster(width, height, pixsz))      /* allocate new subraster */
-        == (subraster *) NULL)
-        goto end_of_job;        /* failed, so quit */
-/* --- initialize subraster parameters --- */
+
+/* --- allocate returned subraster_t (and then initialize it) --- */
+    sp = new_subraster(width, height, pixsz);
+    if (sp == NULL)
+        goto end_of_job;
+
     sp->type = IMAGERASTER;     /* image */
     sp->baseline = base;        /* composite baseline */
     sp->size = sp1->size;       /* underlying char is sp1 */
     if (isalign == 2)
         sp->baseline += lift1;  /* adjust baseline */
-/* --- extract raster from subraster --- */
-    rp = sp->image;             /* raster allocated in subraster */
+/* --- extract raster from subraster_t --- */
+    rp = sp->image;             /* raster allocated in subraster_t */
 /* -------------------------------------------------------------------------
 overlay sp1 and sp2 in new composite raster
 -------------------------------------------------------------------------- */
@@ -3344,9 +1241,7 @@ overlay sp1 and sp2 in new composite raster
         }
         break;
     }
-/* -------------------------------------------------------------------------
-free input if requested
--------------------------------------------------------------------------- */
+
     if (isfree > 0) {           /* caller wants input freed */
         if (isfree == 1 || isfree > 2) {
             delete_subraster(sp1);
@@ -3355,63 +1250,54 @@ free input if requested
             delete_subraster(sp2);
         }
     }
-    /* and/or sp2 */
-  end_of_job:
+
+end_of_job:
     return sp;
 }
 
-/* ==========================================================================
- * Function:    rastcat ( sp1, sp2, isfree )
- * Purpose: "Concatanates" subrasters sp1||sp2, leaving both unchanged
- *      and returning a newly-allocated subraster.
- *      Frees/deletes input sp1 and/or sp2 depending on value
- *      of isfree (0=none, 1=sp1, 2=sp2, 3=both).
- * --------------------------------------------------------------------------
- * Arguments:   sp1 (I)     subraster *  to left-hand subraster
- *      sp2 (I)     subraster *  to right-hand subraster
- *      isfree (I)  int containing 1=free sp1 before return,
- *              2=free sp2, 3=free both, 0=free none.
- * --------------------------------------------------------------------------
- * Returns: ( subraster * ) pointer to constructed subraster sp1||sp2
- *              or  NULL for any error
- * --------------------------------------------------------------------------
- * Notes:
- * ======================================================================= */
-subraster *rastcat(subraster * sp1, subraster * sp2, int isfree)
+/* ============================================================================
+ * "Concatanates" subrasters sp1||sp2, leaving both unchanged
+ * and returning a newly-allocated subraster_t.
+ * 
+ * @sp1: subraster_t *  to left-hand subraster_t
+ * @sp2: subraster_t *  to right-hand subraster_t
+ * @isfree: 1=free sp1 before return, 2=free sp2, 3=free both, 0=free none.
+ * 
+ * @returns: pointer to constructed subraster_t sp1||sp2 or  NULL for any error
+ * ===========================================================================*/
+subraster_t *rastcat(subraster_t *sp1, subraster_t *sp2, int isfree)
 {
-    subraster *sp = NULL;       /* returned subraster */
-    raster *rp = NULL;          /* new concatted raster */
-    int base1 = sp1->baseline,  /*baseline for left-hand subraster */
-        height1 = (sp1->image)->height, /* height for left-hand subraster */
-        width1 = (sp1->image)->width,   /* width for left-hand subraster */
-        pixsz1 = (sp1->image)->pixsz,   /* pixsz for left-hand subraster */
-        type1 = sp1->type,      /* image type for left-hand */
-        base2 = sp2->baseline,  /*baseline for right-hand subraster */
-        height2 = (sp2->image)->height, /* height for right-hand subraster */
-        width2 = (sp2->image)->width,   /* width for right-hand subraster */
-        pixsz2 = (sp2->image)->pixsz,   /* pixsz for right-hand subraster */
-        type2 = sp2->type;      /* image type for right-hand */
+    subraster_t *sp = NULL;       /* returned subraster_t */
+    raster_t *rp = NULL;          /* new concatted raster */
+    int base1 = sp1->baseline;  /*baseline for left-hand subraster_t */
+    int height1 = (sp1->image)->height; /* height for left-hand subraster_t */
+    int width1 = (sp1->image)->width;   /* width for left-hand subraster_t */
+    int pixsz1 = (sp1->image)->pixsz;   /* pixsz for left-hand subraster_t */
+    int type1 = sp1->type;      /* image type for left-hand */
+    int base2 = sp2->baseline;  /*baseline for right-hand subraster_t */
+    int height2 = (sp2->image)->height; /* height for right-hand subraster_t */
+    int width2 = (sp2->image)->width;   /* width for right-hand subraster_t */
+    int pixsz2 = (sp2->image)->pixsz;   /* pixsz for right-hand subraster_t */
+    int type2 = sp2->type;      /* image type for right-hand */
     int height = 0, width = 0, pixsz = 0, base = 0;     /*concatted sp1||sp2 composite */
-    int issmash = (smashmargin != 0 ? 1 : 0),   /* true to "squash" sp1||sp2 */
-        isopaque = (issmash ? 0 : 1),   /* not oppaque if smashing */
-        isblank = 0, nsmash = 0,        /* #cols to smash */
-        oldsmashmargin = smashmargin,   /* save original smashmargin */
-        oldblanksymspace = blanksymspace,       /* save original blanksymspace */
-        oldnocatspace = isnocatspace;   /* save original isnocatspace */
-    mathchardef *symdef1 = sp1->symdef, /*mathchardef of last left-hand char */
-        *symdef2 = sp2->symdef; /* mathchardef of right-hand char */
-    int class1 = (symdef1 == NULL ? ORDINARY : symdef1->class), /* symdef->class */
-        class2 = (symdef2 == NULL ? ORDINARY : symdef2->class), /* or default */
-        smash1 = (symdef1 != NULL) && (class1 == ORDINARY || class1 == VARIABLE || class1 == OPENING || class1 == CLOSING || class1 == PUNCTION), smash2 = (symdef2 != NULL) && (class2 == ORDINARY || class2 == VARIABLE || class2 == OPENING || class2 == CLOSING || class2 == PUNCTION), space = fontsize / 2 + 1;   /* #cols between sp1 and sp2 */
+    int issmash = (smashmargin != 0 ? 1 : 0);   /* true to "squash" sp1||sp2 */
+    int isopaque = (issmash ? 0 : 1);   /* not oppaque if smashing */
+    int isblank = 0, nsmash = 0;        /* #cols to smash */
+    int oldsmashmargin = smashmargin;   /* save original smashmargin */
+    //int oldblanksymspace = blanksymspace;       /* save original blanksymspace */
+    //int oldnocatspace = isnocatspace;   /* save original isnocatspace */
+    const mathchardef_t *symdef1 = sp1->symdef; /*mathchardef of last left-hand char */
+    const mathchardef_t *symdef2 = sp2->symdef; /* mathchardef of right-hand char */
+    int class1 = (symdef1 == NULL ? ORDINARY : symdef1->class); /* symdef->class */
+    int class2 = (symdef2 == NULL ? ORDINARY : symdef2->class); /* or default */
+    int smash1 = (symdef1 != NULL) && (class1 == ORDINARY || class1 == VARIABLE || class1 == OPENING || class1 == CLOSING || class1 == PUNCTION), smash2 = (symdef2 != NULL) && (class2 == ORDINARY || class2 == VARIABLE || class2 == OPENING || class2 == CLOSING || class2 == PUNCTION), space = fontsize / 2 + 1;   /* #cols between sp1 and sp2 */
     int isfrac = (type1 == FRACRASTER && class2 == PUNCTION);   /* sp1 is a \frac and sp2 is punctuation */
 /* -------------------------------------------------------------------------
 Initialization
 -------------------------------------------------------------------------- */
 /* --- determine inter-character space from character class --- */
-    if (!isstring)
-        space = max2(2, (symspace[class1][class2] + fontsize - 3));     /* space */
-    else
-        space = 1;              /* space for ascii string */
+    space = max2(2, (symspace[class1][class2] + fontsize - 3));     /* space */
+
     if (isnocatspace > 0) {     /* spacing explicitly turned off */
         space = 0;              /* reset space */
         isnocatspace--;
@@ -3425,14 +1311,13 @@ Initialization
             space = max2(0, space + blanksymspace);     /* adjust as much as possible */
             blanksymspace = 0;
         }                       /* and reset adjustment */
-    if (msgfp != NULL && msglevel >= 999) {     /* display space results */
-        fprintf(msgfp,
-                "rastcat> space=%d, blanksymspace=%d, isnocatspace=%d\n",
-                space, oldblanksymspace, oldnocatspace);
-        fflush(msgfp);
-    }
+#if DEBUG_LOG_LEVEL >= 999
+    fprintf(msgfp,
+            "rastcat> space=%d, blanksymspace=%d, isnocatspace=%d\n",
+            space, oldblanksymspace, oldnocatspace);
+#endif
 /* --- determine smash --- */
-    if (!isstring && !isfrac) {  /* don't smash strings or \frac's */
+    if (!isfrac) {  /* don't smash strings or \frac's */
         if (issmash) {          /* raster smash wanted */
             int maxsmash = rastsmash(sp1, sp2), /* calculate max smash space */
                 margin = smashmargin;   /* init margin without delta */
@@ -3447,120 +1332,99 @@ Initialization
                 isblank = 1;    /* set blank flag signal */
             else /* see how much extra space we have */ if (maxsmash > margin)  /* enough space for adjustment */
                 nsmash = maxsmash - margin;     /* make adjustment */
-            if (msgfp != NULL && msglevel >= 99) {      /* display smash results */
-                fprintf(msgfp,
-                        "rastcat> maxsmash=%d, margin=%d, nsmash=%d\n",
-                        maxsmash, margin, nsmash);
-                fprintf(msgfp, "rastcat> type1=%d,2=%d, class1=%d,2=%d\n",
-                        type1, type2, (symdef1 == NULL ? -999 : class1),
-                        (symdef2 == NULL ? -999 : class2));
-                fflush(msgfp);
-            }
+#if DEBUG_LOG_LEVEL >= 99
+            fprintf(msgfp,
+                    "rastcat> maxsmash=%d, margin=%d, nsmash=%d\n",
+                    maxsmash, margin, nsmash);
+            fprintf(msgfp, "rastcat> type1=%d,2=%d, class1=%d,2=%d\n",
+                    type1, type2, (symdef1 == NULL ? -999 : class1),
+                    (symdef2 == NULL ? -999 : class2));
+#endif
         }
     }
 
     /* --- determine height, width and baseline of composite raster --- */
-    if (!isstring) {
-        height = max2(base1 + 1, base2 + 1)     /* max height above baseline */
-            +max2(height1 - base1 - 1, height2 - base2 - 1);    /*+ max descending below */
-        width = width1 + width2 + space - nsmash;       /*add widths and space-smash */
-        width = max3(width, width1, width2);
-    } else {                      /* ascii string */
-        height = 1;             /* default */
-        width = width1 + width2 + space - 1;
-    }                           /* no need for two nulls */
+    height = max2(base1 + 1, base2 + 1)     /* max height above baseline */
+        +max2(height1 - base1 - 1, height2 - base2 - 1);    /*+ max descending below */
+    width = width1 + width2 + space - nsmash;       /*add widths and space-smash */
+    width = max3(width, width1, width2);
+
     pixsz = max2(pixsz1, pixsz2);       /* bitmap||bytemap becomes bytemap */
     base = max2(base1, base2);  /* max space above baseline */
-    if (msgfp != NULL && msglevel >= 9999) {    /* display components */
-        fprintf(msgfp,
-                "rastcat> Left-hand ht,width,pixsz,base = %d,%d,%d,%d\n",
-                height1, width1, pixsz1, base1);
-        type_raster(sp1->image, msgfp); /* display left-hand raster */
-        fprintf(msgfp,
-                "rastcat> Right-hand ht,width,pixsz,base = %d,%d,%d,%d\n",
-                height2, width2, pixsz2, base2);
-        type_raster(sp2->image, msgfp); /* display right-hand raster */
-        fprintf(msgfp,
-                "rastcat> Composite ht,width,smash,pixsz,base = %d,%d,%d,%d,%d\n",
-                height, width, nsmash, pixsz, base);
-        fflush(msgfp);
-    }
+
+#if DEBUG_LOG_LEVEL >= 9999
+    fprintf(msgfp,
+            "rastcat> Left-hand ht,width,pixsz,base = %d,%d,%d,%d\n",
+            height1, width1, pixsz1, base1);
+    type_raster(sp1->image, msgfp); /* display left-hand raster */
+    fprintf(msgfp,
+            "rastcat> Right-hand ht,width,pixsz,base = %d,%d,%d,%d\n",
+            height2, width2, pixsz2, base2);
+    type_raster(sp2->image, msgfp); /* display right-hand raster */
+    fprintf(msgfp,
+            "rastcat> Composite ht,width,smash,pixsz,base = %d,%d,%d,%d,%d\n",
+            height, width, nsmash, pixsz, base);
+#endif
 
     /* -------------------------------------------------------------------------
-       allocate concatted composite subraster
+       allocate concatted composite subraster_t
        -------------------------------------------------------------------------- */
-    /* --- allocate returned subraster (and then initialize it) --- */
-    if (msgfp != NULL && msglevel >= 9999) {
-        fprintf(msgfp, "rastcat> calling new_subraster(%d,%d,%d)\n",
-                width, height, pixsz);
-        fflush(msgfp);
-    }
+    /* --- allocate returned subraster_t (and then initialize it) --- */
+#if DEBUG_LOG_LEVEL >= 9999
+    fprintf(msgfp, "rastcat> calling new_subraster(%d,%d,%d)\n",
+            width, height, pixsz);
+#endif
     if ((sp = new_subraster(width, height, pixsz)) == NULL) {   /* failed */
-        if (msgfp != NULL && msglevel >= 1) {   /* report failure */
-            fprintf(msgfp, "rastcat> new_subraster(%d,%d,%d) failed\n",
-                    width, height, pixsz);
-            fflush(msgfp);
-        }
+#if DEBUG_LOG_LEVEL >= 1
+        fprintf(msgfp, "rastcat> new_subraster(%d,%d,%d) failed\n",
+                width, height, pixsz);
+#endif
         goto end_of_job;
     }
 
     /* failed, so quit */
-    /* --- initialize subraster parameters --- */
+    /* --- initialize subraster_t parameters --- */
     /* sp->type = (!isstring?STRINGRASTER:ASCIISTRING); */
     /*concatted string */
-    if (!isstring) {
-        sp->type =              /*type2; *//*(type1==type2?type2:IMAGERASTER); */
-            (type2 != CHARASTER ? type2 :
-             (type1 != CHARASTER && type1 != BLANKSIGNAL
-              && type1 != FRACRASTER ? type1 : IMAGERASTER));
-    } else {
-        sp->type = ASCIISTRING; /* concatted ascii string */
-    }
+    sp->type =              /*type2; *//*(type1==type2?type2:IMAGERASTER); */
+        (type2 != CHARASTER ? type2 :
+         (type1 != CHARASTER && type1 != BLANKSIGNAL
+          && type1 != FRACRASTER ? type1 : IMAGERASTER));
+
     sp->symdef = symdef2;       /* rightmost char is sp2 */
     sp->baseline = base;        /* composite baseline */
     sp->size = sp2->size;       /* rightmost char is sp2 */
     if (isblank) {              /* need to propagate blanksignal */
         sp->type = blanksignal; /* may not be completely safe??? */
     }
-/* --- extract raster from subraster --- */
-    rp = sp->image;             /* raster allocated in subraster */
+/* --- extract raster from subraster_t --- */
+    rp = sp->image;             /* raster allocated in subraster_t */
 /* -------------------------------------------------------------------------
 overlay sp1 and sp2 in new composite raster
 -------------------------------------------------------------------------- */
-    if (msgfp != NULL && msglevel >= 9999) {
-        fprintf(msgfp,
-                "rastcat> calling rastput() to concatanate left||right\n");
-        fflush(msgfp);
-    }                           /* flush msgfp buffer */
-    if (!isstring) {
-        rastput(rp, sp1->image, base - base1,   /* overlay left-hand */
-                max2(0, nsmash - width1), 1);   /* plus any residual smash space */
-    } else {
-        memcpy(rp->pixmap, (sp1->image)->pixmap, width1 - 1);   /*init left string */
-    }
-    if (msgfp != NULL && msglevel >= 9999) {
-        type_raster(sp->image, msgfp);  /* display composite raster */
-        fflush(msgfp);
-    }                           /* flush msgfp buffer */
-    if (!isstring) {
-        int fracbase = (isfrac ?        /* baseline for punc after \frac */
-                        max2(fraccenterline, base2) : base);    /*adjust baseline or use original */
-        rastput(rp, sp2->image, fracbase - base2,       /* overlay right-hand */
-                max2(0, width1 + space - nsmash), isopaque);    /* minus any smashed space */
-        if (1 && type1 == FRACRASTER    /* we're done with \frac image */
-            && type2 != FRACRASTER)     /* unless we have \frac\frac */
-            fraccenterline = NOVALUE;   /* so reset centerline signal */
-        if (fraccenterline != NOVALUE)  /* sp2 is a fraction */
-            fraccenterline += (base - base2);
-    } else {
-        strcpy((char *) (rp->pixmap) + width1 - 1 + space,
-               (char *) ((sp2->image)->pixmap));
-        ((char *) (rp->pixmap))[width1 + width2 + space - 2] = '\0';
-    }
-    if (msgfp != NULL && msglevel >= 9999) {
-        type_raster(sp->image, msgfp);  /* display composite raster */
-        fflush(msgfp);
-    }
+#if DEBUG_LOG_LEVEL >= 9999
+    fprintf(msgfp,
+            "rastcat> calling rastput() to concatanate left||right\n");
+#endif
+    rastput(rp, sp1->image, base - base1,   /* overlay left-hand */
+            max2(0, nsmash - width1), 1);   /* plus any residual smash space */
+
+#if DEBUG_LOG_LEVEL >= 9999
+    type_raster(sp->image, msgfp);  /* display composite raster */
+#endif
+    int fracbase = (isfrac ?        /* baseline for punc after \frac */
+                    max2(fraccenterline, base2) : base);    /*adjust baseline or use original */
+    rastput(rp, sp2->image, fracbase - base2,       /* overlay right-hand */
+            max2(0, width1 + space - nsmash), isopaque);    /* minus any smashed space */
+    if (1 && type1 == FRACRASTER    /* we're done with \frac image */
+        && type2 != FRACRASTER)     /* unless we have \frac\frac */
+        fraccenterline = NOVALUE;   /* so reset centerline signal */
+    if (fraccenterline != NOVALUE)  /* sp2 is a fraction */
+        fraccenterline += (base - base2);
+
+#if DEBUG_LOG_LEVEL >= 9999
+    type_raster(sp->image, msgfp);  /* display composite raster */
+#endif
     /* flush msgfp buffer */
     /* -------------------------------------------------------------------------
        free input if requested
@@ -3574,7 +1438,7 @@ overlay sp1 and sp2 in new composite raster
         }
     }
     /* and/or sp2 */
-  end_of_job:
+end_of_job:
     smashmargin = oldsmashmargin;
     return sp;
 }
@@ -3582,13 +1446,13 @@ overlay sp1 and sp2 in new composite raster
 /* ==========================================================================
  * Function:    rastack ( sp1, sp2, base, space, iscenter, isfree )
  * Purpose: Stack subrasters sp2 atop sp1, leaving both unchanged
- *      and returning a newly-allocated subraster,
+ *      and returning a newly-allocated subraster_t,
  *      whose baseline is sp1's if base=1, or sp2's if base=2.
  *      Frees/deletes input sp1 and/or sp2 depending on value
  *      of isfree (0=none, 1=sp1, 2=sp2, 3=both).
  * --------------------------------------------------------------------------
- * Arguments:   sp1 (I)     subraster *  to lower subraster
- *      sp2 (I)     subraster *  to upper subraster
+ * Arguments:   sp1 (I)     subraster_t *  to lower subraster_t
+ *      sp2 (I)     subraster_t *  to upper subraster_t
  *      base (I)    int containing 1 if sp1 is baseline,
  *              or 2 if sp2 is baseline.
  *      space (I)   int containing #rows blank space inserted
@@ -3598,27 +1462,27 @@ overlay sp1 and sp2 in new composite raster
  *      isfree (I)  int containing 1=free sp1 before return,
  *              2=free sp2, 3=free both, 0=free none.
  * --------------------------------------------------------------------------
- * Returns: ( subraster * ) pointer to constructed subraster sp2 atop sp1
+ * Returns: ( subraster_t * ) pointer to constructed subraster_t sp2 atop sp1
  *              or  NULL for any error
  * --------------------------------------------------------------------------
  * Notes:
  * ======================================================================= */
-subraster *rastack(subraster * sp1, subraster * sp2, int base, int space,
+subraster_t *rastack(subraster_t *sp1, subraster_t *sp2, int base, int space,
                    int iscenter, int isfree)
 {
-    subraster *sp = NULL;       /* returned subraster */
-    raster *rp = NULL;          /* new stacked raster in sp */
-    int base1 = sp1->baseline,  /* baseline for lower subraster */
-        height1 = (sp1->image)->height, /* height for lower subraster */
-        width1 = (sp1->image)->width,   /* width for lower subraster */
-        pixsz1 = (sp1->image)->pixsz,   /* pixsz for lower subraster */
-        base2 = sp2->baseline,  /* baseline for upper subraster */
-        height2 = (sp2->image)->height, /* height for upper subraster */
-        width2 = (sp2->image)->width,   /* width for upper subraster */
-        pixsz2 = (sp2->image)->pixsz;   /* pixsz for upper subraster */
+    subraster_t *sp = NULL;       /* returned subraster_t */
+    raster_t *rp = NULL;          /* new stacked raster in sp */
+    int base1 = sp1->baseline,  /* baseline for lower subraster_t */
+        height1 = (sp1->image)->height, /* height for lower subraster_t */
+        width1 = (sp1->image)->width,   /* width for lower subraster_t */
+        pixsz1 = (sp1->image)->pixsz,   /* pixsz for lower subraster_t */
+        base2 = sp2->baseline,  /* baseline for upper subraster_t */
+        height2 = (sp2->image)->height, /* height for upper subraster_t */
+        width2 = (sp2->image)->width,   /* width for upper subraster_t */
+        pixsz2 = (sp2->image)->pixsz;   /* pixsz for upper subraster_t */
     int height = 0, width = 0, pixsz = 0, baseline = 0; /*for stacked sp2 atop sp1 */
-    mathchardef *symdef1 = sp1->symdef, /* mathchardef of right lower char */
-        *symdef2 = sp2->symdef; /* mathchardef of right upper char */
+    const mathchardef_t *symdef1 = sp1->symdef; /* mathchardef of right lower char */
+    const mathchardef_t *symdef2 = sp2->symdef; /* mathchardef of right upper char */
 /* -------------------------------------------------------------------------
 Initialization
 -------------------------------------------------------------------------- */
@@ -3629,19 +1493,19 @@ Initialization
     baseline =
         (base == 1 ? height2 + space + base1 : (base == 2 ? base2 : 0));
 /* -------------------------------------------------------------------------
-allocate stacked composite subraster (with embedded raster)
+allocate stacked composite subraster_t (with embedded raster)
 -------------------------------------------------------------------------- */
-/* --- allocate returned subraster (and then initialize it) --- */
+/* --- allocate returned subraster_t (and then initialize it) --- */
     if ((sp = new_subraster(width, height, pixsz)) == NULL) {
         goto end_of_job;        /* failed, so quit */
     }
-/* --- initialize subraster parameters --- */
+/* --- initialize subraster_t parameters --- */
     sp->type = IMAGERASTER;     /* stacked rasters */
     sp->symdef = (base == 1 ? symdef1 : (base == 2 ? symdef2 : NULL));  /* symdef */
     sp->baseline = baseline;    /* composite baseline */
     sp->size = (base == 1 ? sp1->size : (base == 2 ? sp2->size : NORMALSIZE));  /*size */
-/* --- extract raster from subraster --- */
-    rp = sp->image;             /* raster embedded in subraster */
+/* --- extract raster from subraster_t --- */
+    rp = sp->image;             /* raster embedded in subraster_t */
 /* -------------------------------------------------------------------------
 overlay sp1 and sp2 in new composite raster
 -------------------------------------------------------------------------- */
@@ -3666,7 +1530,7 @@ free input if requested
         }
     }
     /* and/or sp2 */
-  end_of_job:
+end_of_job:
     return sp;
 }
 
@@ -3675,7 +1539,7 @@ free input if requested
  * Purpose: Allocate and build up a composite raster
  *      from the ntiles components/characters supplied in tiles.
  * --------------------------------------------------------------------------
- * Arguments:   tiles (I)   subraster *  to array of subraster structs
+ * Arguments:   tiles (I)   subraster_t *  to array of subraster_t structs
  *              describing the components and their locations
  *      ntiles (I)  int containing number of subrasters in tiles[]
  * --------------------------------------------------------------------------
@@ -3693,9 +1557,9 @@ free input if requested
  *      and I've left it in place should it be needed again.
  *      But recent changes haven't been tested/exercised.
  * ======================================================================= */
-raster *rastile(subraster * tiles, int ntiles)
+raster_t *rastile(subraster_t * tiles, int ntiles)
 {
-    raster *composite = NULL;   /*raster back to caller */
+    raster_t *composite = NULL;   /*raster back to caller */
     int width = 0, height = 0, pixsz = 0,       /*width,height,pixsz of composite raster */
         toprow = 9999, rightcol = -999, /* extreme upper-right corner of tiles */
         botrow = -999, leftcol = 9999;  /* extreme lower-left corner of tiles */
@@ -3705,7 +1569,7 @@ run through tiles[] to determine dimensions for composite raster
 -------------------------------------------------------------------------- */
 /* --- determine row and column bounds of composite raster --- */
     for (itile = 0; itile < ntiles; itile++) {
-        subraster *tile = &tiles[itile];        /* ptr to current tile */
+        subraster_t *tile = &tiles[itile];        /* ptr to current tile */
         /* --- upper-left corner of composite --- */
         toprow = min2(toprow, tile->toprow);
         leftcol = min2(leftcol, tile->leftcol);
@@ -3731,11 +1595,11 @@ allocate composite raster, and embed tiles[] within it
     }
 /* --- embed tiles[] in composite --- */
     for (itile = 0; itile < ntiles; itile++) {
-        subraster *tile = &(tiles[itile]);      /* ptr to current tile */
+        subraster_t *tile = &(tiles[itile]);      /* ptr to current tile */
         rastput(composite, tile->image, /* overlay tile image at... */
                 tile->toprow - toprow, tile->leftcol - leftcol, 1);
     }                           /*upper-left corner */
-  end_of_job:
+end_of_job:
     return composite;
 }
 
@@ -3744,8 +1608,8 @@ allocate composite raster, and embed tiles[] within it
  * Purpose: When concatanating sp1||sp2, calculate #pixels
  *      we can "smash sp2 left"
  * --------------------------------------------------------------------------
- * Arguments:   sp1 (I)     subraster *  to left-hand raster
- *      sp2 (I)     subraster *  to right-hand raster
+ * Arguments:   sp1 (I)     subraster_t *  to left-hand raster
+ *      sp2 (I)     subraster_t *  to right-hand raster
  * --------------------------------------------------------------------------
  * Returns: ( int )     max #pixels we can smash sp1||sp2,
  *              or "blanksignal" if sp2 intentionally blank,
@@ -3753,15 +1617,15 @@ allocate composite raster, and embed tiles[] within it
  * --------------------------------------------------------------------------
  * Notes:     o
  * ======================================================================= */
-static int rastsmash(subraster * sp1, subraster * sp2)
+static int rastsmash(subraster_t * sp1, subraster_t * sp2)
 {
     int nsmash = 0;             /* #pixels to smash sp1||sp2 */
-    int base1 = sp1->baseline,  /*baseline for left-hand subraster */
-        height1 = (sp1->image)->height, /* height for left-hand subraster */
-        width1 = (sp1->image)->width,   /* width for left-hand subraster */
-        base2 = sp2->baseline,  /*baseline for right-hand subraster */
-        height2 = (sp2->image)->height, /* height for right-hand subraster */
-        width2 = (sp2->image)->width;   /* width for right-hand subraster */
+    int base1 = sp1->baseline,  /*baseline for left-hand subraster_t */
+        height1 = (sp1->image)->height, /* height for left-hand subraster_t */
+        width1 = (sp1->image)->width,   /* width for left-hand subraster_t */
+        base2 = sp2->baseline,  /*baseline for right-hand subraster_t */
+        height2 = (sp2->image)->height, /* height for right-hand subraster_t */
+        width2 = (sp2->image)->width;   /* width for right-hand subraster_t */
     int base = max2(base1, base2),      /* max ascenders - 1 above baseline */
         top1 = base - base1, top2 = base - base2,       /* top irow indexes for sp1, sp2 */
         bot1 = top1 + height1 - 1, bot2 = top2 + height2 - 1,   /* bot irow indexes */
@@ -3774,9 +1638,6 @@ static int rastsmash(subraster * sp1, subraster * sp2)
 find right edge of sp1 and left edge of sp2 (these will be abutting edges)
 -------------------------------------------------------------------------- */
 /* --- check args --- */
-    if (isstring) {
-        goto end_of_job;        /* ignore string rasters */
-    }
     if (0 && istextmode) {
         goto end_of_job;        /* don't smash in text mode */
     }
@@ -3855,21 +1716,20 @@ find minimum separation
 /* -------------------------------------------------------------------------
 Back to caller with #pixels to smash sp1||sp2
 -------------------------------------------------------------------------- */
-  end_of_job:
+end_of_job:
     /* --- debugging output --- */
-    if (msgfp != NULL && msglevel >= 99) {      /* display for debugging */
-        fprintf(msgfp, "rastsmash> nsmash=%d, smashmargin=%d\n",
-                nsmash, smashmargin);
-        if (msglevel >= 999) {  /* also display rasters */
-            fprintf(msgfp, "rastsmash>left-hand image...\n");
-            if (sp1 != NULL)
-                type_raster(sp1->image, msgfp); /* left image */
-            fprintf(msgfp, "rastsmash>right-hand image...\n");
-            if (sp2 != NULL)
-                type_raster(sp2->image, msgfp);
-        }                       /* right image */
-        fflush(msgfp);
-    }
+#if DEBUG_LOG_LEVEL >= 99
+    fprintf(msgfp, "rastsmash> nsmash=%d, smashmargin=%d\n",
+            nsmash, smashmargin);
+#if DEBUG_LOG_LEVEL >= 999
+    fprintf(msgfp, "rastsmash>left-hand image...\n");
+    if (sp1 != NULL)
+        type_raster(sp1->image, msgfp); /* left image */
+    fprintf(msgfp, "rastsmash>right-hand image...\n");
+    if (sp2 != NULL)
+        type_raster(sp2->image, msgfp);
+#endif
+#endif
     return nsmash;
 }
 
@@ -3896,7 +1756,7 @@ int rastsmashcheck(const char *term)
         "\\tiny", "\\small", "\\normalsize",
         "\\large", "\\Large", "\\LARGE", "\\huge", "\\Huge", NULL
     };
-    const char *expression = term;      /* local ptr to beginning of expression */
+    //const char *expression = term;      /* local ptr to beginning of expression */
     const char *token = NULL;   /* token = nosmashstrs[i] or grayspace[i] */
     int i;
 
@@ -3930,25 +1790,23 @@ see if smash check enabled
             term += strlen(token);      /* skip past this grayspace token */
             skipwhite(term);    /* and skip any subsequent white space */
             if (*term == '\0') {        /* nothing left so quit */
-                if (msgfp != NULL && msglevel >= 99)    /* display for debugging */
-                    fprintf(msgfp,
-                            "rastsmashcheck> only grayspace in %.32s\n",
-                            expression);
-                goto end_of_job;
+#if DEBUG_LOG_LEVEL >= 99
+                fprintf(msgfp,
+                        "rastsmashcheck> only grayspace in %.32s\n",
+                        expression);
+#endif
             }
             goto skipgray;
         }
     }
 
     /* restart grayspace check from beginning */
-    /* -------------------------------------------------------------------------
-       check for leading no-smash single char
-       -------------------------------------------------------------------------- */
     /* --- don't smash if term begins with a "nosmash" char --- */
     if ((token = strchr(nosmashchars, *term)) != NULL) {
-        if (msgfp != NULL && msglevel >= 99)    /* display for debugging */
-            fprintf(msgfp, "rastsmashcheck> char %.1s found in %.32s\n",
-                    token, term);
+#if DEBUG_LOG_LEVEL >= 99
+        fprintf(msgfp, "rastsmashcheck> char %.1s found in %.32s\n",
+                token, term);
+#endif
         goto end_of_job;
     }
 /* -------------------------------------------------------------------------
@@ -3956,28 +1814,27 @@ check for leading no-smash token
 -------------------------------------------------------------------------- */
     for (i = 0; (token = nosmashstrs[i]) != NULL; i++) {        /* check each nosmashstr */
         if (strncmp(term, token, strlen(token)) == 0) { /* found a nosmashstr */
-            if (msgfp != NULL && msglevel >= 99)        /* display for debugging */
-                fprintf(msgfp, "rastsmashcheck> token %s found in %.32s\n",
-                        token, term);
+#if DEBUG_LOG_LEVEL >= 99
+            fprintf(msgfp, "rastsmashcheck> token %s found in %.32s\n",
+                    token, term);
+#endif
             goto end_of_job;
         }
     }
-    /* so don't smash term */
-    /* -------------------------------------------------------------------------
-       back to caller
-       -------------------------------------------------------------------------- */
+
     isokay = 1;                 /* no problem, so signal okay to smash */
-  end_of_job:
-    if (msgfp != NULL && msglevel >= 999)       /* display for debugging */
-        fprintf(msgfp,
-                "rastsmashcheck> returning isokay=%d for \"%.32s\"\n",
-                isokay, (expression == NULL ? "<no input>" : expression));
+end_of_job:
+#if DEBUG_LOG_LEVEL >= 999
+    fprintf(msgfp,
+            "rastsmashcheck> returning isokay=%d for \"%.32s\"\n",
+            isokay, (expression == NULL ? "<no input>" : expression));
+#endif
     return isokay;
 }
 
 /* ==========================================================================
  * Function:    accent_subraster ( accent, width, height, direction, pixsz )
- * Purpose: Allocate a new subraster of width x height
+ * Purpose: Allocate a new subraster_t of width x height
  *      (or maybe different dimensions, depending on accent),
  *      and draw an accent (\hat or \vec or \etc) that fills it
  * --------------------------------------------------------------------------
@@ -3989,32 +1846,28 @@ check for leading no-smash token
  *              +1=right, -1=left, 0=left/right
  *      pixsz (I)   int containing 1 for bitmap, 8 for bytemap
  * --------------------------------------------------------------------------
- * Returns: ( subraster * ) ptr to newly-allocated subraster with accent,
+ * Returns: ( subraster_t * ) ptr to newly-allocated subraster_t with accent,
  *              or NULL for any error.
  * --------------------------------------------------------------------------
  * Notes:     o Some accents have internally-determined dimensions,
- *      and caller should check dimensions in returned subraster
+ *      and caller should check dimensions in returned subraster_t
  * ======================================================================= */
-static subraster *accent_subraster(int accent, int width, int height,
+subraster_t *accent_subraster(int accent, int width, int height,
                                    int direction, int pixsz)
 {
-/* --- general info --- */
-    raster *rp = NULL;          /*raster containing desired accent */
-    subraster *sp = NULL;       /* subraster returning accent */
+    raster_t *rp = NULL;          /*raster containing desired accent */
+    subraster_t *sp = NULL;       /* subraster_t returning accent */
     int thickness = 1;          /* line thickness */
-    /*int   pixval = (pixsz==1? 1 : (pixsz==8?255:(-1))); *//*black pixel value */
-/* --- other working info --- */
-    int col0, col1,             /* cols for line */
-     row0, row1;                /* rows for line */
-    subraster *accsp = NULL;    /*find suitable cmex10 symbol/accent */
-/* --- info for under/overbraces, tildes, etc --- */
+
+    int col0, col1;             /* cols for line */
+    int row0, row1;                /* rows for line */
+    subraster_t *accsp = NULL;    /*find suitable cmex10 symbol/accent */
+
     char brace[16];             /*"{" for over, "}" for under, etc */
     int iswidthneg = 0;         /* set true if width<0 arg passed */
     int serifwidth = 0;         /* serif for surd */
     int isBig = 0;              /* true for ==>arrow, false for --> */
-/* -------------------------------------------------------------------------
-initialization
--------------------------------------------------------------------------- */
+
     if (width < 0) {
         width = (-width);
         iswidthneg = 1;
@@ -4086,8 +1939,7 @@ initialization
                 row0 = max2(1, ((height + 1) / 2) - 2); /* midpoint row of sqrt */
                 row1 = height - 1;      /* bottom row of sqrt */
                 /*line_raster(rp,row0,0,row1,col0,thickness); *//*descending portion */
-                line_raster(rp, row0 + serifwidth, 0, row0, serifwidth,
-                            thickness);
+                line_raster(rp, row0 + serifwidth, 0, row0, serifwidth, thickness);
                 line_raster(rp, row0, serifwidth, row1, col0, thickness);       /* descending */
                 line_raster(rp, row1, col0, 0, col1, thickness);        /* ascending portion */
                 line_raster(rp, 0, col1, 0, width - 1, thickness);      /*overbar of thickness 1 */
@@ -4107,7 +1959,7 @@ initialization
             /* found desired brace */
             rp = rastrot(accsp->image); /* rotate 90 degrees clockwise */
             delete_subraster(accsp);
-        }                       /* and free subraster "envelope" */
+        }                       /* and free subraster_t "envelope" */
         break;
         /* --- hat request --- */
     case HATACCENT:
@@ -4118,7 +1970,7 @@ initialization
             /* found desired brace */
             rp = rastrot(accsp->image); /* rotate 90 degrees clockwise */
             delete_subraster(accsp);
-        }                       /* and free subraster "envelope" */
+        }                       /* and free subraster_t "envelope" */
         break;
         /* --- vec request --- */
     case VECACCENT:
@@ -4131,29 +1983,30 @@ initialization
             !=NULL) {           /* succeeded */
             rp = accsp->image;  /* "extract" raster with bitmap */
             free((void *) accsp);
-        }                       /* and free subraster "envelope" */
+        }                       /* and free subraster_t "envelope" */
         break;
         /* --- tilde request --- */
     case TILDEACCENT:
         accsp = (width < 25 ? get_delim("\\sim", -width, CMSY10) : get_delim("~", -width, CMEX10));     /*width search for tilde */
-        if (accsp != NULL)      /* found desired tilde */
+        if (accsp != NULL) {    /* found desired tilde */
             if ((sp = rastack(new_subraster(1, 1, pixsz), accsp, 1, 0, 1, 3))   /*space below */
                 !=NULL) {       /* have tilde with space below it */
                 rp = sp->image; /* "extract" raster with bitmap */
-                free((void *) sp);      /* and free subraster "envelope" */
+                free((void *) sp);      /* and free subraster_t "envelope" */
                 leftsymdef = NULL;
             }                   /* so \tilde{x}^2 works properly */
+        }
         break;
     }
 /* -------------------------------------------------------------------------
-if we constructed accent raster okay, embed it in a subraster and return it
+if we constructed accent raster okay, embed it in a subraster_t and return it
 -------------------------------------------------------------------------- */
-/* --- if all okay, allocate subraster to contain constructed raster --- */
+/* --- if all okay, allocate subraster_t to contain constructed raster --- */
     if (rp != NULL) {           /* accent raster constructed okay */
         if ((sp = new_subraster(0, 0, 0)) == NULL) {           /* and if we fail to allocate */
             delete_raster(rp);  /* free now-unneeded raster */
-        } else {                  /* subraster allocated okay */
-            /* --- init subraster parameters, embedding raster in it --- */
+        } else {                  /* subraster_t allocated okay */
+            /* --- init subraster_t parameters, embedding raster in it --- */
             sp->type = IMAGERASTER;     /* constructed image */
             sp->image = rp;     /* raster we just constructed */
             sp->size = (-1);    /* can't set font size here */
@@ -4165,7 +2018,7 @@ if we constructed accent raster okay, embed it in a subraster and return it
 
 /* ==========================================================================
  * Function:    arrow_subraster ( width, height, pixsz, drctn, isBig )
- * Purpose: Allocate a raster/subraster and draw left/right arrow in it
+ * Purpose: Allocate a raster/subraster_t and draw left/right arrow in it
  * --------------------------------------------------------------------------
  * Arguments:   width (I)   int containing number of cols for arrow
  *      height (I)  int containing number of rows for arrow
@@ -4176,22 +2029,21 @@ if we constructed accent raster okay, embed it in a subraster and return it
  *              or false for \long arrows, i.e.,
  *              true for ===> or false for --->.
  * --------------------------------------------------------------------------
- * Returns: ( subraster * ) ptr to constructed left/right arrow
+ * Returns: ( subraster_t * ) ptr to constructed left/right arrow
  *              or NULL for any error.
  * --------------------------------------------------------------------------
  * Notes:     o
  * ======================================================================= */
-static subraster *arrow_subraster(int width, int height, int pixsz,
-                                  int drctn, int isBig)
+subraster_t *arrow_subraster(int width, int height, int pixsz, int drctn, int isBig)
 {
-    subraster *arrowsp = NULL;  /* allocate arrow subraster */
+    subraster_t *arrowsp = NULL;  /* allocate arrow subraster_t */
     int irow, midrow = height / 2;      /* index, midrow is arrowhead apex */
     int icol, thickness = (height > 15 ? 2 : 2);        /* arrowhead thickness and index */
     int pixval = (pixsz == 1 ? 1 : (pixsz == 8 ? 255 : (-1)));  /* black pixel value */
     int ipix;                   /* raster pixmap[] index */
     int npix = width * height;  /* #pixels malloced in pixmap[] */
 /* -------------------------------------------------------------------------
-allocate raster/subraster and draw arrow line
+allocate raster/subraster_t and draw arrow line
 -------------------------------------------------------------------------- */
     if (height < 3) {
         height = 3;
@@ -4204,12 +2056,9 @@ allocate raster/subraster and draw arrow line
     if (!isBig) {               /* single line */
         rule_raster(arrowsp->image, midrow, 0, width, 1, 0);    /*draw line across midrow */
     } else {
-        int delta =
-            (width > 6 ? (height > 15 ? 3 : (height > 7 ? 2 : 1)) : 1);
-        rule_raster(arrowsp->image, midrow - delta, delta,
-                    width - 2 * delta, 1, 0);
-        rule_raster(arrowsp->image, midrow + delta, delta,
-                    width - 2 * delta, 1, 0);
+        int delta = (width > 6 ? (height > 15 ? 3 : (height > 7 ? 2 : 1)) : 1);
+        rule_raster(arrowsp->image, midrow - delta, delta, width - 2 * delta, 1, 0);
+        rule_raster(arrowsp->image, midrow + delta, delta, width - 2 * delta, 1, 0);
     }
 /* -------------------------------------------------------------------------
 construct arrowhead(s)
@@ -4217,7 +2066,7 @@ construct arrowhead(s)
     for (irow = 0; irow < height; irow++) {     /* for each row of arrow */
         int delta = abs(irow - midrow); /*arrowhead offset for irow */
         /* --- right arrowhead --- */
-        if (drctn >= 0)         /* right arrowhead wanted */
+        if (drctn >= 0) {       /* right arrowhead wanted */
             for (icol = 0; icol < thickness; icol++) {  /* for arrowhead thickness */
                 ipix = ((irow + 1) * width - 1) - delta - icol; /* rightmost-delta-icol */
                 if (ipix >= 0) {        /* bounds check */
@@ -4228,6 +2077,7 @@ construct arrowhead(s)
                     }
                 }
             }
+        }
         /*set arrowhead byte */
         /* --- left arrowhead (same as right except for ipix calculation) --- */
         if (drctn <= 0) {        /* left arrowhead wanted */
@@ -4243,13 +2093,13 @@ construct arrowhead(s)
             }
         }
     }
-  end_of_job:
+end_of_job:
     return arrowsp;
 }
 
 /* ==========================================================================
  * Function:    uparrow_subraster ( width, height, pixsz, drctn, isBig )
- * Purpose: Allocate a raster/subraster and draw up/down arrow in it
+ * Purpose: Allocate a raster/subraster_t and draw up/down arrow in it
  * --------------------------------------------------------------------------
  * Arguments:   width (I)   int containing number of cols for arrow
  *      height (I)  int containing number of rows for arrow
@@ -4260,22 +2110,21 @@ construct arrowhead(s)
  *              or false for \long arrows, i.e.,
  *              true for ===> or false for --->.
  * --------------------------------------------------------------------------
- * Returns: ( subraster * ) ptr to constructed up/down arrow
+ * Returns: ( subraster_t * ) ptr to constructed up/down arrow
  *              or NULL for any error.
  * --------------------------------------------------------------------------
  * Notes:     o
  * ======================================================================= */
-subraster *uparrow_subraster(int width, int height, int pixsz, int drctn,
-                             int isBig)
+subraster_t *uparrow_subraster(int width, int height, int pixsz, int drctn, int isBig)
 {
-    subraster *arrowsp = NULL;  /* allocate arrow subraster */
+    subraster_t *arrowsp = NULL;  /* allocate arrow subraster_t */
     int icol, midcol = width / 2;       /* index, midcol is arrowhead apex */
     int irow, thickness = (width > 15 ? 2 : 2); /* arrowhead thickness and index */
     int pixval = (pixsz == 1 ? 1 : (pixsz == 8 ? 255 : -1));    /* black pixel value */
     int ipix;                   /* raster pixmap[] index */
     int npix = width * height;  /* #pixels malloced in pixmap[] */
 /* -------------------------------------------------------------------------
-allocate raster/subraster and draw arrow line
+allocate raster/subraster_t and draw arrow line
 -------------------------------------------------------------------------- */
     if (width < 3) {
         width = 3;
@@ -4355,7 +2204,7 @@ construct arrowhead(s)
  *      on relative width,height dimensions.  It's a box if they're
  *      more or less comparable.
  * ======================================================================= */
-static int rule_raster(raster * rp, int top, int left, int width,
+int rule_raster(raster_t * rp, int top, int left, int width,
                        int height, int type)
 {
     int irow = 0, icol = 0;     /* indexes over rp raster */
@@ -4369,15 +2218,18 @@ static int rule_raster(raster * rp, int top, int left, int width,
 /* -------------------------------------------------------------------------
 Check args
 -------------------------------------------------------------------------- */
-    if (rp == (raster *) NULL) {        /* no raster arg supplied */
-        if (workingbox != (subraster *) NULL)   /* see if we have a workingbox */
+    if (rp == NULL) {        /* no raster arg supplied */
+        if (workingbox != NULL) {  /* see if we have a workingbox */
             rp = workingbox->image;     /* use workingbox if possible */
-        else
-            return (0);
+        } else {
+            return 0;
+        }
     }                           /* otherwise signal error to caller */
-    if (type == bevel)          /* remove corners of solid box */
-        if (width < 3 || height < 3)
+    if (type == bevel) {         /* remove corners of solid box */
+        if (width < 3 || height < 3) {
             type = 0;           /* too small to remove corners */
+        }
+    }
 /* -------------------------------------------------------------------------
 Fill line/box
 -------------------------------------------------------------------------- */
@@ -4421,8 +2273,8 @@ Fill line/box
             }
         }
     }
-  end_of_job:
-    return (isfatal ? (ipix < npix ? 1 : 0) : 1);
+end_of_job:
+    return isfatal ? (ipix < npix ? 1 : 0) : 1;
 }
 
 /* ==========================================================================
@@ -4455,8 +2307,7 @@ Fill line/box
  *        o if both the above, you get a square thickness x thickness
  *      whose top-left corner is row0,col0.
  * ======================================================================= */
-int line_raster(raster * rp, int row0, int col0, int row1, int col1,
-                int thickness)
+int line_raster(raster_t *rp, int row0, int col0, int row1, int col1, int thickness)
 {
     int irow = 0, icol = 0;     /* indexes over rp raster */
     int locol = col0, hicol = col1;     /* col limits at irow */
@@ -4491,13 +2342,12 @@ Check args
     /* -------------------------------------------------------------------------
        Initialization
        -------------------------------------------------------------------------- */
-    if (msgfp != NULL && msglevel >= 29) {      /* debugging */
-        fprintf(msgfp,
-                "line_raster> row,col0=%d,%d row,col1=%d,%d, thickness=%d\n"
-                "\t dy,dx=%3.1f,%3.1f, a=%4.3f, xwidth=%4.3f\n", row0,
-                col0, row1, col1, thickness, dy, dx, a, xwidth);
-        fflush(msgfp);
-    }
+#if DEBUG_LOG_LEVEL >= 29
+    fprintf(msgfp,
+            "line_raster> row,col0=%d,%d row,col1=%d,%d, thickness=%d\n"
+            "\t dy,dx=%3.1f,%3.1f, a=%4.3f, xwidth=%4.3f\n", row0,
+            col0, row1, col1, thickness, dy, dx, a, xwidth);
+#endif
 /* --- check for recursive line drawing --- */
     if (isrecurse) {            /* drawing lines recursively */
         for (irow = 0; irow < thickness; irow++) {      /* each line 1 pixel thick */
@@ -4532,9 +2382,10 @@ draw line one row at a time
                 min2((int) (xcol + 0.5 * (xwidth - 0.0)),
                      max2(col0, col1));
         }                       /*right */
-        if (msgfp != NULL && msglevel >= 29)    /* debugging */
-            fprintf(msgfp, "\t irow=%d, xcol=%4.2f, lo,hicol=%d,%d\n",
-                    irow, xcol, locol, hicol);
+#if DEBUG_LOG_LEVEL >= 29
+        fprintf(msgfp, "\t irow=%d, xcol=%4.2f, lo,hicol=%d,%d\n",
+                irow, xcol, locol, hicol);
+#endif
         ipix = irow * rp->width + min2(locol, hicol) - 1;       /*first pix preceding icol */
         for (icol = min2(locol, hicol); icol <= max2(locol, hicol); icol++) {   /*each pix */
             if (++ipix >= npix) {       /* bounds check failed */
@@ -4557,30 +2408,31 @@ draw line one row at a time
 /* -------------------------------------------------------------------------
 now _redraw_ line one col at a time to avoid "gaps"
 -------------------------------------------------------------------------- */
-    if (1) {
-        for (icol = min2(col0, col1); icol <= max2(col0, col1); icol++) {       /*each scan line */
-            if (!isbar && !isline) {    /* neither vert nor horiz */
-                xrow = row0 + ((double) (icol - col0)) * a;     /* "middle" row in icol */
-                lorow = max2((int) (xrow - 0.5 * (xheight - 1.0)), 0);  /* topmost row */
-                hirow =
-                    min2((int) (xrow + 0.5 * (xheight - 0.0)),
-                         max2(row0, row1));
-            }                   /*bot */
-            if (msgfp != NULL && msglevel >= 29)        /* debugging */
-                fprintf(msgfp, "\t icol=%d, xrow=%4.2f, lo,hirow=%d,%d\n",
-                        icol, xrow, lorow, hirow);
-            ipix = irow * rp->width + min2(locol, hicol) - 1;   /*first pix preceding icol */
-            for (irow = min2(lorow, hirow); irow <= max2(lorow, hirow); irow++) /*each pix */
-                if (irow < 0 || irow >= rp->height || icol < 0 || icol >= rp->width)    /* bounds check */
-                    if (isfatal)
-                        goto end_of_job;        /* abort if error is fatal */
-                    else
-                        continue;       /*or just go on to next row */
+#if 1
+    for (icol = min2(col0, col1); icol <= max2(col0, col1); icol++) {       /*each scan line */
+        if (!isbar && !isline) {    /* neither vert nor horiz */
+            xrow = row0 + ((double) (icol - col0)) * a;     /* "middle" row in icol */
+            lorow = max2((int) (xrow - 0.5 * (xheight - 1.0)), 0);  /* topmost row */
+            hirow =
+                min2((int) (xrow + 0.5 * (xheight - 0.0)),
+                     max2(row0, row1));
+        }                   /*bot */
+#if DEBUG_LOG_LEVEL >= 29
+        fprintf(msgfp, "\t icol=%d, xrow=%4.2f, lo,hirow=%d,%d\n",
+                icol, xrow, lorow, hirow);
+#endif
+        ipix = irow * rp->width + min2(locol, hicol) - 1;   /*first pix preceding icol */
+        for (irow = min2(lorow, hirow); irow <= max2(lorow, hirow); irow++) /*each pix */
+            if (irow < 0 || irow >= rp->height || icol < 0 || icol >= rp->width)    /* bounds check */
+                if (isfatal)
+                    goto end_of_job;        /* abort if error is fatal */
                 else
-                    setpixel(rp, irow, icol, 255);      /* set pixel at irow,icol */
-        }
+                    continue;       /*or just go on to next row */
+            else
+                setpixel(rp, irow, icol, 255);      /* set pixel at irow,icol */
     }
-  end_of_job:
+#endif
+end_of_job:
     return (isfatal ? (ipix < npix ? 1 : 0) : 1);
 }
 
@@ -4608,7 +2460,7 @@ now _redraw_ line one col at a time to avoid "gaps"
  * Notes:     o Recurses, drawing left- and right-halves of line
  *      until a horizontal or vertical segment is found
  * ======================================================================= */
-int line_recurse(raster * rp, double row0, double col0, double row1,
+int line_recurse(raster_t * rp, double row0, double col0, double row1,
                  double col1, int thickness)
 {
     double delrow = fabs(row1 - row0);  /* 0 if line horizontal */
@@ -4665,8 +2517,8 @@ draw converged point
  * Notes:     o row0==row1 or col0==col1 are errors
  *        o using ellipse equation x^2/a^2 + y^2/b^2 = 1
  * ======================================================================= */
-static int circle_raster(raster * rp, int row0, int col0, int row1,
-                         int col1, int thickness, const char *quads)
+int circle_raster(raster_t * rp, int row0, int col0, int row1,
+                  int col1, int thickness, const char *quads)
 {
 /* --- lower-left and upper-right bounding points (in our coords) --- */
     int lorow = min2(row0, row1),       /* lower bounding row (top of box) */
@@ -4701,9 +2553,10 @@ pixel-by-pixel along positive major axis, quit when it goes negative
 -------------------------------------------------------------------------- */
     if (quads == NULL)
         quads = allquads;       /* draw all quads, or only user's */
-    if (msgfp != NULL && msglevel >= 39)        /* debugging */
-        fprintf(msgfp, "circle_raster> width,height;quads=%d,%d,%s\n",
-                width, height, quads);
+#if DEBUG_LOG_LEVEL >= 39
+    fprintf(msgfp, "circle_raster> width,height;quads=%d,%d,%s\n",
+            width, height, quads);
+#endif
     if (nmajor < 1) {
         isokay = 0;             /* problem with input args */
     } else {
@@ -4766,10 +2619,11 @@ pixel-by-pixel along positive major axis, quit when it goes negative
                     iround(midcol +
                            (double) csign * (islandscape ? xy : yx));
                 icol = min2(hicol, max2(locol, icol));  /* keep icol in bounds */
-                if (msgfp != NULL && msglevel >= 49)    /* debugging */
-                    fprintf(msgfp,
-                            "\t...imajor=%d; iminor,quad,irow,icol=%d,%c,%d,%d\n",
-                            imajor, iminor, *qptr, irow, icol);
+#if DEBUG_LOG_LEVEL >= 49
+                fprintf(msgfp,
+                        "\t...imajor=%d; iminor,quad,irow,icol=%d,%c,%d,%d\n",
+                        imajor, iminor, *qptr, irow, icol);
+#endif
                 if (irow < 0 || irow >= rp->height      /* row outside raster */
                     || icol < 0 || icol >= rp->width) { /* col outside raster */
                     isokay = 0; /* signal out-of-bounds pixel */
@@ -4812,10 +2666,11 @@ pixel-by-pixel along positive major axis, quit when it goes negative
                     irow = min2(hirow, max2(lorow, irow));      /* keep irow in bounds */
                     icol = iround(midcol + (double) csign * (islandscape ? xy : yx));
                     icol = min2(hicol, max2(locol, icol));      /* keep icol in bounds */
-                    if (msgfp != NULL && msglevel >= 49)        /* debugging */
-                        fprintf(msgfp,
-                                "\t...iminor=%d; imajor,quad,irow,icol=%d,%c,%d,%d\n",
-                                iminor, imajor, *qptr, irow, icol);
+#if DEBUG_LOG_LEVEL >= 49
+                    fprintf(msgfp,
+                            "\t...iminor=%d; imajor,quad,irow,icol=%d,%c,%d,%d\n",
+                            iminor, imajor, *qptr, irow, icol);
+#endif
                     if (irow < 0 || irow >= rp->height || icol < 0 || icol >= rp->width) {
                         isokay = 0;     /* signal out-of-bounds pixel */
                         continue;
@@ -4859,9 +2714,9 @@ pixel-by-pixel along positive major axis, quit when it goes negative
  *      Then, with x=r*cos(theta), y=r*sin(theta), ellipse
  *      equation is r = ab/sqrt(a^2*sin^2(theta)+b^2*cos^2(theta))
  * ======================================================================= */
-static int circle_recurse(raster * rp, int row0, int col0,
-                          int row1, int col1, int thickness, double theta0,
-                          double theta1)
+int circle_recurse(raster_t * rp, int row0, int col0,
+                   int row1, int col1, int thickness, double theta0,
+                   double theta1)
 {
 /* --- lower-left and upper-right bounding points (in our coords) --- */
     int lorow = min2(row0, row1);       /* lower bounding row (top of box) */
@@ -4930,7 +2785,7 @@ recurse if either delta > tolerance
  * Notes:     o Recurses, drawing left- and right-halves of bezier curve
  *      until a point is found
  * ======================================================================= */
-static int bezier_raster(raster * rp, double r0, double c0, double r1,
+int bezier_raster(raster_t * rp, double r0, double c0, double r1,
                          double c1, double rt, double ct)
 {
     double delrow = fabs(r1 - r0),      /* 0 if same row */
@@ -5001,10 +2856,10 @@ draw converged point
  *      sides.  And 0 (no sides value embedded in isline)
  *      draws all four sides, too.
  * ======================================================================= */
-static raster *border_raster(raster * rp, int ntop, int nbot, int isline,
-                             int isfree)
+raster_t *border_raster(raster_t * rp, int ntop, int nbot, int isline,
+                      int isfree)
 {
-    raster *bp = NULL;          /*raster back to caller */
+    raster_t *bp = NULL;          /*raster back to caller */
     int width = (rp == NULL ? 0 : rp->width),   /* width of raster */
         height = (rp == NULL ? 0 : rp->height), /* height of raster */
         istopneg = 0, isbotneg = 0,     /* true if ntop or nbot negative */
@@ -5015,11 +2870,11 @@ Initialization
 -------------------------------------------------------------------------- */
     if (rp == NULL)
         goto end_of_job;        /* no input raster provided */
-    if (isstring || (1 && rp->height == 1)) {   /* explicit string signal or infer */
+    //if (isstring || (1 && rp->height == 1)) {   /* explicit string signal or infer */
+    if (rp->height == 1) {   /* explicit string signal or infer */
         bp = rp;
         goto end_of_job;
     }
-    /* return ascii string unchanged */
     /* --- check for negative args --- */
     if (ntop < 0) {
         ntop = -ntop;
@@ -5117,7 +2972,7 @@ draw border if requested
         delete_raster(rp);      /* so free it for him */
     }
 
-  end_of_job:
+end_of_job:
     return bp;
 }
 
@@ -5145,10 +3000,9 @@ draw border if requested
  * --------------------------------------------------------------------------
  * Notes:     o For \! negative space, for \hspace{-10}, etc.
  * ======================================================================= */
-static raster *backspace_raster(raster * rp, int nback, int *pback,
-                                int minspace, int isfree)
+raster_t *backspace_raster(raster_t * rp, int nback, int *pback, int minspace, int isfree)
 {
-    raster *bp = NULL;          /* raster returned to caller */
+    raster_t *bp = NULL;          /* raster returned to caller */
     int width = (rp == NULL ? 0 : rp->width);   /* original width of raster */
     int height = (rp == NULL ? 0 : rp->height); /* height of raster */
     int mback = nback;          /* nback adjusted for minspace */
@@ -5158,9 +3012,7 @@ static raster *backspace_raster(raster * rp, int nback, int *pback,
     if (rp == NULL) {
         goto end_of_job;        /* no input given */
     }
-/* -------------------------------------------------------------------------
-locate rightmost column of rp containing ink, and determine backspaced width
--------------------------------------------------------------------------- */
+
 /* --- locate rightmost column of rp containing ink --- */
     if (minspace >= 0) {         /* only needed if given minspace */
         for (icol = width - 1; icol >= 0; icol--) {      /* find first non-empty col in row */
@@ -5175,7 +3027,7 @@ locate rightmost column of rp containing ink, and determine backspaced width
     }
     /* no need to look further */
     /* --- determine width of new backspaced raster --- */
-  gotright:                    /* found col with ink (or rp empty) */
+gotright:                    /* found col with ink (or rp empty) */
     if (mback > width) {
         mback = width;          /* can't backspace before beginning */
     }
@@ -5183,11 +3035,10 @@ locate rightmost column of rp containing ink, and determine backspaced width
     if (pback != NULL) {
         *pback = width - newwidth;      /* caller wants #pixels */
     }
-/* -------------------------------------------------------------------------
-allocate new raster and fill it with leftmost cols of rp
--------------------------------------------------------------------------- */
+
 /* --- allocate backspaced raster --- */
-    if ((bp = new_raster(newwidth, height, rp->pixsz)) == NULL) {
+    bp = new_raster(newwidth, height, rp->pixsz);
+    if (bp == NULL) {
         goto end_of_job;
     }
 /* --- fill new raster --- */
@@ -5201,22 +3052,20 @@ allocate new raster and fill it with leftmost cols of rp
     }
 
     /* saved in backspaced raster */
-    /* -------------------------------------------------------------------------
-       Back to caller with backspaced raster (or null for any error)
-       -------------------------------------------------------------------------- */
-  end_of_job:
-    if (msgfp != NULL && msglevel >= 999) {
-        fprintf(msgfp,          /* diagnostics */
-                "backspace_raster> nback=%d,minspace=%d,mback=%d, width:old=%d,new=%d\n",
-                nback, minspace, mback, width, newwidth);
-        fflush(msgfp);
-    }
+
+end_of_job:
+#if DEBUG_LOG_LEVEL >= 999
+    fprintf(msgfp,          /* diagnostics */
+            "backspace_raster> nback=%d,minspace=%d,mback=%d, width:old=%d,new=%d\n",
+            nback, minspace, mback, width, newwidth);
+#endif
     if (isfree && bp != NULL) {
         delete_raster(rp);      /* free original raster */
     }
     return bp;
 }
 
+#if DEBUG_LOG_LEVEL > 0
 /* ==========================================================================
  * Function:    type_raster ( rp, fp )
  * Purpose: Emit an ascii dump representing rp, on fp.
@@ -5231,30 +3080,27 @@ allocate new raster and fill it with leftmost cols of rp
  * --------------------------------------------------------------------------
  * Notes:
  * ======================================================================= */
-int type_raster(raster * rp, FILE *fp)
+int type_raster(const raster_t * rp, FILE *fp)
 {
     static int display_width = 72;      /* max columns for display */
     static char display_chars[] = " 123456789BCDE*";    /* display chars for bytemap */
     char scanline[133];         /* ascii image for one scan line */
     int scan_width;             /* #chars in scan (<=display_width) */
     int irow, locol, hicol = (-1);      /* height index, width indexes */
-    raster *bitmaprp = rp;      /* convert .gf to bitmap if needed */
-/* --------------------------------------------------------------------------
-initialization
--------------------------------------------------------------------------- */
+    const raster_t *bitmaprp = rp;      /* convert .gf to bitmap if needed */
+    raster_t *bitmaprp_new = NULL;
+
 /* --- redirect null fp --- */
     if (fp == NULL) {
         fp = stdout;            /* default fp to stdout if null */
     }
-    if (msglevel >= 999) {
-        fprintf(fp,             /* debugging diagnostics */
-                "type_raster> width=%d height=%d ...\n",
-                rp->width, rp->height);
-        fflush(fp);
-    }
+#if DEBUG_LOG_LEVEL >= 999
+    fprintf(fp,             /* debugging diagnostics */
+            "type_raster> width=%d height=%d ...\n",
+            rp->width, rp->height);
+#endif
 /* --- check for ascii string --- */
-    if (isstring                /* pixmap has string, not raster */
-        || (0 && rp->height == 1)) {    /* infer input rp is a string */
+    if (0 && rp->height == 1) {    /* infer input rp is a string */
         char *string = (char *) (rp->pixmap);   /*interpret pixmap as ascii string */
         int width = strlen(string);     /* #chars in ascii string */
         while (width > display_width - 2) {     /* too big for one line */
@@ -5268,9 +3114,10 @@ initialization
     /* --------------------------------------------------------------------------
        display ascii dump of bitmap image (in segments if display_width < rp->width)
        -------------------------------------------------------------------------- */
-    if (rp->format == 2         /* input is .gf-formatted */
-        || rp->format == 3)
-        bitmaprp = gftobitmap(rp);      /* so convert it for display */
+    if (rp->format == 2 || rp->format == 3) {     /* input is .gf-formatted */
+        bitmaprp_new = gftobitmap(rp);      /* so convert it for display */
+        bitmaprp = bitmaprp_new;
+    }
     if (bitmaprp != NULL) {      /* if we have image for display */
         while ((locol = hicol + 1) < rp->width) {       /*start where prev segment left off */
             /* --- set hicol for this pass (locol set above) --- */
@@ -5307,18 +3154,18 @@ initialization
     /* -------------------------------------------------------------------------
        Back to caller with 1=okay, 0=failed.
        -------------------------------------------------------------------------- */
-    if (rp->format == 2         /* input was .gf-format */
-        || rp->format == 3)
-        if (bitmaprp != NULL)   /* and we converted it for display */
-            delete_raster(bitmaprp);    /* no longer needed, so free it */
+    if (bitmaprp_new != NULL) {
+        delete_raster(bitmaprp_new);    /* no longer needed, so free it */
+    }
     return 1;
 }
+#endif
 
 /* ==========================================================================
  * Function:    type_bytemap ( bp, grayscale, width, height, fp )
  * Purpose: Emit an ascii dump representing bp, on fp.
  * --------------------------------------------------------------------------
- * Arguments:   bp (I)      intbyte * to bytemap for which an
+ * Arguments:   bp (I)      pixbyte_t * to bytemap for which an
  *              ascii dump is to be constructed.
  *      grayscale (I)   int containing #gray shades, 256 for 8-bit
  *      width (I)   int containing #cols in bytemap
@@ -5331,13 +3178,8 @@ initialization
  * --------------------------------------------------------------------------
  * Notes:
  * ======================================================================= */
-/* --- entry point --- */
-int type_bytemap(intbyte * bp, int grayscale,
-                 int width, int height, FILE * fp)
+int type_bytemap(const pixbyte_t * bp, int grayscale, int width, int height, FILE * fp)
 {
-/* -------------------------------------------------------------------------
-Allocations and Declarations
--------------------------------------------------------------------------- */
     static int display_width = 72;      /* max columns for display */
     int byte_width = 3,         /* cols to display byte (ff+space) */
         maxbyte = 0;            /* if maxbyte<16, set byte_width=2 */
@@ -5348,17 +3190,11 @@ Allocations and Declarations
      scan_cols;                 /* #cols in scan (hicol-locol+1) */
     int ibyte,                  /* bp[] index */
      irow, locol, hicol = (-1); /* height index, width indexes */
-/* --------------------------------------------------------------------------
-initialization
--------------------------------------------------------------------------- */
+
 /* --- redirect null fp --- */
     if (fp == (FILE *) NULL)
         fp = stdout;            /* default fp to stdout if null */
-/* --- check for ascii string --- */
-    if (isstring) {             /* bp has ascii string, not raster */
-        width = strlen((char *) bp);    /* #chars in ascii string */
-        height = 1;
-    }
+
     /* default */
     /* --- see if we can get away with byte_width=1 --- */
     for (ibyte = 0; ibyte < width * height; ibyte++) {  /* check all bytes */
@@ -5378,7 +3214,7 @@ display ascii dump of bitmap image (in segments if display_width < rp->width)
             hicol = width - 1;  /* but not more than bytemap */
         scan_cols = hicol - locol + 1;  /* #cols in this scan */
         scan_width = byte_width * scan_cols;    /* #chars in this scan */
-        if (locol > 0 && !isstring)
+        if (locol > 0)
             fprintf(fp, "----------\n");        /* separator */
         /* ------------------------------------------------------------------------
            display all scan lines for this local...hicol segment range
@@ -5420,9 +3256,9 @@ display ascii dump of bitmap image (in segments if display_width < rp->width)
  * --------------------------------------------------------------------------
  * Notes:     o
  * ======================================================================= */
-static raster *gftobitmap(raster * gf)
+static raster_t *gftobitmap(const raster_t *gf)
 {
-    raster *rp = NULL;          /* image raster retuned to caller */
+    raster_t *rp = NULL;          /* image raster retuned to caller */
     int width = 0, height = 0, totbits = 0;     /* gf->width, gf->height, #bits */
     int format = 0, icount = 0, ncounts = 0;    /*.gf format, count index, #counts */
     int ibit = 0, bitval = 0;   /* bitmap index, bit value */
@@ -5458,16 +3294,18 @@ fill bitmap
                 nrepeats = (int) (getbyfmt(format, gf->pixmap, icount + 1));    /*repeat count */
                 nbits = (int) (getbyfmt(format, gf->pixmap, icount + 2));       /*#bits to set */
                 icount += 2;
-            } else if (msgfp != NULL && msglevel >= 1) {
+            } else {
+#if DEBUG_LOG_LEVEL >= 1
                 fprintf(msgfp,
                         "gftobitmap> found embedded repeat command\n");
+#endif
             }
         }
-        if (0) {
-            fprintf(stdout,
-                    "gftobitmap> icount=%d bitval=%d nbits=%d ibit=%d totbits=%d\n",
-                    icount, bitval, nbits, ibit, totbits);
-        }
+#if DEBUG_LOG_LEVEL >= 10000
+        fprintf(stdout,
+                "gftobitmap> icount=%d bitval=%d nbits=%d ibit=%d totbits=%d\n",
+                icount, bitval, nbits, ibit, totbits);
+#endif
         for (; nbits > 0; nbits--) {    /* count down */
             if (ibit >= totbits) {
                 goto end_of_job;        /* overflow check */
@@ -5487,10 +3325,10 @@ fill bitmap
         if (wbits >= width) {   /* completed repeats */
             ibit += nrepeats * width;   /*bump bit count past repeated scans */
             if (wbits > width) {  /* out-of alignment error */
-                if (msgfp != NULL && msglevel >= 1) {    /* report error */
-                    fprintf(msgfp, "gftobitmap> width=%d wbits=%d\n",
-                            width, wbits);
-                }
+#if DEBUG_LOG_LEVEL >= 1
+                fprintf(msgfp, "gftobitmap> width=%d wbits=%d\n",
+                        width, wbits);
+#endif
             }
             wbits = nrepeats = 0;
         }
@@ -5519,9 +3357,9 @@ fill bitmap
  *      shorter table matches, i.e., in this case \ep
  * ======================================================================= */
 
-static mathchardef *get_symdef(const char *symbol)
+static const mathchardef_t *get_symdef(const char *symbol)
 {
-    mathchardef *symdefs = symtable;    /* table of mathchardefs */
+    const mathchardef_t *symdefs = symtable;    /* table of mathchardefs */
     int ligdef = 0;             /* or we may have a ligature */
     int idef = 0;               /* symdefs[] index */
     int bestdef = -9999;        /*index of shortest matching symdef */
@@ -5579,12 +3417,11 @@ First check for ligature
                 break;          /* end-of-table */
             }
             if (!strcmp(symbol, fromsym)) {     /* found a match */
-                if (msglevel >= 99 && msgfp != NULL) {  /* debugging output */
-                    fprintf(msgfp,
-                            "get_symdef> isdisplaystyle=%d, xlated %s to %s\n",
-                            isdisplaystyle, symbol, tosym);
-                    fflush(msgfp);
-                }
+#if DEBUG_LOG_LEVEL >= 99
+                fprintf(msgfp,
+                        "get_symdef> isdisplaystyle=%d, xlated %s to %s\n",
+                        isdisplaystyle, symbol, tosym);
+#endif
                 symbol = tosym; /* so look up tosym instead */
                 symlen = strlen(symbol);        /* reset symbol length */
                 break;
@@ -5623,22 +3460,22 @@ First check for ligature
     if (bestdef < 0) {           /* failed to look up symbol */
         if (fontnum != 0) {     /* we're in a restricted font mode */
             int oldfontnum = fontnum;   /* save current font family */
-            mathchardef *symdef = NULL; /* lookup result with fontnum=0 */
+            const mathchardef_t *symdef = NULL; /* lookup result with fontnum=0 */
             fontnum = 0;        /*try to look up symbol in any font */
             symdef = get_symdef(symbol);        /* repeat lookup with fontnum=0 */
             fontnum = oldfontnum;       /* reset font family */
             return symdef;
         }                       /* caller gets fontnum=0 lookup */
     }
-  end_of_job:
-    if (msgfp != NULL && msglevel >= 999) {     /* debugging output */
-        fprintf(msgfp,
-                "get_symdef> symbol=%s matches symtable[%d]=%s (isligature=%d)\n",
-                symbol, bestdef,
-                (bestdef < 0 ? "NotFound" : symdefs[bestdef].symbol),
-                isligature);
-        fflush(msgfp);
-    }
+end_of_job:
+#if DEBUG_LOG_LEVEL >= 999
+    fprintf(msgfp,
+            "get_symdef> symbol=%s matches symtable[%d]=%s (isligature=%d)\n",
+            symbol, bestdef,
+            (bestdef < 0 ? "NotFound" : symdefs[bestdef].symbol),
+            isligature);
+#endif
+
     return ((bestdef < 0 ? NULL : &(symdefs[bestdef])));
 }
 
@@ -5659,7 +3496,7 @@ First check for ligature
 
 static int get_ligature(const char *expression, int family)
 {
-    mathchardef *symdefs = symtable;    /* table of mathchardefs */
+    const mathchardef_t *symdefs = symtable;    /* table of mathchardefs */
     const char *ligature = expression;  /*- 1*//* expression ptr */
     const char *symbol = NULL;  /* symdefs[idef].symbol */
     int liglen = strlen(ligature);      /* #chars remaining in expression */
@@ -5668,32 +3505,29 @@ static int get_ligature(const char *expression, int family)
     int bestdef = -9999;        /*index of longest matching symdef */
     int maxlen = -9999;         /*length of longest matching symdef */
 
-    if (!isstring) {            /* no ligatures in "string" mode */
-        for (idef = 0;; idef++) /* until trailer record found */
-            if ((symbol = symdefs[idef].symbol) == NULL) {
-                break;          /* end-of-table */
-            } else {              /* check against caller's ligature */
-                int symlen = strlen(symbol);    /* #chars in symbol */
-                if ((symlen > 1 || iscyrfam)    /*ligature >1 char long or cyrillic */
-                    &&symlen <= liglen  /* and enough remaining chars */
-                    && (*symbol != '\\' || iscyrfam)    /* not escaped or cyrillic */
-                    &&symdefs[idef].handler == NULL)    /* and not a handler */
-                    if (strncmp(ligature, symbol, symlen) == 0) /* found match */
-                        if (family < 0  /* no family specifies */
-                            || symdefs[idef].family == family)  /* or have correct family */
-                            if (symlen > maxlen) {      /* new longest ligature */
-                                bestdef = idef; /* save index of new best match */
-                                maxlen = symlen;
-            }
-        }
-        if (msgfp != NULL && msglevel >= 999) { /* debugging output */
-            fprintf(msgfp,
-                    "get_ligature> ligature=%.4s matches symtable[%d]=%s\n",
-                    ligature, bestdef,
-                    (bestdef < 0 ? "NotFound" : symdefs[bestdef].symbol));
-            fflush(msgfp);
+    for (idef = 0;; idef++) /* until trailer record found */
+        if ((symbol = symdefs[idef].symbol) == NULL) {
+            break;          /* end-of-table */
+        } else {              /* check against caller's ligature */
+            int symlen = strlen(symbol);    /* #chars in symbol */
+            if ((symlen > 1 || iscyrfam)    /*ligature >1 char long or cyrillic */
+                &&symlen <= liglen  /* and enough remaining chars */
+                && (*symbol != '\\' || iscyrfam)    /* not escaped or cyrillic */
+                &&symdefs[idef].handler == NULL)    /* and not a handler */
+                if (strncmp(ligature, symbol, symlen) == 0) /* found match */
+                    if (family < 0  /* no family specifies */
+                        || symdefs[idef].family == family)  /* or have correct family */
+                        if (symlen > maxlen) {      /* new longest ligature */
+                            bestdef = idef; /* save index of new best match */
+                            maxlen = symlen;
         }
     }
+#if DEBUG_LOG_LEVEL >= 999
+    fprintf(msgfp,
+            "get_ligature> ligature=%.4s matches symtable[%d]=%s\n",
+            ligature, bestdef,
+            (bestdef < 0 ? "NotFound" : symdefs[bestdef].symbol));
+#endif
     return bestdef;
 }
 
@@ -5711,11 +3545,11 @@ static int get_ligature(const char *expression, int family)
  * Notes:     o if size unavailable, the next-closer-to-normalsize
  *      is returned instead.
  * ======================================================================= */
-static chardef *get_chardef(mathchardef * symdef, int size)
+static const chardef_t *get_chardef(const mathchardef_t * symdef, int size)
 {
-    fontfamily *fonts = fonttable;      /* table of font families */
-    chardef **fontdef;          /*tables for desired font, by size */
-    chardef *gfdata = NULL;     /* chardef for symdef,size */
+    fontfamily_t *fonts = fonttable;      /* table of font families */
+    chardef_t *const*fontdef;          /*tables for desired font, by size */
+    chardef_t *gfdata = NULL;     /* chardef for symdef,size */
     int ifont;                  /* fonts[] index */
     int family, charnum;        /* indexes retrieved from symdef */
     int sizeinc = 0;            /*+1 or -1 to get closer to normal */
@@ -5727,8 +3561,8 @@ static chardef *get_chardef(mathchardef * symdef, int size)
         goto end_of_job;
     }
 /* --- get local copy of indexes from symdef --- */
-     family = symdef->family;   /* font family containing symbol */
-     charnum = symdef->charnum; /* char# of symbol within font */
+    family = symdef->family;   /* font family containing symbol */
+    charnum = symdef->charnum; /* char# of symbol within font */
 /* --- check for supersampling --- */
     if (issupersampling) {      /* check for supersampling fonts */
         if (fonts != ssfonttable) {     /* uh oh--probably internal error */
@@ -5765,46 +3599,40 @@ static chardef *get_chardef(mathchardef * symdef, int size)
         }
     }
 
-    /* -------------------------------------------------------------------------
-       find font family in table of fonts[]
-       -------------------------------------------------------------------------- */
     /* --- look up font family --- */
     for (ifont = 0;; ifont++) {   /* until trailer record found */
-        if (fonts[ifont].family < 0) {  /* error, no such family */
-            if (msgfp != NULL && msglevel >= 99) {      /* emit error */
-                fprintf(msgfp,
-                        "get_chardef> failed to find font family %d\n",
-                        family);
-                fflush(msgfp);
-            }
+        if (fonts[ifont].family < 0) {
+#if DEBUG_LOG_LEVEL >= 99
+            fprintf(msgfp,
+                    "get_chardef> failed to find font family %d\n",
+                    family);
+#endif
             goto end_of_job;
         } else if (fonts[ifont].family == family) {
-            break;              /* found font family */
+            /* found font family */
+            break;
         }
     }
 /* --- get local copy of table for this family by size --- */
     fontdef = fonts[ifont].fontdef;     /* font by size */
-/* -------------------------------------------------------------------------
-get font in desired size, or closest available size, and return symbol
--------------------------------------------------------------------------- */
+
 /* --- get font in desired size --- */
     for (;;) {                  /* find size or closest available */
         if (fontdef[size] != NULL) {
             break;              /* found available size */
         } else if (size == NORMALSIZE || sizeinc == 0) {  /* or must be supersampling */
-            if (msgfp != NULL && msglevel >= 99) {      /* emit error */
-                fprintf(msgfp,
-                        "get_chardef> failed to find font size %d\n",
-                        size);
-                fflush(msgfp);
-            }
+#if DEBUG_LOG_LEVEL >= 99
+            fprintf(msgfp,
+                    "get_chardef> failed to find font size %d\n",
+                    size);
+#endif
             goto end_of_job;
         } else {                   /*bump size 1 closer to NORMALSIZE */
             size += sizeinc;    /* see if adjusted size available */
         }
     }
 /* --- ptr to chardef struct --- */
-    gfdata = &((fontdef[size])[charnum]);       /*ptr to chardef for symbol in size */
+    gfdata = &fontdef[size][charnum];       /*ptr to chardef for symbol in size */
 /* -------------------------------------------------------------------------
 kludge to tweak CMEX10 (which appears to have incorrect descenders)
 -------------------------------------------------------------------------- */
@@ -5813,54 +3641,48 @@ kludge to tweak CMEX10 (which appears to have incorrect descenders)
         gfdata->botrow = (isBig ? (-height / 3) : (-height / 4));
         gfdata->toprow = gfdata->botrow + gfdata->image.height;
     }
-/* -------------------------------------------------------------------------
-return subraster containing chardef data for symbol in requested size
--------------------------------------------------------------------------- */
-  end_of_job:
-    if (msgfp != NULL && msglevel >= 999) {
-        if (symdef == NULL) {
-            fprintf(msgfp, "get_chardef> input symdef==NULL\n");
-        } else {
-            fprintf(msgfp,
-                    "get_chardef> requested symbol=\"%s\" size=%d  %s\n",
-                    symdef->symbol, size,
-                    (gfdata == NULL ? "FAILED" : "Succeeded"));
-        }
-        fflush(msgfp);
+
+end_of_job:
+#if DEBUG_LOG_LEVEL >= 999
+    if (symdef == NULL) {
+        fprintf(msgfp, "get_chardef> input symdef==NULL\n");
+    } else {
+        fprintf(msgfp,
+                "get_chardef> requested symbol=\"%s\" size=%d  %s\n",
+                symdef->symbol, size,
+                (gfdata == NULL ? "FAILED" : "Succeeded"));
     }
+#endif
     return gfdata;
 }
 
 /* ==========================================================================
  * Function:    get_charsubraster ( symdef, size )
- * Purpose: returns new subraster ptr containing
+ * Purpose: returns new subraster_t ptr containing
  *      data for symdef at given size
  * --------------------------------------------------------------------------
  * Arguments:   symdef (I)  mathchardef *  corresponding to symbol whose
- *              corresponding chardef subraster is wanted
+ *              corresponding chardef subraster_t is wanted
  *      size (I)    int containing 0-5 for desired size
  * --------------------------------------------------------------------------
- * Returns: ( subraster * ) pointer to struct defining symbol at size,
+ * Returns: ( subraster_t * ) pointer to struct defining symbol at size,
  *              or NULL for any error
  * --------------------------------------------------------------------------
- * Notes:     o just wraps a subraster envelope around get_chardef()
+ * Notes:     o just wraps a subraster_t envelope around get_chardef()
  * ======================================================================= */
-
-static subraster *get_charsubraster(mathchardef * symdef, int size)
+static subraster_t *get_charsubraster(const mathchardef_t *symdef, int size)
 {
-    chardef *gfdata = NULL;     /* chardef struct for symdef,size */
-    subraster *sp = NULL;       /* subraster containing gfdata */
-    raster *bitmaprp = NULL;    /* convert .gf-format to bitmap */
+    const chardef_t *gfdata = NULL;     /* chardef struct for symdef,size */
+    subraster_t *sp = NULL;       /* subraster_t containing gfdata */
+    raster_t *bitmaprp = NULL;    /* convert .gf-format to bitmap */
     int grayscale = 256;        /* aasupersamp() parameters */
 
-/* -------------------------------------------------------------------------
-look up chardef for symdef at size, and embed data (gfdata) in subraster
--------------------------------------------------------------------------- */
-    if ((gfdata = get_chardef(symdef, size)) != NULL) {
+    gfdata = get_chardef(symdef, size);
+    if (gfdata != NULL) {
         /* we found it */
-        /* allocate subraster "envelope" */
+        /* allocate subraster_t "envelope" */
         if ((sp = new_subraster(0, 0, 0)) != NULL) {
-            raster *image = &(gfdata->image);   /* ptr to chardef's bitmap or .gf */
+            const raster_t *image = &gfdata->image;   /* ptr to chardef's bitmap or .gf */
             int format = image->format; /* 1=bitmap, else .gf */
             sp->symdef = symdef;       /* replace NULL with caller's arg */
             sp->size = size;   /*replace default with caller's size */
@@ -5868,7 +3690,7 @@ look up chardef for symdef at size, and embed data (gfdata) in subraster
 
             if (format == 1) {  /* already a bitmap */
                 sp->type = CHARASTER;   /* static char raster */
-                sp->image = image;
+                sp->image = (raster_t*)image;
             } else if ((bitmaprp = gftobitmap(image)) != NULL) {
                 /* convert successful */
                 sp->type = IMAGERASTER; /* allocated raster will be freed */
@@ -5880,7 +3702,7 @@ look up chardef for symdef at size, and embed data (gfdata) in subraster
                 goto end_of_job;
             }                   /* quit */
             if (issupersampling) {      /* antialias character right here */
-                raster *aa = NULL;      /* antialiased char raster */
+                raster_t *aa = NULL;      /* antialiased char raster */
                 int status = aasupsamp(sp->image, &aa, shrinkfactor, grayscale);
                 if (status) {   /* supersampled successfully */
                     int baseline = sp->baseline;        /* baseline before supersampling */
@@ -5896,47 +3718,45 @@ look up chardef for symdef at size, and embed data (gfdata) in subraster
             }
         }
     }
-  end_of_job:
-    if (msgfp != NULL && msglevel >= 999) {
-        fprintf(msgfp,
-                "get_charsubraster> requested symbol=\"%s\" baseline=%d"
-                " %s %s\n", symdef->symbol,
-                (sp == NULL ? 0 : sp->baseline),
-                (sp == NULL ? "FAILED" : "Succeeded"),
-                (gfdata == NULL ? "(gfdata=NULL)" : " "));
-        fflush(msgfp);
-    }
+end_of_job:
+#if DEBUG_LOG_LEVEL >= 999
+    fprintf(msgfp,
+            "get_charsubraster> requested symbol=\"%s\" baseline=%d"
+            " %s %s\n", symdef->symbol,
+            (sp == NULL ? 0 : sp->baseline),
+            (sp == NULL ? "FAILED" : "Succeeded"),
+            (gfdata == NULL ? "(gfdata=NULL)" : " "));
+#endif
     return sp;
 }
 
 /* ==========================================================================
  * Function:    get_symsubraster ( symbol, size )
- * Purpose: returns new subraster ptr containing
+ * Purpose: returns new subraster_t ptr containing
  *      data for symbol at given size
  * --------------------------------------------------------------------------
  * Arguments:   symbol (I)  char *  corresponding to symbol
- *              whose corresponding subraster is wanted
+ *              whose corresponding subraster_t is wanted
  *      size (I)    int containing 0-5 for desired size
  * --------------------------------------------------------------------------
- * Returns: ( subraster * ) pointer to struct defining symbol at size,
+ * Returns: ( subraster_t * ) pointer to struct defining symbol at size,
  *              or NULL for any error
  * --------------------------------------------------------------------------
  * Notes:     o just combines get_symdef() and get_charsubraster()
  * ======================================================================= */
 
-static subraster *get_symsubraster(const char *symbol, int size)
+static subraster_t *get_symsubraster(const char *symbol, int size)
 {
-    subraster *sp = NULL; /* subraster containing gfdata */
-    mathchardef *symdef = NULL;  /* mathchardef lookup for symbol */
+    subraster_t *sp = NULL; /* subraster_t containing gfdata */
+    const mathchardef_t *symdef = NULL;  /* mathchardef lookup for symbol */
 
     if (symbol != NULL) {        /* user supplied input symbol */
          symdef = get_symdef(symbol);   /*look up corresponding mathchardef */
     }
-/* -------------------------------------------------------------------------
-look up chardef for mathchardef and wrap a subraster structure around data
--------------------------------------------------------------------------- */
-    if (symdef != NULL) {        /* lookup succeeded */
-         sp = get_charsubraster(symdef, size);  /* so get symbol data in subraster */
+
+    if (symdef != NULL) {
+        /* lookup succeeded */
+        sp = get_charsubraster(symdef, size);  /* so get symbol data in subraster_t */
     }
     return sp;
 }
@@ -5956,7 +3776,7 @@ look up chardef for mathchardef and wrap a subraster structure around data
  *      so 0 would mean the very top row is on the baseline
  *      and everything else descends below the baseline.
  * ======================================================================= */
-static int get_baseline(chardef * gfdata)
+static int get_baseline(const chardef_t *gfdata)
 {
     /*toprow = gfdata->toprow, */
     /*TeX top row from .gf file info */
@@ -5968,7 +3788,7 @@ static int get_baseline(chardef * gfdata)
 
 /* ==========================================================================
  * Function:    get_delim ( char *symbol, int height, int family )
- * Purpose: returns subraster corresponding to the samllest
+ * Purpose: returns subraster_t corresponding to the samllest
  *      character containing symbol, but at least as large as height,
  *      and in caller's family (if specified).
  *      If no symbol character as large as height is available,
@@ -5982,17 +3802,17 @@ static int get_baseline(chardef * gfdata)
  *      family (I)  int containing -1 to consider all families,
  *              or, e.g., CMEX10 for only that family
  * --------------------------------------------------------------------------
- * Returns: ( subraster * ) best matching character available,
+ * Returns: ( subraster_t * ) best matching character available,
  *              or NULL for any error
  * --------------------------------------------------------------------------
  * Notes:     o If height is passed as negative, its absolute value is used
  *      but the best-fit width is searched for (rather than height)
  * ======================================================================= */
-/* --- entry point --- */
-static subraster *get_delim(const char *symbol, int height, int family) {
-    mathchardef *symdefs = symtable;    /* table of mathchardefs */
-    subraster *sp = NULL;       /* best match char */
-    chardef *gfdata = NULL;     /* get chardef struct for a symdef */
+subraster_t *get_delim(const char *symbol, int height, int family)
+{
+    const mathchardef_t *symdefs = symtable;    /* table of mathchardefs */
+    subraster_t *sp = NULL;       /* best match char */
+    const chardef_t *gfdata = NULL;     /* get chardef struct for a symdef */
     char lcsymbol[256];
     char *symptr;               /* lowercase symbol for comparison */
     const char *unescsymbol = symbol;   /* unescaped symbol */
@@ -6026,29 +3846,29 @@ determine if searching height or width, and search symdefs[] for best-fit
         iscurly = 1;            /* user wants curly delim */
     }
 /* --- ignore leading escapes for CMEX10 --- */
-    if (1) {                     /* ignore leading escape */
-        if ((family == CMEX10 || family == CMSYEX)) {   /* for CMEX10 or CMSYEX */
-            if (strstr(symbol, "sq") != NULL)   /* \sq symbol requested */
-                issq = 1;       /* seq \sq signal */
-            if (strstr(symbol, "oint") != NULL) { /* \oint symbol requested */
-                isoint = 1;     /* seq \oint signal */
-            }
-            if (*symbol == '\\') {      /* have leading \ */
-                unescsymbol = symbol + 1;       /* push past leading \ */
-                if (--symlen < 1) {
-                    return sp;        /* one less char */
-                }
-                if (strcmp(unescsymbol, "int") == 0) {    /* \int requested by caller */
-                    unescsymbol = bigint;       /* but big version looks better */
-                }
-                if (strcmp(unescsymbol, "oint") == 0) {   /* \oint requested by caller */
-                    unescsymbol = bigoint;      /* but big version looks better */
-                }
-                symlen = strlen(unescsymbol);   /* explicitly recalculate length */
-                isunesc = 1;
-            }                   /* signal leading escape removed */
+#if 1
+    if ((family == CMEX10 || family == CMSYEX)) {   /* for CMEX10 or CMSYEX */
+        if (strstr(symbol, "sq") != NULL)   /* \sq symbol requested */
+            issq = 1;       /* seq \sq signal */
+        if (strstr(symbol, "oint") != NULL) { /* \oint symbol requested */
+            isoint = 1;     /* seq \oint signal */
         }
+        if (*symbol == '\\') {      /* have leading \ */
+            unescsymbol = symbol + 1;       /* push past leading \ */
+            if (--symlen < 1) {
+                return sp;        /* one less char */
+            }
+            if (strcmp(unescsymbol, "int") == 0) {    /* \int requested by caller */
+                unescsymbol = bigint;       /* but big version looks better */
+            }
+            if (strcmp(unescsymbol, "oint") == 0) {   /* \oint requested by caller */
+                unescsymbol = bigoint;      /* but big version looks better */
+            }
+            symlen = strlen(unescsymbol);   /* explicitly recalculate length */
+            isunesc = 1;
+        }                   /* signal leading escape removed */
     }
+#endif
     /* --- determine whether searching for best-fit height or width --- */
     if (height < 0) {           /* negative signals width search */
         height = -height;       /* flip "height" positive */
@@ -6067,29 +3887,29 @@ determine if searching height or width, and search symdefs[] for best-fit
             if (isunesc && *lcsymbol == '\\') { /* ignored leading \ in symbol */
                 strsqueeze(lcsymbol, 1);
             }                   /*so squeeze it out of lcsymbol too */
-            if (0) {              /* don't ignore case */
-                for (symptr = lcsymbol; *symptr != '\0'; symptr++) {     /*for each symbol ch */
-                    if (isalpha(*symptr)) {
-                        *symptr = tolower(*symptr);
-                    }
+#if 0
+            for (symptr = lcsymbol; *symptr != '\0'; symptr++) {     /*for each symbol ch */
+                if (isalpha(*symptr)) {
+                    *symptr = tolower(*symptr);
                 }
             }
+#endif
             deflen = strlen(lcsymbol);  /* #chars in symbol we're checking */
-            if ((symptr = strstr(lcsymbol, unescsymbol)) != NULL)       /*found caller's sym */
+            if ((symptr = strstr(lcsymbol, unescsymbol)) != NULL) {     /*found caller's sym */
                 if ((isoint || strstr(lcsymbol, "oint") == NULL)        /* skip unwanted "oint" */
-                    &&(issq || strstr(lcsymbol, "sq") == NULL)) /* skip unwanted "sq" */
+                    &&(issq || strstr(lcsymbol, "sq") == NULL)) { /* skip unwanted "sq" */
                     if ((deffam == CMSY10 ?     /* CMSY10 or not CMSY10 */
                          symptr == lcsymbol     /* caller's sym is a prefix */
                          && deflen == symlen :  /* and same length */
                          (iscurly || strstr(lcsymbol, "curly") == NULL) &&      /*not unwanted curly */
                          (symptr == lcsymbol    /* caller's sym is a prefix */
-                          || symptr == lcsymbol + deflen - symlen)))    /* or a suffix */
-                        for (size = 0; size <= LARGESTSIZE; size++)     /* check all font sizes */
+                          || symptr == lcsymbol + deflen - symlen))) {  /* or a suffix */
+                        for (size = 0; size <= LARGESTSIZE; size++) {   /* check all font sizes */
                             if ((gfdata = get_chardef(&(symdefs[idef]), size)) != NULL) {       /*got one */
                                 defheight = gfdata->image.height;       /* height of this character */
                                 if (iswidth)    /* width search wanted instead... */
                                     defheight = gfdata->image.width;    /* ...so substitute width */
-                                leftsymdef = &(symdefs[idef]);  /* set symbol class, etc */
+                                leftsymdef = &symdefs[idef];  /* set symbol class, etc */
                                 if (defheight >= height && defheight < bestheight) {    /*new best fit */
                                     bestdef = idef;
                                     bestsize = size;    /* save indexes of best fit */
@@ -6101,32 +3921,36 @@ determine if searching height or width, and search symdefs[] for best-fit
                                     bigheight = defheight;
                                 }       /* and save new big height */
                             }
+                        }
+                    }
+                }
+            }
         }
     }
 /* -------------------------------------------------------------------------
-construct subraster for best fit character, and return it to caller
+construct subraster_t for best fit character, and return it to caller
 -------------------------------------------------------------------------- */
     if (bestdef >= 0) {          /* found a best fit for caller */
-        sp = get_charsubraster(&(symdefs[bestdef]), bestsize);  /* best subraster */
+        sp = get_charsubraster(&(symdefs[bestdef]), bestsize);  /* best subraster_t */
     }
     if ((sp == NULL && height - bigheight > 5) ||bigdef < 0) {           /* delim not in font tables */
         sp = make_delim(symbol, (iswidth ? -height : height));  /* try to build delim */
     }
     if (sp == NULL && bigdef >= 0) {     /* just give biggest to caller */
-        sp = get_charsubraster(&(symdefs[bigdef]), bigsize);    /* biggest subraster */
+        sp = get_charsubraster(&(symdefs[bigdef]), bigsize);    /* biggest subraster_t */
     }
-    if (msgfp != NULL && msglevel >= 99) {
-        fprintf(msgfp,
-                "get_delim> symbol=%.50s, height=%d family=%d isokay=%s\n",
-                (symbol == NULL ? "null" : symbol), height, family,
-                (sp == NULL ? "fail" : "success"));
-    }
+#if DEBUG_LOG_LEVEL >= 99
+    fprintf(msgfp,
+            "get_delim> symbol=%.50s, height=%d family=%d isokay=%s\n",
+            (symbol == NULL ? "null" : symbol), height, family,
+            (sp == NULL ? "fail" : "success"));
+#endif
     return sp;
 }
 
 /* ==========================================================================
  * Function:    make_delim ( char *symbol, int height )
- * Purpose: constructs subraster corresponding to symbol
+ * Purpose: constructs subraster_t corresponding to symbol
  *      exactly as large as height,
  * --------------------------------------------------------------------------
  * Arguments:   symbol (I)  char *  containing, e.g., if symbol="("
@@ -6134,20 +3958,19 @@ construct subraster for best fit character, and return it to caller
  *      height (I)  int containing height
  *              for returned character
  * --------------------------------------------------------------------------
- * Returns: ( subraster * ) constructed delimiter
+ * Returns: ( subraster_t * ) constructed delimiter
  *              or NULL for any error
  * --------------------------------------------------------------------------
  * Notes:     o If height is passed as negative, its absolute value is used
  *      and interpreted as width (rather than height)
  * ======================================================================= */
- 
-subraster *make_delim(const char *symbol, int height)
+subraster_t *make_delim(const char *symbol, int height)
 {
-    subraster *sp = NULL;       /* subraster returned to caller */
-    subraster *symtop = NULL, *symbot = NULL, *symmid = NULL, *symbar = NULL;   /* pieces */
-    subraster *topsym = NULL, *botsym = NULL, *midsym = NULL, *barsym = NULL;   /* +filler */
+    subraster_t *sp = NULL;       /* subraster_t returned to caller */
+    subraster_t *symtop = NULL, *symbot = NULL, *symmid = NULL, *symbar = NULL;   /* pieces */
+    subraster_t *topsym = NULL, *botsym = NULL, *midsym = NULL, *barsym = NULL;   /* +filler */
     int isdrawparen = 0;        /*1=draw paren, 0=build from pieces */
-    raster *rasp = NULL;        /* sp->image */
+    raster_t *rasp = NULL;        /* sp->image */
     int isokay = 0;             /* set true if delimiter drawn ok */
     int pixsz = 1;              /* pixels are one bit each */
     int symsize = 0;            /* size arg for get_symsubraster() */
@@ -6159,7 +3982,7 @@ subraster *make_delim(const char *symbol, int height)
     char *lp2 = NULL, *rp2 = NULL;       /* synonym for lp,rp */
     char *lp3 = NULL, *rp3 = NULL;       /* synonym for lp,rp */
     char *lp4 = NULL, *rp4 = NULL;       /* synonym for lp,rp */
-    int isprealloc = 1;         /*pre-alloc subraster, except arrow */
+    int isprealloc = 1;         /*pre-alloc subraster_t, except arrow */
     int oldsmashmargin = smashmargin;   /* save original smashmargin */
     int wasnocatspace = isnocatspace;   /* save original isnocatspace */
 
@@ -6197,18 +4020,18 @@ subraster *make_delim(const char *symbol, int height)
     if (strstr(symbol, "arrow") != NULL) {      /* arrow wanted */
         width = min2(height / 3, 20);   /* adjust width */
         isprealloc = 0;
-    }                           /* don't preallocate subraster */
+    }                           /* don't preallocate subraster_t */
     if (strchr(symbol, '{') != NULL     /* if left { */
         || strchr(symbol, '}') != NULL) {       /* or right } brace wanted */
         isprealloc = 0;
     }
     /* don't preallocate */
-    /* --- allocate and initialize subraster for constructed delimiter --- */
+    /* --- allocate and initialize subraster_t for constructed delimiter --- */
     if (isprealloc) {           /* pre-allocation wanted */
         if ((sp = new_subraster(width, height, pixsz)) == NULL) {
             goto end_of_job;
         }
-        /* --- initialize delimiter subraster parameters --- */
+        /* --- initialize delimiter subraster_t parameters --- */
         sp->type = IMAGERASTER; /* image */
         sp->symdef = NULL;      /* not applicable for image */
         sp->baseline = height / 2 + 2;  /* is a little above center good? */
@@ -6506,11 +4329,11 @@ subraster *make_delim(const char *symbol, int height)
         isokay = 1;
     }
 
-  end_of_job:
-    if (msgfp != NULL && msglevel >= 99) {
-        fprintf(msgfp, "make_delim> symbol=%.50s, isokay=%d\n",
-                (symbol == NULL ? "null" : symbol), isokay);
-    }
+end_of_job:
+#if DEBUG_LOG_LEVEL >= 99
+    fprintf(msgfp, "make_delim> symbol=%.50s, isokay=%d\n",
+            (symbol == NULL ? "null" : symbol), isokay);
+#endif
     if (!isokay) {              /* don't have requested delimiter */
         if (sp != NULL) {
             delete_subraster(sp);       /* so free unneeded structure */
@@ -6544,17 +4367,18 @@ subraster *make_delim(const char *symbol, int height)
  * Notes:     o Does *not* skip leading whitespace, but simply
  *      returns any whitespace character as the next character.
  * ======================================================================= */
-
 char *texchar(const char *expression, char *chartoken)
 {
     int esclen = 0;             /*length of escape sequence */
     int maxesclen = 128;        /* max len of esc sequence */
     char *ptoken = chartoken;   /* ptr into chartoken */
     int iprefix = 0;            /* prefix index */
-    static const char *prefixes[] =     /*e.g., \big followed by ( */
-        {"\\big", "\\Big", "\\bigg", "\\Bigg",
-         "\\bigl", "\\Bigl", "\\biggl", "\\Biggl",
-         "\\bigr", "\\Bigr", "\\biggr", "\\Biggr", NULL};
+    static const char *prefixes[] = {    /*e.g., \big followed by ( */
+        "\\big", "\\Big", "\\bigg", "\\Bigg",
+        "\\bigl", "\\Bigl", "\\biggl", "\\Biggl",
+        "\\bigr", "\\Bigr", "\\biggr", "\\Biggr",
+        NULL
+    };
     static const char *starred[] = {"\\hspace", "\\!", NULL};
 
 /* -------------------------------------------------------------------------
@@ -6630,12 +4454,139 @@ just return the next char if it's not \
         }
     }
 
-  end_of_job:
-    if (msgfp != NULL && msglevel >= 999) {
-        fprintf(msgfp, "texchar> returning token = \"%s\"\n", chartoken);
-        fflush(msgfp);
-    }
+end_of_job:
+#if DEBUG_LOG_LEVEL >= 999
+    fprintf(msgfp, "texchar> returning token = \"%s\"\n", chartoken);
+#endif
     return (char *) expression; /*ptr to 1st non-alpha char */
+}
+
+/* ==========================================================================
+ * Function:    texleft (expression,subexpr,maxsubsz,ldelim,rdelim)
+ * Purpose: scans expression, starting after opening \left,
+ *      and returning ptr after matching closing \right.
+ *      Everything between is returned in subexpr, if given.
+ *      Likewise, if given, ldelim returns delimiter after \left
+ *      and rdelim returns delimiter after \right.
+ *      If ldelim is given, the returned subexpr doesn't include it.
+ *      If rdelim is given, the returned pointer is after that delim.
+ * --------------------------------------------------------------------------
+ * Arguments:   expression (I)  char * to first char of null-terminated
+ *              string immediately following opening \left
+ *      subexpr (O) char * to null-terminated string returning
+ *              either everything between balanced
+ *              \left ... \right.  If leftdelim given,
+ *              subexpr does _not_ contain that delimiter.
+ *      maxsubsz (I)    int containing max #bytes returned
+ *              in subexpr buffer (0 means unlimited)
+ *      ldelim (O)  char * returning delimiter following
+ *              opening \left
+ *      rdelim (O)  char * returning delimiter following
+ *              closing \right
+ * --------------------------------------------------------------------------
+ * Returns: ( char * )  ptr to the first char of expression
+ *              past closing \right, or past closing
+ *              right delimiter if rdelim!=NULL,
+ *              or NULL for any error.
+ * --------------------------------------------------------------------------
+ * Notes:     o
+ * ======================================================================= */
+
+static char *texleft(const char *expression, char *subexpr, int maxsubsz, char *ldelim, char *rdelim)
+{
+    const char *pright = expression;    /* locate matching \right */
+    static char left[16] = "\\left", right[16] = "\\right";     /* tex delimiters */
+    int sublen = 0;             /* #chars between \left...\right */
+/* -------------------------------------------------------------------------
+initialization
+-------------------------------------------------------------------------- */
+/* --- init output --- */
+    if (subexpr != NULL) {
+        *subexpr = '\0';        /* init subexpr, if given */
+    }
+    if (ldelim != NULL) {
+        *ldelim = '\0';         /* init ldelim,  if given */
+    }
+    if (rdelim != NULL) {
+        *rdelim = '\0';         /* init rdelim,  if given */
+    }
+/* --- check args --- */
+    if (expression == NULL) {
+        goto end_of_job;        /* no input supplied */
+    }
+    if (*expression == '\0') {
+        goto end_of_job;        /* nothing after \left */
+    }
+/* --- determine left delimiter  --- */
+    if (ldelim != NULL) {       /* caller wants left delim */
+        skipwhite(expression);  /* interpret \left ( as \left( */
+        expression = texchar(expression, ldelim);
+    }
+
+    /*delim from expression */
+    /* -------------------------------------------------------------------------
+       locate \right balancing opening \left
+       -------------------------------------------------------------------------- */
+    /* --- first \right following \left --- */
+    if ((pright = strtexchr(expression, right)) != NULL) {      /* look for \right after \left */
+        /* --- find matching \right by pushing past any nested \left's --- */
+        const char *pleft = expression; /* start after first \left( */
+        while (1) {             /*break when matching \right found */
+            /* -- locate next nested \left if there is one --- */
+            if ((pleft = strtexchr(pleft, left)) == NULL) {     /* find next \left */
+                break;          /*no more, so matching \right found */
+            }
+            pleft += strlen(left);      /* push ptr past \left token */
+            if (pleft >= pright) {
+                break;          /* not nested if \left after \right */
+            }
+            /* --- have nested \left, so push forward to next \right --- */
+            if ((pright = strtexchr(pright + strlen(right), right)) == NULL) {  /* find next \right */
+                break;          /* ran out of \right's */
+            }
+        }
+    }
+    /* --- set subexpression length, push pright past \right --- */
+    if (pright != (char *) NULL) {      /* found matching \right */
+        sublen = (int) (pright - expression);   /* #chars between \left...\right */
+        pright += strlen(right);
+    }
+
+    /* so push pright past \right */
+    /* -------------------------------------------------------------------------
+       get rightdelim and subexpr between \left...\right
+       -------------------------------------------------------------------------- */
+    /* --- get delimiter following \right --- */
+    if (rdelim != NULL) {       /* caller wants right delim */
+        if (pright == (char *) NULL) {  /* assume \right. at end of exprssn */
+            strcpy(rdelim, ".");        /* set default \right. */
+            sublen = strlen(expression);        /* use entire remaining expression */
+            pright = expression + sublen;
+        } /* and push pright to end-of-string */
+        else {                  /* have explicit matching \right */
+            skipwhite(pright);  /* interpret \right ) as \right) */
+            pright = texchar(pright, rdelim);   /* pull delim from expression */
+            if (*rdelim == '\0')
+                strcpy(rdelim, ".");
+        }
+    }
+    /* or set \right. */
+    /* --- get subexpression between \left...\right --- */
+    if (sublen > 0)             /* have subexpr */
+        if (subexpr != NULL) {  /* and caller wants it */
+            if (maxsubsz > 0)
+                sublen = min2(sublen, maxsubsz - 1);    /* max buffer size */
+            memcpy(subexpr, expression, sublen);        /* stuff between \left...\right */
+            subexpr[sublen] = '\0';
+        }                       /* null-terminate subexpr */
+end_of_job:
+#if DEBUG_LOG_LEVEL >= 99
+    fprintf(msgfp, "texleft> ldelim=%s, rdelim=%s, subexpr=%.128s\n",
+            (ldelim == NULL ? "none" : ldelim),
+            (rdelim == NULL ? "none" : rdelim),
+            (subexpr == NULL ? "none" : subexpr));
+#endif
+    return (char *) pright;
 }
 
 /* ==========================================================================
@@ -6834,136 +4785,6 @@ accumulate chars between balanced {}'s, i.e., till nestlevel returns to 0
     }
 }
 
-
-/* ==========================================================================
- * Function:    texleft (expression,subexpr,maxsubsz,ldelim,rdelim)
- * Purpose: scans expression, starting after opening \left,
- *      and returning ptr after matching closing \right.
- *      Everything between is returned in subexpr, if given.
- *      Likewise, if given, ldelim returns delimiter after \left
- *      and rdelim returns delimiter after \right.
- *      If ldelim is given, the returned subexpr doesn't include it.
- *      If rdelim is given, the returned pointer is after that delim.
- * --------------------------------------------------------------------------
- * Arguments:   expression (I)  char * to first char of null-terminated
- *              string immediately following opening \left
- *      subexpr (O) char * to null-terminated string returning
- *              either everything between balanced
- *              \left ... \right.  If leftdelim given,
- *              subexpr does _not_ contain that delimiter.
- *      maxsubsz (I)    int containing max #bytes returned
- *              in subexpr buffer (0 means unlimited)
- *      ldelim (O)  char * returning delimiter following
- *              opening \left
- *      rdelim (O)  char * returning delimiter following
- *              closing \right
- * --------------------------------------------------------------------------
- * Returns: ( char * )  ptr to the first char of expression
- *              past closing \right, or past closing
- *              right delimiter if rdelim!=NULL,
- *              or NULL for any error.
- * --------------------------------------------------------------------------
- * Notes:     o
- * ======================================================================= */
-
-char *texleft(const char *expression, char *subexpr, int maxsubsz, char *ldelim, char *rdelim)
-{
-    const char *pright = expression;    /* locate matching \right */
-    static char left[16] = "\\left", right[16] = "\\right";     /* tex delimiters */
-    int sublen = 0;             /* #chars between \left...\right */
-/* -------------------------------------------------------------------------
-initialization
--------------------------------------------------------------------------- */
-/* --- init output --- */
-    if (subexpr != NULL) {
-        *subexpr = '\0';        /* init subexpr, if given */
-    }
-    if (ldelim != NULL) {
-        *ldelim = '\0';         /* init ldelim,  if given */
-    }
-    if (rdelim != NULL) {
-        *rdelim = '\0';         /* init rdelim,  if given */
-    }
-/* --- check args --- */
-    if (expression == NULL) {
-        goto end_of_job;        /* no input supplied */
-    }
-    if (*expression == '\0') {
-        goto end_of_job;        /* nothing after \left */
-    }
-/* --- determine left delimiter  --- */
-    if (ldelim != NULL) {       /* caller wants left delim */
-        skipwhite(expression);  /* interpret \left ( as \left( */
-        expression = texchar(expression, ldelim);
-    }
-
-    /*delim from expression */
-    /* -------------------------------------------------------------------------
-       locate \right balancing opening \left
-       -------------------------------------------------------------------------- */
-    /* --- first \right following \left --- */
-    if ((pright = strtexchr(expression, right)) != NULL) {      /* look for \right after \left */
-        /* --- find matching \right by pushing past any nested \left's --- */
-        const char *pleft = expression; /* start after first \left( */
-        while (1) {             /*break when matching \right found */
-            /* -- locate next nested \left if there is one --- */
-            if ((pleft = strtexchr(pleft, left)) == NULL) {     /* find next \left */
-                break;          /*no more, so matching \right found */
-            }
-            pleft += strlen(left);      /* push ptr past \left token */
-            if (pleft >= pright) {
-                break;          /* not nested if \left after \right */
-            }
-            /* --- have nested \left, so push forward to next \right --- */
-            if ((pright = strtexchr(pright + strlen(right), right)) == NULL) {  /* find next \right */
-                break;          /* ran out of \right's */
-            }
-        }
-    }
-    /* --- set subexpression length, push pright past \right --- */
-    if (pright != (char *) NULL) {      /* found matching \right */
-        sublen = (int) (pright - expression);   /* #chars between \left...\right */
-        pright += strlen(right);
-    }
-
-    /* so push pright past \right */
-    /* -------------------------------------------------------------------------
-       get rightdelim and subexpr between \left...\right
-       -------------------------------------------------------------------------- */
-    /* --- get delimiter following \right --- */
-    if (rdelim != NULL) {       /* caller wants right delim */
-        if (pright == (char *) NULL) {  /* assume \right. at end of exprssn */
-            strcpy(rdelim, ".");        /* set default \right. */
-            sublen = strlen(expression);        /* use entire remaining expression */
-            pright = expression + sublen;
-        } /* and push pright to end-of-string */
-        else {                  /* have explicit matching \right */
-            skipwhite(pright);  /* interpret \right ) as \right) */
-            pright = texchar(pright, rdelim);   /* pull delim from expression */
-            if (*rdelim == '\0')
-                strcpy(rdelim, ".");
-        }
-    }
-    /* or set \right. */
-    /* --- get subexpression between \left...\right --- */
-    if (sublen > 0)             /* have subexpr */
-        if (subexpr != NULL) {  /* and caller wants it */
-            if (maxsubsz > 0)
-                sublen = min2(sublen, maxsubsz - 1);    /* max buffer size */
-            memcpy(subexpr, expression, sublen);        /* stuff between \left...\right */
-            subexpr[sublen] = '\0';
-        }                       /* null-terminate subexpr */
-  end_of_job:
-    if (msglevel >= 99 && msgfp != NULL) {
-        fprintf(msgfp, "texleft> ldelim=%s, rdelim=%s, subexpr=%.128s\n",
-                (ldelim == NULL ? "none" : ldelim),
-                (rdelim == NULL ? "none" : rdelim),
-                (subexpr == NULL ? "none" : subexpr));
-        fflush(msgfp);
-    }
-    return (char *) pright;
-}
-
 /* ==========================================================================
  * Function:    texscripts ( expression, subscript, superscript, which )
  * Purpose: scans expression, returning subscript and/or superscript
@@ -7087,13 +4908,12 @@ static int isbrace(const char *expression, const char *braces, int isescape)
         }
     }
 
-  end_of_job:
-    if (msglevel >= 999 && msgfp != NULL) {
-        fprintf(msgfp,
-                "isbrace> expression=%.8s, gotbrace=%d (isligature=%d)\n",
-                expression, gotbrace, isligature);
-        fflush(msgfp);
-    }
+end_of_job:
+#if DEBUG_LOG_LEVEL >= 999
+    fprintf(msgfp,
+            "isbrace> expression=%.8s, gotbrace=%d (isligature=%d)\n",
+            expression, gotbrace, isligature);
+#endif
     if (gotbrace && (isescape == 2 || gotescape == isescape)) {
         return 1;
     }
@@ -7124,7 +4944,6 @@ static int isbrace(const char *expression, const char *braces, int isescape)
  *        o if subexpr is passed as NULL ptr, then returned expression
  *      ptr will have "flushed" and preamble parameters after size
  * ======================================================================= */
-
 char *preamble(char *expression, int *size, char *subexpr)
 {
     char pretext[512];
@@ -7751,8 +5570,8 @@ run thru table, converting all occurrences of each macro to its expansion
             }                   /* --- end-of-if(nargs>0) --- */
             strchange(escapelen, tokptr, abuff);        /*replace macro or html symbol */
             expptr = tokptr + strlen(abuff);    /*resume search after macro / html */
-        }                       /* --- end-of-while(tokptr!=NULL) --- */
-    }                           /* --- end-of-for(isymbol) --- */
+        }
+    }
 /* -------------------------------------------------------------------------
 convert \left( to \(  and  \right) to \),  etc.
 -------------------------------------------------------------------------- */
@@ -7786,7 +5605,7 @@ convert \left( to \(  and  \right) to \),  etc.
                 }
             }
         }
-    }
+	}
     /* -------------------------------------------------------------------------
        run thru table, converting all {a+b\atop c+d} to \atop{a+b}{c+d}
        -------------------------------------------------------------------------- */
@@ -7796,11 +5615,10 @@ convert \left( to \(  and  \right) to \),  etc.
         while ((tokptr = strstr(expptr, atopsym)) != NULL) {    /* found another atop */
             char *leftbrace = NULL, *rightbrace = NULL; /*ptr to opening {, closing } */
             char termchar = *(tokptr + atoplen);        /* \atop followed by terminator */
-            if (msgfp != NULL && msglevel >= 999) {
-                fprintf(msgfp, "mimeprep> offset=%d rhs=\"%s\"\n",
-                        (int) (tokptr - expression), tokptr);
-                fflush(msgfp);
-            }
+#if DEBUG_LOG_LEVEL >= 999
+            fprintf(msgfp, "mimeprep> offset=%d rhs=\"%s\"\n",
+                    (int) (tokptr - expression), tokptr);
+#endif
             if (isalpha((int) termchar)) {      /*we just have prefix of longer sym */
                 expptr = tokptr + atoplen;      /* just resume search after prefix */
                 continue;
@@ -7845,10 +5663,9 @@ convert \left( to \(  and  \right) to \),  etc.
 /* -------------------------------------------------------------------------
 back to caller with preprocessed expression
 -------------------------------------------------------------------------- */
-    if (msgfp != NULL && msglevel >= 99) {      /* display preprocessed expression */
-        fprintf(msgfp, "mimeprep> expression=\"\"%s\"\"\n", expression);
-        fflush(msgfp);
-    }
+#if DEBUG_LOG_LEVEL >= 99
+    fprintf(msgfp, "mimeprep> expression=\"\"%s\"\"\n", expression);
+#endif
     return expression;
 }
 
@@ -7871,7 +5688,8 @@ back to caller with preprocessed expression
  * Notes:     o If strlen(to)>nfirst, from must have memory past its null
  *      (i.e., we don't do a realloc)
  * ======================================================================= */
-static char *strchange(int nfirst, char *from, const char *to) {
+char *strchange(int nfirst, char *from, const char *to)
+{
     int tolen = (to == NULL ? 0 : strlen(to)),  /* #chars in replacement string */
         nshift = abs(tolen - nfirst);   /*need to shift from left or right */
 /* -------------------------------------------------------------------------
@@ -7912,8 +5730,8 @@ shift from left or right to accommodate replacement of its nfirst chars by to
  * --------------------------------------------------------------------------
  * Notes:     o
  * ======================================================================= */
-int strreplace(char *string, const char *from, const char *to,
-               int nreplace) {
+int strreplace(char *string, const char *from, const char *to, int nreplace)
+{
     int fromlen = (from == NULL ? 0 : strlen(from)),    /* #chars to be replaced */
         tolen = (to == NULL ? 0 : strlen(to));  /* #chars in replacement string */
     char *pfrom = NULL;         /*ptr to 1st char of from in string */
@@ -7993,8 +5811,8 @@ repace occurrences of 'from' in string to 'to'
  *      the very beginning of a string is assumed to be preceded
  *      by "virtual blanks".
  * ======================================================================= */
-char *strwstr(const char *string, const char *substr, const char *white,
-              int *sublen) {
+char *strwstr(const char *string, const char *substr, const char *white, int *sublen)
+{
     const char *psubstr = substr;
     const char *pstring = string;       /*ptr to current char in substr,str */
     const char *pfound = NULL;  /*ptr to found substr back to caller */
@@ -8085,14 +5903,13 @@ Initialization
     /* -------------------------------------------------------------------------
        Back to caller with ptr to first occurrence of substr in string
        -------------------------------------------------------------------------- */
-  end_of_job:
-    if (msglevel >= 999 && msgfp != NULL) {     /* debugging/diagnostic output */
-        fprintf(msgfp,
-                "strwstr> str=\"%.72s\" sub=\"%s\" found at offset %d\n",
-                string, substr,
-                (pfound == NULL ? (-1) : (int) (pfound - string)));
-        fflush(msgfp);
-    }
+end_of_job:
+#if DEBUG_LOG_LEVEL >= 999
+    fprintf(msgfp,
+            "strwstr> str=\"%.72s\" sub=\"%s\" found at offset %d\n",
+            string, substr,
+            (pfound == NULL ? (-1) : (int) (pfound - string)));
+#endif
     if (sublen != NULL) {       /*caller wants length of found substr */
         *sublen = foundlen;     /* give it to him along with ptr */
     }
@@ -8120,7 +5937,8 @@ Initialization
  *      so don't call strdetex() again until you're finished
  *      with output from the preceding call.
  * ======================================================================= */
-static char *strdetex(char *s, int mode) {
+static char *strdetex(char *s, int mode)
+{
     static char sbuff[4096];    /* copy of s with no math chars */
 /* -------------------------------------------------------------------------
 Make a clean copy of s
@@ -8130,8 +5948,9 @@ Make a clean copy of s
     if (isempty(s)) {
         goto end_of_job;        /* no input */
     }
-                                                                        /* --- start with copy of s --- */ strninit(sbuff, s, 2048);
-                                                                        /* leave room for replacements */
+    /* --- start with copy of s --- */
+    strninit(sbuff, s, 2048);
+    /* leave room for replacements */
 /* --- make some replacements -- we *must* replace \ { } first --- */
     strreplace(sbuff, "\\", "\\backslash~\\!\\!", 0);   /*change all \'s to text */
     strreplace(sbuff, "{", "\\lbrace~\\!\\!", 0);       /*change all {'s to \lbrace */
@@ -8171,8 +5990,9 @@ Make a clean copy of s
  *              or NULL if not found or for any error.
  * --------------------------------------------------------------------------
  * Notes:     o texchr should contain its leading \, e.g., "\\left"
-                                                                              * ======================================================================= *//* --- entry point --- */
-char *strtexchr(const char *string, const char *texchr) {
+ * ======================================================================= */
+char *strtexchr(const char *string, const char *texchr)
+{
     char delim, *ptexchr = NULL;        /* ptr returned to caller */
     const char *pstring = string;       /* start or continue up search here */
     int texchrlen = (texchr == NULL ? 0 : strlen(texchr));      /* #chars in texchr */
@@ -8217,7 +6037,8 @@ locate texchr in string
  * --------------------------------------------------------------------------
  * Notes:     o
  * ======================================================================= */
-static char *findbraces(const char *expression, const char *command) {
+static char *findbraces(const char *expression, const char *command)
+{
     int isopen = (expression == NULL ? 0 : 1);  /* true to find left opening { */
     const char *left = "{";
     const char *right = "}";    /* delims bracketing {x\command y} */
@@ -8263,7 +6084,7 @@ search for left opening { before command, or right closing } after command
             level++;            /* so bump nesting level */
         }
     }
-  end_of_job:
+end_of_job:
     if (brace == NULL) {        /* open{ or close} not found */
         if (setbrace) {         /* want to force one at start/end? */
             brace = ptr;        /* { before expressn, } after cmmnd */
@@ -8303,7 +6124,8 @@ search for left opening { before command, or right closing } after command
  *        o if reject not found, segment returns the entire string s
  *        o leading/trailing whitespace is trimmed from returned segment
  * ======================================================================= */
-char *strpspn(const char *s, const char *reject, char *segment) {
+char *strpspn(const char *s, const char *reject, char *segment)
+{
     const char *ps = s;         /* current pointer into s */
     int depth = 0;              /* () paren nesting level */
     int seglen = 0;
@@ -8316,9 +6138,10 @@ initialization
         goto end_of_job;        /* no reject chars supplied */
     }
 /* -------------------------------------------------------------------------
-find first char from s outside () parens (and outside ""'s) and in reject
-                                                                                                        -------------------------------------------------------------------------- */ while (*ps != '\0') {
-                                                                                                        /* search till end of input string */
+ * find first char from s outside () parens (and outside ""'s) and in reject
+ * -------------------------------------------------------------------------- */
+    while (*ps != '\0') {
+        /* search till end of input string */
         if (isthischar(*ps, "([{")) {
             depth++;            /* push another paren */
         }
@@ -8341,8 +6164,8 @@ find first char from s outside () parens (and outside ""'s) and in reject
         }
         seglen += 1;
         ps += 1;                /* bump to next char */
-    }                           /* --- end-of-while(*ps!=0) --- */
-  end_of_job:
+    }
+end_of_job:
     if (segment != NULL) {      /* caller gave us segment */
         if (isempty(reject)) {  /* no reject char */
             segment[min2(seglen, maxseg)] = *ps;
@@ -8351,7 +6174,7 @@ find first char from s outside () parens (and outside ""'s) and in reject
         segment[min2(seglen, maxseg)] = '\0';   /* null-terminate the segment */
         trimwhite(segment);
     }                           /* trim leading/trailing whitespace */
-    return (char *) ps;         /* back to caller */
+    return (char *) ps;
 }
 
 /* ==========================================================================
@@ -8427,7 +6250,7 @@ extract each snippet and see if it's a substring of string
             break;
         }                       /* no need to check any further */
     }                           /* --- end-of-while(*snipptr!=0) --- */
-  end_of_job:
+end_of_job:
     return (status);  /*1 if snippet found in list, else 0 */
 }
 
@@ -8444,7 +6267,7 @@ extract each snippet and see if it's a substring of string
  * --------------------------------------------------------------------------
  * Notes:     o
  * ======================================================================= */
-static int isnumeric(const char *s)
+int isnumeric(const char *s)
 {
     int status = 0;             /* return 0 if not numeric, 1 if is */
     const char *p = s;          /* pointer into s */
@@ -8470,7 +6293,7 @@ static int isnumeric(const char *s)
     }
     status = 1;
 
-  end_of_job:
+end_of_job:
     return status;
 }
 
@@ -8492,8 +6315,7 @@ static int isnumeric(const char *s)
  *      Each a:b:c:etc can be another expression, including another
  *      (index?a:b:c:etc) which must be enclosed in parentheses.
  * ======================================================================= */
-
-static int evalterm(STORE *store, const char *term)
+int evalterm(const store_t *store, const char *term)
 {
     int termval = 0;            /* term value returned to caller */
     char token[2048] = "\0";  /* copy term */
@@ -8611,7 +6433,7 @@ First look for conditional of the form term?term:term:...
     /* -------------------------------------------------------------------------
        back to caller with truth value of proposition
        -------------------------------------------------------------------------- */
-  end_of_job:
+end_of_job:
     /* --- back to caller --- */
     if (evaltermdepth > 0) {
         evaltermdepth--;        /* pop recursion depth */
@@ -8634,7 +6456,7 @@ First look for conditional of the form term?term:term:...
  * --------------------------------------------------------------------------
  * Notes:     o
  * ======================================================================= */
-static int getstore(STORE * store, const char *identifier)
+static int getstore(const store_t *store, const char *identifier)
 {
     int value = 0;              /* store[istore].value for identifier */
     int istore = 0;             /* store[] index containing identifier */
@@ -8661,15 +6483,13 @@ static int getstore(STORE * store, const char *identifier)
     if (store[istore].value != NULL) {   /* address of int supplied */
          value = *(store[istore].value);        /* return de-referenced int */
     }
-  end_of_job:
+end_of_job:
     return value;
 }
-#endif                          /* PART2 */
 
-#if 1
 /* ==========================================================================
  * Function:    rasterize ( expression, size )
- * Purpose: returns subraster corresponding to (a valid LaTeX) expression
+ * Purpose: returns subraster_t corresponding to (a valid LaTeX) expression
  *      at font size
  * --------------------------------------------------------------------------
  * Arguments:   expression (I)  char * to first char of null-terminated
@@ -8677,33 +6497,30 @@ static int getstore(STORE * store, const char *identifier)
  *              to be rasterized
  *      size (I)    int containing 0-4 default font size
  * --------------------------------------------------------------------------
- * Returns: ( subraster * ) ptr to subraster corresponding to expression,
+ * Returns: ( subraster_t * ) ptr to subraster_t corresponding to expression,
  *              or NULL for any parsing error.
  * --------------------------------------------------------------------------
  * Notes:     o This is mimeTeX's "main" reusable entry point.  Easy to use:
  *      just call it with a LaTeX expression, and get back a bitmap
  *      of that expression.  Then do what you want with the bitmap.
  * ======================================================================= */
-/* --- entry point --- */
-
-subraster *rasterize(const char *expression, int size)
+subraster_t *rasterize(const char *expression, int size)
 {
     char pretext[512];          /* process preamble, if present */
     char chartoken[MAXSUBXSZ + 1];      /*get subexpression from expr */
     const char *subexpr = chartoken;    /* token may be parenthesized expr */
-    mathchardef *symdef;        /*get mathchardef struct for symbol */
+    const mathchardef_t *symdef;        /*get mathchardef struct for symbol */
     int ligdef;                 /*get symtable[] index for ligature */
     int natoms = 0;             /* #atoms/tokens processed so far */
-    subraster *sp = NULL;
-    subraster *prevsp = NULL;   /* raster for current, prev char */
-    subraster *expraster = NULL;        /* raster returned to caller */
+    subraster_t *sp = NULL;
+    subraster_t *prevsp = NULL;   /* raster for current, prev char */
+    subraster_t *expraster = NULL;        /* raster returned to caller */
     int family = fontinfo[fontnum].family;      /* current font family */
     int isleftscript = 0;       /* true if left-hand term scripted */
     int wasscripted = 0;        /* true if preceding token scripted */
     int wasdelimscript = 0;     /* true if preceding delim scripted */
     /*int   pixsz = 1; *//*default #bits per pixel, 1=bitmap */
 /* --- global values saved/restored at each recursive iteration --- */
-    int wasstring = isstring;   /* initial isstring mode flag */
     int wasdisplaystyle = isdisplaystyle;       /*initial displaystyle mode flag */
     int oldfontnum = fontnum;   /* initial font family */
     int oldfontsize = fontsize; /* initial fontsize */
@@ -8714,10 +6531,10 @@ subraster *rasterize(const char *expression, int size)
     int oldisexplicitsmash = isexplicitsmash;   /* initial isexplicitsmash */
     int oldisscripted = isscripted;     /* initial isscripted */
     int *oldworkingparam = workingparam;        /* initial working parameter */
-    subraster *oldworkingbox = workingbox;      /* initial working box */
-    subraster *oldleftexpression = leftexpression;      /*left half rasterized so far */
+    subraster_t *oldworkingbox = workingbox;      /* initial working box */
+    subraster_t *oldleftexpression = leftexpression;      /*left half rasterized so far */
     double oldunitlength = unitlength;  /* initial unitlength */
-    mathchardef *oldleftsymdef = leftsymdef;    /* init oldleftsymdef */
+    const mathchardef_t *oldleftsymdef = leftsymdef;    /* init oldleftsymdef */
 
     recurlevel++;               /* wind up one more recursion level */
     leftexpression = NULL;      /* no leading left half yet */
@@ -8728,13 +6545,12 @@ subraster *rasterize(const char *expression, int size)
     /* shrinkfactor = shrinkfactors[max2(0,min2(size,LARGESTSIZE))]; *//*set sf */
     shrinkfactor = shrinkfactors[max2(0, min2(size, 16))];      /* have 17 sf's */
     rastlift = 0;               /* reset global rastraise() lift */
-    if (msgfp != NULL && msglevel >= 9) {       /*display expression for debugging */
-        fprintf(msgfp,
-                "rasterize> recursion#%d, size=%d,\n\texpression=\"%s\"\n",
-                recurlevel, size,
-                (expression == NULL ? "<null>" : expression));
-        fflush(msgfp);
-    }
+#if DEBUG_LOG_LEVEL >= 9
+    fprintf(msgfp,
+            "rasterize> recursion#%d, size=%d,\n\texpression=\"%s\"\n",
+            recurlevel, size,
+            (expression == NULL ? "<null>" : expression));
+#endif
     if (expression == NULL) {
         goto end_of_job;        /* nothing given to do */
     }
@@ -8771,7 +6587,7 @@ build up raster one character (or subexpression) at a time
         expression = texsubexpr(expression, chartoken, 0, LEFTBRACES, RIGHTBRACES, 1, 1);
         subexpr = chartoken;    /* "local" copy of chartoken ptr */
         leftsymdef = NULL;      /* no character identified yet */
-        sp = NULL;              /* no subraster yet */
+        sp = NULL;              /* no subraster_t yet */
         size = fontsize;        /* in case reset by \tiny, etc */
         /*isleftscript = isdelimscript; *//*was preceding term scripted delim */
         wasscripted = isscripted;       /* true if preceding token scripted */
@@ -8781,13 +6597,12 @@ build up raster one character (or subexpression) at a time
         }
         isdelimscript = 0;      /* reset \right delim scripted flag */
         /* --- debugging output --- */
-        if (msgfp != NULL && msglevel >= 9) {   /* display chartoken for debugging */
-            fprintf(msgfp,
-                    "rasterize> recursion#%d,atom#%d=\"%s\" (isligature=%d,isleftscript=%d)\n",
-                    recurlevel, natoms + 1, chartoken, isligature,
-                    isleftscript);
-            fflush(msgfp);
-        }
+#if DEBUG_LOG_LEVEL >= 9
+        fprintf(msgfp,
+                "rasterize> recursion#%d,atom#%d=\"%s\" (isligature=%d,isleftscript=%d)\n",
+                recurlevel, natoms + 1, chartoken, isligature,
+                isleftscript);
+#endif
         if (expression == NULL && *subexpr == '\0') {   /* no more tokens */
             break;              /* and this token empty */
         }
@@ -8828,16 +6643,15 @@ build up raster one character (or subexpression) at a time
             } else if ((leftsymdef = symdef = get_symdef(chartoken)) == NULL) { /* lookup failed */
                 char literal[512] = "[?]";      /*display for unrecognized literal */
                 int oldfontnum_tmp = fontnum;   /* error display in default mode */
-                if (msgfp != NULL && msglevel >= 29) {  /* display unrecognized symbol */
-                    fprintf(msgfp,
-                            "rasterize> get_symdef() failed for \"%s\"\n",
-                            chartoken);
-                    fflush(msgfp);
-                }
+#if DEBUG_LOG_LEVEL >= 29
+                fprintf(msgfp,
+                        "rasterize> get_symdef() failed for \"%s\"\n",
+                        chartoken);
+#endif
                 sp = NULL;      /* init to signal failure */
-                if (warninglevel < 1) {
-                    continue;   /* warnings not wanted */
-                }
+                //if (warninglevel < 1) {
+                //    continue;   /* warnings not wanted */
+                //}
                 fontnum = 0;    /* reset from \mathbb, etc */
                 if (isthischar(*chartoken, ESCAPE)) {   /* we got unrecognized \escape *//* --- so display literal {\rm~[\backslash~chartoken?]} ---  */
                     strcpy(literal, "{\\rm~["); /* init error message token */
@@ -8857,27 +6671,13 @@ build up raster one character (or subexpression) at a time
                 if ((sp = symdef->handler(&expression, size, prevsp, arg1, arg2, arg3)) == NULL) {
                     continue;
                 }
-            } else if (!isstring) {     /* --- no handler, so just get subraster for this character --- */
+            } else {     /* --- no handler, so just get subraster_t for this character --- */
                 if (isligature) {       /* found a ligature */
                     expression = subexprptr + strlen(symdef->symbol);   /*push past it */
                 }
-                if ((sp = get_charsubraster(symdef, size)) == NULL) {   /* get subraster */
+                if ((sp = get_charsubraster(symdef, size)) == NULL) {   /* get subraster_t */
                     continue;
                 }
-            } else {
-                /* constructing ascii string */
-                const char *symbol = symdef->symbol;    /* symbol for ascii string */
-                int symlen = (symbol != NULL ? strlen(symbol) : 0);     /*#chars in symbol */
-                if (symlen < 1) {
-                    continue;   /* no symbol for ascii string */
-                }
-                if ((sp = new_subraster(symlen + 1, 1, 8)) == NULL) {   /* subraster for symbol */
-                    continue;   /* flush token if malloc failed */
-                }
-                sp->type = ASCIISTRING; /* set subraster type */
-                sp->symdef = symdef;    /* and set symbol definition */
-                sp->baseline = 1;       /* default (should be unused) */
-                strcpy((char *) sp->image->pixmap, symbol);     /* copy symbol */
             }
         }
 
@@ -8885,22 +6685,18 @@ build up raster one character (or subexpression) at a time
         sp = rastlimits(&expression, size, sp);
         isleftscript = (wasscripted || wasdelimscript ? 1 : 0); /*preceding term scripted */
         /* --- debugging output --- */
-        if (msgfp != NULL && msglevel >= 9) {   /* display raster for debugging */
-            fprintf(msgfp, "rasterize> recursion#%d,atom#%d%s\n",
-                    recurlevel, natoms + 1,
-                    (sp == NULL ? " = <null>" : "..."));
-            if (msglevel >= 9)
-                fprintf(msgfp,
-                        "  isleftscript=%d is/wasscripted=%d,%d is/wasdelimscript=%d,%d\n",
-                        isleftscript, isscripted, wasscripted,
-                        isdelimscript, wasdelimscript);
-            if (msglevel >= 99) {
-                if (sp != NULL) {
-                    type_raster(sp->image, msgfp);      /* display raster */
-                }
-            }
-            fflush(msgfp);
+#if DEBUG_LOG_LEVEL >= 9
+        fprintf(msgfp, "rasterize> recursion#%d,atom#%d%s\n",
+                recurlevel, natoms + 1,
+                (sp == NULL ? " = <null>" : "..."));
+        fprintf(msgfp,
+                "  isleftscript=%d is/wasscripted=%d,%d is/wasdelimscript=%d,%d\n",
+                isleftscript, isscripted, wasscripted,
+                isdelimscript, wasdelimscript);
+        if (sp != NULL) {
+            type_raster(sp->image, msgfp);      /* display raster */
         }
+#endif
 
         /* --- accumulate atom or parenthesized subexpression --- */
         if (natoms < 1          /* nothing previous to concat */
@@ -8930,16 +6726,15 @@ build up raster one character (or subexpression) at a time
 /* -------------------------------------------------------------------------
 back to caller with rasterized expression
 -------------------------------------------------------------------------- */
-  end_of_job:
+end_of_job:
     delete_subraster(prevsp);   /* free last (if not a CHARASTER) */
     /* --- debugging output --- */
-    if (msgfp != NULL && msglevel >= 999) {     /* display raster for debugging */
-        fprintf(msgfp, "rasterize> Final recursion level=%d, atom#%d...\n", recurlevel, natoms);
-        if (expraster != NULL) {    /* i.e., if natoms>0 */
-            type_raster(expraster->image, msgfp);       /* display completed raster */
-        }
-        fflush(msgfp);
+#if DEBUG_LOG_LEVEL >= 999
+    fprintf(msgfp, "rasterize> Final recursion level=%d, atom#%d...\n", recurlevel, natoms);
+    if (expraster != NULL) {    /* i.e., if natoms>0 */
+        type_raster(expraster->image, msgfp);       /* display completed raster */
     }
+#endif
     /* flush msgfp buffer */
     /* --- set final raster buffer --- */
     if (1 && expraster != NULL) { /* have an expression */
@@ -8952,7 +6747,6 @@ back to caller with rasterized expression
     }
     /* set original input font size */
     /* --- restore flags/values to original saved values --- */
-    isstring = wasstring;       /* string mode reset */
     isdisplaystyle = wasdisplaystyle;   /* displaystyle mode reset */
     fontnum = oldfontnum;       /* font family reset */
     fontsize = oldfontsize;     /* fontsize reset */
@@ -8975,18 +6769,18 @@ back to caller with rasterized expression
 
 /* ==========================================================================
  * Function:    rastparen ( subexpr, size, basesp )
- * Purpose: parentheses handler, returns a subraster corresponding to
+ * Purpose: parentheses handler, returns a subraster_t corresponding to
  *      parenthesized subexpression at font size
  * --------------------------------------------------------------------------
  * Arguments:   subexpr (I) char **  to first char of null-terminated
  *              string beginning with a LEFTBRACES
  *              to be rasterized
  *      size (I)    int containing 0-7 default font size
- *      basesp (I)  subraster *  to character (or subexpression)
+ *      basesp (I)  subraster_t *  to character (or subexpression)
  *              immediately preceding leading left{
  *              (unused, but passed for consistency)
  * --------------------------------------------------------------------------
- * Returns: ( subraster * ) ptr to subraster corresponding to subexpr,
+ * Returns: ( subraster_t * ) ptr to subraster_t corresponding to subexpr,
  *              or NULL for any parsing error
  * --------------------------------------------------------------------------
  * Notes:     o This "handler" isn't in the mathchardef symbol table,
@@ -8995,8 +6789,8 @@ back to caller with rasterized expression
  *      for consistency with other handlers.  Ditto, basesp is unused
  *      but passed for consistency
  * ======================================================================= */
-static subraster *rastparen(const char **subexpr, int size,
-                            subraster * basesp) {
+subraster_t *rastparen(const char **subexpr, int size, subraster_t * basesp)
+{
     const char *expression = *subexpr;  /* dereference subexpr to get char* */
     int explen = strlen(expression);    /* total #chars, including parens */
     int isescape = 0;           /* true if parens \escaped */
@@ -9004,12 +6798,12 @@ static subraster *rastparen(const char **subexpr, int size,
     int isleftdot = 0;          /* true if left paren is \left. */
     char left[32], right[32];   /* parens enclosing expresion */
     char noparens[MAXSUBXSZ + 1];       /* get subexpr without parens */
-    subraster *sp = NULL;       /* rasterize what's between ()'s */
+    subraster_t *sp = NULL;       /* rasterize what's between ()'s */
     int isheight = 1;           /*true=full height, false=baseline */
     int height;                 /* height of rasterized noparens[] */
     int baseline;               /* and its baseline */
     int family = /*CMSYEX*/ CMEX10;     /* family for paren chars */
-    subraster *lp = NULL, *rp = NULL;   /* left and right paren chars */
+    subraster_t *lp = NULL, *rp = NULL;   /* left and right paren chars */
 /* -------------------------------------------------------------------------
 rasterize "interior" of expression, i.e., without enclosing parens
 -------------------------------------------------------------------------- */
@@ -9017,8 +6811,9 @@ rasterize "interior" of expression, i.e., without enclosing parens
     if (isthischar(*expression, ESCAPE)) {      /* expression begins with \escape */
         isescape = 1;           /* so set flag accordingly */
     }
-                                                                                                /* --- get expression *without* enclosing parens --- */ strcpy(noparens, expression);
-                                                                                                /* get local copy of expression */
+    /* --- get expression *without* enclosing parens --- */
+    strcpy(noparens, expression);
+    /* get local copy of expression */
     noparens[explen - (1 + isescape)] = '\0';   /* null-terminate before right} */
     strsqueeze(noparens, (1 + isescape));       /* and then squeeze out left{ */
 /* --- rasterize it --- */
@@ -9051,16 +6846,15 @@ obtain paren characters to enclose noparens[] raster with
         rp = get_delim(right, height + 1, family);      /* get right paren char */
     if ((lp == NULL && !isleftdot)      /* check that we got left( */
         ||(rp == NULL && !isrightdot)) {        /* and right) if needed */
-        delete_subraster(sp);   /* if failed, free subraster */
+        delete_subraster(sp);   /* if failed, free subraster_t */
         if (lp != NULL)
-            free((void *) lp);  /*free left-paren subraster envelope */
+            free((void *) lp);  /*free left-paren subraster_t envelope */
         if (rp != NULL)
-            free((void *) rp);  /*and right-paren subraster envelope */
+            free((void *) rp);  /*and right-paren subraster_t envelope */
         sp = NULL;              /* signal error to caller */
         goto end_of_job;
     }
 
-    /* and quit */
     /* -------------------------------------------------------------------------
        set paren baselines to center on noparens[] raster, and concat components
        -------------------------------------------------------------------------- */
@@ -9072,11 +6866,13 @@ obtain paren characters to enclose noparens[] raster with
 /* --- concat lp||sp||rp to obtain final result --- */
     if (lp != NULL)             /* ignore \left. */
         sp = rastcat(lp, sp, 3);        /* concat lp||sp and free sp,lp */
-    if (sp != NULL)             /* succeeded or ignored \left. */
-        if (rp != NULL)         /* ignore \right. */
+    if (sp != NULL) {           /* succeeded or ignored \left. */
+        if (rp != NULL) {       /* ignore \right. */
             sp = rastcat(sp, rp, 3);    /* concat sp||rp and free sp,rp */
+        }
+    }
 
-  end_of_job:
+end_of_job:
     return sp;
 }
 
@@ -9089,27 +6885,27 @@ obtain paren characters to enclose noparens[] raster with
  * Arguments:   expression (I)  char **  to first char of null-terminated
  *              LaTeX expression (unused/unchanged)
  *      size (I)    int containing base font size (not used,
- *              just stored in subraster)
- *      basesp (I)  subraster *  to current character (or
+ *              just stored in subraster_t)
+ *      basesp (I)  subraster_t *  to current character (or
  *              subexpression) immediately preceding script
  *              indicator
  * --------------------------------------------------------------------------
- * Returns: ( subraster * ) ptr to subraster returned by rastscripts()
+ * Returns: ( subraster_t * ) ptr to subraster_t returned by rastscripts()
  *              or rastdispmath(), or NULL for any error
  * --------------------------------------------------------------------------
  * Notes:     o
  * ======================================================================= */
-static subraster *rastlimits(const char **expression, int size,
-                             subraster * basesp) {
-    subraster *scriptsp = basesp;       /* and this will become the result */
-    subraster *dummybase = basesp;      /* for {}_i construct a dummy base */
+subraster_t *rastlimits(const char **expression, int size, subraster_t *basesp)
+{
+    subraster_t *scriptsp = basesp;       /* and this will become the result */
+    subraster_t *dummybase = basesp;      /* for {}_i construct a dummy base */
     int isdisplay = -1;         /* set 1 for displaystyle, else 0 */
     int oldsmashmargin = smashmargin;   /* save original smashmargin */
 /* --- to check for \limits or \nolimits preceding scripts --- */
     const char *exprptr = *expression;
     char limtoken[255];         /*check for \limits */
     int toklen = 0;             /* strlen(limtoken) */
-    mathchardef *tokdef;        /* mathchardef struct for limtoken */
+    const mathchardef_t *tokdef;        /* mathchardef struct for limtoken */
     int class = (leftsymdef == NULL ? NOVALUE : leftsymdef->class);     /*base sym class */
 /* -------------------------------------------------------------------------
 determine whether or not to use displaymath
@@ -9117,17 +6913,15 @@ determine whether or not to use displaymath
      scriptlevel++;             /* first, increment subscript level */
     *limtoken = '\0';           /* no token yet */
      isscripted = 0;            /* signal term not (text) scripted */
-    if (msgfp != NULL && msglevel >= 999) {
-        fprintf(msgfp, "rastlimits> scriptlevel#%d exprptr=%.48s\n",
-                scriptlevel, (exprptr == NULL ? "null" : exprptr));
-        fflush(msgfp);
-    }
-    if (isstring)
-         goto end_of_job;       /* no scripts for ascii string */
+#if DEBUG_LOG_LEVEL >= 999
+    fprintf(msgfp, "rastlimits> scriptlevel#%d exprptr=%.48s\n",
+            scriptlevel, (exprptr == NULL ? "null" : exprptr));
+#endif
 /* --- check for \limits or \nolimits --- */
     skipwhite(exprptr);         /* skip white space before \limits */
-    if (!isempty(exprptr))      /* non-empty expression supplied */
+    if (!isempty(exprptr)) {    /* non-empty expression supplied */
         exprptr = texchar(exprptr, limtoken);   /* retrieve next token */
+    }
     if (*limtoken != '\0')      /* have token */
         if ((toklen = strlen(limtoken)) >= 3)   /* which may be \[no]limits */
             if (memcmp("\\limits", limtoken, toklen) == 0       /* may be \limits */
@@ -9200,24 +6994,23 @@ dispatch call to create sub/superscripts
             }
         }
     }                           /* and set font size */
-  end_of_job:
+
     smashmargin = oldsmashmargin;       /* reset original smashmargin */
     if (dummybase != basesp)
         delete_subraster(dummybase);    /*free work area */
-    if (msgfp != NULL && msglevel >= 99) {
-        fprintf(msgfp, "rastlimits> scriptlevel#%d returning %s\n",
-                scriptlevel, (scriptsp == NULL ? "null" : "..."));
-        if (scriptsp != NULL)   /* have a constructed raster */
-            type_raster(scriptsp->image, msgfp);        /*display constructed raster */
-        fflush(msgfp);
-    }
+#if DEBUG_LOG_LEVEL >= 99
+    fprintf(msgfp, "rastlimits> scriptlevel#%d returning %s\n",
+            scriptlevel, (scriptsp == NULL ? "null" : "..."));
+    if (scriptsp != NULL)   /* have a constructed raster */
+        type_raster(scriptsp->image, msgfp);        /*display constructed raster */
+#endif
     scriptlevel--;              /*lastly, decrement subscript level */
     return scriptsp;
 }
 
 /* ==========================================================================
  * Function:    rastscripts ( expression, size, basesp )
- * Purpose: super/subscript handler, returns subraster for the leading
+ * Purpose: super/subscript handler, returns subraster_t for the leading
  *      scripts in expression, whose base symbol is at font size
  * --------------------------------------------------------------------------
  * Arguments:   expression (I/O) char **  to first char of null-terminated
@@ -9225,23 +7018,23 @@ dispatch call to create sub/superscripts
  *              and returning ptr immediately following
  *              last script character processed.
  *      size (I)    int containing 0-7 default font size
- *      basesp (I)  subraster *  to character (or subexpression)
+ *      basesp (I)  subraster_t *  to character (or subexpression)
  *              immediately preceding leading script
  *              (scripts will be placed relative to base)
  * --------------------------------------------------------------------------
- * Returns: ( subraster * ) ptr to subraster corresponding to scripts,
+ * Returns: ( subraster_t * ) ptr to subraster_t corresponding to scripts,
  *              or NULL for any parsing error
  * --------------------------------------------------------------------------
  * Notes:     o This "handler" isn't in the mathchardef symbol table,
  *      but is called directly from rasterize(), as necessary.
  * ======================================================================= */
-static subraster *rastscripts(const char **expression, int size,
-                              subraster * basesp) {
+subraster_t *rastscripts(const char **expression, int size, subraster_t * basesp)
+{
     char subscript[512];
     char supscript[512];        /* scripts parsed from expression */
-    subraster *subsp = NULL, *supsp = NULL;     /* rasterize scripts */
-    subraster *sp = NULL;       /* super- over subscript subraster */
-    raster *rp = NULL;          /* image raster embedded in sp */
+    subraster_t *subsp = NULL, *supsp = NULL;     /* rasterize scripts */
+    subraster_t *sp = NULL;       /* super- over subscript subraster_t */
+    raster_t *rp = NULL;          /* image raster embedded in sp */
     int height = 0, width = 0, baseline = 0;    /* height,width,baseline of sp */
     int subht = 0, subwidth = 0 /* not used --, subln = 0 */ ;  /* height,width,baseline of sub */
     int supht = 0, supwidth = 0 /* not used --, supln = 0 */ ;  /* height,width,baseline of sup */
@@ -9250,11 +7043,11 @@ static subraster *rastscripts(const char **expression, int size,
     int issub = 0, issup = 0, isboth = 0;       /* true if we have sub,sup,both */
                                         /* not used -- int isbase = 0 */ ;
                                         /* true if we have base symbol */
-    int szval = min2(max2(size, 0), LARGESTSIZE),       /* 0...LARGESTSIZE */
-        vbetween = 2,           /* vertical space between scripts */
-        vabove = szval + 1,     /*sup's top/bot above base's top/bot */
-        vbelow = szval + 1,     /*sub's top/bot below base's top/bot */
-        vbottom = szval + 1;    /*sup's bot above (sub's below) bsln */
+    int szval = min2(max2(size, 0), LARGESTSIZE);       /* 0...LARGESTSIZE */
+    int vbetween = 2;           /* vertical space between scripts */
+    int vabove = szval + 1;     /*sup's top/bot above base's top/bot */
+    int vbelow = szval + 1;     /*sub's top/bot below base's top/bot */
+    int vbottom = szval + 1;    /*sup's bot above (sub's below) bsln */
     /*int   istweak = 1; *//* true to tweak script positioning */
     int pixsz = 1;              /*default #bits per pixel, 1=bitmap */
 /* -------------------------------------------------------------------------
@@ -9274,26 +7067,31 @@ Obtain subscript and/or superscript expressions, and rasterize them/it
     if (*supscript != '\0')     /* have a superscript */
          supsp = rasterize(supscript, size - 1);        /* so rasterize it at size-1 */
 /* --- set flags for convenience --- */
-     issub = (subsp != (subraster *) NULL);     /* true if we have subscript */
-     issup = (supsp != (subraster *) NULL);     /* true if we have superscript */
-     isboth = (issub && issup); /* true if we have both */
+    issub = (subsp != NULL);     /* true if we have subscript */
+    issup = (supsp != NULL);     /* true if we have superscript */
+    isboth = (issub && issup); /* true if we have both */
     if (!issub && !issup)
          goto end_of_job;       /* quit if we have neither */
 /* --- check for leading no-smash chars (if enabled) --- */
-     issmashokay = 0;           /* default, don't smash scripts */
+    issmashokay = 0;           /* default, don't smash scripts */
     if (smashcheck > 0) {       /* smash checking wanted */
         issmashokay = 1;        /*haven't found a no-smash char yet */
-        if (issub)              /* got a subscript */
+        if (issub) {            /* got a subscript */
             issmashokay = rastsmashcheck(subscript);    /* check if okay to smash */
-        if (issmashokay)        /* clean sub, so check sup */
-            if (issup)          /* got a superscript */
+        }
+        if (issmashokay) {      /* clean sub, so check sup */
+            if (issup) {        /* got a superscript */
                 issmashokay = rastsmashcheck(supscript);        /* check if okay to smash */
+            }
+        }
     }
 
-    /* --- end-of-if(smashcheck>0) --- *//* -------------------------------------------------------------------------
+    /* -------------------------------------------------------------------------
        get height, width, baseline of scripts,  and height, baseline of base symbol
-                                                                                                                                                           -------------------------------------------------------------------------- *//* --- get height and width of components --- */ if (issub) {
-                                                                                                                                                        /* we have a subscript */
+       -------------------------------------------------------------------------- */
+    /* --- get height and width of components --- */
+    if (issub) {
+        /* we have a subscript */
         subht = (subsp->image)->height; /* so get its height */
         subwidth = (subsp->image)->width;       /* and width */
         /* not used --subln = subsp->baseline */ ;
@@ -9320,10 +7118,10 @@ Obtain subscript and/or superscript expressions, and rasterize them/it
        determine width of constructed raster
        -------------------------------------------------------------------------- */
     width = max2(subwidth, supwidth);   /*widest component is overall width */
-/* -------------------------------------------------------------------------
-determine height and baseline of constructed raster
--------------------------------------------------------------------------- */
-/* --- both super/subscript --- */
+    /* -------------------------------------------------------------------------
+       determine height and baseline of constructed raster
+       -------------------------------------------------------------------------- */
+    /* --- both super/subscript --- */
     if (isboth) {               /*we have subscript and superscript */
         height = max2(subht + vbetween + supht, /* script heights + space bewteen */
                       vbelow + baseht + vabove);        /*sub below base bot, sup above top */
@@ -9352,27 +7150,22 @@ determine height and baseline of constructed raster
     }
 
     /* sub's baseline at top of raster */
-    /* -------------------------------------------------------------------------
-       construct raster with superscript over subscript
-       -------------------------------------------------------------------------- */
-    /* --- allocate subraster containing constructed raster --- */
-    if ((sp = new_subraster(width, height, pixsz)) == NULL) {
+    sp = new_subraster(width, height, pixsz);
+    if (sp == NULL) {
         goto end_of_job;
     }
-/* --- initialize subraster parameters --- */
+/* --- initialize subraster_t parameters --- */
     sp->type = IMAGERASTER;     /* set type as constructed image */
     sp->size = size;            /* set given size */
     sp->baseline = baseline;    /* composite scripts baseline */
-    rp = sp->image;             /* raster embedded in subraster */
+    rp = sp->image;             /* raster embedded in subraster_t */
 /* --- place super/subscripts in new raster --- */
     if (issup)                  /* we have a superscript */
         rastput(rp, supsp->image, 0, 0, 1);     /* it goes in upper-left corner */
     if (issub)                  /* we have a subscript */
         rastput(rp, subsp->image, height - subht, 0, 1);        /*in lower-left corner */
-/* -------------------------------------------------------------------------
-free unneeded component subrasters and return final result to caller
--------------------------------------------------------------------------- */
-  end_of_job:
+
+end_of_job:
     if (issub) {
         delete_subraster(subsp);
     }
@@ -9393,20 +7186,20 @@ free unneeded component subrasters and return final result to caller
  *              and returning ptr immediately following last
  *              character processed.
  *      size (I)    int containing 0-7 default font size
- *      sp (I)      subraster *  to display math operator
+ *      sp (I)      subraster_t *  to display math operator
  *              to which super/subscripts will be added
  * --------------------------------------------------------------------------
- * Returns: ( subraster * ) ptr to subraster corresponding to sp
+ * Returns: ( subraster_t * ) ptr to subraster_t corresponding to sp
  *              plus its scripts, or NULL for any error
  * --------------------------------------------------------------------------
  * Notes:     o sp returned unchanged if no super/subscript(s) follow it.
  * ======================================================================= */
-static subraster *rastdispmath(const char **expression, int size,
-                               subraster * sp) {
+static subraster_t *rastdispmath(const char **expression, int size,
+                               subraster_t * sp) {
     char subscript[512];
     char supscript[512];        /* scripts parsed from expression */
     int issub = 0, issup = 0;   /* true if we have sub,sup */
-    subraster *subsp = NULL, *supsp = NULL;     /* rasterize scripts */
+    subraster_t *subsp = NULL, *supsp = NULL;     /* rasterize scripts */
     int vspace = 1;             /* vertical space between scripts */
 /* -------------------------------------------------------------------------
 Obtain subscript and/or superscript expressions, and rasterize them/it
@@ -9465,4085 +7258,17 @@ free unneeded component subrasters and return final result to caller
     return sp;
 }
 
-/* ==========================================================================
- * Function:    rastleft ( expression, size, basesp, ildelim, arg2, arg3 )
- * Purpose: \left...\right handler, returns a subraster corresponding to
- *      delimited subexpression at font size
- * --------------------------------------------------------------------------
- * Arguments:   expression (I)  char **  to first char of null-terminated
- *              string beginning with a \left
- *              to be rasterized
- *      size (I)    int containing 0-7 default font size
- *      basesp (I)  subraster *  to character (or subexpression)
- *              immediately preceding leading left{
- *              (unused, but passed for consistency)
- *      ildelim (I) int containing ldelims[] index of
- *              left delimiter
- *      arg2 (I)    int unused
- *      arg3 (I)    int unused
- * --------------------------------------------------------------------------
- * Returns: ( subraster * ) ptr to subraster corresponding to subexpr,
- *              or NULL for any parsing error
- * --------------------------------------------------------------------------
- * Notes:     o
- * ======================================================================= */
-subraster *rastleft(const char **expression, int size, subraster * basesp,
-                    int ildelim, int arg2, int arg3) {
-    subraster *sp = NULL;       /*rasterize between \left...\right */
-    subraster *lp = NULL, *rp = NULL;   /* left and right delim chars */
-    int family = CMSYEX;        /* get_delim() family */
-    int height = 0, rheight = 0;        /* subexpr, right delim height */
-    int margin = size + 1;      /* delim height margin over subexpr */
-    int opmargin = 5;           /* extra margin for \int,\sum,\etc */
-    char /* *texleft(), */ subexpr[MAXSUBXSZ + 1];      /*chars between \left...\right */
-    char ldelim[256] = ".";
-    char rdelim[256] = ".";     /* delims following \left,\right */
-    const char *pleft;
-    const char *pright;         /*locate \right matching our \left */
-    int isleftdot = 0, isrightdot = 0;  /* true if \left. or \right. */
-    /* not used --int isleftscript = 0; */
-    int isrightscript = 0;      /* true if delims are scripted */
-    int sublen = 0;             /* strlen(subexpr) */
-    int idelim = 0;             /* 1=left,2=right */
-    /* int  gotldelim = 0; *//* true if ildelim given by caller */
-    int wasdisplaystyle = isdisplaystyle;       /* save current displaystyle */
-    int istextleft = 0, istextright = 0;        /* true for non-displaystyle delims */
-/* --- recognized delimiters --- */
-    static char left[16] = "\\left";
-    static char right[16] = "\\right";  /* tex delimiters */
-    static const char *ldelims[] = {
-        "unused", ".",          /* 1   for \left., \right. */
-            "(", ")",           /* 2,3 for \left(, \right) */
-            "\\{", "\\}",       /* 4,5 for \left\{, \right\} */
-            "[", "]",           /* 6,7 for \left[, \right] */
-            "<", ">",           /* 8,9 for \left<, \right> */
-            "|", "\\|",         /* 10,11 for \left,\right |,\| */
-    NULL};
-/* --- recognized operator delimiters --- */
-    static const char *opdelims[] = {   /* operator delims from cmex10 */
-    "int", "sum", "prod", "cup", "cap", "dot", "plus", "times",
-            "wedge", "vee", NULL};
-/* --- delimiter xlation --- */
-    static const char *xfrom[] =        /* xlate any delim suffix... */
-    {
-        "\\|",                  /* \| */
-            "\\{",              /* \{ */
-            "\\}",              /* \} */
-            "\\lbrace",         /* \lbrace */
-            "\\rbrace",         /* \rbrace */
-            "\\langle",         /* \langle */
-            "\\rangle",         /* \rangle */
-    NULL};
-    static const char *xto[] =  /* ...to this instead */
-    {
-        "=",                    /* \| to = */
-            "{",                /* \{ to { */
-            "}",                /* \} to } */
-            "{",                /* \lbrace to { */
-            "}",                /* \rbrace to } */
-            "<",                /* \langle to < */
-            ">",                /* \rangle to > */
-    NULL};
-/* --- non-displaystyle delimiters --- */
-    static const char *textdelims[] =   /* these delims _aren't_ display */
-    {
-        "|", "=", "(", ")", "[", "]", "<", ">", "{", "}", "dbl",        /* \lbrackdbl and \rbrackdbl */
-    NULL};
-/* -------------------------------------------------------------------------
-initialization
--------------------------------------------------------------------------- */
-/* --- check args --- */
-    if (*(*expression) == '\0') {
-        goto end_of_job;        /* nothing after \left */
-    }
-/* --- determine left delimiter, and set default \right. delimiter --- */
-    if (ildelim != NOVALUE && ildelim >= 1) {   /* called with explicit left delim */
-        strcpy(ldelim, ldelims[ildelim]);       /* so just get a local copy */
-        /* gotldelim = 1; */
-    } else {                    /* trapped \left without delim */
-        skipwhite(*expression); /* interpret \left ( as \left( */
-        if (*(*expression) == '\0') {   /* end-of-string after \left */
-            goto end_of_job;    /* so return NULL */
-        }
-        *expression = texchar(*expression, ldelim);     /*pull delim from expression */
-        if (*expression == NULL || *ldelim == '\0') {   /* probably invalid end-of-string */
-            goto end_of_job;
-        }
-    }                           /* no delimiter */
-    strcpy(rdelim, ".");        /* init default \right. delim */
-/* -------------------------------------------------------------------------
-locate \right balancing our opening \left
--------------------------------------------------------------------------- */
-/* --- first \right following \left --- */
-    if ((pright = strtexchr(*expression, right))        /* look for \right after \left */
-        !=NULL) {               /* found it */
-        /* --- find matching \right by pushing past any nested \left's --- */
-        pleft = *expression;    /* start after first \left( */
-        while (1) {             /*break when matching \right found */
-            /* -- locate next nested \left if there is one --- */
-            if ((pleft = strtexchr(pleft, left))        /* find next \left */
-                == NULL)
-                break;          /*no more, so matching \right found */
-            pleft += strlen(left);      /* push ptr past \left token */
-            if (pleft >= pright)
-                break;          /* not nested if \left after \right */
-            /* --- have nested \left, so push forward to next \right --- */
-            if ((pright = strtexchr(pright + strlen(right), right))     /* find next \right */
-                == NULL)
-                break;          /* ran out of \right's */
-        }                       /* --- end-of-while(1) --- */
-    }
-    /* -------------------------------------------------------------------------
-       push past \left(_a^b sub/superscripts, if present
-       -------------------------------------------------------------------------- */
-    pleft = *expression;        /*reset pleft after opening \left( */
-    if ((lp = rastlimits(expression, size, lp)) != NULL) {
-        /* found actual _a^b scripts, too */
-        delete_subraster(lp);   /* but we don't need them */
-        lp = NULL;
-    }
-
-    /* reset pointer, too */
-    /* -------------------------------------------------------------------------
-       get \right delimiter and subexpression between \left...\right, xlate delims
-       -------------------------------------------------------------------------- */
-    /* --- get delimiter following \right --- */
-    if (pright == NULL) {       /* assume \right. at end of exprssn */
-        strcpy(rdelim, ".");    /* set default \right. */
-        sublen = strlen(*expression);   /* use entire remaining expression */
-        memcpy(subexpr, *expression, sublen);   /* copy all remaining chars */
-        *expression += sublen;
-    } else {                    /* have explicit matching \right */
-        sublen = (int) (pright - (*expression));        /* #chars between \left...\right */
-        memcpy(subexpr, *expression, sublen);   /* copy chars preceding \right */
-        *expression = pright + strlen(right);   /* push expression past \right */
-        skipwhite(*expression); /* interpret \right ) as \right) */
-        *expression = texchar(*expression, rdelim);     /*pull delim from expression */
-        if (*rdelim == '\0') {
-            strcpy(rdelim, ".");
-        }
-    }                           /* \right. if no rdelim */
-/* --- get subexpression between \left...\right --- */
-    if (sublen < 1) {
-        goto end_of_job;        /* nothing between delimiters */
-    }
-    subexpr[sublen] = '\0';     /* and null-terminate it */
-/* --- adjust margin for expressions containing \middle's --- */
-    if (strtexchr(subexpr, "\\middle") != NULL) {       /* have enclosed \middle's */
-        margin = 1;             /* so don't "overwhelm" them */
-    }
-/* --- check for operator delimiter --- */
-    for (idelim = 0; opdelims[idelim] != NULL; idelim++) {
-        if (strstr(ldelim, opdelims[idelim]) != NULL) { /* found operator */
-            margin += opmargin; /* extra height for operator */
-            if (*ldelim == '\\') {      /* have leading escape */
-                strsqueeze(ldelim, 1);
-            }
-            break;
-        }
-    }
-    /* no need to check rest of table */
-    /* --- xlate delimiters and check for textstyle --- */
-    for (idelim = 1; idelim <= 2; idelim++) {   /* 1=left, 2=right */
-        char *lrdelim = (idelim == 1 ? ldelim : rdelim);        /* ldelim or rdelim */
-        int ix;
-        const char *xdelim;     /* xfrom[] and xto[] index, delim */
-        for (ix = 0; (xdelim = xfrom[ix]) != NULL; ix++) {
-            if (strcmp(lrdelim, xdelim) == 0) { /* found delim to xlate */
-                strcpy(lrdelim, xto[ix]);       /* replace with corresponding xto[] */
-                break;
-            }
-        }
-        for (ix = 0; (xdelim = textdelims[ix]) != NULL; ix++) {
-            if (strstr(lrdelim, xdelim) != 0) { /* found textstyle delim */
-                if (idelim == 1) {      /* if it's the \left one */
-                    istextleft = 1;     /* set left textstyle flag */
-                } else {
-                    istextright = 1;    /* else set right textstyle flag */
-                }
-                break;
-            }
-        }
-    }
-/* --- debugging --- */
-    if (msgfp != NULL && msglevel >= 99)
-        fprintf(msgfp,
-                "rastleft> left=\"%s\" right=\"%s\" subexpr=\"%s\"\n",
-                ldelim, rdelim, subexpr);
-/* -------------------------------------------------------------------------
-rasterize subexpression
--------------------------------------------------------------------------- */
-/* --- rasterize subexpression --- */
-    if ((sp = rasterize(subexpr, size)) == NULL) {
-        goto end_of_job;        /* quit if failed */
-    }
-    height = sp->image->height; /* height of subexpr raster */
-    rheight = height + margin;  /*default rheight as subexpr height */
-/* -------------------------------------------------------------------------
-rasterize delimiters, reset baselines, and add  sub/superscripts if present
--------------------------------------------------------------------------- */
-/* --- check for dot delimiter --- */
-    isleftdot = (strchr(ldelim, '.') != NULL);  /* true if \left. */
-    isrightdot = (strchr(rdelim, '.') != NULL); /* true if \right. */
-/* --- get rasters for best-fit delim characters, add sub/superscripts --- */
-    isdisplaystyle = (istextleft ? 0 : 9);      /* force \displaystyle */
-    if (!isleftdot) {           /* if not \left. *//* --- first get requested \left delimiter --- */
-        lp = get_delim(ldelim, rheight, family);        /* get \left delim char */
-        /* --- reset lp delim baseline to center delim on subexpr raster --- */
-        if (lp != NULL) {       /* if get_delim() succeeded */
-            int lheight = (lp->image)->height;  /* actual height of left delim */
-            lp->baseline = sp->baseline + (lheight - height) / 2;
-            if (lheight > rheight)      /* got bigger delim than requested */
-                rheight = lheight - 1;
-        }
-        /* make sure right delim matches */
-        /* --- then add on any sub/superscripts attached to \left( --- */
-        lp = rastlimits(&pleft, size, lp);      /*\left(_a^b and push pleft past b */
-        /* not used --isleftscript = isscripted; */
-    }
-    isdisplaystyle = (istextright ? 0 : 9);     /* force \displaystyle */
-    if (!isrightdot) {
-        /* and if not \right. */
-        /* --- first get requested \right delimiter --- */
-        rp = get_delim(rdelim, rheight, family);        /* get \right delim char */
-        /* --- reset rp delim baseline to center delim on subexpr raster --- */
-        if (rp != NULL) {
-            rp->baseline = sp->baseline + (rp->image->height - height) / 2;
-        }
-        /* --- then add on any sub/superscripts attached to \right) --- */
-        rp = rastlimits(expression, size, rp);  /*\right)_c^d, expression past d */
-        isrightscript = isscripted;
-    }
-    isdisplaystyle = wasdisplaystyle;   /* original \displystyle default */
-/* --- check that we got delimiters --- */
-    if (0) {
-        if ((lp == NULL && !isleftdot)  /* check that we got left( */
-            ||(rp == NULL && !isrightdot)) {    /* and right) if needed */
-            if (lp != NULL)
-                free((void *) lp);      /* free \left-delim subraster */
-            if (rp != NULL)
-                free((void *) rp);      /* and \right-delim subraster */
-            if (0) {
-                delete_subraster(sp);   /* if failed, free subraster */
-                sp = (subraster *) NULL;
-            }                   /* signal error to caller */
-            goto end_of_job;
-        }
-    }
-
-    /* -------------------------------------------------------------------------
-       concat  lp || sp || rp  components
-       -------------------------------------------------------------------------- */
-    /* --- concat lp||sp||rp to obtain final result --- */
-    if (lp != NULL)             /* ignore \left. */
-        sp = rastcat(lp, sp, 3);        /* concat lp||sp and free sp,lp */
-    if (sp != NULL)             /* succeeded or ignored \left. */
-        if (rp != NULL)         /* ignore \right. */
-            sp = rastcat(sp, rp, 3);    /* concat sp||rp and free sp,rp */
-/* --- back to caller --- */
-  end_of_job:
-    isdelimscript = isrightscript;      /* signal if right delim scripted */
-    return sp;
-}
-
-#if 0
-/* ==========================================================================
- * Function:    rastright ( expression, size, basesp, ildelim, arg2, arg3 )
- * Purpose: ...\right handler, intercepts an unexpected/unbalanced \right
- * --------------------------------------------------------------------------
- * Arguments:   expression (I)  char **  to first char of null-terminated
- *              string beginning with a \right
- *              to be rasterized
- *      size (I)    int containing 0-7 default font size
- *      basesp (I)  subraster *  to character (or subexpression)
- *              immediately preceding leading left{
- *              (unused, but passed for consistency)
- *      ildelim (I) int containing rdelims[] index of
- *              right delimiter
- *      arg2 (I)    int unused
- *      arg3 (I)    int unused
- * --------------------------------------------------------------------------
- * Returns: ( subraster * ) ptr to subraster corresponding to subexpr,
- *              or NULL for any parsing error
- * --------------------------------------------------------------------------
- * Notes:     o
- * ======================================================================= */
-static subraster *rastright(const char **expression, int size,
-                            subraster * basesp, int ildelim, int arg2,
-                            int arg3) {
-    subraster *sp = NULL;       /*rasterize \right subexpr's */
-    if (sp != NULL) {           /* returning entire expression */
-        isreplaceleft = 1;      /* set flag to replace left half */
-    }
-    return (sp);
-}
-#endif
 
 
-/* ==========================================================================
- * Function:    rastmiddle ( expression, size, basesp,  arg1, arg2, arg3 )
- * Purpose: \middle handler, returns subraster corresponding to
- *      entire expression with \middle delimiter(s) sized to fit.
- * --------------------------------------------------------------------------
- * Arguments:   expression (I/O) char **  to first char of null-terminated
- *              string immediately following \middle to be
- *              rasterized, and returning ptr immediately
- *              to terminating null.
- *      size (I)    int containing 0-7 default font size
- *      basesp (I)  subraster *  to character (or subexpression)
- *              immediately preceding \middle
- *              (unused, but passed for consistency)
- *      arg1 (I)    int unused
- *      arg2 (I)    int unused
- *      arg3 (I)    int unused
- * --------------------------------------------------------------------------
- * Returns: ( subraster * ) ptr to subraster corresponding to expression,
- *              or NULL for any parsing error
- *              (expression ptr unchanged if error occurs)
- * --------------------------------------------------------------------------
- * Notes:     o
- * ======================================================================= */
-static subraster *rastmiddle(const char **expression, int size,
-                             subraster * basesp, int arg1, int arg2,
-                             int arg3) {
-    subraster *sp = NULL, *subsp[32];   /*rasterize \middle subexpr's */
-    const char *exprptr = *expression;  /* local copy of ptr to expression */
-    char delim[32][132];        /* delimiters following \middle's */
-    char subexpr[MAXSUBXSZ + 1];
-    char *subptr = NULL;        /*subexpression between \middle's */
-    int height = 0, habove = 0, hbelow = 0;     /* height, above & below baseline */
-    int idelim, ndelims = 0;    /* \middle count (max 32) */
-    int family = CMSYEX;        /* delims from CMSY10 or CMEX10 */
-/* -------------------------------------------------------------------------
-initialization
--------------------------------------------------------------------------- */
-     subsp[0] = leftexpression; /* expressn preceding 1st \middle */
-     subsp[1] = NULL;           /* set first null */
-/* -------------------------------------------------------------------------
-accumulate subrasters between consecutive \middle\delim...\middle\delim...'s
--------------------------------------------------------------------------- */
-    while (ndelims < 30) {      /* max of 31 \middle's */
-        /* --- maintain max height above,below baseline --- */
-        if (subsp[ndelims] != NULL) {   /*exprssn preceding current \middle */
-            int baseline = (subsp[ndelims])->baseline;  /* #rows above baseline */
-             height = ((subsp[ndelims])->image)->height;        /* tot #rows (height) */
-             habove = max2(habove, baseline);   /* max #rows above baseline */
-             hbelow = max2(hbelow, height - baseline);
-        }
-                                                                                                        /* max #rows below baseline *//* --- get delimter after \middle --- */ skipwhite(exprptr);
-                                                                                                        /*skip space betwn \middle & \delim */
-        exprptr = texchar(exprptr, delim[ndelims]);     /* \delim after \middle */
-        if (*(delim[ndelims]) == '\0') {        /* \middle at end-of-expression */
-            break;              /* ignore it and consider job done */
-        }
-        ndelims++;              /* count another \middle\delim */
-        /* --- get subexpression between \delim and next \middle --- */
-        subsp[ndelims] = NULL;  /* no subexpresion yet */
-        if (*exprptr == '\0') { /* end-of-expression after \delim */
-            break;              /* so we have all subexpressions */
-        }
-        if ((subptr = strtexchr(exprptr, "\\middle")) == NULL) {
-            /* no more \middle's */
-            strncpy(subexpr, exprptr, MAXSUBXSZ);       /*get entire remaining expression */
-            subexpr[MAXSUBXSZ] = '\0';  /* make sure it's null-terminated */
-            exprptr += strlen(exprptr);
-        } else {
-            /* have another \middle */
-            int sublen = (int) (subptr - exprptr);      /* #chars between \delim...\middle */
-            memcpy(subexpr, exprptr, min2(sublen, MAXSUBXSZ));  /* get subexpression */
-            subexpr[min2(sublen, MAXSUBXSZ)] = '\0';    /* and null-terminate it */
-            exprptr += (sublen + strlen("\\middle"));
-        }
-        /* --- rasterize subexpression --- */
-        subsp[ndelims] = rasterize(subexpr, size);      /* rasterize subexpresion */
-    }
-/* -------------------------------------------------------------------------
-construct \middle\delim's and concatanate them between subexpressions
--------------------------------------------------------------------------- */
-    if (ndelims < 1             /* no delims */
-        || (height = habove + hbelow) < 1)      /* or no subexpressions? */
-        goto end_of_job;        /* just flush \middle directive */
-    for (idelim = 0; idelim <= ndelims; idelim++) {
-        /* --- first add on subexpression preceding delim --- */
-        if (subsp[idelim] != NULL) {    /* have subexpr preceding delim */
-            if (sp == NULL) {   /* this is first piece */
-                sp = subsp[idelim];     /* so just use it */
-                if (idelim == 0)
-                    sp = subrastcpy(sp);
-            } else {
-                sp = rastcat(sp, subsp[idelim], (idelim > 0 ? 3 : 1));
-            }
-        }
-        /* or concat it */
-        /* --- now construct delimiter --- */
-        if (*(delim[idelim]) != '\0') { /* have delimter */
-            subraster *delimsp = get_delim(delim[idelim], height, family);
-            if (delimsp != NULL) {      /* rasterized delim */
-                delimsp->baseline = habove;     /* set baseline */
-                if (sp == NULL) {       /* this is first piece */
-                    sp = delimsp;       /* so just use it */
-                } else {
-                    sp = rastcat(sp, delimsp, 3);
-                }
-            }
-        }                       /*or concat to existing pieces */
-    }                           /* --- end-of-for(idelim) --- */
-/* --- back to caller --- */
-  end_of_job:
-    if (0) {
-        for (idelim = 1; idelim <= ndelims; idelim++) { /* free subsp[]'s (not 0) */
-            if (subsp[idelim] != NULL) {        /* have allocated subraster */
-                delete_subraster(subsp[idelim]);        /* so free it */
-            }
-        }
-    }
-    if (sp != NULL) {           /* returning entire expression */
-        int newht = (sp->image)->height;        /* height of returned subraster */
-        sp->baseline = min2(newht - 1, newht / 2 + 5);  /* guess new baseline */
-        isreplaceleft = 1;      /* set flag to replace left half */
-        *expression += strlen(*expression);
-    }                           /* and push to terminating null */
-    return (sp);
-}                               /* --- end-of-function rastmiddle() --- */
-
-/* ==========================================================================
- * Function:    rastflags ( expression, size, basesp,  flag, value, arg3 )
- * Purpose: sets an internal flag, e.g., for \rm, or sets an internal
- *      value, e.g., for \unitlength=<value>, and returns NULL
- *      so nothing is displayed
- * --------------------------------------------------------------------------
- * Arguments:   expression (I)  char **  to first char of null-terminated
- *              LaTeX expression (unused/unchanged)
- *      size (I)    int containing base font size (not used,
- *              just stored in subraster)
- *      basesp (I)  subraster *  to character (or subexpression)
- *              immediately preceding "flags" directive
- *              (unused but passed for consistency)
- *      flag (I)    int containing #define'd symbol specifying
- *              internal flag to be set
- *      value (I)   int containing new value of flag
- *      arg3 (I)    int unused
- * --------------------------------------------------------------------------
- * Returns: ( subraster * ) NULL so nothing is displayed
- * --------------------------------------------------------------------------
- * Notes:     o
- * ======================================================================= */
-static subraster *rastflags(const char **expression, int size,
-                            subraster * basesp, int flag, int value,
-                            int arg3) {
-    char valuearg[1024] = "NOVALUE";    /* value from expression, if needed */
-    int argvalue = NOVALUE;     /* atoi(valuearg) */
-    int isdelta = 0;            /* true if + or - precedes valuearg */
-    int valuelen = 0;           /* strlen(valuearg) */
-    static int displaystylelevel = -99; /* \displaystyle set at recurlevel */
-/* -------------------------------------------------------------------------
-set flag or value
--------------------------------------------------------------------------- */
-    switch (flag) {
-    default:
-        break;                  /* unrecognized flag */
-        case ISFONTFAM:if (isthischar((*(*expression)), WHITEMATH)) {   /* \rm followed by white */
-            (*expression)++;    /* skip leading ~ after \rm */
-        }
-        fontnum = value;        /* set font family */
-        break;
-    case ISSTRING:
-        isstring = value;
-        break;                  /* set string/image mode */
-    case ISDISPLAYSTYLE:       /* set \displaystyle mode */
-        displaystylelevel = recurlevel; /* \displaystyle set at recurlevel */
-        isdisplaystyle = value;
-        break;
-    case ISSUPER:              /* set supersampling/lowpass flag */
-#ifndef SSFONTS                 /* don't have ss fonts loaded */
-        value = 0;              /* so force lowpass */
-#endif
-        isss = issupersampling = value;
-        fonttable = (issupersampling ? ssfonttable : aafonttable);      /* set fonts */
-        break;
-    case ISFONTSIZE:           /* set fontsize */
-    case ISMAGSTEP:            /* set magstep */
-    case ISDISPLAYSIZE:        /* set displaysize */
-    case ISSHRINK:             /* set shrinkfactor */
-    case ISAAALGORITHM:        /* set anti-aliasing algorithm */
-    case ISWEIGHT:             /* set font weight */
-    case ISCENTERWT:           /* set lowpass center pixel weight */
-    case ISADJACENTWT:         /* set lowpass adjacent weight */
-    case ISCORNERWT:           /* set lowpass corner weight */
-    case ISSMASH:              /* set (minimum) "smash" margin */
-//  case ISGAMMA:               /* set gamma correction */
-//  case ISPBMPGM:              /* set pbmpgm output flag and ptype */
-        if (value != NOVALUE) { /* passed a fixed value to be set */
-            argvalue = value;   /* set given fixed int value */
-            /* not used --dblvalue = (double) value; */
-        } /* or maybe interpreted as double */
-        else {                  /* get value from expression */
-            *expression =
-                texsubexpr(*expression, valuearg, 1023, "{", "}", 0, 0);
-            if (*valuearg != '\0') {    /* guard against empty string */
-                if (!isalpha(*valuearg)) {      /* and against alpha string args */
-                    if (!isthischar(*valuearg, "?")) {  /*leading ? is query for value */
-                        isdelta = isthischar(*valuearg, "+-");  /* leading + or - */
-                        if (memcmp(valuearg, "--", 2) == 0) {   /* leading -- signals... */
-                            isdelta = 0;
-                            strsqueeze(valuearg, 1);
-                        }       /* ...not delta */
-                        switch (flag) { /* convert to double or int */
-                        default:
-                            argvalue = atoi(valuearg);
-                            break;      /* convert to int */
-                        }       /* or to double */
-                    }
-                }
-            }
-        }
-        switch (flag) {
-        default:
-            break;
-        case ISFONTSIZE:       /* set fontsize */
-            if (argvalue != NOVALUE) {  /* got a value */
-                int largestsize = (issupersampling ? 16 : LARGESTSIZE);
-                fontsize = (isdelta ? fontsize + argvalue : argvalue);
-                fontsize = max2(0, min2(fontsize, largestsize));
-                shrinkfactor = shrinkfactors[fontsize];
-                if (isdisplaystyle == 1 /* displaystyle enabled but not set */
-                    || (1 && isdisplaystyle == 2)       /* displaystyle enabled and set */
-                    ||(0 && isdisplaystyle == 0))       /*\textstyle disabled displaystyle */
-                    if (displaystylelevel != recurlevel)        /*respect \displaystyle */
-                        if (!ispreambledollars) {       /* respect $$...$$'s */
-                            if (fontsize >= displaysize)
-                                isdisplaystyle = 2;     /* forced */
-                            else
-                                isdisplaystyle = 1;
-                        }
-                /*displaystylelevel = (-99); */
-            } /* reset \displaystyle level */
-            else {              /* embed font size in expression */
-                sprintf(valuearg, "%d", fontsize);      /* convert size */
-                valuelen = strlen(valuearg);    /* ought to be 1 */
-                if (*expression != '\0') {      /* ill-formed expression */
-                    *expression = (*expression - valuelen);     /*back up buff */
-                    // XXX:
-                    memcpy((char *) (*expression), valuearg, valuelen);
-                }
-            }
-            break;
-        case ISMAGSTEP:        /* set magstep */
-            if (argvalue != NOVALUE) {  /* got a value */
-                int largestmag = 10;
-                magstep = (isdelta ? magstep + argvalue : argvalue);
-                magstep = max2(1, min2(magstep, largestmag));
-            }
-            break;
-        case ISDISPLAYSIZE:    /* set displaysize */
-            if (argvalue != NOVALUE)    /* got a value */
-                displaysize =
-                    (isdelta ? displaysize + argvalue : argvalue);
-            break;
-        case ISSMASH:          /* set (minimum) "smash" margin */
-            if (argvalue != NOVALUE) {  /* got a value */
-                smashmargin = argvalue; /* set value */
-                if (arg3 != NOVALUE)
-                    isdelta = arg3;     /* hard-coded isdelta */
-                issmashdelta = (isdelta ? 1 : 0);
-            }                   /* and set delta flag */
-            smashmargin = max2((isdelta ? -5 : 0), min2(smashmargin, 32));      /*sanity */
-            isexplicitsmash = 1;        /* signal explicit \smash directive */
-            break;
-        case ISSHRINK:         /* set shrinkfactor */
-            if (argvalue != NOVALUE)    /* got a value */
-                shrinkfactor =
-                    (isdelta ? shrinkfactor + argvalue : argvalue);
-            shrinkfactor = max2(1, min2(shrinkfactor, 27));     /* sanity check */
-            break;
-        case ISAAALGORITHM:    /* set anti-aliasing algorithm */
-            if (argvalue != NOVALUE) {  /* got a value */
-                if (argvalue >= 0) {    /* non-negative to set algorithm */
-                    aaalgorithm = argvalue;     /* set algorithm number */
-                    aaalgorithm = max2(0, min2(aaalgorithm, 4));
-                } else {
-                    /* bounds check */
-                    maxfollow = abs(argvalue);
-                }
-            }                   /* or maxfollow=abs(negative#) */
-            break;
-        case ISWEIGHT:         /* set font weight number */
-            value = (argvalue == NOVALUE ? NOVALUE :    /* don't have a value */
-                     (isdelta ? weightnum + argvalue : argvalue));
-            if (value >= 0 && value < maxaaparams) {    /* in range */
-                weightnum = value;      /* reset weightnum index */
-                minadjacent = aaparams[weightnum].minadjacent;
-                maxadjacent = aaparams[weightnum].maxadjacent;
-                cornerwt = aaparams[weightnum].cornerwt;
-                adjacentwt = aaparams[weightnum].adjacentwt;
-                centerwt = aaparams[weightnum].centerwt;
-                fgalias = aaparams[weightnum].fgalias;
-                fgonly = aaparams[weightnum].fgonly;
-                bgalias = aaparams[weightnum].bgalias;
-                bgonly = aaparams[weightnum].bgonly;
-            }
-            break;
-        case ISCENTERWT:       /* set lowpass center pixel weight */
-            if (argvalue != NOVALUE) {  /* got a value */
-                centerwt = argvalue;    /* set lowpass center weight */
-            }
-            break;
-        case ISADJACENTWT:     /* set lowpass adjacent weight */
-            if (argvalue != NOVALUE) {  /* got a value */
-                adjacentwt = argvalue;  /* set lowpass adjacent weight */
-            }
-            break;
-        case ISCORNERWT:       /* set lowpass corner weight */
-            if (argvalue != NOVALUE) {  /* got a value */
-                cornerwt = argvalue;    /* set lowpass corner weight */
-            }
-            break;
-        }
-        break;
-    case UNITLENGTH:
-        if (value != NOVALUE)   /* passed a fixed value to be set */
-            unitlength = (double) (value);      /* set given fixed value */
-        else {                  /* get value from expression */
-            *expression =
-                texsubexpr(*expression, valuearg, 1023, "{", "}", 0, 0);
-            if (*valuearg != '\0')      /* guard against empty string */
-                unitlength = strtod(valuearg, NULL);
-        }                       /* convert to double */
-        iunitlength = (int) (unitlength + 0.5); /* iunitlength reset */
-        break;
-    }
-    return NULL;
-}
-
-/* ==========================================================================
- * Function:    rastspace(expression, size, basesp,  width, isfill, isheight)
- * Purpose: returns a blank/space subraster width wide,
- *      with baseline and height corresponding to basep
- * --------------------------------------------------------------------------
- * Arguments:   expression (I)  char **  to first char of null-terminated
- *              LaTeX expression (unused/unchanged)
- *      size (I)    int containing base font size (not used,
- *              just stored in subraster)
- *      basesp (I)  subraster *  to character (or subexpression)
- *              immediately preceding space, whose baseline
- *              and height params are transferred to space
- *      width (I)   int containing #bits/pixels for space width
- *      isfill (I)  int containing true to \hfill complete
- *              expression out to width
- *              (Kludge: isfill=99 signals \hspace*
- *              for negative space)
- *      isheight (I)    int containing true (but not NOVALUE)
- *              to treat width arg as height
- * --------------------------------------------------------------------------
- * Returns: ( subraster * ) ptr to empty/blank subraster
- *              or NULL for any error
- * --------------------------------------------------------------------------
- * Notes:     o
- * ======================================================================= */
-static subraster *rastspace(const char **expression, int size,
-                            subraster * basesp, int width, int isfill,
-                            int isheight) {
-    subraster *spacesp = NULL;  /* subraster for space */
-    raster *bp = NULL;          /* for negative space */
-    int baseht = 1, baseln = 0; /* height,baseline of base symbol */
-    int pixsz = 1;              /*default #bits per pixel, 1=bitmap */
-    int isstar = 0, minspace = 0;       /* defaults for negative hspace */
-    char widtharg[256];         /* parse for optional {width} */
-    int evalue = 0;             /* evaluate [args], {args} */
-    subraster *rightsp = NULL;  /*rasterize right half of expression */
-/* -------------------------------------------------------------------------
-initialization
--------------------------------------------------------------------------- */
-    if (isfill > 1) {
-        isstar = 1;
-        isfill = 0;
-    } /* large fill signals \hspace* */ if (isfill == NOVALUE) {
-        isfill = 0;             /* novalue means false */
-    }
-    if (isheight == NOVALUE) {
-        isheight = 0;           /* novalue means false */
-    }
-    minspace = (isstar ? (-1) : 0);     /* reset default minspace */
-/* -------------------------------------------------------------------------
-determine width if not given (e.g., \hspace{width}, \hfill{width})
--------------------------------------------------------------------------- */
-    if (width == 0) {           /* width specified in expression */
-        double dwidth;
-        int widthval;           /* test {width} before using it */
-        int minwidth = (isfill || isheight ? 1 : -600); /* \hspace allows negative */
-        /* --- check if optional [minspace] given for negative \hspace --- */
-        if (*(*expression) == '[') {    /* [minspace] if leading char is [ */
-            /* ---parse [minspace], bump expression past it, evaluate expression--- */
-            *expression =
-                texsubexpr(*expression, widtharg, 127, "[", "]", 0, 0);
-            if (!isempty(widtharg)) {   /* got [minspace] */
-                evalue = evalterm(mimestore, widtharg); /* evaluate widtharg expr */
-                minspace = iround(unitlength * ((double) evalue));
-            }                   /* in pixels */
-        }                       /* --- end-of-if(*(*expression)=='[') --- */
-        width = 1;              /* set default width */
-        *expression =
-            texsubexpr(*expression, widtharg, 255, "{", "}", 0, 0);
-        dwidth = unitlength * ((double) evalterm(mimestore, widtharg)); /* scaled */
-        widthval =              /* convert {width} to integer */
-            (int) (dwidth + (dwidth >= 0.0 ? 0.5 : (-0.5)));
-        if (widthval >= minwidth && widthval <= 600)    /* sanity check */
-            width = widthval;   /* replace deafault width */
-    }
-    /* -------------------------------------------------------------------------
-       first check for negative space
-       -------------------------------------------------------------------------- */
-    if (width < 0) {            /* have negative hspace */
-        if (leftexpression != (subraster *) NULL)       /* can't backspace */
-            if ((spacesp = new_subraster(0, 0, 0))      /* get new subraster for backspace */
-                !=NULL) {       /* and if we succeed... */
-                int nback = (-width), pback;    /*#pixels wanted,actually backspaced */
-                if ((bp =
-                     backspace_raster(leftexpression->image, nback, &pback,
-                                      minspace, 0))
-                    != NULL) {  /* and if backspace succeeds... */
-                    spacesp->image = bp;        /* save backspaced image */
-                    /*spacesp->type = leftexpression->type; *//* copy original type */
-                    spacesp->type = blanksignal;        /* need to propagate blanks */
-                    spacesp->size = leftexpression->size;       /* copy original font size */
-                    spacesp->baseline = leftexpression->baseline;       /* and baseline */
-                    blanksymspace += -(nback - pback);  /* wanted more than we got */
-                    isreplaceleft = 1;
-                } /*signal to replace entire expressn */
-                else {          /* backspace failed */
-                    delete_subraster(spacesp);  /* free unneeded envelope */
-                    spacesp = (subraster *) NULL;
-                }
-            }                   /* and signal failure */
-        goto end_of_job;
-    }
-    /* --- end-of-if(width<0) --- */
-    /* -------------------------------------------------------------------------
-       see if width is "absolute" or fill width
-       -------------------------------------------------------------------------- */
-    if (isfill                  /* called as \hfill{} */
-        && !isheight) {         /* parameter conflict */
-        if (leftexpression != NULL)     /* if we have left half */
-            width -= (leftexpression->image)->width;    /*reduce left width from total */
-        if ((rightsp = rasterize(*expression, size))    /* rasterize right half */
-            !=NULL)             /* succeeded */
-            width -= (rightsp->image)->width;
-    }
-
-    /* reduce right width from total */
-    /* -------------------------------------------------------------------------
-       construct blank subraster, and return it to caller
-       -------------------------------------------------------------------------- */
-    /* --- get parameters from base symbol --- */
-    if (basesp != (subraster *) NULL) { /* we have base symbol for space */
-        baseht = (basesp->image)->height;       /* height of base symbol */
-        baseln = basesp->baseline;
-    }
-    /* and its baseline */
-    /* --- flip params for height --- */
-    if (isheight) {             /* width is actually height */
-        baseht = width;         /* use given width as height */
-        width = 1;
-    }
-    /* and set default width */
-    /* --- generate and init space subraster --- */
-    if (width > 0)              /*make sure we have positive width */
-        if ((spacesp = new_subraster(width, baseht, pixsz))     /*generate space subraster */
-            !=NULL) {           /* and if we succeed... *//* --- ...re-init subraster parameters --- */
-            spacesp->size = size;       /*propagate base font size forward */
-            if (1)
-                spacesp->type = blanksignal;    /* need to propagate blanks (???) */
-            spacesp->baseline = baseln;
-        }
-    /* ditto baseline */
-    /* -------------------------------------------------------------------------
-       concat right half if \hfill-ing
-       -------------------------------------------------------------------------- */
-    if (rightsp != NULL) {      /* we have a right half after fill */
-        spacesp = (spacesp == NULL ? rightsp :  /* no space, so just use right half */
-                   rastcat(spacesp, rightsp, 3));       /* or cat right half after space */
-        spacesp->type = blanksignal;    /* need to propagate blanks */
-        *expression += strlen((*expression));
-    }                           /* push expression to its null */
-  end_of_job:
-    return spacesp;
-}
-
-/* ==========================================================================
- * Function:    rastnewline ( expression, size, basesp,  arg1, arg2, arg3 )
- * Purpose: \\ handler, returns subraster corresponding to
- *      left-hand expression preceding \\ above right-hand expression
- * --------------------------------------------------------------------------
- * Arguments:   expression (I/O) char **  to first char of null-terminated
- *              string immediately following \\ to be
- *              rasterized, and returning ptr immediately
- *              to terminating null.
- *      size (I)    int containing 0-7 default font size
- *      basesp (I)  subraster *  to character (or subexpression)
- *              immediately preceding \\
- *              (unused, but passed for consistency)
- *      arg1 (I)    int unused
- *      arg2 (I)    int unused
- *      arg3 (I)    int unused
- * --------------------------------------------------------------------------
- * Returns: ( subraster * ) ptr to subraster corresponding to expression,
- *              or NULL for any parsing error
- *              (expression ptr unchanged if error occurs)
- * --------------------------------------------------------------------------
- * Notes:     o
- * ======================================================================= */
-static subraster *rastnewline(const char **expression, int size,
-                              subraster * basesp, int arg1, int arg2,
-                              int arg3) {
-    subraster *newlsp = NULL;   /* subraster for both lines */
-    subraster *rightsp = NULL;  /*rasterize right half of expression */
-    char spacexpr[129] /*, *xptr=spacexpr */ ;  /*for \\[vspace] */
-    int evalue = 0;             /* evaluate [arg], {arg} */
-    int vspace = size + 2;      /* #pixels between lines */
-/* -------------------------------------------------------------------------
-obtain optional [vspace] argument immediately following \\ command
--------------------------------------------------------------------------- */
-/* --- check if [vspace] given --- */
-    if (*(*expression) == '[') {        /*have [vspace] if leading char is [ */
-        /* ---parse [vspace] and bump expression past it, interpret as double--- */
-        *expression =
-            texsubexpr(*expression, spacexpr, 127, "[", "]", 0, 0);
-        if (*spacexpr == '\0') {
-            goto end_of_job;    /* couldn't get [vspace] */
-        }
-        evalue = evalterm(mimestore, spacexpr); /* evaluate [space] arg */
-        vspace = iround(unitlength * ((double) evalue));        /* vspace in pixels */
-    }                           /* --- end-of-if(*(*expression)=='[') --- */
-    if (leftexpression == NULL) {
-        goto end_of_job;        /* nothing preceding \\ */
-    }
-/* -------------------------------------------------------------------------
-rasterize right half of expression and stack left half above it
--------------------------------------------------------------------------- */
-/* --- rasterize right half --- */
-    if ((rightsp = rasterize(*expression, size)) == NULL) {
-        goto end_of_job;        /* quit if failed */
-    }
-/* --- stack left half above it --- */
-    /*newlsp = rastack(rightsp,leftexpression,1,vspace,0,3); *//*right under left */
-    newlsp = rastack(rightsp, leftexpression, 1, vspace, 0, 1); /*right under left */
-/* --- back to caller --- */
-  end_of_job:
-    if (newlsp != NULL) {       /* returning entire expression */
-        int newht = (newlsp->image)->height;    /* height of returned subraster */
-        newlsp->baseline = min2(newht - 1, newht / 2 + 5);      /* guess new baseline */
-        isreplaceleft = 1;      /* so set flag to replace left half */
-        *expression += strlen(*expression);
-    }                           /* and push to terminating null */
-    return newlsp;              /* 1st line over 2nd, or null=error */
-}
-
-/* ==========================================================================
- * Function:    rastarrow ( expression, size, basesp,  drctn, isBig, arg3 )
- * Purpose: returns left/right arrow subraster (e.g., for \longrightarrow)
- * --------------------------------------------------------------------------
- * Arguments:   expression (I)  char **  to first char of null-terminated
- *              LaTeX expression (unused/unchanged)
- *      size (I)    int containing base font size (not used,
- *              just stored in subraster)
- *      basesp (I)  subraster *  to character (or subexpression)
- *              immediately preceding space, whose baseline
- *              and height params are transferred to space
- *      drctn (I)   int containing +1 for right, -1 for left,
- *              or 0 for leftright
- *      isBig (I)   int containing 0 for ---> or 1 for ===>
- *      arg3 (I)    int unused
- * --------------------------------------------------------------------------
- * Returns: ( subraster * ) ptr to left/right arrow subraster
- *              or NULL for any error
- * --------------------------------------------------------------------------
- * Notes:     o An optional argument [width] may *immediately* follow
- *      the \longxxx to explicitly set the arrow's width in pixels.
- *      For example, \longrightarrow calculates a default width
- *      (as usual in LaTeX), whereas \longrightarrow[50] explicitly
- *      draws a 50-pixel long arrow.  This can be used, e.g.,
- *      to draw commutative diagrams in conjunction with
- *      \array (and maybe with \stackrel and/or \relstack, too).
- *        o In case you really want to render, say, [f]---->[g], just
- *      use an intervening space, i.e., [f]\longrightarrow~[g].
- *      In text mode use two spaces {\rm~[f]\longrightarrow~~[g]}.
- * ======================================================================= */
-static subraster *rastarrow(const char **expression, int size,
-                            subraster * basesp, int drctn, int isBig,
-                            int arg3) {
-    subraster *arrowsp = NULL;  /* subraster for arrow */
-    char widtharg[256];         /* parse for optional [width] */
-    char sub[1024], super[1024];        /* and _^limits after [width] */
-    subraster *subsp = NULL, *supsp = NULL;     /*rasterize limits */
-    subraster *spacesp = NULL;  /*space below arrow */
-    int width = 10 + 8 * size, height;  /* width, height for \longxxxarrow */
-    int islimits = 1;           /*true to handle limits internally */
-    int limsize = size - 1;     /* font size for limits */
-    int vspace = 1;             /* #empty rows below arrow */
-    int pixsz = 1;              /*default #bits per pixel, 1=bitmap */
-/* -------------------------------------------------------------------------
-construct longleft/rightarrow subraster, with limits, and return it to caller
--------------------------------------------------------------------------- */
-/* --- check for optional width arg and replace default width --- */
-    if (*(*expression) == '[') {        /*check for []-enclosed optional arg */
-        int widthval;           /* test [width] before using it */
-        *expression =
-            texsubexpr(*expression, widtharg, 255, "[", "]", 0, 0);
-         widthval =
-            (int) ((unitlength *
-                    ((double) evalterm(mimestore, widtharg))) + 0.5);
-        if (widthval >= 2 && widthval <= 600)   /* sanity check */
-             width = widthval;
-    }
-                                                                                                                        /* replace deafault width *//* --- now parse for limits, and bump expression past it(them) --- */ if (islimits) {
-                                                                                                                        /* handling limits internally */
-        *expression = texscripts(*expression, sub, super, 3);   /* parse for limits */
-        if (*sub != '\0')       /*have a subscript following arrow */
-            subsp = rasterize(sub, limsize);    /* so try to rasterize subscript */
-        if (*super != '\0')     /*have superscript following arrow */
-            supsp = rasterize(super, limsize);
-    }
-    /*so try to rasterize superscript */
-    /* --- set height based on width --- */
-    height = min2(17, max2(9, (width + 2) / 6));        /* height based on width */
-    height = 1 + (height / 2) * 2;      /* always force odd height */
-/* --- generate arrow subraster --- */
-    if ((arrowsp = arrow_subraster(width, height, pixsz, drctn, isBig)) /*build arrow */
-        == NULL)
-        goto end_of_job;        /* and quit if we failed */
-/* --- add space below arrow --- */
-    if (vspace > 0) {           /* if we have space below arrow */
-        if ((spacesp = new_subraster(width, vspace, pixsz)) != NULL) {
-            /* and if we succeeded */
-            if ((arrowsp = rastack(spacesp, arrowsp, 2, 0, 1, 3)) == NULL) {
-                goto end_of_job;        /* and quit if we failed */
-            }
-        }
-    }
-/* --- init arrow subraster parameters --- */
-    arrowsp->size = size;       /*propagate base font size forward */
-    arrowsp->baseline = height + vspace - 1;    /* set baseline at bottom of arrow */
-/* --- add limits above/below arrow, as necessary --- */
-    if (subsp != NULL) {        /* stack subscript below arrow */
-        if ((arrowsp = rastack(subsp, arrowsp, 2, 0, 1, 3)) == NULL) {
-            goto end_of_job;    /* quit if failed */
-        }
-    }
-    if (supsp != NULL) {        /* stack superscript above arrow */
-        if ((arrowsp = rastack(arrowsp, supsp, 1, vspace, 1, 3)) == NULL) {
-            goto end_of_job;    /* quit if failed */
-        }
-    }
-  end_of_job:
-    return arrowsp;
-}
-
-/* ==========================================================================
- * Function:    rastuparrow ( expression, size, basesp,  drctn, isBig, arg3 )
- * Purpose: returns an up/down arrow subraster (e.g., for \longuparrow)
- * --------------------------------------------------------------------------
- * Arguments:   expression (I)  char **  to first char of null-terminated
- *              LaTeX expression (unused/unchanged)
- *      size (I)    int containing base font size (not used,
- *              just stored in subraster)
- *      basesp (I)  subraster *  to character (or subexpression)
- *              immediately preceding space, whose baseline
- *              and height params are transferred to space
- *      drctn (I)   int containing +1 for up, -1 for down,
- *              or 0 for updown
- *      isBig (I)   int containing 0 for ---> or 1 for ===>
- *      arg3 (I)    int unused
- * --------------------------------------------------------------------------
- * Returns: ( subraster * ) ptr to up/down arrow subraster
- *              or NULL for any error
- * --------------------------------------------------------------------------
- * Notes:     o An optional argument [height] may *immediately* follow
- *      the \longxxx to explicitly set the arrow's height in pixels.
- *      For example, \longuparrow calculates a default height
- *      (as usual in LaTeX), whereas \longuparrow[25] explicitly
- *      draws a 25-pixel high arrow.  This can be used, e.g.,
- *      to draw commutative diagrams in conjunction with
- *      \array (and maybe with \stackrel and/or \relstack, too).
- *        o In case you really want to render, say, [f]---->[g], just
- *      use an intervening space, i.e., [f]\longuparrow~[g].
- *      In text use two spaces {\rm~[f]\longuparrow~~[g]}.
- * ======================================================================= */
-static subraster *rastuparrow(const char **expression, int size,
-                              subraster * basesp, int drctn, int isBig,
-                              int arg3) {
-    subraster *arrowsp = NULL;  /* subraster for arrow */
-    char heightarg[256];        /* parse for optional [height] */
-    char sub[1024], super[1024];        /* and _^limits after [width] */
-    subraster *subsp = NULL, *supsp = NULL;     /*rasterize limits */
-    int height = 8 + 2 * size, width;   /* height, width for \longxxxarrow */
-    int islimits = 1;           /*true to handle limits internally */
-    int limsize = size - 1;     /* font size for limits */
-    int pixsz = 1;              /*default #bits per pixel, 1=bitmap */
-/* -------------------------------------------------------------------------
-construct blank subraster, and return it to caller
--------------------------------------------------------------------------- */
-/* --- check for optional height arg and replace default height --- */
-    if (*(*expression) == '[') {        /*check for []-enclosed optional arg */
-        int heightval;          /* test height before using it */
-        *expression =
-            texsubexpr(*expression, heightarg, 255, "[", "]", 0, 0);
-         heightval =
-            (int) ((unitlength *
-                    ((double) evalterm(mimestore, heightarg))) + 0.5);
-        if (heightval >= 2 && heightval <= 600) {       /* sanity check */
-            height = heightval;
-        }
-    }
-                                                                                                                        /* replace deafault height *//* --- now parse for limits, and bump expression past it(them) --- */ if (islimits) {
-                                                                                                                        /* handling limits internally */
-        *expression = texscripts(*expression, sub, super, 3);   /* parse for limits */
-        if (*sub != '\0')       /*have a subscript following arrow */
-            subsp = rasterize(sub, limsize);    /* so try to rasterize subscript */
-        if (*super != '\0')     /*have superscript following arrow */
-            supsp = rasterize(super, limsize);
-    }
-    /*so try to rasterize superscript */
-    /* --- set width based on height --- */
-    width = min2(17, max2(9, (height + 2) / 4));        /* width based on height */
-    width = 1 + (width / 2) * 2;        /* always force odd width */
-/* --- generate arrow subraster --- */
-    if ((arrowsp =
-         uparrow_subraster(width, height, pixsz, drctn, isBig)) == NULL)
-        goto end_of_job;        /* and quit if we failed */
-/* --- init arrow subraster parameters --- */
-    arrowsp->size = size;       /*propagate base font size forward */
-    arrowsp->baseline = height - 1;     /* set baseline at bottom of arrow */
-/* --- add limits above/below arrow, as necessary --- */
-    if (supsp != NULL) {        /* cat superscript to left of arrow */
-        int supht = (supsp->image)->height,     /* superscript height */
-            deltab = (1 + abs(height - supht)) / 2;     /* baseline difference to center */
-        supsp->baseline = supht - 1;    /* force script baseline to bottom */
-        if (supht <= height)    /* arrow usually taller than script */
-            arrowsp->baseline -= deltab;        /* so bottom of script goes here */
-        else
-            supsp->baseline -= deltab;  /* else bottom of arrow goes here */
-        if ((arrowsp = rastcat(supsp, arrowsp, 3))      /* superscript left of arrow */
-            == NULL)
-            goto end_of_job;
-    }                           /* quit if failed */
-    if (subsp != NULL) {        /* cat subscript to right of arrow */
-        int subht = (subsp->image)->height,     /* subscript height */
-            deltab = (1 + abs(height - subht)) / 2;     /* baseline difference to center */
-        arrowsp->baseline = height - 1; /* reset arrow baseline to bottom */
-        subsp->baseline = subht - 1;    /* force script baseline to bottom */
-        if (subht <= height)    /* arrow usually taller than script */
-            arrowsp->baseline -= deltab;        /* so bottom of script goes here */
-        else
-            subsp->baseline -= deltab;  /* else bottom of arrow goes here */
-        if ((arrowsp = rastcat(arrowsp, subsp, 3))      /* subscript right of arrow */
-            == NULL)
-            goto end_of_job;
-    }
-    /* quit if failed */
-    /* --- return arrow (or NULL) to caller --- */
-  end_of_job:
-    arrowsp->baseline = height - 1;     /* reset arrow baseline to bottom */
-    return arrowsp;
-}
-
-/* ==========================================================================
- * Function:    rastoverlay (expression, size, basesp, overlay, offset2, arg3)
- * Purpose: overlays one raster on another
- * --------------------------------------------------------------------------
- * Arguments:   expression (I/O) char **  to first char of null-terminated
- *              string immediately following overlay \cmd to
- *              be rasterized, and returning ptr immediately
- *              following last character processed.
- *      size (I)    int containing 0-7 default font size
- *      basesp (I)  subraster *  to character (or subexpression)
- *              immediately preceding overlay \cmd
- *              (unused, but passed for consistency)
- *      overlay (I) int containing 1 to overlay / (e.g., \not)
- *              or NOVALUE to pick up 2nd arg from expression
- *      offset2 (I) int containing #pixels to horizontally offset
- *              overlay relative to underlying symbol,
- *              positive(right) or negative or 0,
- *              or NOVALUE to pick up optional [offset] arg
- *      arg3 (I)    int unused
- * --------------------------------------------------------------------------
- * Returns: ( subraster * ) ptr to subraster corresponding to composite,
- *              or NULL for any parsing error
- * --------------------------------------------------------------------------
- * Notes:     o
- * ======================================================================= */
-static subraster *rastoverlay(const char **expression, int size,
-                              subraster * basesp, int overlay, int offset2,
-                              int arg3) {
-    char expr1[512], expr2[512];        /* base, overlay */
-    subraster *sp1 = NULL, *sp2 = NULL; /*rasterize 1=base, 2=overlay */
-    subraster *overlaysp = NULL;        /*subraster for composite overlay */
-    int isalign = 0;            /* true to align baselines */
-/* -------------------------------------------------------------------------
-Obtain base, and maybe overlay, and rasterize them
--------------------------------------------------------------------------- */
-/* --- check for optional offset2 arg  --- */
-    if (offset2 == NOVALUE)     /* only if not explicitly specified */
-        if (*(*expression) == '[') {    /*check for []-enclosed optional arg */
-            int offsetval;      /* test before using it */
-            *expression =
-                texsubexpr(*expression, expr2, 511, "[", "]", 0, 0);
-             offsetval =        /* convert [offset2] to int */
-                (int) (((double) evalterm(mimestore, expr2)) + 0.5);
-            if (abs(offsetval) <= 25)   /* sanity check */
-                 offset2 = offsetval;
-    } /* replace deafault */ if (offset2 == NOVALUE)
-        offset2 = 0;            /* novalue means no offset */
-/* --- parse for base, bump expression past it, and rasterize it --- */
-    *expression = texsubexpr(*expression, expr1, 511, "{", "}", 0, 0);
-    if (isempty(expr1))
-        goto end_of_job;        /* nothing to overlay, so quit */
-    rastlift1 = rastlift = 0;   /* reset all raisebox() lifts */
-    if (strstr(expr1, "\\raise") != NULL)       /* have a \raisebox */
-        isalign = 2;            /* so align baselines */
-    if ((sp1 = rasterize(expr1, size))  /* rasterize base expression */
-        == NULL)
-        goto end_of_job;        /* quit if failed to rasterize */
-    overlaysp = sp1;            /*in case we return with no overlay */
-    rastlift1 = rastlift;       /* save lift for base expression */
-/* --- get overlay expression, and rasterize it --- */
-    if (overlay == NOVALUE) {   /* get overlay from input stream */
-        *expression = texsubexpr(*expression, expr2, 511, "{", "}", 0, 0);
-        if (!isempty(expr2)) {  /* have an overlay */
-            if (strstr(expr2, "\\raise") != NULL)       /* have a \raisebox */
-                isalign = 2;    /* so align baselines */
-            sp2 = rasterize(expr2, size);
-        }
-    } /* rasterize overlay expression */
-    else                        /* use specific built-in overlay */
-        switch (overlay) {
-        default:
-            break;
-        case 1:                /* e.g., \not overlays slash */
-            sp2 = rasterize("/", size + 1);     /* rasterize overlay expression */
-            isalign = 0;        /* automatically handled correctly */
-            offset2 = max2(1, size - 3);        /* push / right a bit */
-            offset2 = 0;
-            break;
-        case 2:                /* e.g., \Not draws diagonal */
-            sp2 = NULL;         /* no overlay required */
-            isalign = 0;        /* automatically handled correctly */
-            if (overlaysp != NULL) {    /* check that we have raster */
-                raster *rp = overlaysp->image;  /* raster to be \Not-ed */
-                int width = rp->width, height = rp->height;     /* raster dimensions */
-                if (0)          /* diagonal within bounding box */
-                    line_raster(rp, 0, width - 1, height - 1, 0, 1);    /* just draw diagonal */
-                else {          /* construct "wide" diagonal */
-                    int margin = 3;     /* desired extra margin width */
-                    sp2 = new_subraster(width + margin, height + margin, 1);    /*alloc it */
-                    if (sp2 != NULL)    /* allocated successfully */
-                        line_raster(sp2->image, 0, width + margin - 1,
-                                    height + margin - 1, 0, 1);
-                }
-            }
-            break;
-        case 3:                /* e.g., \sout for strikeout */
-            sp2 = NULL;         /* no overlay required */
-            if (overlaysp != NULL) {    /* check that we have raster */
-                raster *rp = overlaysp->image;  /* raster to be \sout-ed */
-                int width = rp->width, height = rp->height;     /* raster dimensions */
-                int baseline = (overlaysp->baseline) - rastlift;        /*skip descenders */
-                int midrow =
-                    max2(0,
-                         min2(height - 1, offset2 + ((baseline + 1) / 2)));
-                if (1)          /* strikeout within bounding box */
-                    line_raster(rp, midrow, 0, midrow, width - 1, 1);
-            }                   /*draw strikeout */
-            break;
-        }                       /* --- end-of-switch(overlay) --- */
-    if (sp2 == NULL)
-        goto end_of_job;        /*return sp1 if failed to rasterize */
-/* -------------------------------------------------------------------------
-construct composite overlay
--------------------------------------------------------------------------- */
-    overlaysp = rastcompose(sp1, sp2, offset2, isalign, 3);
-  end_of_job:
-    return overlaysp;
-}
-
-/* ==========================================================================
- * Function:    rastfrac ( expression, size, basesp,  isfrac, arg2, arg3 )
- * Purpose: \frac,\atop handler, returns a subraster corresponding to
- *      expression (immediately following \frac,\atop) at font size
- * --------------------------------------------------------------------------
- * Arguments:   expression (I/O) char **  to first char of null-terminated
- *              string immediately following \frac to be
- *              rasterized, and returning ptr immediately
- *              following last character processed.
- *      size (I)    int containing 0-7 default font size
- *      basesp (I)  subraster *  to character (or subexpression)
- *              immediately preceding \frac
- *              (unused, but passed for consistency)
- *      isfrac (I)  int containing true to draw horizontal line
- *              between numerator and denominator,
- *              or false not to draw it (for \atop).
- *      arg2 (I)    int unused
- *      arg3 (I)    int unused
- * --------------------------------------------------------------------------
- * Returns: ( subraster * ) ptr to subraster corresponding to fraction,
- *              or NULL for any parsing error
- * --------------------------------------------------------------------------
- * Notes:     o
- * ======================================================================= */
-subraster *rastfrac(const char **expression, int size, subraster * basesp,
-                    int isfrac, int arg2, int arg3) {
-    char numer[MAXSUBXSZ + 1], denom[MAXSUBXSZ + 1];    /* parsed numer, denom */
-    subraster *numsp = NULL, *densp = NULL;     /*rasterize numer, denom */
-    subraster *fracsp = NULL;   /* subraster for numer/denom */
-    int width = 0;              /* width of constructed raster */
-    int numheight = 0;          /* height of numerator */
-                                                        /* not used --int baseht = 0, baseln = 0 */ ;
-                                                        /* height,baseline of base symbol */
-    /*int   istweak = 1; *//*true to tweak baseline alignment */
-    int lineheight = 1;         /* thickness of fraction line */
-    int vspace = (size > 2 ? 2 : 1);    /*vertical space between components */
-/* -------------------------------------------------------------------------
-Obtain numerator and denominator, and rasterize them
--------------------------------------------------------------------------- */
-/* --- parse for numerator,denominator and bump expression past them --- */
-    *expression = texsubexpr(*expression, numer, 0, "{", "}", 0, 0);
-    *expression = texsubexpr(*expression, denom, 0, "{", "}", 0, 0);
-    if (*numer == '\0' && *denom == '\0')       /* missing both components of frac */
-        goto end_of_job;        /* nothing to do, so quit */
-/* --- rasterize numerator, denominator --- */
-    if (*numer != '\0') {       /* have a numerator */
-        if ((numsp = rasterize(numer, size - 1)) == NULL) {
-            goto end_of_job;    /* and quit if failed */
-        }
-    }
-    if (*denom != '\0') {       /* have a denominator */
-        if ((densp = rasterize(denom, size - 1)) == NULL) {     /* failed */
-            if (numsp != NULL) {        /* already rasterized numerator */
-                delete_subraster(numsp);        /* so free now-unneeded numerator */
-            }
-            goto end_of_job;
-        }
-    }
-    /* --- if one componenet missing, use a blank space for it --- */
-    if (numsp == NULL) {        /* no numerator given */
-        numsp = rasterize("[?]", size - 1);     /* missing numerator */
-    }
-    if (densp == NULL) {        /* no denominator given */
-        densp = rasterize("[?]", size - 1);     /* missing denominator */
-    }
-/* --- check that we got both components --- */
-    if (numsp == NULL || densp == NULL) {       /* some problem */
-        delete_subraster(numsp);        /*delete numerator (if it existed) */
-        delete_subraster(densp);        /*delete denominator (if it existed) */
-        goto end_of_job;
-    }
-    /* and quit */
-    /* --- get height of numerator (to determine where line belongs) --- */
-    numheight = (numsp->image)->height; /* get numerator's height */
-/* -------------------------------------------------------------------------
-construct raster with numerator stacked over denominator
--------------------------------------------------------------------------- */
-/* --- construct raster with numer/denom --- */
-    if ((fracsp =
-         rastack(densp, numsp, 0, 2 * vspace + lineheight, 1,
-                 3)) == NULL) {
-        /* failed to construct numer/denom */
-        delete_subraster(numsp);        /* so free now-unneeded numerator */
-        delete_subraster(densp);        /* and now-unneeded denominator */
-        goto end_of_job;
-    }
-    /* and then quit */
-    /* --- determine width of constructed raster --- */
-    width = (fracsp->image)->width;     /*just get width of embedded image */
-/* --- initialize subraster parameters --- */
-    fracsp->size = size;        /* propagate font size forward */
-    fracsp->baseline = (numheight + vspace + lineheight) + (size + 2);  /*default baseline */
-    fracsp->type = FRACRASTER;  /* signal \frac image */
-    if (basesp != NULL) {       /* we have base symbol for frac */
-        /* not used --baseht = (basesp->image)->height; *//* height of base symbol */
-        /* not used --baseln = basesp->baseline; *//* and its baseline */
-    }
-    /* -------------------------------------------------------------------------
-       draw horizontal line between numerator and denominator
-       -------------------------------------------------------------------------- */
-    fraccenterline = numheight + vspace;        /* signal that we have a \frac */
-    if (isfrac) {               /*line for \frac, but not for \atop */
-        rule_raster(fracsp->image, fraccenterline, 0, width, lineheight,
-                    0);
-    }
-/* -------------------------------------------------------------------------
-return final result to caller
--------------------------------------------------------------------------- */
-  end_of_job:
-    if (msgfp != NULL && msglevel >= 99) {
-        fprintf(msgfp, "rastfrac> returning %s\n",
-                (fracsp == NULL ? "null" : "..."));
-        if (fracsp != NULL)     /* have a constructed raster */
-            type_raster(fracsp->image, msgfp);
-    }                           /* display constructed raster */
-    return fracsp;
-}
-
-/* ==========================================================================
- * Function:    rastackrel ( expression, size, basesp,  base, arg2, arg3 )
- * Purpose: \stackrel handler, returns a subraster corresponding to
- *      stacked relation
- * --------------------------------------------------------------------------
- * Arguments:   expression (I/O) char **  to first char of null-terminated
- *              string immediately following \stackrel to be
- *              rasterized, and returning ptr immediately
- *              following last character processed.
- *      size (I)    int containing 0-7 default font size
- *      basesp (I)  subraster *  to character (or subexpression)
- *              immediately preceding \stackrel
- *              (unused, but passed for consistency)
- *      base (I)    int containing 1 if upper/first subexpression
- *              is base relation, or 2 if lower/second is
- *      arg2 (I)    int unused
- *      arg3 (I)    int unused
- * --------------------------------------------------------------------------
- * Returns: ( subraster * ) ptr to subraster corresponding to stacked
- *              relation, or NULL for any parsing error
- * --------------------------------------------------------------------------
- * Notes:     o
- * ======================================================================= */
-static subraster *rastackrel(const char **expression, int size,
-                             subraster * basesp, int base, int arg2,
-                             int arg3) {
-    char upper[MAXSUBXSZ + 1], lower[MAXSUBXSZ + 1];    /* parsed upper, lower */
-    subraster *upsp = NULL, *lowsp = NULL;      /* rasterize upper, lower */
-    subraster *relsp = NULL;    /* subraster for upper/lower */
-    int upsize = (base == 1 ? size : size - 1); /* font size for upper component */
-    int lowsize = (base == 2 ? size : size - 1);        /* font size for lower component */
-    int vspace = 1;             /*vertical space between components */
-/* -------------------------------------------------------------------------
-Obtain numerator and denominator, and rasterize them
--------------------------------------------------------------------------- */
-/* --- parse for numerator,denominator and bump expression past them --- */
-    *expression = texsubexpr(*expression, upper, 0, "{", "}", 0, 0);
-    *expression = texsubexpr(*expression, lower, 0, "{", "}", 0, 0);
-    if (*upper == '\0' || *lower == '\0') {     /* missing either component */
-        goto end_of_job;        /* nothing to do, so quit */
-    }
-                                                                /* --- rasterize upper, lower --- */ if (*upper != '\0') {
-                                                                /* have upper component */
-        if ((upsp = rasterize(upper, upsize)) == NULL) {
-            goto end_of_job;    /* and quit if failed */
-        }
-    }
-    if (*lower != '\0') {       /* have lower component */
-        if ((lowsp = rasterize(lower, lowsize)) == NULL) {
-            /* failed */
-            if (upsp != NULL) { /* already rasterized upper */
-                delete_subraster(upsp); /* so free now-unneeded upper */
-            }
-            goto end_of_job;
-        }
-    }
-    /* -------------------------------------------------------------------------
-       construct stacked relation raster
-       -------------------------------------------------------------------------- */
-    /* --- construct stacked relation --- */
-    if ((relsp = rastack(lowsp, upsp, 3 - base, vspace, 1, 3)) == NULL) {
-        goto end_of_job;        /* quit if failed */
-    }
-    relsp->size = size;         /* propagate font size forward */
-  end_of_job:
-    return (relsp);
-}
-
-/* ==========================================================================
- * Function:    rastmathfunc ( expression, size, basesp,  base, arg2, arg3 )
- * Purpose: \log, \lim, etc handler, returns a subraster corresponding
- *      to math functions
- * --------------------------------------------------------------------------
- * Arguments:   expression (I/O) char **  to first char of null-terminated
- *              string immediately following \mathfunc to be
- *              rasterized, and returning ptr immediately
- *              following last character processed.
- *      size (I)    int containing 0-7 default font size
- *      basesp (I)  subraster *  to character (or subexpression)
- *              immediately preceding \mathfunc
- *              (unused, but passed for consistency)
- *      mathfunc (I)    int containing 1=arccos, 2=arcsin, etc.
- *      islimits (I)    int containing 1 if function may have
- *              limits underneath, e.g., \lim_{n\to\infty}
- *      arg3 (I)    int unused
- * --------------------------------------------------------------------------
- * Returns: ( subraster * ) ptr to subraster corresponding to mathfunc,
- *              or NULL for any parsing error
- * --------------------------------------------------------------------------
- * Notes:     o
- * ======================================================================= */
-static subraster *rastmathfunc(const char **expression, int size,
-                               subraster * basesp, int mathfunc,
-                               int islimits, int arg3) {
-    char func[MAXTOKNSZ + 1], limits[MAXSUBXSZ + 1];    /*func as {\rm func}, limits */
-    char funcarg[MAXTOKNSZ + 1];        /* optional func arg */
-    subraster *funcsp = NULL, *limsp = NULL;    /*rasterize func,limits */
-    subraster *mathfuncsp = NULL;       /* subraster for mathfunc/limits */
-    int limsize = size - 1;     /* font size for limits */
-    int vspace = 1;             /*vertical space between components */
-/* --- table of function names by mathfunc number --- */
-    static const char *funcnames[] = {
-        "error",                /*  0 index is illegal/error bucket */
-            "arccos", "arcsin", "arctan",       /*  1 -  3 */
-            "arg", "cos", "cosh",       /*  4 -  6 */
-            "cot", "coth", "csc",       /*  7 -  9 */
-            "deg", "det", "dim",        /* 10 - 12 */
-            "exp", "gcd", "hom",        /* 13 - 15 */
-            "inf", "ker", "lg", /* 16 - 18 */
-            "lim", "liminf", "limsup",  /* 19 - 21 */
-            "ln", "log", "max", /* 22 - 24 */
-            "min", "Pr", "sec", /* 25 - 27 */
-            "sin", "sinh", "sup",       /* 28 - 30 */
-            "tan", "tanh",      /* 31 - 32 */
-            /* --- extra mimetex funcnames --- */
-            "tr",               /* 33 */
-            "pmod"              /* 34 */
-    };
-    static int numnames = sizeof(funcnames) / sizeof(funcnames[0]);
-/* -------------------------------------------------------------------------
-set up and rasterize function name in \rm
--------------------------------------------------------------------------- */
-    if (mathfunc < 0 || mathfunc > numnames) {
-        mathfunc = 0;           /* check index bounds */
-    }
-    switch (mathfunc) {         /* check for special processing */
-    default:                   /* no special processing */
-        strcpy(func, "{\\rm~"); /* init string with {\rm~ */
-        strcat(func, funcnames[mathfunc]);      /* concat function name */
-        strcat(func, "}");      /* and add terminating } */
-        break;
-    case 34:                   /* \pmod{x} --> (mod x) */
-        /* --- parse for \pmod{arg} argument --- */
-        *expression =
-            texsubexpr(*expression, funcarg, 2047, "{", "}", 0, 0);
-        strcpy(func, "{\\({\\rm~mod}"); /* init with {\left({\rm~mod} */
-        strcat(func, "\\hspace2");      /* concat space */
-        strcat(func, funcarg);  /* and \pmodargument */
-        strcat(func, "\\)}");   /* and add terminating \right)} */
-        break;
-    }
-    if ((funcsp = rasterize(func, size)) == NULL) {
-        goto end_of_job;
-    }
-    mathfuncsp = funcsp;        /* just return funcsp if no limits */
-    if (!islimits) {
-        goto end_of_job;        /* treat any subscript normally */
-    }
-/* -------------------------------------------------------------------------
-Obtain limits, if permitted and if provided, and rasterize them
--------------------------------------------------------------------------- */
-/* --- parse for subscript limits, and bump expression past it(them) --- */
-    *expression = texscripts(*expression, limits, limits, 1);
-    if (*limits == '\0') {
-        goto end_of_job;        /* no limits, nothing to do, quit */
-    }
-/* --- rasterize limits --- */
-    if ((limsp = rasterize(limits, limsize)) == NULL) {
-        goto end_of_job;        /* and quit if failed */
-    }
-/* -------------------------------------------------------------------------
-construct func atop limits
--------------------------------------------------------------------------- */
-/* --- construct func atop limits --- */
-    if ((mathfuncsp = rastack(limsp, funcsp, 2, vspace, 1, 3)) == NULL) {
-        goto end_of_job;        /* quit if failed */
-    }
-/* --- initialize subraster parameters --- */
-    mathfuncsp->size = size;    /* propagate font size forward */
-/* -------------------------------------------------------------------------
-return final result to caller
--------------------------------------------------------------------------- */
-  end_of_job:
-    return mathfuncsp;
-}
-
-/* ==========================================================================
- * Function:    rastsqrt ( expression, size, basesp,  arg1, arg2, arg3 )
- * Purpose: \sqrt handler, returns a subraster corresponding to
- *      expression (immediately following \sqrt) at font size
- * --------------------------------------------------------------------------
- * Arguments:   expression (I/O) char **  to first char of null-terminated
- *              string immediately following \sqrt to be
- *              rasterized, and returning ptr immediately
- *              following last character processed.
- *      size (I)    int containing 0-7 default font size
- *      basesp (I)  subraster *  to character (or subexpression)
- *              immediately preceding \accent
- *              (unused, but passed for consistency)
- *      arg1 (I)    int unused
- *      arg2 (I)    int unused
- *      arg3 (I)    int unused
- * --------------------------------------------------------------------------
- * Returns: ( subraster * ) ptr to subraster corresponding to expression,
- *              or NULL for any parsing error
- *              (expression ptr unchanged if error occurs)
- * --------------------------------------------------------------------------
- * Notes:     o
- * ======================================================================= */
-static subraster *rastsqrt(const char **expression, int size,
-                           subraster * basesp, int arg1, int arg2,
-                           int arg3) {
-    char subexpr[MAXSUBXSZ + 1];        /*parse subexpr to be sqrt-ed */
-    char rootarg[MAXSUBXSZ + 1];        /* optional \sqrt[rootarg]{...} */
-    subraster *subsp = NULL;    /* rasterize subexpr */
-    subraster *sqrtsp = NULL;   /* subraster with the sqrt */
-    subraster *rootsp = NULL;   /* optionally preceded by [rootarg] */
-    int sqrtheight = 0, sqrtwidth = 0, surdwidth = 0,   /* height,width of sqrt */
-        rootheight = 0, rootwidth = 0,  /* height,width of rootarg raster */
-        subheight = 0, subwidth = 0, pixsz = 0; /* height,width,pixsz of subexpr */
-    int overspace = 2;          /*space between subexpr and overbar */
-/* -------------------------------------------------------------------------
-Obtain subexpression to be sqrt-ed, and rasterize it
--------------------------------------------------------------------------- */
-/* --- first check for optional \sqrt[rootarg]{...} --- */
-    if (*(*expression) == '[') {        /*check for []-enclosed optional arg */
-        *expression = texsubexpr(*expression, rootarg, 0, "[", "]", 0, 0);
-        if (*rootarg != '\0')   /* got rootarg */
-            if ((rootsp = rasterize(rootarg, size - 1)) /*rasterize it at smaller size */
-                !=NULL) {       /* rasterized successfully */
-                rootheight = (rootsp->image)->height;   /* get height of rootarg */
-                rootwidth = (rootsp->image)->width;
-    } /* and its width */ }
-    /* --- end-of-if(**expression=='[') --- *//* --- parse for subexpr to be sqrt-ed, and bump expression past it --- */
-        *expression = texsubexpr(*expression, subexpr, 0, "{", "}", 0, 0);
-    if (*subexpr == '\0') {     /* couldn't get subexpression */
-        goto end_of_job;        /* nothing to do, so quit */
-    }
-/* --- rasterize subexpression to be accented --- */
-    if ((subsp = rasterize(subexpr, size)) == NULL) {
-        goto end_of_job;        /* quit if failed */
-    }
-/* -------------------------------------------------------------------------
-determine height and width of sqrt raster to be constructed
--------------------------------------------------------------------------- */
-/* --- first get height and width of subexpr --- */
-    subheight = (subsp->image)->height; /* height of subexpr */
-    subwidth = (subsp->image)->width;   /* and its width */
-    pixsz = (subsp->image)->pixsz;      /* pixsz remains constant */
-/* --- determine height and width of sqrt to contain subexpr --- */
-    sqrtheight = subheight + overspace; /* subexpr + blank line + overbar */
-    surdwidth = SQRTWIDTH(sqrtheight, (rootheight < 1 ? 2 : 1));        /* width of surd */
-    sqrtwidth = subwidth + surdwidth + 1;       /* total width */
-/* -------------------------------------------------------------------------
-construct sqrt (with room to move in subexpr) and embed subexpr in it
--------------------------------------------------------------------------- */
-/* --- construct sqrt --- */
-    if ((sqrtsp = accent_subraster(SQRTACCENT,
-                                   (rootheight <
-                                    1 ? sqrtwidth : (-sqrtwidth)),
-                                   sqrtheight, 0, pixsz)) == NULL) {
-        goto end_of_job;        /* quit if failed to build sqrt */
-    }
-/* --- embed subexpr in sqrt at lower-right corner--- */
-    rastput(sqrtsp->image, subsp->image, overspace, sqrtwidth - subwidth,
-            1);
-    sqrtsp->baseline = subsp->baseline + overspace;     /* adjust baseline */
-/* --- "embed" rootarg at upper-left --- */
-    if (rootsp != NULL) {       /*have optional \sqrt[rootarg]{...} */
-        /* --- allocate full raster to contain sqrtsp and rootsp --- */
-        int fullwidth =
-            sqrtwidth + rootwidth - min2(rootwidth,
-                                         max2(0, surdwidth - 4));
-        int fullheight =
-            sqrtheight + rootheight - min2(rootheight, 3 + size);
-        subraster *fullsp = new_subraster(fullwidth, fullheight, pixsz);
-        if (fullsp != NULL) {   /* allocated successfully *//* --- embed sqrtsp exactly at lower-right corner --- */
-            rastput(fullsp->image, sqrtsp->image,       /* exactly at lower-right corner */
-                    fullheight - sqrtheight, fullwidth - sqrtwidth, 1);
-            /* --- embed rootsp near upper-left, nestled above leading surd --- */
-            rastput(fullsp->image, rootsp->image, 0,
-                    max2(0, surdwidth - rootwidth - 2 - size), 0);
-            /* --- replace sqrtsp with fullsp --- */
-            delete_subraster(sqrtsp);   /* free original sqrtsp */
-            sqrtsp = fullsp;    /* and repoint it to fullsp instead */
-            sqrtsp->baseline = fullheight - (subheight - subsp->baseline);
-        }
-    }
-    sqrtsp->size = size;        /* propagate font size forward */
-/* -------------------------------------------------------------------------
-free unneeded component subrasters and return final result to caller
--------------------------------------------------------------------------- */
-  end_of_job:
-    if (subsp != NULL) {
-        delete_subraster(subsp);        /* free unneeded subexpr */
-    }
-    return sqrtsp;
-}
-
-/* ==========================================================================
- * Function:    rastaccent (expression,size,basesp,accent,isabove,isscript)
- * Purpose: \hat, \vec, \etc handler, returns a subraster corresponding
- *      to expression (immediately following \accent) at font size
- * --------------------------------------------------------------------------
- * Arguments:   expression (I/O) char **  to first char of null-terminated
- *              string immediately following \accent to be
- *              rasterized, and returning ptr immediately
- *              following last character processed.
- *      size (I)    int containing 0-7 default font size
- *      basesp (I)  subraster *  to character (or subexpression)
- *              immediately preceding \accent
- *              (unused, but passed for consistency)
- *      accent (I)  int containing HATACCENT or VECACCENT, etc,
- *              between numerator and denominator,
- *              or false not to draw it (for \over).
- *      isabove (I) int containing true if accent is above
- *              expression to be accented, or false
- *              if accent is below (e.g., underbrace)
- *      isscript (I)    int containing true if sub/superscripts
- *              allowed (for under/overbrace), or 0 if not.
- * --------------------------------------------------------------------------
- * Returns: ( subraster * ) ptr to subraster corresponding to expression,
- *              or NULL for any parsing error
- *              (expression ptr unchanged if error occurs)
- * --------------------------------------------------------------------------
- * Notes:     o Also handles \overbrace{}^{} and \underbrace{}_{} by way
- *      of isabove and isscript args.
- * ======================================================================= */
-static subraster *rastaccent(const char **expression, int size,
-                             subraster * basesp, int accent, int isabove,
-                             int isscript) {
-    char subexpr[MAXSUBXSZ + 1];        /*parse subexpr to be accented */
-    char *script = NULL;        /* \under,overbrace allow scripts */
-    char subscript[MAXTOKNSZ + 1], supscript[MAXTOKNSZ + 1];    /* parsed scripts */
-    subraster *subsp = NULL, *scrsp = NULL;     /*rasterize subexpr,script */
-    subraster *accsubsp = NULL; /* stack accent, subexpr, script */
-    subraster *accsp = NULL;    /*raster for the accent itself */
-    int accheight = 0, accwidth = 0, accdir = 0,        /*accent height, width, direction */
-        subheight = 0, subwidth = 0, pixsz = 0; /* height,width,pixsz of subexpr */
-    int vspace = 0;             /*vertical space between accent,sub */
-/* -------------------------------------------------------------------------
-Obtain subexpression to be accented, and rasterize it
--------------------------------------------------------------------------- */
-/* --- parse for subexpr to be accented, and bump expression past it --- */
-    *expression = texsubexpr(*expression, subexpr, 0, "{", "}", 0, 0);
-    if (*subexpr == '\0')       /* couldn't get subexpression */
-        goto end_of_job;        /* nothing to do, so quit */
-/* --- rasterize subexpression to be accented --- */
-    if ((subsp = rasterize(subexpr, size))      /*rasterize subexpr at original size */
-        == NULL)
-        goto end_of_job;        /* quit if failed */
-/* -------------------------------------------------------------------------
-determine desired accent width and height
--------------------------------------------------------------------------- */
-/* --- first get height and width of subexpr --- */
-     subheight = (subsp->image)->height;        /* height of subexpr */
-     subwidth = (subsp->image)->width;  /* and its width is overall width */
-     pixsz = (subsp->image)->pixsz;     /* original pixsz remains constant */
-/* --- determine desired width, height of accent --- */
-     accwidth = subwidth;       /* same width as subexpr */
-     accheight = 4;             /* default for bars */
-    switch (accent) {
-    default:
-        break;                  /* default okay */
-        case DOTACCENT:case DDOTACCENT:accheight = (size < 4 ? 3 : 4);  /* default for dots */
-        break;
-        case VECACCENT:vspace = 1;      /* set 1-pixel vertical space */
-        accdir = isscript;      /* +1=right,-1=left,0=lr; +10for==> */
-        isscript = 0;           /* >>don't<< signal sub/supscript */
-        case HATACCENT:accheight = 7;   /* default */
-        if (subwidth < 10)
-            accheight = 5;      /* unless small width */
-        else if (subwidth > 25)
-            accheight = 9;      /* or large */
-        break;
-    } /* --- end-of-switch(accent) --- */ accheight = min2(accheight, subheight);       /*never higher than accented subexpr */
-/* -------------------------------------------------------------------------
-construct accent, and construct subraster with accent over (or under) subexpr
--------------------------------------------------------------------------- */
-/* --- first construct accent --- */
-    if ((accsp =
-         accent_subraster(accent, accwidth, accheight, accdir, pixsz))
-        == NULL)
-        goto end_of_job;        /* quit if failed to build accent */
-/* --- now stack accent above (or below) subexpr, and free both args --- */
-    accsubsp = (isabove ? rastack(subsp, accsp, 1, vspace, 1, 3)        /*accent above subexpr */
-                : rastack(accsp, subsp, 2, vspace, 1, 3));      /*accent below subexpr */
-    if (accsubsp == NULL) {     /* failed to stack accent */
-        delete_subraster(subsp);        /* free unneeded subsp */
-        delete_subraster(accsp);        /* and unneeded accsp */
-        goto end_of_job;
-    }
-
-    /* and quit */
-    /* -------------------------------------------------------------------------
-       look for super/subscript (annotation for over/underbrace)
-       -------------------------------------------------------------------------- */
-    /* --- first check whether accent permits accompanying annotations --- */
-    if (!isscript)
-        goto end_of_job;        /* no annotations for this accent */
-/* --- now get scripts if there actually are any --- */
-    *expression =
-        texscripts(*expression, subscript, supscript, (isabove ? 2 : 1));
-    script = (isabove ? supscript : subscript); /*select above^ or below_ script */
-    if (*script == '\0')
-        goto end_of_job;        /* no accompanying script */
-/* --- rasterize script annotation at size-2 --- */
-    if ((scrsp = rasterize(script, size - 2))   /* rasterize script at size-2 */
-        == NULL)
-        goto end_of_job;        /* quit if failed */
-/* --- stack annotation above (or below) accent, and free both args --- */
-    accsubsp = (isabove ? rastack(accsubsp, scrsp, 1, 0, 1, 3)  /* accent above base */
-                : rastack(scrsp, accsubsp, 2, 0, 1, 3));        /* accent below base */
-/* -------------------------------------------------------------------------
-return final result to caller
--------------------------------------------------------------------------- */
-  end_of_job:
-    if (accsubsp != NULL)       /* initialize subraster parameters */
-        accsubsp->size = size;  /* propagate font size forward */
-    return (accsubsp);
-}                               /* --- end-of-function rastaccent() --- */
 
 
-/* ==========================================================================
- * Function:    rastfont (expression,size,basesp,ifontnum,arg2,arg3)
- * Purpose: \cal{}, \scr{}, \etc handler, returns subraster corresponding
- *      to char(s) within {}'s rendered at size
- * --------------------------------------------------------------------------
- * Arguments:   expression (I/O) char **  to first char of null-terminated
- *              string immediately following \font to be
- *              rasterized, and returning ptr immediately
- *              following last character processed.
- *      size (I)    int containing 0-7 default font size
- *      basesp (I)  subraster *  to character (or subexpression)
- *              immediately preceding \accent
- *              (unused, but passed for consistency)
- *      ifontnum (I)    int containing 1 for \cal{}, 2 for \scr{}
- *      arg2 (I)    int unused
- *      arg3 (I)    int unused
- * --------------------------------------------------------------------------
- * Returns: ( subraster * ) ptr to subraster corresponding to chars
- *              between {}'s, or NULL for any parsing error
- * --------------------------------------------------------------------------
- * Notes:     o
- * ======================================================================= */
-subraster *rastfont(const char **expression, int size, subraster * basesp,
-                    int ifontnum, int arg2, int arg3) {
-    char fontchars[MAXSUBXSZ + 1];      /* chars to render in font */
-    char subexpr[MAXSUBXSZ + 1];        /* turn \cal{AB} into \calA\calB */
-    char *pfchars = fontchars;
-    char fchar = '\0';          /* run thru fontchars one at a time */
-    const char *name = NULL;    /* fontinfo[ifontnum].name */
-    /* not used--int family = 0: *//* fontinfo[ifontnum].family */
-    int istext = 0;             /* fontinfo[ifontnum].istext */
-    int class = 0;              /* fontinfo[ifontnum].class */
-    subraster *fontsp = NULL;   /* rasterize chars in font */
-    int oldsmashmargin = smashmargin;   /* turn off smash in text mode */
-#if 0
-/* --- fonts recognized by rastfont --- */
-    static int nfonts = 11;     /* legal font #'s are 1...nfonts */
-    static struct {
-        const char *name;
-        int class;
-    } fonts[] = {               /* --- name  class 1=upper,2=alpha,3=alnum,4=lower,5=digit,9=all --- */
-        {
-        "\\math", 0}, {
-        "\\mathcal", 1},        /*(1) calligraphic, uppercase */
-        {
-        "\\mathscr", 1},        /*(2) rsfs/script, uppercase */
-        {
-        "\\textrm", -1},        /*(3) \rm,\text{abc} --> {\rm~abc} */
-        {
-        "\\textit", -1},        /*(4) \it,\textit{abc}-->{\it~abc} */
-        {
-        "\\mathbb", -1},        /*(5) \bb,\mathbb{abc}-->{\bb~abc} */
-        {
-        "\\mathbf", -1},        /*(6) \bf,\mathbf{abc}-->{\bf~abc} */
-        {
-        "\\mathrm", -1},        /*(7) \mathrm */
-        {
-        "\\cyr", -1},           /*(8) \cyr */
-        {
-        "\\textgreek", -1},     /*(9) \textgreek */
-        {
-        "\\textbfgreek", CMMI10BGR, 1, -1},     /*(10) \textbfgreek{ab} */
-        {
-        "\\textbbgreek", BBOLD10GR, 1, -1},     /*(11) \textbbgreek{ab} */
-        {
-        NULL, 0}
-    };
-#endif
-/* -------------------------------------------------------------------------
-first get font name and class to determine type of conversion desired
--------------------------------------------------------------------------- */
-    if (ifontnum <= 0 || ifontnum > nfontinfo)
-        ifontnum = 0;           /*math if out-of-bounds */
-    name = fontinfo[ifontnum].name;     /* font name */
-    /* not used --family = fontinfo[ifontnum].family; *//* font family */
-    istext = fontinfo[ifontnum].istext; /*true in text mode (respect space) */
-    class = fontinfo[ifontnum].class;   /* font class */
-    if (istext) {               /* text (respect blanks) */
-        mathsmashmargin = smashmargin;  /* needed for \text{if $n-m$ even} */
-        smashmargin = 0;
-    }
-    /* don't smash internal blanks */
-    /* -------------------------------------------------------------------------
-       now convert \font{abc} --> {\font~abc}, or convert ABC to \calA\calB\calC
-       -------------------------------------------------------------------------- */
-    if (1 || class < 0) {       /* not character-by-character */
-        /* ---
-           if \font not immediately followed by { then it has no arg, so just set flag
-           ------------------------------------------------------------------------ */
-        if (*(*expression) != '{') {    /* no \font arg, so just set flag */
-            if (msgfp != NULL && msglevel >= 99)
-                fprintf(msgfp, "rastfont> \\%s rastflags() for font#%d\n",
-                        name, ifontnum);
-            fontsp =
-                rastflags(expression, size, basesp, ISFONTFAM, ifontnum,
-                          arg3);
-            goto end_of_job;
-        }
-
-        /* --- end-of-if(*(*expression)!='{') --- */
-        /* ---
-           convert \font{abc} --> {\font~abc}
-           ---------------------------------- */
-        /* --- parse for {fontchars} arg, and bump expression past it --- */
-        *expression =
-            texsubexpr(*expression, fontchars, 0, "{", "}", 0, 0);
-        if (msgfp != NULL && msglevel >= 99)
-            fprintf(msgfp, "rastfont> \\%s fontchars=\"%s\"\n", name,
-                    fontchars);
-        /* --- convert all fontchars at the same time --- */
-        strcpy(subexpr, "{");   /* start off with opening { */
-        strcat(subexpr, name);  /* followed by font name */
-        strcat(subexpr, "~");   /* followed by whitespace */
-        strcat(subexpr, fontchars);     /* followed by all the chars */
-        strcat(subexpr, "}");   /* terminate with closing } */
-    } else {                    /* character-by-character */
-        /* ---
-           convert ABC to \calA\calB\calC
-           ------------------------------ */
-        int isprevchar = 0;     /* true if prev char converted */
-        /* --- parse for {fontchars} arg, and bump expression past it --- */
-        *expression =
-            texsubexpr(*expression, fontchars, 0, "{", "}", 0, 0);
-        if (msgfp != NULL && msglevel >= 99)
-            fprintf(msgfp, "rastfont> \\%s fontchars=\"%s\"\n", name,
-                    fontchars);
-        /* --- convert fontchars one at a time --- */
-        strcpy(subexpr, "{\\rm~");      /* start off with opening {\rm */
-        strcpy(subexpr, "{");   /* nope, just start off with { */
-        for (pfchars = fontchars; (fchar = *pfchars) != '\0'; pfchars++) {
-            if (isthischar(fchar, WHITEMATH)) { /* some whitespace */
-                if (0 || istext)        /* and we're in a text mode font */
-                    strcat(subexpr, "\\;");
-            } /* so respect whitespace */
-            else {              /* char to be displayed in font */
-                int exprlen = 0;        /* #chars in subexpr before fchar */
-                int isinclass = 0;      /* set true if fchar in font class */
-                /* --- class: 1=upper, 2=alpha, 3=alnum, 4=lower, 5=digit, 9=all --- */
-                switch (class) {        /* check if fchar is in font class */
-                default:
-                    break;      /* no chars in unrecognized class */
-                case 1:
-                    if (isupper((int) fchar)) {
-                        isinclass = 1;
-                    }
-                    break;
-                case 2:
-                    if (isalpha((int) fchar)) {
-                        isinclass = 1;
-                    }
-                    break;
-                case 3:
-                    if (isalnum((int) fchar)) {
-                        isinclass = 1;
-                    }
-                    break;
-                case 4:
-                    if (islower((int) fchar)) {
-                        isinclass = 1;
-                    }
-                    break;
-                case 5:
-                    if (isdigit((int) fchar)) {
-                        isinclass = 1;
-                    }
-                    break;
-                case 9:
-                    isinclass = 1;
-                    break;
-                }
-                if (isinclass) {        /* convert current char to \font */
-                    strcat(subexpr, name);      /* by prefixing it with font name */
-                    isprevchar = 1;
-                } /* and set flag to signal separator */
-                else {          /* current char not in \font */
-                    if (isprevchar)     /* extra separator only after \font */
-                        if (isalpha(fchar))     /* separator only before alpha */
-                            strcat(subexpr, "~");       /* need separator after \font */
-                    isprevchar = 0;
-                }               /* reset flag for next char */
-                exprlen = strlen(subexpr);      /* #chars so far */
-                subexpr[exprlen] = fchar;       /*fchar immediately after \fontname */
-                subexpr[exprlen + 1] = '\0';
-            }                   /* replace terminating '\0' */
-        }                       /* --- end-of-for(pfchars) --- */
-        strcat(subexpr, "}");   /* add closing } */
-    }                           /* --- end-of-if/else(class<0) --- */
-/* -------------------------------------------------------------------------
-rasterize subexpression containing chars to be rendered at font
--------------------------------------------------------------------------- */
-    if (msgfp != NULL && msglevel >= 99)
-        fprintf(msgfp, "rastfont> subexpr=\"%s\"\n", subexpr);
-    if ((fontsp = rasterize(subexpr, size))     /* rasterize chars in font */
-        == NULL)
-        goto end_of_job;        /* and quit if failed */
-/* -------------------------------------------------------------------------
-back to caller with chars rendered in font
--------------------------------------------------------------------------- */
-  end_of_job:
-    smashmargin = oldsmashmargin;       /* restore smash */
-    mathsmashmargin = SMASHMARGIN;      /* this one probably not necessary */
-    if (istext && fontsp != NULL)       /* raster contains text mode font */
-        fontsp->type = blanksignal;     /* signal nosmash */
-    return (fontsp);            /* chars rendered in font */
-}                               /* --- end-of-function rastfont() --- */
 
 
-/* ==========================================================================
- * Function:    rastbegin ( expression, size, basesp, arg1, arg2, arg3 )
- * Purpose: \begin{}...\end{}  handler, returns a subraster corresponding
- *      to array expression within environment, i.e., rewrites
- *      \begin{}...\end{} as mimeTeX equivalent, and rasterizes that.
- * --------------------------------------------------------------------------
- * Arguments:   expression (I/O) char **  to first char of null-terminated
- *              string immediately following \begin to be
- *              rasterized, and returning ptr immediately
- *              following last character processed.
- *      size (I)    int containing 0-7 default font size
- *      basesp (I)  subraster *  to character (or subexpression)
- *              immediately preceding \begin
- *              (unused, but passed for consistency)
- *      arg1 (I)    int unused
- *      arg2 (I)    int unused
- *      arg3 (I)    int unused
- * --------------------------------------------------------------------------
- * Returns: ( subraster * ) ptr to subraster corresponding to array
- *              expression, or NULL for any parsing error
- * --------------------------------------------------------------------------
- * Notes:     o
- * ======================================================================= */
-static subraster *rastbegin(const char **expression, int size,
-                            subraster * basesp, int arg1, int arg2,
-                            int arg3) {
-    char subexpr[MAXSUBXSZ + 1];        /* \begin{} environment params */
-    char *exprptr = NULL;
-    char *begptr = NULL;
-    char *endptr = NULL;
-    char *braceptr = NULL;      /* ptrs */
-    const char *begtoken = "\\begin{";
-    const char *endtoken = "\\end{";    /*tokens we're looking for */
-    char *delims = NULL;        /* mdelims[ienviron] */
-    subraster *sp = NULL;       /* rasterize environment */
-    int ienviron = 0;           /* environs[] index */
-    int nbegins = 0;            /* #\begins nested beneath this one */
-    int envlen = 0, sublen = 0; /* #chars in environ, subexpr */
-    static int blevel = 0;      /* \begin...\end nesting level */
-    static const char *mdelims[] = {
-        NULL, NULL, NULL, NULL, "()", "[]", "{}", "||", "==",   /* for pbBvVmatrix */
-    NULL, NULL, NULL, NULL, "{.", NULL, NULL, NULL, NULL, NULL,
-            NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
-            NULL, NULL, NULL};
-    static const char *environs[] = {   /* types of environments we process */
-        "eqnarray",             /* 0 eqnarray environment */
-            "array",            /* 1 array environment */
-            "matrix",           /* 2 array environment */
-            "tabular",          /* 3 array environment */
-            "pmatrix",          /* 4 ( ) */
-            "bmatrix",          /* 5 [ ] */
-            "Bmatrix",          /* 6 { } */
-            "vmatrix",          /* 7 | | */
-            "Vmatrix",          /* 8 || || */
-            "gather",           /* 9 gather environment */
-            "align",            /* 10 align environment */
-            "verbatim",         /* 11 verbatim environment */
-            "picture",          /* 12 picture environment */
-            "cases",            /* 13 cases environment */
-            "equation",         /* 14 for \begin{equation} */
-    NULL};                      /* trailer */
-/* -------------------------------------------------------------------------
-determine type of environment we're beginning
--------------------------------------------------------------------------- */
-/* --- first bump nesting level --- */
-    blevel++;                   /* count \begin...\begin...'s */
-/* --- \begin must be followed by {type_of_environment} --- */
-    exprptr = texsubexpr(*expression, subexpr, 0, "{", "}", 0, 0);
-    if (*subexpr == '\0')
-        goto end_of_job;        /* no environment given */
-    while ((delims = strchr(subexpr, '*')) != NULL) {   /* have environment* */
-        strsqueeze(delims, 1);
-    }                           /* treat it as environment */
-/* --- look up environment in our table --- */
-    for (ienviron = 0;; ienviron++)     /* search table till NULL */
-        if (environs[ienviron] == NULL) /* found NULL before match */
-            goto end_of_job;    /* so quit */
-        else /* see if we have an exact match */ if (memcmp(environs[ienviron], subexpr, strlen(subexpr)) == 0) /*match */
-            break;              /* leave loop with ienviron index */
-/* --- accumulate any additional params for this environment --- */
-    *subexpr = '\0';            /* reset subexpr to empty string */
-    // XXX:
-    delims = (char *) mdelims[ienviron];        /* mdelims[] string for ienviron */
-    if (delims != NULL) {       /* add appropriate opening delim */
-        strcpy(subexpr, "\\");  /* start with \ for (,[,{,|,= */
-        strcat(subexpr, delims);        /* then add opening delim */
-        subexpr[2] = '\0';
-    }                           /* remove extraneous closing delim */
-    switch (ienviron) {
-    default:
-        goto end_of_job;        /* environ not implemented yet */
-    case 0:                    /* \begin{eqnarray} */
-        strcpy(subexpr, "\\array{rcl$");        /* set default rcl for eqnarray */
-        break;
-    case 1:
-    case 2:
-    case 3:                    /* \begin{array} followed by {lcr} */
-        strcpy(subexpr, "\\array{");    /*start with mimeTeX \array{ command */
-        skipwhite(exprptr);     /* bump to next non-white char */
-        if (*exprptr == '{') {  /* assume we have {lcr} argument */
-            exprptr = texsubexpr(exprptr, subexpr + 7, 0, "{", "}", 0, 0);      /*add on lcr */
-            if (*(subexpr + 7) == '\0')
-                goto end_of_job;        /* quit if no lcr */
-            strcat(subexpr, "$");
-        }                       /* add terminating $ to lcr */
-        break;
-    case 4:
-    case 5:
-    case 6:                    /* \begin{pmatrix} or b,B,v,Vmatrix */
-    case 7:
-    case 8:
-        strcat(subexpr, "\\array{");    /*start with mimeTeX \array{ command */
-        break;
-    case 9:                    /* gather */
-        strcat(subexpr, "\\array{c$");  /* center equations */
-        break;
-    case 10:                   /* align */
-        strcat(subexpr, "\\array{rclrclrclrclrclrcl$"); /* a&=b & c&=d & etc */
-        break;
-    case 11:                   /* verbatim */
-        strcat(subexpr, "{\\rm ");      /* {\rm ...} */
-        /*strcat(subexpr,"\\\\{\\rm "); *//* \\{\rm } doesn't work in context */
-        break;
-    case 12:                   /* picture */
-        strcat(subexpr, "\\picture");   /* picture environment */
-        skipwhite(exprptr);     /* bump to next non-white char */
-        if (*exprptr == '(') {  /*assume we have (width,height) arg */
-            exprptr = texsubexpr(exprptr, subexpr + 8, 0, "(", ")", 0, 1);      /*add on arg */
-            if (*(subexpr + 8) == '\0')
-                goto end_of_job;
-        }                       /* quit if no arg */
-        strcat(subexpr, "{");   /* opening {  after (width,height) */
-        break;
-    case 13:                   /* cases */
-        strcat(subexpr, "\\array{ll$"); /* a&b \\ c&d etc */
-        break;
-    case 14:                   /* \begin{equation} */
-        strcat(subexpr, "{");   /* just enclose expression in {}'s */
-        break;
-    }                           /* --- end-of-switch(ienviron) --- */
-/* -------------------------------------------------------------------------
-locate matching \end{...}
--------------------------------------------------------------------------- */
-/* --- first \end following \begin --- */
-    if ((endptr = strstr(exprptr, endtoken))    /* find 1st \end following \begin */
-        == NULL)
-        goto end_of_job;        /* and quit if no \end found */
-/* --- find matching endptr by pushing past any nested \begin's --- */
-    begptr = exprptr;           /* start after first \begin{...} */
-    while (1) {                 /*break when we find matching \end */
-        /* --- first, set ptr to closing } terminating current \end{...} --- */
-        if ((braceptr = strchr(endptr + 1, '}'))        /* find 1st } following \end{ */
-            == NULL)
-            goto end_of_job;    /* and quit if no } found */
-        /* -- locate next nested \begin --- */
-        if ((begptr = strstr(begptr, begtoken)) /* find next \begin{...} */
-            == NULL)
-            break;              /*no more, so we have matching \end */
-        begptr += strlen(begtoken);     /* push ptr past token */
-        if (begptr >= endptr)
-            break;              /* past endptr, so not nested */
-        /* --- have nested \begin, so push forward to next \end --- */
-        nbegins++;              /* count another nested \begin */
-        if ((endptr = strstr(endptr + strlen(endtoken), endtoken))      /* find next \end */
-            == NULL)
-            goto end_of_job;    /* and quit if none found */
-    }                           /* --- end-of-while(1) --- */
-/* --- push expression past closing } of \end{} --- */
-    *expression = braceptr + 1; /* resume processing after } */
-/* -------------------------------------------------------------------------
-add on everything (i.e., the ...'s) between \begin{}[{}] ... \end{}
--------------------------------------------------------------------------- */
-/* --- add on everything, completing subexpr for \begin{}...\end{} --- */
-    sublen = strlen(subexpr);   /* #chars in "preamble" */
-    envlen = (int) (endptr - exprptr);  /* #chars between \begin{}{}...\end */
-    memcpy(subexpr + sublen, exprptr, envlen);  /*concatanate environ after subexpr */
-    subexpr[sublen + envlen] = '\0';    /* and null-terminate */
-    if (2 > 1)                  /* always... */
-        strcat(subexpr, "}");   /* ...followed by terminating } */
-/* --- add terminating \right), etc, if necessary --- */
-    if (delims != (char *) NULL) {      /* need closing delim */
-        strcat(subexpr, "\\");  /* start with \ for ),],},|,= */
-        strcat(subexpr, delims + 1);
-    }
-    /* add appropriate closing delim */
-    /* -------------------------------------------------------------------------
-       change nested \begin...\end to {\begin...\end} so \array{} can handle them
-       -------------------------------------------------------------------------- */
-    if (nbegins > 0)            /* have nested begins */
-        if (blevel < 2) {       /* only need to do this once */
-            begptr = subexpr;   /* start at beginning of subexpr */
-            while ((begptr = strstr(begptr, begtoken)) != NULL) {       /* have \begin{...} */
-                strchange(0, begptr, "{");      /* \begin --> {\begin */
-                begptr += strlen(begtoken);
-            }                   /* continue past {\begin */
-            endptr = subexpr;   /* start at beginning of subexpr */
-            while ((endptr = strstr(endptr, endtoken)) != NULL) /* have \end{...} */
-                if ((braceptr = strchr(endptr + 1, '}'))        /* find 1st } following \end{ */
-                    == NULL)
-                    goto end_of_job;    /* and quit if no } found */
-                else {          /* found terminating } */
-                    strchange(0, braceptr, "}");        /* \end{...} --> \end{...}} */
-                    endptr = braceptr + 1;
-                }               /* continue past \end{...} */
-        }
-    /* --- end-of-if(nbegins>0) --- */
-    /* -------------------------------------------------------------------------
-       post process as necessary
-       -------------------------------------------------------------------------- */
-    switch (ienviron) {
-    default:
-        break;                  /* no post-processing required */
-    case 10:                   /* align */
-        strreplace(subexpr, "&=", "#*@*#=", 0); /* tag all &='s */
-        strreplace(subexpr, "&<", "#*@*#<", 0); /* tag all &<'s */
-        strreplace(subexpr, "&\\lt", "#*@*#<", 0);      /* tag all &\lt's */
-        strreplace(subexpr, "&\\leq", "#*@*#\\leq", 0); /* tag all &\leq's */
-        strreplace(subexpr, "&>", "#*@*#>", 0); /* tag all &>'s */
-        strreplace(subexpr, "&\\gt", "#*@*#>", 0);      /* tag all &\gt's */
-        strreplace(subexpr, "&\\geq", "#*@*#\\geq", 0); /* tag all &\geq's */
-        if (nbegins < 1)        /* don't modify nested arrays */
-            strreplace(subexpr, "&", "\\hspace{10}&\\hspace{10}", 0);   /* add space */
-        strreplace(subexpr, "#*@*#=", "& = &", 0);      /*restore and xlate tagged &='s */
-        strreplace(subexpr, "#*@*#<", "& \\lt &", 0);   /*restore, xlate tagged &<'s */
-        strreplace(subexpr, "#*@*#\\leq", "& \\leq &", 0);      /*xlate tagged &\leq's */
-        strreplace(subexpr, "#*@*#>", "& \\gt &", 0);   /*restore, xlate tagged &>'s */
-        strreplace(subexpr, "#*@*#\\geq", "& \\geq &", 0);      /*xlate tagged &\geq's */
-        break;
-    case 11:                   /* verbatim */
-        strreplace(subexpr, "\n", "\\\\", 0);   /* xlate \n newline to latex \\ */
-        /*strcat(subexpr,"\\\\"); *//* add final latex \\ newline */
-        break;
-    case 12:                   /* picture */
-        strreplace(subexpr, "\\put ", " ", 0);  /*remove \put's (not really needed) */
-        strreplace(subexpr, "\\put(", "(", 0);  /*remove \put's (not really needed) */
-        strreplace(subexpr, "\\oval", "\\circle", 0);   /* actually an ellipse */
-        break;
-    }                           /* --- end-of-switch(ienviron) --- */
-/* -------------------------------------------------------------------------
-return rasterized mimeTeX equivalent of \begin{}...\end{} environment
--------------------------------------------------------------------------- */
-/* --- debugging output --- */
-    if (msgfp != NULL && msglevel >= 99)
-        fprintf(msgfp, "rastbegin> subexpr=%s\n", subexpr);
-/* --- rasterize mimeTeX equivalent of \begin{}...\end{} environment --- */
-    sp = rasterize(subexpr, size);      /* rasterize subexpr */
-  end_of_job:
-    blevel--;                   /* decrement \begin nesting level */
-    return (sp);                /* back to caller with sp or NULL */
-}                               /* --- end-of-function rastbegin() --- */
 
 
-/* ==========================================================================
- * Function:    rastarray ( expression, size, basesp, arg1, arg2, arg3 )
- * Purpose: \array handler, returns a subraster corresponding to array
- *      expression (immediately following \array) at font size
- * --------------------------------------------------------------------------
- * Arguments:   expression (I/O) char **  to first char of null-terminated
- *              string immediately following \array to be
- *              rasterized, and returning ptr immediately
- *              following last character processed.
- *      size (I)    int containing 0-7 default font size
- *      basesp (I)  subraster *  to character (or subexpression)
- *              immediately preceding \array
- *              (unused, but passed for consistency)
- *      arg1 (I)    int unused
- *      arg2 (I)    int unused
- *      arg3 (I)    int unused
- * --------------------------------------------------------------------------
- * Returns: ( subraster * ) ptr to subraster corresponding to array
- *              expression, or NULL for any parsing error
- * --------------------------------------------------------------------------
- * Notes:     o Summary of syntax...
- *          \array{3,lcrBC$a&b&c\\d&e&f\\etc}
- *        o The 3,lcrBC$ part is an optional "preamble".  The lcr means
- *      what you think, i.e., "horizontal" left,center,right
- *      justification down corresponding column.  The new BC means
- *      "vertical" baseline,center justification across corresponding
- *      row.  The leading 3 specifies the font size 0-4 to be used.
- *      You may also specify +1,-1,+2,-2, etc, which is used as an
- *      increment to the current font size, e.g., -1,lcr$ uses
- *      one font size smaller than current.  Without a leading
- *      + or -, the font size is "absolute".
- *        o The preamble can also be just lcrBC$ without a leading
- *      size-part, or just 3$ without a trailing lcrBC-part.
- *      The default size is whatever is current, and the
- *      default justification is c(entered) and B(aseline).
- * ======================================================================= */
-static subraster *rastarray(const char **expression, int size,
-                            subraster * basesp, int arg1, int arg2,
-                            int arg3) {
-    char subexpr[MAXSUBXSZ + 1];
-    char *exprptr;              /*parse array subexpr */
-    char subtok[MAXTOKNSZ + 1];
-    /* not used --char *subptr = subtok; *//* &,\\ inside { } not a delim */
-    char token[MAXTOKNSZ + 1];
-    char *tokptr = token;       /* subexpr token to rasterize */
-    char *preptr = token;       /*process optional size,lcr preamble */
-    const char *coldelim = "&";
-    const char *rowdelim = "\\";        /* need escaped rowdelim */
-    int maxarraysz = 63;        /* max #rows, cols */
-    int justify[65] = {
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,      /* -1,0,+1 = l,c,r */
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0};
-    int hline[65] = {
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,      /* hline above row? */
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0};
-    int vline[65] = {
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,      /*vline left of col? */
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0};
-    int colwidth[65] = {
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,      /*widest tokn in col */
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0};
-    int rowheight[65] = {
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,      /* "highest" in row */
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0};
-    int fixcolsize[65] = {
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,      /*1=fixed col width */
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0};
-    int fixrowsize[65] = {
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,      /*1=fixed row height */
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0};
-    int rowbaseln[65] = {
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,      /* baseline for row */
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0};
-    int vrowspace[65] = {
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,      /*extra //[len]space */
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0};
-    int rowcenter[65] = {
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,      /*true = vcenter row */
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0};
-    static int                  /* --- propagate global values across arrays --- */
-     gjustify[65] = {
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,      /* -1,0,+1 = l,c,r */
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0};
-    static int gcolwidth[65] = {
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,      /*widest tokn in col */
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0};
-    static int growheight[65] = {
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,      /* "highest" in row */
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0};
-    static int gfixcolsize[65] = {
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,      /*1=fixed col width */
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0};
-    static int gfixrowsize[65] = {
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,      /*1=fixed row height */
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0};
-    static int growcenter[65] = {
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,      /*true = vcenter row */
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0};
-    int rowglobal = 0, colglobal = 0,   /* true to set global values */
-        rowpropagate = 0, colpropagate = 0;     /* true if propagating values */
-    int irow, nrows = 0, icol, ncols[65],       /*#rows in array, #cols in each row */
-        maxcols = 0;            /* max# cols in any single row */
-    int itoken, ntokens = 0,    /* index, total #tokens in array */
-        subtoklen = 0,          /* strlen of {...} subtoken */
-        istokwhite = 1,         /* true if token all whitespace */
-        nnonwhite = 0;          /* #non-white tokens */
-    int isescape = 0, wasescape = 0,    /* current,prev chars escape? */
-        ischarescaped = 0,      /* is current char escaped? */
-        nescapes = 0;           /* #consecutive escapes */
-    subraster *rasterize(), *toksp[1025],       /* rasterize tokens */
-    *new_subraster(), *arraysp = NULL;  /* subraster for entire array */
-    raster *arrayrp = NULL;     /* raster for entire array */
-    int delete_subraster();     /* free toksp[] workspace at eoj */
-    int rowspace = 2, colspace = 4,     /* blank space between rows, cols */
-        hspace = 1, vspace = 1; /*space to accommodate hline,vline */
-    int width = 0, height = 0,  /* width,height of array */
-        leftcol = 0, toprow = 0;        /*upper-left corner for cell in it */
-    int rastput();              /* embed tokens/cells in array */
-    int rule_raster();          /* draw hlines and vlines in array */
-    const char *hlchar = "\\hline";
-    const char *hdchar = "\\hdash";     /* token signals hline */
-    char *texchar(), hltoken[1025];     /* extract \hline from token */
-    int ishonly = 0, hltoklen, minhltoklen = 3; /*flag, token must be \hl or \hd */
-    int isnewrow = 1;           /* true for new row */
-    int pixsz = 1;              /*default #bits per pixel, 1=bitmap */
-    int evalterm(), evalue = 0; /* evaluate [arg], {arg} */
-    static int mydaemonlevel = 0;       /* check against global daemonlevel */
-/* -------------------------------------------------------------------------
-Macros to determine extra raster space required for vline/hline
--------------------------------------------------------------------------- */
-#define vlinespace(icol) \
-    ( vline[icol] == 0?  0 :    /* no vline so no space needed */   \
-      ( icol<1 || icol>=maxcols? vspace+(colspace+1)/2 : vspace ) )
-#define hlinespace(irow) \
-    ( hline[irow] == 0?  0 :    /* no hline so no space needed */   \
-      ( irow<1 || irow>=nrows? hspace+(rowspace+1)/2 : hspace ) )
-/* -------------------------------------------------------------------------
-Obtain array subexpression
--------------------------------------------------------------------------- */
-/* --- parse for array subexpression, and bump expression past it --- */
-    subexpr[1] = *subexpr = ' ';        /* set two leading blanks */
-    *expression = texsubexpr(*expression, subexpr + 2, 0, "{", "}", 0, 0);
-    if (msglevel >= 29 && msgfp != NULL)        /* debugging, display array */
-        fprintf(msgfp, "rastarray> %.256s\n", subexpr + 2);
-    if (*(subexpr + 2) == '\0') /* couldn't get subexpression */
-        goto end_of_job;        /* nothing to do, so quit */
-/* -------------------------------------------------------------------------
-reset static arrays if main re-entered as daemon (or dll)
--------------------------------------------------------------------------- */
-    if (mydaemonlevel != daemonlevel) { /* main re-entered */
-        for (icol = 0; icol <= maxarraysz; icol++)      /* for each array[] index */
-            gjustify[icol] = gcolwidth[icol] = growheight[icol] =
-                gfixcolsize[icol] = gfixrowsize[icol] = growcenter[icol] =
-                0;
-        mydaemonlevel = daemonlevel;
-    }
-
-    /* update mydaemonlevel */
-    /* -------------------------------------------------------------------------
-       process optional size,lcr preamble if present
-       -------------------------------------------------------------------------- */
-    /* --- reset size, get lcr's, and push exprptr past preamble --- */
-    exprptr = preamble(subexpr + 2, &size, preptr);     /* reset size and get lcr's */
-/* --- init with global values --- */
-    for (icol = 0; icol <= maxarraysz; icol++) {        /* propagate global values... */
-        justify[icol] = gjustify[icol]; /* -1,0,+1 = l,c,r */
-        colwidth[icol] = gcolwidth[icol];       /* column width */
-        rowheight[icol] = growheight[icol];     /* row height */
-        fixcolsize[icol] = gfixcolsize[icol];   /* 1=fixed col width */
-        fixrowsize[icol] = gfixrowsize[icol];   /* 1=fixed row height */
-        rowcenter[icol] = growcenter[icol];
-    }                           /* true = vcenter row */
-/* --- process lcr's, etc in preamble --- */
-    itoken = 0;                 /* debugging flag */
-    if (msglevel >= 29 && msgfp != NULL)        /* debugging, display preamble */
-        if (*preptr != '\0')    /* if we have one */
-            fprintf(msgfp,
-                    "rastarray> preamble= \"%.256s\"\nrastarray> preamble: ",
-                    preptr);
-    irow = icol = 0;            /* init lcr counts */
-    while (*preptr != '\0') {   /* check preamble text for lcr */
-        char prepchar = *preptr;        /* current preamble character */
-        int prepcase = (islower(prepchar) ? 1 : (isupper(prepchar) ? 2 : 0));   /*1,2,or 0 */
-        if (irow < maxarraysz && icol < maxarraysz)
-            switch ( /*tolower */ (prepchar)) {
-            default:
-                break;          /* just flush unrecognized chars */
-            case 'l':
-                justify[icol] = (-1);   /*left-justify this column */
-                if (colglobal)
-                    gjustify[irow] = justify[irow];
-                break;
-            case 'c':
-                justify[icol] = (0);    /* center this column */
-                if (colglobal)
-                    gjustify[irow] = justify[irow];
-                break;
-            case 'r':
-                justify[icol] = (+1);   /* right-justify this col */
-                if (colglobal)
-                    gjustify[irow] = justify[irow];
-                break;
-            case '|':
-                vline[icol] += 1;
-                break;          /* solid vline left of col */
-            case '.':
-                vline[icol] = (-1);
-                break;          /*dashed vline left of col */
-            case 'b':
-                prepchar = 'B';
-                prepcase = 2;   /* alias for B */
-            case 'B':
-                break;          /* baseline-justify row */
-            case 'v':
-                prepchar = 'C';
-                prepcase = 2;   /* alias for C */
-            case 'C':
-                rowcenter[irow] = 1;    /* vertically center row */
-                if (rowglobal)
-                    growcenter[irow] = rowcenter[irow];
-                break;
-            case 'g':
-                colglobal = 1;
-                prepcase = 0;
-                break;          /* set global col values */
-            case 'G':
-                rowglobal = 1;
-                prepcase = 0;
-                break;          /* set global row values */
-            case '#':
-                colglobal = rowglobal = 1;
-                break;
-            }                   /* set global col,row vals */
-        if (msglevel >= 29 && msgfp != NULL)    /* debugging */
-            fprintf(msgfp, " %c[%d]", prepchar,
-                    (prepcase ==
-                     1 ? icol + 1 : (prepcase == 2 ? irow + 1 : 0)));
-        preptr++;               /* check next char for lcr */
-        itoken++;               /* #lcr's processed (debugging only) */
-        /* --- check for number or +number specifying colwidth or rowheight --- */
-        if (prepcase != 0) {    /* only check upper,lowercase */
-            int ispropagate = (*preptr == '+' ? 1 : 0); /* leading + propagates width/ht */
-            if (ispropagate) {  /* set row or col propagation */
-                if (prepcase == 1)
-                    colpropagate = 1;   /* propagating col values */
-                else if (prepcase == 2)
-                    rowpropagate = 1;
-            }                   /*propagating row values */
-            if (!colpropagate && prepcase == 1) {
-                colwidth[icol] = 0;     /* reset colwidth */
-                fixcolsize[icol] = 0;
-            }                   /* reset width flag */
-            if (!rowpropagate && prepcase == 2) {
-                rowheight[irow] = 0;    /* reset row height */
-                fixrowsize[irow] = 0;
-            }                   /* reset height flag */
-            if (ispropagate)
-                preptr++;       /* bump past leading + */
-            if (isdigit(*preptr)) {     /* digit follows character */
-                char *endptr = NULL;    /* preptr set to 1st char after num */
-                int size_digit = (int) (strtol(preptr, &endptr, 10));   /* interpret number */
-                const char *whchars = "?wh";    /* debugging width/height labels */
-                preptr = endptr;        /* skip over all digits */
-                if (size_digit == 0 || (size_digit >= 3 && size_digit <= 500)) {        /* sanity check */
-                    int index;  /* icol,irow...maxarraysz index */
-                    if (prepcase == 1)  /* lowercase signifies colwidth */
-                        for (index = icol; index <= maxarraysz; index++) {      /*propagate col size */
-                            colwidth[index] = size_digit;       /* set colwidth to fixed size */
-                            fixcolsize[index] = (size_digit > 0 ? 1 : 0);       /* set fixed width flag */
-                            justify[index] = justify[icol];     /* and propagate justification */
-                            if (colglobal) {    /* set global values */
-                                gcolwidth[index] = colwidth[index];     /* set global col width */
-                                gfixcolsize[index] = fixcolsize[index]; /*set global width flag */
-                                gjustify[index] = justify[icol];
-                            }   /* set global col justify */
-                            if (!ispropagate)
-                                break;
-                        } /* don't propagate */
-                    else        /* uppercase signifies rowheight */
-                        for (index = irow; index <= maxarraysz; index++) {      /*propagate row size */
-                            rowheight[index] = size_digit;      /* set rowheight to size */
-                            fixrowsize[index] = (size_digit > 0 ? 1 : 0);       /* set fixed height flag */
-                            rowcenter[index] = rowcenter[irow]; /* and propagate row center */
-                            if (rowglobal) {    /* set global values */
-                                growheight[index] = rowheight[index];   /* set global row height */
-                                gfixrowsize[index] = fixrowsize[index]; /*set global height flag */
-                                growcenter[index] = rowcenter[irow];
-                            }   /*set global row center */
-                            if (!ispropagate)
-                                break;
-                        }       /* don't propagate */
-                }               /* --- end-of-if(size>=3&&size<=500) --- */
-                if (msglevel >= 29 && msgfp != NULL)    /* debugging */
-                    fprintf(msgfp, ":%c=%d/fix#%d", whchars[prepcase],
-                            (prepcase ==
-                             1 ? colwidth[icol] : rowheight[irow]),
-                            (prepcase ==
-                             1 ? fixcolsize[icol] : fixrowsize[irow]));
-            }                   /* --- end-of-if(isdigit()) --- */
-        }                       /* --- end-of-if(prepcase!=0) --- */
-        if (prepcase == 1)
-            icol++;             /* bump col if lowercase lcr */
-        else if (prepcase == 2)
-            irow++;             /* bump row if uppercase BC */
-    }                           /* --- end-of-while(*preptr!='\0') --- */
-    if (msglevel >= 29 && msgfp != NULL)        /* debugging, emit final newline */
-        if (itoken > 0)         /* if we have preamble */
-            fprintf(msgfp, "\n");
-/* -------------------------------------------------------------------------
-tokenize and rasterize components  a & b \\ c & d \\ etc  of subexpr
--------------------------------------------------------------------------- */
-/* --- rasterize tokens one at a time, and maintain row,col counts --- */
-    nrows = 0;                  /* start with top row */
-    ncols[nrows] = 0;           /* no tokens/cols in top row yet */
-    while (1) {                 /* scan chars till end */
-        /* --- local control flags --- */
-        int iseox = (*exprptr == '\0'), /* null signals end-of-expression */
-            iseor = iseox,      /* \\ or eox signals end-of-row */
-            iseoc = iseor;      /* & or eor signals end-of-col */
-        /* --- check for escapes --- */
-        isescape = isthischar(*exprptr, ESCAPE);        /* is current char escape? */
-        wasescape = (!isnewrow && isthischar(*(exprptr - 1), ESCAPE));  /*prev char esc? */
-        nescapes = (wasescape ? nescapes + 1 : 0);      /* # preceding consecutive escapes */
-        ischarescaped = (nescapes % 2 == 0 ? 0 : 1);    /* is current char escaped? */
-        /* -----------------------------------------------------------------------
-           check for {...} subexpression starting from where we are now
-           ------------------------------------------------------------------------ */
-        if (*exprptr == '{'     /* start of {...} subexpression */
-            && !ischarescaped) {        /* if not escaped \{ */
-                                                                                                /* not used --subptr = */ texsubexpr(exprptr, subtok, 4095, "{", "}", 1, 1);
-                                                                                                /*entire subexpr */
-            subtoklen = strlen(subtok); /* #chars in {...} */
-            memcpy(tokptr, exprptr, subtoklen); /* copy {...} to accumulated token */
-            tokptr += subtoklen;        /* bump tokptr to end of token */
-            exprptr += subtoklen;       /* and bump exprptr past {...} */
-            istokwhite = 0;     /* signal non-empty token */
-            continue;           /* continue with char after {...} */
-        }
-
-        /* --- end-of-if(*exprptr=='{') --- */
-        /* -----------------------------------------------------------------------
-           check for end-of-row(\\) and/or end-of-col(&)
-           ------------------------------------------------------------------------ */
-        /* --- check for (escaped) end-of-row delimiter --- */
-        if (isescape && !ischarescaped) /* current char is escaped */
-            if (isthischar(*(exprptr + 1), rowdelim)    /* next char is rowdelim */
-                ||*(exprptr + 1) == '\0') {     /* or a pathological null */
-                iseor = 1;      /* so set end-of-row flag */
-                wasescape = isescape = nescapes = 0;
-            }
-        /* reset flags for new row */
-        /* --- check for end-of-col delimiter --- */
-        if (iseor               /* end-of-row signals end-of-col */
-            || (!ischarescaped && isthischar(*exprptr, coldelim)))      /*or unescaped coldel */
-            iseoc = 1;          /* so set end-of-col flag */
-        /* -----------------------------------------------------------------------
-           rasterize completed token
-           ------------------------------------------------------------------------ */
-        if (iseoc) {            /* we have a completed token */
-            *tokptr = '\0';     /* first, null-terminate token */
-            /* --- check first token in row for [len] and/or \hline or \hdash --- */
-            ishonly = 0;        /*init for token not only an \hline */
-            if (ncols[nrows] == 0) {    /*\hline must be first token in row */
-                tokptr = token;
-                skipwhite(tokptr);      /* skip whitespace after // */
-                /* --- first check for optional [len] --- */
-                if (*tokptr == '[') {   /* have [len] if leading char is [ */
-                    /* ---parse [len] and bump tokptr past it, interpret as double--- */
-                    char lenexpr[128];
-                    int len;    /* chars between [...] as int */
-                    tokptr =
-                        texsubexpr(tokptr, lenexpr, 127, "[", "]", 0, 0);
-                    if (*lenexpr != '\0') {     /* got [len] expression */
-                        evalue = evalterm(mimestore, lenexpr);  /* evaluate len expression */
-                        len = iround(unitlength * ((double) evalue));   /* len in pixels */
-                        if (len >= (-63) && len <= 255) {       /* sanity check */
-                            vrowspace[nrows] = len;     /* extra vspace before this row */
-                            strsqueezep(token, tokptr); /* flush [len] from token */
-                            tokptr = token;
-                            skipwhite(tokptr);
-                        }
-                    }           /* reset ptr, skip white */
-                }
-                /* --- end-of-if(*tokptr=='[') --- */
-                /* --- now check for \hline or \hdash --- */
-                tokptr = texchar(tokptr, hltoken);      /* extract first char from token */
-                hltoklen = strlen(hltoken);     /* length of first char */
-                if (hltoklen >= minhltoklen) {  /*token must be at least \hl or \hd */
-                    if (memcmp(hlchar, hltoken, hltoklen) == 0) /* we have an \hline */
-                        hline[nrows] += 1;      /* bump \hline count for row */
-                    else if (memcmp(hdchar, hltoken, hltoklen) == 0)    /*we have an \hdash */
-                        hline[nrows] = (-1);
-                }               /* set \hdash flag for row */
-                if (hline[nrows] != 0) {        /* \hline or \hdash prefixes token */
-                    skipwhite(tokptr);  /* flush whitespace after \hline */
-                    if (*tokptr == '\0' /* end-of-expression after \hline */
-                        || isthischar(*tokptr, coldelim)) {     /* or unescaped coldelim */
-                        istokwhite = 1; /* so token contains \hline only */
-                        if (iseox)
-                            ishonly = 1;
-                    } /* ignore entire row at eox */
-                    else {      /* token contains more than \hline */
-                        strsqueezep(token, tokptr);
-                    }
-                }               /* so flush \hline */
-            }
-            /* --- end-of-if(ncols[nrows]==0) --- */
-            /* --- rasterize completed token --- */
-            toksp[ntokens] = (istokwhite ? NULL :       /* don't rasterize empty token */
-                              rasterize(token, size));  /* rasterize non-empty token */
-            if (toksp[ntokens] != NULL) /* have a rasterized token */
-                nnonwhite++;    /* bump rasterized token count */
-            /* --- maintain colwidth[], rowheight[] max, and rowbaseln[] --- */
-            if (toksp[ntokens] != NULL) {       /* we have a rasterized token */
-                /* --- update max token "height" in current row, and baseline --- */
-                int twidth = ((toksp[ntokens])->image)->width,  /* width of token */
-                    theight = ((toksp[ntokens])->image)->height,        /* height of token */
-                    tbaseln = (toksp[ntokens])->baseline,       /* baseline of token */
-                    rheight = rowheight[nrows], /* current max height for row */
-                    rbaseln = rowbaseln[nrows]; /* current baseline for max height */
-                if (0 || fixrowsize[nrows] == 0)        /* rowheight not fixed */
-                    rowheight[nrows] = /*max2( rheight, */ (    /* current (max) rowheight */
-                                                               max2(rbaseln + 1, tbaseln + 1)   /* max height above baseline */
-                                                               +max2(rheight - rbaseln - 1, theight - tbaseln - 1));    /* plus max below */
-                rowbaseln[nrows] = max2(rbaseln, tbaseln);      /*max space above baseline */
-                /* --- update max token width in current column --- */
-                icol = ncols[nrows];    /* current column index */
-                if (0 || fixcolsize[icol] == 0) /* colwidth not fixed */
-                    colwidth[icol] = max2(colwidth[icol], twidth);      /*widest token in col */
-            }
-            /* --- end-of-if(toksp[]!=NULL) --- */
-            /* --- bump counters --- */
-            if (!ishonly)       /* don't count only an \hline */
-                if (ncols[nrows] < maxarraysz) {        /* don't overflow arrays */
-                    ntokens++;  /* bump total token count */
-                    ncols[nrows] += 1;
-                }
-            /* and bump #cols in current row */
-            /* --- get ready for next token --- */
-            tokptr = token;     /* reset ptr for next token */
-            istokwhite = 1;     /* next token starts all white */
-        }
-        /* --- end-of-if(iseoc) --- */
-        /* -----------------------------------------------------------------------
-           bump row as necessary
-           ------------------------------------------------------------------------ */
-        if (iseor) {            /* we have a completed row */
-            maxcols = max2(maxcols, ncols[nrows]);      /* max# cols in array */
-            if (ncols[nrows] > 0 || hline[nrows] == 0)  /*ignore row with only \hline */
-                if (nrows < maxarraysz) /* don't overflow arrays */
-                    nrows++;    /* bump row count */
-            ncols[nrows] = 0;   /* no cols in this row yet */
-            if (!iseox) {       /* don't have a null yet */
-                exprptr++;      /* bump past extra \ in \\ delim */
-                iseox = (*exprptr == '\0');
-            }                   /* recheck for pathological \null */
-            isnewrow = 1;       /* signal start of new row */
-        } /* --- end-of-if(iseor) --- */
-        else
-            isnewrow = 0;       /* no longer first col of new row */
-        /* -----------------------------------------------------------------------
-           quit when done, or accumulate char in token and proceed to next char
-           ------------------------------------------------------------------------ */
-        /* --- quit when done --- */
-        if (iseox)
-            break;              /* null terminator signalled done */
-        /* --- accumulate chars in token --- */
-        if (!iseoc) {           /* don't accumulate delimiters */
-            *tokptr++ = *exprptr;       /* accumulate non-delim char */
-            if (!isthischar(*exprptr, WHITESPACE))      /* this token isn't empty */
-                istokwhite = 0;
-        }
-        /* so reset flag to rasterize it */
-        /* --- ready for next char --- */
-        exprptr++;              /* bump ptr */
-    }                           /* --- end-of-while(*exprptr!='\0') --- */
-/* --- make sure we got something to do --- */
-    if (nnonwhite < 1)          /* completely empty array */
-        goto end_of_job;        /* NULL back to caller */
-/* -------------------------------------------------------------------------
-determine dimensions of array raster and allocate it
--------------------------------------------------------------------------- */
-/* --- adjust colspace --- */
-    colspace = 2 + 2 * size;    /* temp kludge */
-/* --- reset propagated sizes at boundaries of array --- */
-    colwidth[maxcols] = rowheight[nrows] = 0;   /* reset explicit 0's at edges */
-/* --- determine width of array raster --- */
-    width = colspace * (maxcols - 1);   /* empty space between cols */
-    if (msglevel >= 29 && msgfp != NULL)        /* debugging */
-        fprintf(msgfp, "rastarray> %d cols,  widths: ", maxcols);
-    for (icol = 0; icol <= maxcols; icol++) {   /* and for each col */
-        width += colwidth[icol];        /*width of this col (0 for maxcols) */
-        width += vlinespace(icol);      /*plus space for vline, if present */
-        if (msglevel >= 29 && msgfp != NULL)    /* debugging */
-            fprintf(msgfp, " %d=%2d+%d", icol + 1, colwidth[icol],
-                    (vlinespace(icol)));
-    }
-/* --- determine height of array raster --- */
-    height = rowspace * (nrows - 1);    /* empty space between rows */
-    if (msglevel >= 29 && msgfp != NULL)        /* debugging */
-        fprintf(msgfp, "\nrastarray> %d rows, heights: ", nrows);
-    for (irow = 0; irow <= nrows; irow++) {     /* and for each row */
-        height += rowheight[irow];      /*height of this row (0 for nrows) */
-        height += vrowspace[irow];      /*plus extra //[len], if present */
-        height += hlinespace(irow);     /*plus space for hline, if present */
-        if (msglevel >= 29 && msgfp != NULL)    /* debugging */
-            fprintf(msgfp, " %d=%2d+%d", irow + 1, rowheight[irow],
-                    (hlinespace(irow)));
-    }
-/* --- allocate subraster and raster for array --- */
-    if (msglevel >= 29 && msgfp != NULL)        /* debugging */
-        fprintf(msgfp,
-                "\nrastarray> tot width=%d(colspc=%d) height=%d(rowspc=%d)\n",
-                width, colspace, height, rowspace);
-    if ((arraysp = new_subraster(width, height, pixsz)) /* allocate new subraster */
-        == NULL)
-        goto end_of_job;        /* quit if failed */
-/* --- initialize subraster parameters --- */
-    arraysp->type = IMAGERASTER;        /* image */
-    arraysp->symdef = NULL;     /* not applicable for image */
-    arraysp->baseline = min2(height / 2 + 5, height - 1);       /*is a little above center good? */
-    arraysp->size = size;       /* size (probably unneeded) */
-    arrayrp = arraysp->image;   /* raster embedded in subraster */
-/* -------------------------------------------------------------------------
-embed tokens/cells in array
--------------------------------------------------------------------------- */
-    itoken = 0;                 /* start with first token */
-    toprow = 0;                 /* start at top row of array */
-    for (irow = 0; irow <= nrows; irow++) {     /*tokens were accumulated row-wise */
-        /* --- initialization for row --- */
-        int baseline = rowbaseln[irow]; /* baseline for this row */
-        if (hline[irow] != 0) { /* need hline above this row */
-            int hrow = (irow < 1 ? 0 : toprow - rowspace / 2);  /* row for hline */
-            if (irow >= nrows)
-                hrow = height - 1;      /* row for bottom hline */
-            rule_raster(arrayrp, hrow, 0, width, 1,
-                        (hline[irow] < 0 ? 1 : 0));
-        }                       /* hline */
-        if (irow >= nrows)
-            break;              /*just needed \hline for irow=nrows */
-        toprow += vrowspace[irow];      /* extra //[len] space above irow */
-        if (toprow < 0)
-            toprow = 0;         /* check for large negative [-len] */
-        toprow += hlinespace(irow);     /* space for hline above irow */
-        leftcol = 0;            /* start at leftmost column */
-        for (icol = 0; icol < ncols[irow]; icol++) {    /* go through cells in this row */
-            subraster *tsp = toksp[itoken];     /* token that belongs in this cell */
-            /* --- first adjust leftcol for vline to left of icol, if present ---- */
-            leftcol += vlinespace(icol);        /* space for vline to left of col */
-            /* --- now rasterize cell ---- */
-            if (tsp != NULL) {  /* have a rasterized cell token */
-                /* --- local parameters --- */
-                int cwidth = colwidth[icol],    /* total column width */
-                    twidth = (tsp->image)->width,       /* token width */
-                    theight = (tsp->image)->height,     /* token height */
-                    tokencol = 0,       /*H offset (init for left justify) */
-                    tokenrow = baseline - tsp->baseline;        /*V offset (init for baseline) */
-                /* --- adjust leftcol for vline to left of icol, if present ---- */
-                /*leftcol += vlinespace(icol); *//* space for vline to left of col */
-                /* --- reset justification (if not left-justified) --- */
-                if (justify[icol] == 0) /* but user wants it centered */
-                    tokencol = (cwidth - twidth + 1) / 2;       /* so split margin left/right */
-                else if (justify[icol] == 1)    /* or user wants right-justify */
-                    tokencol = cwidth - twidth; /* so put entire margin at left */
-                /* --- reset vertical centering (if not baseline-aligned) --- */
-                if (rowcenter[irow])    /* center cells in row vertically */
-                    tokenrow = (rowheight[irow] - theight) / 2; /* center row */
-                /* --- embed token raster at appropriate place in array raster --- */
-                rastput(arrayrp, tsp->image,    /* overlay cell token in array */
-                        toprow + tokenrow,      /*with aligned baseline or centered */
-                        leftcol + tokencol, 1); /* and justified as requested */
-            }                   /* --- end-of-if(tsp!=NULL) --- */
-            itoken++;           /* bump index for next cell */
-            leftcol += colwidth[icol] + colspace        /*move leftcol right for next col */
-                /* + vlinespace(icol) */ ;
-            /*don't add space for vline to left of col */
-        }                       /* --- end-of-for(icol) --- */
-        toprow += rowheight[irow] + rowspace;   /* move toprow down for next row */
-    }                           /* --- end-of-for(irow) --- */
-/* -------------------------------------------------------------------------
-draw vlines as necessary
--------------------------------------------------------------------------- */
-    leftcol = 0;                /* start at leftmost column */
-    for (icol = 0; icol <= maxcols; icol++) {   /* check each col for a vline */
-        if (vline[icol] != 0) { /* need vline to left of this col */
-            int vcol = (icol < 1 ? 0 : leftcol - colspace / 2); /* column for vline */
-            if (icol >= maxcols)
-                vcol = width - 1;       /*column for right edge vline */
-            rule_raster(arrayrp, 0, vcol, 1, height,
-                        (vline[icol] < 0 ? 2 : 0));
-        }                       /* vline */
-        leftcol += vlinespace(icol);    /* space for vline to left of col */
-        if (icol < maxcols)     /* don't address past end of array */
-            leftcol += colwidth[icol] + colspace;       /*move leftcol right for next col */
-    }                           /* --- end-of-for(icol) --- */
-/* -------------------------------------------------------------------------
-free workspace and return final result to caller
--------------------------------------------------------------------------- */
-  end_of_job:
-    /* --- free workspace --- */
-    if (ntokens > 0)            /* if we have workspace to free */
-        while (--ntokens >= 0)  /* free each token subraster */
-            if (toksp[ntokens] != NULL) /* if we rasterized this cell */
-                delete_subraster(toksp[ntokens]);       /* then free it */
-    /* --- return final result to caller --- */
-    return (arraysp);
-}                               /* --- end-of-function rastarray() --- */
 
 
-/* ==========================================================================
- * Function:    rastpicture ( expression, size, basesp, arg1, arg2, arg3 )
- * Purpose: \picture handler, returns subraster corresponding to picture
- *      expression (immediately following \picture) at font size
- * --------------------------------------------------------------------------
- * Arguments:   expression (I/O) char **  to first char of null-terminated
- *              string immediately following \picture to be
- *              rasterized, and returning ptr immediately
- *              following last character processed.
- *      size (I)    int containing 0-7 default font size
- *      basesp (I)  subraster *  to character (or subexpression)
- *              immediately preceding \picture
- *              (unused, but passed for consistency)
- *      arg1 (I)    int unused
- *      arg2 (I)    int unused
- *      arg3 (I)    int unused
- * --------------------------------------------------------------------------
- * Returns: ( subraster * ) ptr to subraster corresponding to picture
- *              expression, or NULL for any parsing error
- * --------------------------------------------------------------------------
- * Notes:     o Summary of syntax...
- *        \picture(width,height){(x,y){pic_elem}~(x,y){pic_elem}~etc}
- *        o 
- * ======================================================================= */
-subraster *rastpicture(const char **expression, int size,
-                       subraster * basesp, int arg1, int arg2, int arg3) {
-    char picexpr[2049], *picptr = picexpr,      /* picture {expre} */
-        putexpr[256], *putptr, *multptr,        /*[multi]put (x,y[;xinc,yinc;num]) */
-        pream[96], *preptr,     /* optional put preamble */
-        picelem[1025];          /* picture element following put */
-    subraster *picelemsp = NULL,        /* rasterize picture elements */
-        *picturesp = NULL,      /* subraster for entire picture */
-        *oldworkingbox = workingbox;    /* save working box on entry */
-    raster *picturerp = NULL;   /* raster for entire picture */
-    int pixsz = 1;              /* pixels are one bit each */
-    double x = 0.0, y = 0.0,    /* x,y-coords for put,multiput */
-        xinc = 0.0, yinc = 0.0; /* x,y-incrementss for multiput */
-    int width = 0, height = 0,  /* #pixels width,height of picture */
-        ewidth = 0, eheight = 0,        /* pic element width,height */
-        ix = 0, xpos = 0, iy = 0, ypos = 0,     /* mimeTeX x,y pixel coords */
-        num = 1, inum;          /* number reps, index of element */
-    int iscenter = 0;           /* center or lowerleft put position */
-    int *oldworkingparam = workingparam,        /* save working param on entry */
-        origin = 0;             /* x,yinc ++=00 +-=01 -+=10 --=11 */
-/* -------------------------------------------------------------------------
-First obtain (width,height) arguments immediately following \picture command
--------------------------------------------------------------------------- */
-/* --- parse for (width,height) arguments, and bump expression past it --- */
-    *expression = texsubexpr(*expression, putexpr, 254, "(", ")", 0, 0);
-    if (*putexpr == '\0')
-        goto end_of_job;        /* couldn't get (width,height) */
-/* --- now interpret width,height returned in putexpr --- */
-    if ((putptr = strchr(putexpr, ',')) != NULL)        /* look for ',' in width,height */
-        *putptr = '\0';         /* found it, so replace ',' by '\0' */
-    width = height = eround(putexpr);   /*width pixels */
-    if (putptr != NULL)         /* 2nd arg, if present, is height */
-        height = eround(putptr + 1);    /*in pixels */
-/* -------------------------------------------------------------------------
-Then obtain entire picture {...} subexpression following (width,height)
--------------------------------------------------------------------------- */
-/* --- parse for picture subexpression, and bump expression past it --- */
-    *expression = texsubexpr(*expression, picexpr, 2047, "{", "}", 0, 0);
-    if (*picexpr == '\0')
-        goto end_of_job;        /* couldn't get {pic_elements} */
-/* -------------------------------------------------------------------------
-allocate subraster and raster for complete picture
--------------------------------------------------------------------------- */
-/* --- sanity check on width,height args --- */
-    if (width < 2 || width > 600 || height < 2 || height > 600)
-        goto end_of_job;
-/* --- allocate and initialize subraster for constructed picture --- */
-    if ((picturesp = new_subraster(width, height, pixsz))       /*allocate new subraster */
-        == NULL)
-        goto end_of_job;        /* quit if failed */
-    workingbox = picturesp;     /* set workingbox to our picture */
-/* --- initialize picture subraster parameters --- */
-    picturesp->type = IMAGERASTER;      /* image */
-    picturesp->symdef = NULL;   /* not applicable for image */
-    picturesp->baseline = height / 2 + 2;       /* is a little above center good? */
-    picturesp->size = size;     /* size (probably unneeded) */
-    picturerp = picturesp->image;       /* raster embedded in subraster */
-    if (msgfp != NULL && msglevel >= 29)        /* debugging */
-        fprintf(msgfp, "picture> width,height=%d,%d\n", width, height);
-/* -------------------------------------------------------------------------
-parse out each picture element, rasterize it, and place it in picture
--------------------------------------------------------------------------- */
-    while (*picptr != '\0') {   /* until we run out of pic_elems */
-        /* -----------------------------------------------------------------------
-           first obtain leading \[multi]put(x,y[;xinc,yinc;num]) args for pic_elem
-           ------------------------------------------------------------------------ */
-        /* --- init default values in case not explicitly supplied in args --- */
-        x = y = 0.0;
-        xinc = yinc = 0.0;
-        num = 1;                /* init default values */
-        iscenter = origin = 0;  /* center, origin */
-        /* --- get (pream$x,y;xinc,yinc;num ) args and bump picptr past it --- */
-        while (*picptr != '\0') /* skip invalid chars preceding ( */
-            if (*picptr == '(')
-                break;          /* found opening ( */
-            else
-                picptr++;       /* else skip invalid char */
-        picptr = texsubexpr(picptr, putexpr, 254, "(", ")", 0, 0);
-        if (*putexpr == '\0')
-            goto end_of_job;    /* couldn't get (x,y) */
-        /* --- first look for $-terminated or for any non-digit preamble --- */
-        *pream = '\0';          /* init preamble as empty string */
-        if ((putptr = strchr(putexpr, '$')) != NULL) {  /*check for $ pream terminator */
-            *putptr++ = '\0';   /* replace $ by '\0', bump past $ */
-            strninit(pream, putexpr, 92);
-        } /* copy leading preamble from put */
-        else {                  /* look for any non-digit preamble */
-            int npream = 0;     /* #chars in preamble */
-            for (preptr = pream, putptr = putexpr;; npream++, putptr++)
-                if (*putptr == '\0'     /* end-of-putdata signalled */
-                    || !isalpha((int) (*putptr))        /* or found non-alpha char */
-                    ||npream > 92)
-                    break;      /* or preamble too long */
-                else
-                    *preptr++ = *putptr;        /* copy alpha char to preamble */
-            *preptr = '\0';
-        }                       /* null-terminate preamble */
-        /* --- interpret preamble --- */
-        for (preptr = pream;; preptr++) /* examine each preamble char */
-            if (*preptr == '\0')
-                break;          /* end-of-preamble signalled */
-            else
-                switch (tolower(*preptr)) {     /* check lowercase preamble char */
-                default:
-                    break;      /* unrecognized flag */
-                case 'c':
-                    iscenter = 1;
-                    break;      /* center pic_elem at x,y coords */
-                }               /* --- end-of-switch --- */
-        /* --- interpret x,y;xinc,yinc;num following preamble --- */
-        if (*putptr != '\0') {  /*check for put data after preamble */
-            /* --- first squeeze preamble out of put expression --- */
-            if (*pream != '\0') {       /* have preamble */
-                strsqueezep(putexpr, putptr);
-            }
-            /* squeeze it out */
-            /* --- interpret x,y --- */
-            if ((multptr = strchr(putexpr, ';')) != NULL)       /*semicolon signals multiput */
-                *multptr = '\0';        /* replace semicolon by '\0' */
-            if ((putptr = strchr(putexpr, ',')) != NULL)        /* comma separates x,y */
-                *putptr = '\0'; /* replace comma by '\0'  */
-            if (*putexpr != '\0')       /* leading , may be placeholder */
-                x = (double) (eround(putexpr)); /* x coord in pixels */
-            if (putptr != NULL) /* 2nd arg, if present, is y coord */
-                y = (double) (eround(putptr + 1));      /* in pixels */
-            /* --- interpret xinc,yinc,num if we have a multiput --- */
-            if (multptr != NULL) {      /* found ';' signalling multiput */
-                if ((preptr = strchr(multptr + 1, ';')) != NULL)        /* ';' preceding num arg */
-                    *preptr = '\0';     /* replace ';' by '\0' */
-                if ((putptr = strchr(multptr + 1, ',')) != NULL)        /* ',' between xinc,yinc */
-                    *putptr = '\0';     /* replace ',' by '\0' */
-                if (*(multptr + 1) != '\0')     /* leading , may be placeholder */
-                    xinc = (double) (eround(multptr + 1));      /* xinc in pixels */
-                if (putptr != NULL)     /* 2nd arg, if present, is yinc */
-                    yinc = (double) (eround(putptr + 1));       /* in user pixels */
-                num = (preptr == NULL ? 999 : atoi(preptr + 1));        /*explicit num val or 999 */
-            }                   /* --- end-of-if(multptr!=NULL) --- */
-        }                       /* --- end-of-if(*preptr!='\0') --- */
-        if (msgfp != NULL && msglevel >= 29)    /* debugging */
-            fprintf(msgfp,
-                    "picture> pream;x,y;xinc,yinc;num=\"%s\";%.2f,%.2f;%.2f,%.2f;%d\n",
-                    pream, x, y, xinc, yinc, num);
-        /* -----------------------------------------------------------------------
-           now obtain {...} picture element following [multi]put, and rasterize it
-           ------------------------------------------------------------------------ */
-        /* --- parse for {...} picture element and bump picptr past it --- */
-        picptr = texsubexpr(picptr, picelem, 1023, "{", "}", 0, 0);
-        if (*picelem == '\0')
-            goto end_of_job;    /* couldn't get {pic_elem} */
-        if (msgfp != NULL && msglevel >= 29)    /* debugging */
-            fprintf(msgfp, "picture> picelem=\"%.50s\"\n", picelem);
-        /* --- rasterize picture element --- */
-        origin = 0;             /* init origin as working param */
-        workingparam = &origin; /* and point working param to it */
-        picelemsp = rasterize(picelem, size);   /* rasterize picture element */
-        if (picelemsp == NULL)
-            continue;           /* failed to rasterize, skip elem */
-        ewidth = (picelemsp->image)->width;     /* width of element, in pixels */
-        eheight = (picelemsp->image)->height;   /* height of element, in pixels */
-        if (origin == 55)
-            iscenter = 1;       /* origin set to (.5,.5) for center */
-        if (msgfp != NULL && msglevel >= 29) {  /* debugging */
-            fprintf(msgfp,
-                    "picture> ewidth,eheight,origin,num=%d,%d,%d,%d\n",
-                    ewidth, eheight, origin, num);
-            if (msglevel >= 999)
-                type_raster(picelemsp->image, msgfp);
-        }
-        /* -----------------------------------------------------------------------
-           embed element in picture (once, or multiple times if requested)
-           ------------------------------------------------------------------------ */
-        for (inum = 0; inum < num; inum++) {    /* once, or for num repetitions */
-            /* --- set x,y-coords for this iteration --- */
-            ix = iround(x);
-            iy = iround(y);     /* round x,y to nearest integer */
-            if (iscenter) {     /* place center of element at x,y */
-                xpos = ix - ewidth / 2; /* x picture coord to center elem */
-                ypos = height - iy - eheight / 2;
-            } /* y pixel coord to center elem */
-            else {              /* default places lower-left at x,y */
-                xpos = ix;      /* set x pixel coord for left */
-                if (origin == 10 || origin == 11)       /* x,yinc's are -+ or -- */
-                    xpos = ix - ewidth; /* so set for right instead */
-                ypos = height - iy - eheight;   /* set y pixel coord for lower */
-                if (origin == 1 || origin == 11)        /* x,yinc's are +- or -- */
-                    ypos = height - iy;
-            }                   /* so set for upper instead */
-            if (msgfp != NULL && msglevel >= 29)        /* debugging */
-                fprintf(msgfp,
-                        "picture> inum,x,y,ix,iy,xpos,ypos=%d,%.2f,%.2f,%d,%d,%d,%d\n",
-                        inum, x, y, ix, iy, xpos, ypos);
-            /* --- embed token raster at xpos,ypos, and quit if out-of-bounds --- */
-            if (!rastput(picturerp, picelemsp->image, ypos, xpos, 0))
-                break;
-            /* --- apply increment --- */
-            if (xinc == 0. && yinc == 0.)
-                break;          /* quit if both increments zero */
-            x += xinc;
-            y += yinc;          /* increment coords for next iter */
-        }                       /* --- end-of-for(inum) --- */
-        /* --- free picture element subraster after embedding it in picture --- */
-        delete_subraster(picelemsp);    /* done with subraster, so free it */
-    }                           /* --- end-of-while(*picptr!=0) --- */
-/* -------------------------------------------------------------------------
-return picture constructed from pic_elements to caller
--------------------------------------------------------------------------- */
-  end_of_job:
-    workingbox = oldworkingbox; /* restore original working box */
-    workingparam = oldworkingparam;     /* restore original working param */
-    return (picturesp);         /* return our picture to caller */
-}                               /* --- end-of-function rastpicture() --- */
 
-
-/* ==========================================================================
- * Function:    rastline ( expression, size, basesp, arg1, arg2, arg3 )
- * Purpose: \line handler, returns subraster corresponding to line
- *      parameters (xinc,yinc){xlen}
- * --------------------------------------------------------------------------
- * Arguments:   expression (I/O) char **  to first char of null-terminated
- *              string immediately following \line to be
- *              rasterized, and returning ptr immediately
- *              following last character processed.
- *      size (I)    int containing 0-7 default font size
- *      basesp (I)  subraster *  to character (or subexpression)
- *              immediately preceding \line
- *              (unused, but passed for consistency)
- *      arg1 (I)    int unused
- *      arg2 (I)    int unused
- *      arg3 (I)    int unused
- * --------------------------------------------------------------------------
- * Returns: ( subraster * ) ptr to subraster corresponding to line
- *              requested, or NULL for any parsing error
- * --------------------------------------------------------------------------
- * Notes:     o Summary of syntax...
- *        \line(xinc,yinc){xlen}
- *        o if {xlen} not given, then it's assumed xlen = |xinc|
- * ======================================================================= */
-/* --- entry point --- */
-static subraster *rastline(const char **expression, int size,
-                           subraster * basesp, int arg1, int arg2,
-                           int arg3) {
-    char linexpr[257], *xptr = linexpr; /*line(xinc,yinc){xlen} */
-    subraster *linesp = NULL;   /* subraster for line */
-    /*char  *origexpression = *expression; *//*original expression after \line */
-    int pixsz = 1;              /* pixels are one bit each */
-    int thickness = 1;          /* line thickness */
-    double xinc = 0.0, yinc = 0.0,      /* x,y-increments for line, */
-        xlen = 0.0, ylen = 0.0; /* x,y lengths for line */
-    int width = 0, height = 0,  /* #pixels width,height of line */
-        rwidth = 0, rheight = 0;        /*alloc width,height plus thickness */
-    int istop = 0, isright = 0, /* origin at bot-left if x,yinc>=0 */
-        origin = 0;             /* x,yinc: ++=00 +-=01 -+=10 --=11 */
-/* -------------------------------------------------------------------------
-obtain (xinc,yinc) arguments immediately following \line command
--------------------------------------------------------------------------- */
-/* --- parse for (xinc,yinc) arguments, and bump expression past it --- */
-    *expression = texsubexpr(*expression, linexpr, 253, "(", ")", 0, 0);
-    if (*linexpr == '\0')
-        goto end_of_job;        /* couldn't get (xinc,yinc) */
-/* --- now interpret xinc,yinc;thickness returned in linexpr --- */
-    if ((xptr = strchr(linexpr, ';')) != NULL) {        /* look for ';' after xinc,yinc */
-        *xptr = '\0';           /* terminate linexpr at ; */
-        thickness = evalterm(mimestore, xptr + 1);
-    } /* get int thickness */ if ((xptr = strchr(linexpr, ',')) != NULL)        /* look for ',' in xinc,yinc */
-        *xptr = '\0';           /* found it, so replace ',' by '\0' */
-    if (*linexpr != '\0')       /* check against missing 1st arg */
-        xinc = xlen = (double) evalterm(mimestore, linexpr);    /* xinc in user units */
-    if (xptr != NULL)           /* 2nd arg, if present, is yinc */
-        yinc = ylen = (double) evalterm(mimestore, xptr + 1);   /* in user units */
-/* -------------------------------------------------------------------------
-obtain optional {xlen} following (xinc,yinc), and calculate ylen
--------------------------------------------------------------------------- */
-/* --- check if {xlen} given --- */
-    if (*(*expression) == '{') {        /*have {xlen} if leading char is { */
-        /* --- parse {xlen} and bump expression past it, interpret as double --- */
-        *expression =
-            texsubexpr(*expression, linexpr, 253, "{", "}", 0, 0);
-        if (*linexpr == '\0')
-            goto end_of_job;    /* couldn't get {xlen} */
-        xlen = (double) evalterm(mimestore, linexpr);   /* xlen in user units */
-        /* --- set other values accordingly --- */
-        if (xlen < 0.0)
-            xinc = -xinc;       /* if xlen negative, flip xinc sign */
-        if (xinc != 0.0)
-            ylen = xlen * yinc / xinc;  /* set ylen from xlen and slope */
-        else
-            xlen = 0.0;         /* can't have xlen if xinc=0 */
-    }
-
-    /* --- end-of-if(*(*expression)=='{') --- */
-    /* -------------------------------------------------------------------------
-       calculate width,height, etc, based on xlen,ylen, etc
-       -------------------------------------------------------------------------- */
-    /* --- force lengths positive --- */
-    xlen = absval(xlen);        /* force xlen positive */
-    ylen = absval(ylen);        /* force ylen positive */
-/* --- calculate corresponding lengths in pixels --- */
-    width = max2(1, iround(unitlength * xlen)); /*scale by unitlength and round, */
-    height = max2(1, iround(unitlength * ylen));        /* and must be at least 1 pixel */
-    rwidth = width + (ylen < 0.001 ? 0 : max2(0, thickness - 1));
-    rheight = height + (xlen < 0.001 ? 0 : max2(0, thickness - 1));
-/* --- set origin corner, x,yinc's: ++=0=(0,0) +-=1=(0,1) -+=10=(1,0) --- */
-    if (xinc < 0.0)
-        isright = 1;            /*negative xinc, so corner is (1,?) */
-    if (yinc < 0.0)
-        istop = 1;              /*negative yinc, so corner is (?,1) */
-    origin = isright * 10 + istop;      /* interpret 0=(0,0), 11=(1,1), etc */
-    if (msgfp != NULL && msglevel >= 29)        /* debugging */
-        fprintf(msgfp,
-                "rastline> width,height,origin;x,yinc=%d,%d,%d;%g,%g\n",
-                width, height, origin, xinc, yinc);
-/* -------------------------------------------------------------------------
-allocate subraster and raster for line
--------------------------------------------------------------------------- */
-/* --- sanity check on width,height,thickness args --- */
-    if (width < 1 || width > 600
-        || height < 1 || height > 600 || thickness < 1 || thickness > 25)
-        goto end_of_job;
-/* --- allocate and initialize subraster for constructed line --- */
-    if ((linesp = new_subraster(rwidth, rheight, pixsz))        /* alloc new subraster */
-        == NULL)
-        goto end_of_job;        /* quit if failed */
-/* --- initialize line subraster parameters --- */
-    linesp->type = IMAGERASTER; /* image */
-    linesp->symdef = NULL;      /* not applicable for image */
-    linesp->baseline = height / 2 + 2   /* is a little above center good? */
-        + (rheight - height) / 2;       /* account for line thickness too */
-    linesp->size = size;        /* size (probably unneeded) */
-/* -------------------------------------------------------------------------
-draw the line
--------------------------------------------------------------------------- */
-    line_raster(linesp->image,  /* embedded raster image */
-                (istop ? 0 : height - 1),       /* row0, from bottom or top */
-                (isright ? width - 1 : 0),      /* col0, from left or right */
-                (istop ? height - 1 : 0),       /* row1, to top or bottom */
-                (isright ? 0 : width - 1),      /* col1, to right or left */
-                thickness);     /* line thickness (usually 1 pixel) */
-/* -------------------------------------------------------------------------
-return constructed line to caller
--------------------------------------------------------------------------- */
-  end_of_job:
-    if (workingparam != NULL)   /* caller wants origin */
-        *workingparam = origin; /* return origin corner to caller */
-    return (linesp);            /* return line to caller */
-}                               /* --- end-of-function rastline() --- */
-
-
-/* ==========================================================================
- * Function:    rastrule ( expression, size, basesp, arg1, arg2, arg3 )
- * Purpose: \rule handler, returns subraster corresponding to rule
- *      parameters [lift]{width}{height}
- * --------------------------------------------------------------------------
- * Arguments:   expression (I/O) char **  to first char of null-terminated
- *              string immediately following \rule to be
- *              rasterized, and returning ptr immediately
- *              following last character processed.
- *      size (I)    int containing 0-7 default font size
- *      basesp (I)  subraster *  to character (or subexpression)
- *              immediately preceding \rule
- *              (unused, but passed for consistency)
- *      arg1 (I)    int unused
- *      arg2 (I)    int unused
- *      arg3 (I)    int unused
- * --------------------------------------------------------------------------
- * Returns: ( subraster * ) ptr to subraster corresponding to rule
- *              requested, or NULL for any parsing error
- * --------------------------------------------------------------------------
- * Notes:     o Summary of syntax...
- *        \rule[lift]{width}{height}
- *        o if [lift] not given, then bottom of rule on baseline
- *        o if width=0 then you get an invisible strut 1 (one) pixel wide
- * ======================================================================= */
-static subraster *rastrule(const char **expression, int size,
-                           subraster * basesp, int arg1, int arg2,
-                           int arg3) {
-    char rulexpr[257];          /* rule[lift]{wdth}{hgt} */
-    subraster *rulesp = NULL;   /* subraster for rule */
-    int pixsz = 1;              /* pixels are one bit each */
-    int lift = 0, width = 0, height = 0;        /* default rule parameters */
-    double dval;                /* convert ascii params to doubles */
-    int rwidth = 0, rheight = 0;        /* alloc width, height plus lift */
-/* -------------------------------------------------------------------------
-Obtain lift,width,height
--------------------------------------------------------------------------- */
-/* --- check for optional lift arg  --- */
-    if (*(*expression) == '[') {        /*check for []-enclosed optional arg */
-        *expression =
-            texsubexpr(*expression, rulexpr, 255, "[", "]", 0, 0);
-        dval = evalterm(mimestore, rulexpr);    /* convert [lift] to int */
-        if (dval <= 99 && dval >= (-99))        /* sanity check */
-            lift = iround(unitlength * dval);
-    }
-    /* scale by unitlength and round *//* --- parse for width --- */
-        *expression =
-        texsubexpr(*expression, rulexpr, 255, "{", "}", 0, 0);
-    if (*rulexpr == '\0')
-        goto end_of_job;        /* quit if args missing */
-    dval = evalterm(mimestore, rulexpr);        /* convert {width} to int */
-    if (dval <= 500 && dval >= 0)       /* sanity check */
-        width = max2(0, iround(unitlength * dval));     /* scale by unitlength and round */
-/* --- parse for height --- */
-    *expression = texsubexpr(*expression, rulexpr, 255, "{", "}", 0, 0);
-    if (*rulexpr == '\0')
-        goto end_of_job;        /* quit if args missing */
-    dval = evalterm(mimestore, rulexpr);        /* convert {height} to int */
-    if (dval <= 500 && dval > 0)        /* sanity check */
-        height = max2(1, iround(unitlength * dval));    /* scale by unitlength and round */
-/* --- raster width,height in pixels --- */
-    rwidth = max2(1, width);    /* raster must be at least 1 pixel */
-    rheight = height + (lift >= 0 ? lift :      /* raster height plus lift */
-                        (-lift < height ? 0 : -lift - height + 1));     /* may need empty space above rule */
-/* -------------------------------------------------------------------------
-allocate subraster and raster for rule
--------------------------------------------------------------------------- */
-/* --- sanity check on width,height,thickness args --- */
-    if (rwidth < 1 || rwidth > 600 || rheight < 1 || rheight > 600)
-        goto end_of_job;
-/* --- allocate and initialize subraster for constructed rule --- */
-    if ((rulesp = new_subraster(rwidth, rheight, pixsz))        /* alloc new subraster */
-        == NULL)
-        goto end_of_job;        /* quit if failed */
-/* --- initialize line subraster parameters --- */
-    rulesp->type = IMAGERASTER; /* image */
-    rulesp->symdef = NULL;      /* not applicable for image */
-    rulesp->baseline = rheight - 1 + (lift >= 0 ? 0 : lift);    /*adjust baseline for lift */
-    rulesp->size = size;        /* size (probably unneeded) */
-/* -------------------------------------------------------------------------
-draw the rule
--------------------------------------------------------------------------- */
-    rule_raster(rulesp->image,  /* embedded raster image */
-                (-lift < height ? 0 : rheight - height),        /* topmost row for top-left corner */
-                0,              /* leftmost col for top-left corner */
-                width,          /* rule width */
-                height,         /* rule height */
-                (width > 0 ? 0 : 4));   /* rule type */
-/* -------------------------------------------------------------------------
-return constructed rule to caller
--------------------------------------------------------------------------- */
-  end_of_job:
-    return (rulesp);            /* return rule to caller */
-}                               /* --- end-of-function rastrule() --- */
-
-
-/* ==========================================================================
- * Function:    rastcircle ( expression, size, basesp, arg1, arg2, arg3 )
- * Purpose: \circle handler, returns subraster corresponding to ellipse
- *      parameters (xdiam[,ydiam])
- * --------------------------------------------------------------------------
- * Arguments:   expression (I/O) char **  to first char of null-terminated
- *              string immediately following \circle to be
- *              rasterized, and returning ptr immediately
- *              following last character processed.
- *      size (I)    int containing 0-7 default font size
- *      basesp (I)  subraster *  to character (or subexpression)
- *              immediately preceding \circle
- *              (unused, but passed for consistency)
- *      arg1 (I)    int unused
- *      arg2 (I)    int unused
- *      arg3 (I)    int unused
- * --------------------------------------------------------------------------
- * Returns: ( subraster * ) ptr to subraster corresponding to ellipse
- *              requested, or NULL for any parsing error
- * --------------------------------------------------------------------------
- * Notes:     o Summary of syntax...
- *        \circle(xdiam[,ydiam])
- *        o
- * ======================================================================= */
-static subraster *rastcircle(const char **expression, int size,
-                             subraster * basesp, int arg1, int arg2,
-                             int arg3) {
-    char circexpr[512], *xptr = circexpr;       /*circle(xdiam[,ydiam]) */
-    char *qptr = NULL, quads[256] = "1234";     /* default to draw all quadrants */
-    double theta0 = 0.0, theta1 = 0.0;  /* ;theta0,theta1 instead of ;quads */
-    subraster *circsp = NULL;   /* subraster for ellipse */
-    int pixsz = 1;              /* pixels are one bit each */
-    double xdiam = 0.0, ydiam = 0.0;    /* x,y major/minor axes/diameters */
-    int width = 0, height = 0;  /* #pixels width,height of ellipse */
-    int thickness = 1;          /* drawn lines are one pixel thick */
-    int origin = 55;            /* force origin centered */
-/* -------------------------------------------------------------------------
-obtain (xdiam[,ydiam]) arguments immediately following \circle command
--------------------------------------------------------------------------- */
-/* --- parse for (xdiam[,ydiam]) args, and bump expression past it --- */
-    *expression = texsubexpr(*expression, circexpr, 500, "(", ")", 0, 0);
-    if (*circexpr == '\0')
-        goto end_of_job;        /* couldn't get (xdiam[,ydiam]) */
-/* --- now interpret xdiam[,ydiam] returned in circexpr --- */
-    if ((qptr = strchr(circexpr, ';')) != NULL) {       /* semicolon signals quads data */
-        *qptr = '\0';           /* replace semicolon by '\0' */
-        strninit(quads, qptr + 1, 128); /* save user-requested quads */
-        if ((qptr = strchr(quads, ',')) != NULL) {      /* have theta0,theta1 instead */
-            *qptr = '\0';       /* replace , with null */
-            theta0 = (double) evalterm(mimestore, quads);       /* theta0 precedes , */
-            theta1 = (double) evalterm(mimestore, qptr + 1);    /* theta1 follows , */
-            qptr = NULL;
-        } /* signal thetas instead of quads */
-        else
-             qptr = quads;
-    } /* set qptr arg for circle_raster() */
-    else                        /* no ;quads at all */
-        qptr = quads;           /* default to all 4 quadrants */
-    if ((xptr = strchr(circexpr, ',')) != NULL) /* look for ',' in xdiam[,ydiam] */
-        *xptr = '\0';           /* found it, so replace ',' by '\0' */
-    xdiam = ydiam =             /* xdiam=ydiam in user units */
-        (double) evalterm(mimestore, circexpr); /* evaluate expression */
-    if (xptr != NULL)           /* 2nd arg, if present, is ydiam */
-        ydiam = (double) evalterm(mimestore, xptr + 1); /* in user units */
-/* -------------------------------------------------------------------------
-calculate width,height, etc
--------------------------------------------------------------------------- */
-/* --- calculate width,height in pixels --- */
-    width = max2(1, iround(unitlength * xdiam));        /*scale by unitlength and round, */
-    height = max2(1, iround(unitlength * ydiam));       /* and must be at least 1 pixel */
-    if (msgfp != NULL && msglevel >= 29)        /* debugging */
-        fprintf(msgfp, "rastcircle> width,height;quads=%d,%d,%s\n",
-                width, height, (qptr == NULL ? "default" : qptr));
-/* -------------------------------------------------------------------------
-allocate subraster and raster for complete picture
--------------------------------------------------------------------------- */
-/* --- sanity check on width,height args --- */
-    if (width < 1 || width > 600 || height < 1 || height > 600)
-        goto end_of_job;
-/* --- allocate and initialize subraster for constructed ellipse --- */
-    if ((circsp = new_subraster(width, height, pixsz))  /* allocate new subraster */
-        == NULL)
-        goto end_of_job;        /* quit if failed */
-/* --- initialize ellipse subraster parameters --- */
-    circsp->type = IMAGERASTER; /* image */
-    circsp->symdef = NULL;      /* not applicable for image */
-    circsp->baseline = height / 2 + 2;  /* is a little above center good? */
-    circsp->size = size;        /* size (probably unneeded) */
-/* -------------------------------------------------------------------------
-draw the ellipse
--------------------------------------------------------------------------- */
-    if (qptr != NULL)           /* have quads */
-        circle_raster(circsp->image,    /* embedded raster image */
-                      0, 0,     /* row0,col0 are upper-left corner */
-                      height - 1, width - 1,    /* row1,col1 are lower-right */
-                      thickness,        /* line thickness is 1 pixel */
-                      qptr);    /* "1234" quadrants to be drawn */
-    else                        /* have theta0,theta1 */
-        circle_recurse(circsp->image,   /* embedded raster image */
-                       0, 0,    /* row0,col0 are upper-left corner */
-                       height - 1, width - 1,   /* row1,col1 are lower-right */
-                       thickness,       /* line thickness is 1 pixel */
-                       theta0, theta1); /* theta0,theta1 arc to be drawn */
-/* -------------------------------------------------------------------------
-return constructed ellipse to caller
--------------------------------------------------------------------------- */
-  end_of_job:
-    if (workingparam != NULL)   /* caller wants origin */
-        *workingparam = origin; /* return center origin to caller */
-    return (circsp);            /* return ellipse to caller */
-}                               /* --- end-of-function rastcircle() --- */
-
-
-/* ==========================================================================
- * Function:    rastbezier ( expression, size, basesp, arg1, arg2, arg3 )
- * Purpose: \bezier handler, returns subraster corresponding to bezier
- *      parameters (col0,row0)(col1,row1)(colt,rowt)
- * --------------------------------------------------------------------------
- * Arguments:   expression (I/O) char **  to first char of null-terminated
- *              string immediately following \bezier to be
- *              rasterized, and returning ptr immediately
- *              following last character processed.
- *      size (I)    int containing 0-7 default font size
- *      basesp (I)  subraster *  to character (or subexpression)
- *              immediately preceding \bezier
- *              (unused, but passed for consistency)
- *      arg1 (I)    int unused
- *      arg2 (I)    int unused
- *      arg3 (I)    int unused
- * --------------------------------------------------------------------------
- * Returns: ( subraster * ) ptr to subraster corresponding to bezier
- *              requested, or NULL for any parsing error
- * --------------------------------------------------------------------------
- * Notes:     o Summary of syntax...
- *        \bezier(col1,row1)(colt,rowt)
- *        o col0=0,row0=0 assumed, i.e., given by
- *      \picture(){~(col0,row0){\bezier(col1,row1)(colt,rowt)}~}
- * ======================================================================= */
-static subraster *rastbezier(const char **expression, int size,
-                             subraster * basesp, int arg1, int arg2,
-                             int arg3) {
-    subraster *bezsp = NULL;    /* subraster for bezier */
-    char bezexpr[129], *xptr = bezexpr; /*\bezier(r,c)(r,c)(r,c) */
-    double r0 = 0.0, c0 = 0.0, r1 = 0.0, c1 = 0.0, rt = 0.0, ct = 0.0,  /* bezier points */
-        rmid = 0.0, cmid = 0.0, /* coords at parameterized midpoint */
-        rmin = 0.0, cmin = 0.0, /* minimum r,c */
-        rmax = 0.0, cmax = 0.0, /* maximum r,c */
-        rdelta = 0.0, cdelta = 0.0,     /* rmax-rmin, cmax-cmin */
-        r = 0.0, c = 0.0;       /* some point */
-    int iarg = 0;               /* 0=r0,c0 1=r1,c1 2=rt,ct */
-    int width = 0, height = 0;  /* dimensions of bezier raster */
-    int pixsz = 1;              /* pixels are one bit each */
-    /*int   thickness = 1; *//* drawn lines are one pixel thick */
-    int origin = 0;             /*c's,r's reset to lower-left origin */
-/* -------------------------------------------------------------------------
-obtain (c1,r1)(ct,rt) args immediately following \bezier command
--------------------------------------------------------------------------- */
-    for (iarg = 1; iarg <= 2; iarg++) { /* 0=c0,r0 1=c1,r1 2=ct,rt */
-        /* --- parse for (r,c) args, and bump expression past them all --- */
-        *expression =
-            texsubexpr(*expression, bezexpr, 127, "(", ")", 0, 0);
-        if (*bezexpr == '\0')
-            goto end_of_job;    /* couldn't get (r,c) */
-        /* --- now interpret (r,c) returned in bezexpr --- */
-        c = r = 0.0;            /* init x-coord=col, y-coord=row */
-        if ((xptr = strchr(bezexpr, ',')) != NULL) {    /* comma separates row,col */
-            *xptr = '\0';       /* found it, so replace ',' by '\0' */
-            /* --- row=y-coord in pixels --- */
-            r = unitlength * ((double) evalterm(mimestore, xptr + 1));
-        }
-        /* --- col=x-coord in pixels --- */
-            c = unitlength * ((double) evalterm(mimestore, bezexpr));
-        /* --- store r,c --- */
-        switch (iarg) {
-        case 0:
-            r0 = r;
-            c0 = c;
-            break;
-        case 1:
-            r1 = r;
-            c1 = c;
-            break;
-        case 2:
-            rt = r;
-            ct = c;
-            break;
-        }
-    }                           /* --- end-of-for(iarg) --- */
-/* --- determine midpoint and maximum,minimum points --- */
-    rmid = 0.5 * (rt + 0.5 * (r0 + r1));        /* y-coord at middle of bezier */
-    cmid = 0.5 * (ct + 0.5 * (c0 + c1));        /* x-coord at middle of bezier */
-    rmin = min3(r0, r1, rmid);  /* lowest row */
-    cmin = min3(c0, c1, cmid);  /* leftmost col */
-    rmax = max3(r0, r1, rmid);  /* highest row */
-    cmax = max3(c0, c1, cmid);  /* rightmost col */
-    rdelta = rmax - rmin;       /* height */
-    cdelta = cmax - cmin;       /* width */
-/* --- rescale coords so we start at 0,0 --- */
-    r0 -= rmin;
-    c0 -= cmin;                 /* rescale r0,c0 */
-    r1 -= rmin;
-    c1 -= cmin;                 /* rescale r1,c1 */
-    rt -= rmin;
-    ct -= cmin;                 /* rescale rt,ct */
-/* --- flip rows so 0,0 becomes lower-left corner instead of upper-left--- */
-    r0 = rdelta - r0 + 1;       /* map 0-->height-1, height-1-->0 */
-    r1 = rdelta - r1 + 1;
-    rt = rdelta - rt + 1;
-/* --- determine width,height of raster needed for bezier --- */
-    width = (int) (cdelta + 0.9999) + 1;        /* round width up */
-    height = (int) (rdelta + 0.9999) + 1;       /* round height up */
-    if (msgfp != NULL && msglevel >= 29)        /* debugging */
-        fprintf(msgfp,
-                "rastbezier> width,height,origin=%d,%d,%d; c0,r0=%g,%g; "
-                "c1,r1=%g,%g\n rmin,mid,max=%g,%g,%g; cmin,mid,max=%g,%g,%g\n",
-                width, height, origin, c0, r0, c1, r1, rmin, rmid, rmax,
-                cmin, cmid, cmax);
-/* -------------------------------------------------------------------------
-allocate raster
--------------------------------------------------------------------------- */
-/* --- sanity check on width,height args --- */
-    if (width < 1 || width > 600 || height < 1 || height > 600)
-        goto end_of_job;
-/* --- allocate and initialize subraster for constructed bezier --- */
-    if ((bezsp = new_subraster(width, height, pixsz))   /* allocate new subraster */
-        == NULL)
-        goto end_of_job;        /* quit if failed */
-/* --- initialize bezier subraster parameters --- */
-    bezsp->type = IMAGERASTER;  /* image */
-    bezsp->symdef = NULL;       /* not applicable for image */
-    bezsp->baseline = height / 2 + 2;   /* is a little above center good? */
-    bezsp->size = size;         /* size (probably unneeded) */
-/* -------------------------------------------------------------------------
-draw the bezier
--------------------------------------------------------------------------- */
-    bezier_raster(bezsp->image, /* embedded raster image */
-                  r0, c0,       /* row0,col0 are lower-left corner */
-                  r1, c1,       /* row1,col1 are upper-right */
-                  rt, ct);      /* bezier tangent point */
-/* -------------------------------------------------------------------------
-return constructed bezier to caller
--------------------------------------------------------------------------- */
-  end_of_job:
-    if (workingparam != NULL)   /* caller wants origin */
-        *workingparam = origin; /* return center origin to caller */
-    return bezsp;               /* return bezier to caller */
-}                               /* --- end-of-function rastbezier() --- */
-
-
-/* ==========================================================================
- * Function:    rastraise ( expression, size, basesp, arg1, arg2, arg3 )
- * Purpose: \raisebox{lift}{subexpression} handler, returns subraster
- *      containing subexpression with its baseline "lifted" by lift
- *      pixels, scaled by \unitlength, or "lowered" if lift arg
- *      negative
- * --------------------------------------------------------------------------
- * Arguments:   expression (I/O) char **  to first char of null-terminated
- *              string immediately following \raisebox to be
- *              rasterized, and returning ptr immediately
- *              following last character processed.
- *      size (I)    int containing 0-7 default font size
- *      basesp (I)  subraster *  to character (or subexpression)
- *              immediately preceding \raisebox
- *              (unused, but passed for consistency)
- *      arg1 (I)    int unused
- *      arg2 (I)    int unused
- *      arg3 (I)    int unused
- * --------------------------------------------------------------------------
- * Returns: ( subraster * ) ptr to subraster corresponding to \raisebox
- *              requested, or NULL for any parsing error
- * --------------------------------------------------------------------------
- * Notes:     o Summary of syntax...
- *        \raisebox{lift}{subexpression}
- *        o
- * ======================================================================= */
-static subraster *rastraise(const char **expression, int size,
-                            subraster * basesp, int arg1, int arg2,
-                            int arg3) {
-    char subexpr[MAXSUBXSZ + 1], *liftexpr = subexpr;   /* args */
-    subraster *raisesp = NULL;  /* rasterize subexpr to be raised */
-    int lift = 0;               /* amount to raise/lower baseline */
-/* -------------------------------------------------------------------------
-obtain {lift} argument immediately following \raisebox command
--------------------------------------------------------------------------- */
-     rastlift = 0;              /* reset global lift adjustment */
-/* --- parse for {lift} arg, and bump expression past it --- */
-    *expression = texsubexpr(*expression, liftexpr, 0, "{", "}", 0, 0);
-    if (*liftexpr == '\0')
-        goto end_of_job;        /* couldn't get {lift} */
-     lift = eround(liftexpr);   /* {lift} to integer */
-    if (abs(lift) > 200)
-         lift = 0;              /* sanity check */
-/* -------------------------------------------------------------------------
-obtain {subexpr} argument after {lift}, and rasterize it
--------------------------------------------------------------------------- */
-/* --- parse for {subexpr} arg, and bump expression past it --- */
-    *expression = texsubexpr(*expression, subexpr, 0, "{", "}", 0, 0);
-/* --- rasterize subexpression to be raised/lowered --- */
-    if ((raisesp = rasterize(subexpr, size))    /* rasterize subexpression */
-        == NULL)
-        goto end_of_job;        /* and quit if failed */
-/* -------------------------------------------------------------------------
-raise/lower baseline and return it to caller
--------------------------------------------------------------------------- */
-/* --- raise/lower baseline --- */
-     raisesp->baseline += lift; /* new baseline (no height checks) */
-     rastlift = lift;           /* set global to signal adjustment */
-/* --- return raised subexpr to caller --- */
-     end_of_job:return raisesp; /* return raised subexpr to caller */
-}                               /* --- end-of-function rastraise() --- */
-/* ==========================================================================
- * Function:    rastrotate ( expression, size, basesp, arg1, arg2, arg3 )
- * Purpose: \rotatebox{degrees}{subexpression} handler, returns subraster
- *      containing subexpression rotated by degrees (counterclockwise
- *      if degrees positive)
- * --------------------------------------------------------------------------
- * Arguments:   expression (I/O) char **  to first char of null-terminated
- *              string immediately following \rotatebox to be
- *              rasterized, and returning ptr immediately
- *              following last character processed.
- *      size (I)    int containing 0-7 default font size
- *      basesp (I)  subraster *  to character (or subexpression)
- *              immediately preceding \rotatebox
- *              (unused, but passed for consistency)
- *      arg1 (I)    int unused
- *      arg2 (I)    int unused
- *      arg3 (I)    int unused
- * --------------------------------------------------------------------------
- * Returns: ( subraster * ) ptr to subraster corresponding to \rotatebox
- *              requested, or NULL for any parsing error
- * --------------------------------------------------------------------------
- * Notes:     o Summary of syntax...
- *        \rotatebox{degrees}{subexpression}
- *        o
- * ======================================================================= */
-    subraster *rastrotate(const char **expression, int size,
-                          subraster * basesp, int arg1, int arg2,
-                          int arg3) {
-    char subexpr[MAXSUBXSZ + 1], *degexpr = subexpr;    /* args */
-    subraster *rotsp = NULL;    /* subraster for rotated subexpr */
-    raster *rotrp = NULL;       /* rotate subraster->image 90 degs */
-    int baseline = 0;           /* baseline of rasterized image */
-    double degrees = 0.0, ipart, fpart; /* degrees to be rotated */
-    int idegrees = 0, isneg = 0;        /* positive ipart, isneg=1 if neg */
-    int n90 = 0, isn90 = 1;     /* degrees is n90 multiples of 90 */
-/* -------------------------------------------------------------------------
-obtain {degrees} argument immediately following \rotatebox command
--------------------------------------------------------------------------- */
-/* --- parse for {degrees} arg, and bump expression past it --- */
-    *expression = texsubexpr(*expression, degexpr, 0, "{", "}", 0, 0);
-    if (*degexpr == '\0')
-        goto end_of_job;        /* couldn't get {degrees} */
-    degrees = (double) evalterm(mimestore, degexpr);    /* degrees to be rotated */
-    if (degrees < 0.0) {        /* clockwise rotation desired */
-        degrees = -degrees;     /* flip sign so degrees positive */
-        isneg = 1;
-    }                           /* and set flag to indicate flip */
-    fpart = modf(degrees, &ipart);      /* integer and fractional parts */
-    ipart = (double) (((int) degrees) % 360);   /* degrees mod 360 */
-    degrees = ipart + fpart;    /* restore fractional part */
-    if (isneg)                  /* if clockwise rotation requested */
-        degrees = 360.0 - degrees;      /* do equivalent counterclockwise */
-    idegrees = (int) (degrees + 0.5);   /* integer degrees */
-    n90 = idegrees / 90;        /* degrees is n90 multiples of 90 */
-    isn90 = (90 * n90 == idegrees);     /*true if degrees is multiple of 90 */
-    isn90 = 1;                  /* forced true for time being */
-/* -------------------------------------------------------------------------
-obtain {subexpr} argument after {degrees}, and rasterize it
--------------------------------------------------------------------------- */
-/* --- parse for {subexpr} arg, and bump expression past it --- */
-    *expression = texsubexpr(*expression, subexpr, 0, "{", "}", 0, 0);
-/* --- rasterize subexpression to be rotated --- */
-    if ((rotsp = rasterize(subexpr, size))      /* rasterize subexpression */
-        == NULL)
-        goto end_of_job;        /* and quit if failed */
-/* --- return unmodified image if no rotation requested --- */
-    if (abs(idegrees) < 2)
-        goto end_of_job;        /* don't bother rotating image */
-/* --- extract params for image to be rotated --- */
-    rotrp = rotsp->image;       /* unrotated rasterized image */
-    baseline = rotsp->baseline; /* and baseline of that image */
-/* -------------------------------------------------------------------------
-rotate by multiples of 90 degrees
--------------------------------------------------------------------------- */
-    if (isn90)                  /* rotation by multiples of 90 */
-        if (n90 > 0) {          /* do nothing for 0 degrees */
-            n90 = 4 - n90;      /* rasrot() rotates clockwise */
-            while (n90 > 0) {   /* still have remaining rotations */
-                raster *nextrp = rastrot(rotrp);        /* rotate raster image */
-                if (nextrp == NULL)
-                    break;      /* something's terribly wrong */
-                delete_raster(rotrp);   /* free previous raster image */
-                rotrp = nextrp; /* and replace it with rotated one */
-                n90--;
-            }                   /* decrement remaining count */
-        }
-    /* --- end-of-if(isn90) --- */
-    /* -------------------------------------------------------------------------
-       requested rotation not multiple of 90 degrees
-       -------------------------------------------------------------------------- */
-    if (!isn90) { /* explicitly construct rotation */ ;
-    }
-
-    /* not yet implemented */
-    /* -------------------------------------------------------------------------
-       re-populate subraster envelope with rotated image
-       -------------------------------------------------------------------------- */
-    /* --- re-init various subraster parameters, embedding raster in it --- */
-    if (rotrp != NULL) {        /* rotated raster constructed okay */
-        rotsp->type = IMAGERASTER;      /* signal constructed image */
-        rotsp->image = rotrp;   /* raster we just constructed */
-        /* --- now try to guess pleasing baseline --- */
-        if (idegrees > 2) {     /* leave unchanged if unrotated */
-            if (strlen(subexpr) < 3     /* we rotated a short expression */
-                || abs(idegrees - 180) < 3)     /* or just turned it upside-down */
-                baseline = rotrp->height - 1;   /* so set with nothing descending */
-            else                /* rotated a long expression */
-                baseline = (65 * (rotrp->height - 1)) / 100;
-        }                       /* roughly center long expr */
-        rotsp->baseline = baseline;
-    }
-    /* set baseline as calculated above */
-    /* --- return rotated subexpr to caller --- */
-  end_of_job:
-    return rotsp;
-}
-
-/* ==========================================================================
- * Function:    rastmagnify ( expression, size, basesp, arg1, arg2, arg3 )
- * Purpose: \magnify{magstep}{subexpression} handler, returns subraster
- *      containing magnified subexpression
- * --------------------------------------------------------------------------
- * Arguments:   expression (I/O) char **  to first char of null-terminated
- *              string immediately following \reflectbox to
- *              be rasterized, and returning ptr immediately
- *              following last character processed.
- *      size (I)    int containing 0-7 default font size
- *      basesp (I)  subraster *  to character (or subexpression)
- *              immediately preceding \reflectbox
- *              (unused, but passed for consistency)
- *      arg1 (I)    int unused
- *      arg2 (I)    int unused
- *      arg3 (I)    int unused
- * --------------------------------------------------------------------------
- * Returns: ( subraster * ) ptr to subraster corresponding to \magnify
- *              requested, or NULL for any parsing error
- * --------------------------------------------------------------------------
- * Notes:     o Summary of syntax...
- *        \magnify{magstep}{subexpression}
- *        o
- * ======================================================================= */
-static subraster *rastmagnify(const char **expression, int size,
-                              subraster * basesp, int arg1, int arg2,
-                              int arg3) {
-    char subexpr[MAXSUBXSZ + 1], *magexpr = subexpr;    /* args */
-    subraster *magsp = NULL;    /* subraster for magnified subexpr */
-    raster *magrp = NULL;       /* magnify subraster->image */
-    int a_magstep = 1;          /* default magnification */
-    int baseline = 0;           /* baseline of rasterized image */
-/* -------------------------------------------------------------------------
-obtain {magstep} argument immediately following \magnify command
--------------------------------------------------------------------------- */
-/* --- parse for {magstep} arg, and bump expression past it --- */
-    *expression = texsubexpr(*expression, magexpr, 255, "{", "}", 0, 0);
-     a_magstep = atoi(magexpr); /* convert {magstep} to int */
-    if (a_magstep < 1 || a_magstep > 10)        /* check magstep input */
-         a_magstep = 1;         /* back to default if illegal */
-/* -------------------------------------------------------------------------
-obtain {subexpr} argument after {magstep}, and rasterize it
--------------------------------------------------------------------------- */
-/* --- parse for {subexpr} arg, and bump expression past it --- */
-    *expression = texsubexpr(*expression, subexpr, 0, "{", "}", 0, 0);
-/* --- rasterize subexpression to be reflected --- */
-    if ((magsp = rasterize(subexpr, size))      /* rasterize subexpression */
-        == NULL)
-        goto end_of_job;        /* and quit if failed */
-/* --- return unmodified image if no magnification requested --- */
-    if (a_magstep <= 1)
-         goto end_of_job;       /* don't bother magnifying image */
-/* --- extract params for image to be magnified --- */
-     magrp = magsp->image;      /* unmagnified rasterized image */
-     baseline = magsp->baseline;        /* and baseline of that image */
-/* -------------------------------------------------------------------------
-magnify image and adjust its parameters
--------------------------------------------------------------------------- */
-/* --- magnify image --- */
-     magrp = rastmag(magsp->image, a_magstep);  /* magnify raster image */
-    if (magrp == NULL)
-        goto end_of_job;        /* failed to magnify image */
-     delete_raster(magsp->image);       /* free original raster image */
-     magsp->image = magrp;      /*and replace it with magnified one */
-/* --- adjust parameters --- */
-     baseline *= a_magstep;     /* scale baseline */
-    if (baseline > 0)
-         baseline += 1;         /* adjust for no descenders */
-     magsp->baseline = baseline;        /*reset baseline of magnified image */
-/* --- return magnified subexpr to caller --- */
-     end_of_job:return magsp;   /*back to caller with magnified expr */
-}                               /* --- end-of-function rastmagnify() --- */
-/* ==========================================================================
- * Function:    rastreflect ( expression, size, basesp, arg1, arg2, arg3 )
- * Purpose: \reflectbox[axis]{subexpression} handler, returns subraster
- *      containing subexpression reflected horizontally (i.e., around
- *      vertical axis, |_ becomes _|) if [axis] not given or axis=1,
- *      or reflected vertically if axis=2 given.
- * --------------------------------------------------------------------------
- * Arguments:   expression (I/O) char **  to first char of null-terminated
- *              string immediately following \reflectbox to
- *              be rasterized, and returning ptr immediately
- *              following last character processed.
- *      size (I)    int containing 0-7 default font size
- *      basesp (I)  subraster *  to character (or subexpression)
- *              immediately preceding \reflectbox
- *              (unused, but passed for consistency)
- *      arg1 (I)    int unused
- *      arg2 (I)    int unused
- *      arg3 (I)    int unused
- * --------------------------------------------------------------------------
- * Returns: ( subraster * ) ptr to subraster corresponding to \reflectbox
- *              requested, or NULL for any parsing error
- * --------------------------------------------------------------------------
- * Notes:     o Summary of syntax...
- *        \reflectbox[axis]{subexpression}
- *        o
- * ======================================================================= */
-    static subraster *rastreflect(const char **expression, int size,
-                                  subraster * basesp, int arg1, int arg2,
-                                  int arg3) {
-    char subexpr[MAXSUBXSZ + 1], *axisexpr = subexpr;   /* args */
-    subraster *refsp = NULL;    /* subraster for reflected subexpr */
-    raster *refrp = NULL;       /* reflect subraster->image */
-    int axis = 1;               /* default horizontal reflection */
-    int baseline = 0;           /* baseline of rasterized image */
-/* -------------------------------------------------------------------------
-obtain [axis] argument immediately following \reflectbox command, if given
--------------------------------------------------------------------------- */
-/* --- check for optional [axis] arg  --- */
-    if (*(*expression) == '[') {        /*check for []-enclosed optional arg */
-        *expression =
-            texsubexpr(*expression, axisexpr, 255, "[", "]", 0, 0);
-        axis = atoi(axisexpr);  /* convert [axis] to int */
-        if (axis < 1 || axis > 2)       /* check axis input */
-            axis = 1;
-    }
-
-    /* back to default if illegal *//* -------------------------------------------------------------------------
-       obtain {subexpr} argument after optional [axis], and rasterize it
-       -------------------------------------------------------------------------- *//* --- parse for {subexpr} arg, and bump expression past it --- */
-        *expression = texsubexpr(*expression, subexpr, 0, "{", "}", 0, 0);
-/* --- rasterize subexpression to be reflected --- */
-    if ((refsp = rasterize(subexpr, size))      /* rasterize subexpression */
-        == NULL)
-        goto end_of_job;        /* and quit if failed */
-/* --- return unmodified image if no reflection requested --- */
-    if (axis < 1 || axis > 2)
-        goto end_of_job;        /* don't bother reflecting image */
-/* --- extract params for image to be reflected --- */
-    refrp = refsp->image;       /* unreflected rasterized image */
-    baseline = refsp->baseline; /* and baseline of that image */
-/* -------------------------------------------------------------------------
-reflect image and adjust its parameters
--------------------------------------------------------------------------- */
-/* --- reflect image --- */
-    refrp = rastref(refsp->image, axis);        /* reflect raster image */
-    if (refrp == NULL)
-        goto end_of_job;        /* failed to reflect image */
-    delete_raster(refsp->image);        /* free original raster image */
-    refsp->image = refrp;       /*and replace it with reflected one */
-/* --- adjust parameters --- */
-    if (axis == 2)              /* for vertical reflection */
-        baseline = refrp->height - 1;   /* set with nothing descending */
-    refsp->baseline = baseline; /* reset baseline of reflected image */
-/* --- return reflected subexpr to caller --- */
-  end_of_job:
-    return refsp;               /*back to caller with reflected expr */
-}                               /* --- end-of-function rastreflect() --- */
-
-
-/* ==========================================================================
- * Function:    rastfbox ( expression, size, basesp, arg1, arg2, arg3 )
- * Purpose: \fbox{subexpression} handler, returns subraster
- *      containing subexpression with frame box drawn around it
- * --------------------------------------------------------------------------
- * Arguments:   expression (I/O) char **  to first char of null-terminated
- *              string immediately following \fbox to be
- *              rasterized, and returning ptr immediately
- *              following last character processed.
- *      size (I)    int containing 0-7 default font size
- *      basesp (I)  subraster *  to character (or subexpression)
- *              immediately preceding \fbox
- *              (unused, but passed for consistency)
- *      arg1 (I)    int unused
- *      arg2 (I)    int unused
- *      arg3 (I)    int unused
- * --------------------------------------------------------------------------
- * Returns: ( subraster * ) ptr to subraster corresponding to \fbox
- *              requested, or NULL for any parsing error
- * --------------------------------------------------------------------------
- * Notes:     o Summary of syntax...
- *        \fbox[width][height]{subexpression}
- *        o
- * ======================================================================= */
-subraster *rastfbox(const char **expression, int size, subraster * basesp,
-                    int arg1, int arg2, int arg3) {
-    char subexpr[MAXSUBXSZ + 1], widtharg[512]; /* args */
-    subraster *framesp = NULL;  /* rasterize subexpr to be framed */
-    raster *bp = NULL;          /* framed image raster */
-    int evalue = 0;             /* interpret [width][height] */
-    int fwidth = 6, fthick = 1; /*extra frame width, line thickness */
-    int fsides = 0;             /* frame sides: 1=left,2=top,4=right,8=bot */
-    int width = -1, height = -1;        /* optional [width][height] args */
-    int iscompose = 0;          /* set true if optional args given */
-/* -------------------------------------------------------------------------
-obtain optional [width][height] arguments immediately following \fbox
--------------------------------------------------------------------------- */
-/* --- first check for optional \fbox[width] --- */
-    if (*(*expression) == '[') {        /* check for []-enclosed width arg */
-        *expression =
-            texsubexpr(*expression, widtharg, 511, "[", "]", 0, 0);
-        if (!isempty(widtharg)) {       /* got widtharg */
-            char *comma = strchr(widtharg, ',');        /* look for [width,sides] */
-            if (comma == (char *) NULL) /* no comma */
-                comma = strchr(widtharg, ';');  /* permit semicolon [width;sides] */
-            if (comma != (char *) NULL) {       /* optional [width,fsides] found */
-                fsides = atoi(comma + 1);       /* interpret fsides after comma */
-                if (size < 5) { /* for smaller fonts */
-                    fwidth = 2;
-                    fthick = 1;
-                } /* tighten frame, thinner accent */
-                else {
-                    fwidth = 3;
-                    fthick = 2;
-                }               /* loosen frame, thicken accent */
-                *comma = '\0';  /* null-terminate width at comma */
-                trimwhite(widtharg);
-            }                   /*remove leading/trailing whitespace */
-            if (comma == (char *) NULL || !isempty(widtharg)) { /* have a width */
-                height = 1;     /* default explicit height, too */
-                if (fsides == 0) {      /* a normal framebox */
-                    evalue = eround(widtharg);  /* interpret and scale width */
-                    width = max2(1, evalue);    /* must be >0 */
-                    fwidth = 2;
-                    iscompose = 1;
-                } else          /* absolute pixels for "accents" */
-                    width = evalterm(mimestore, widtharg);
-            }
-        }                       /* --- end-of-if(!isempty(widtharg)) --- */
-    }                           /* --- end-of-if(**expression=='[') --- */
-    if (width > 0 || fsides > 0)        /* found leading [width], so... */
-        if (*(*expression) == '[') {    /* check for []-enclosed height arg */
-            *expression =
-                texsubexpr(*expression, widtharg, 511, "[", "]", 0, 0);
-            if (!isempty(widtharg)) {   /* got widtharg */
-                if (fsides == 0) {      /* a normal framebox */
-                    evalue = eround(widtharg);  /* interpret and scale height */
-                    height = max2(1, evalue);   /* must be >0 */
-                    fwidth = 0;
-                } /* no extra border */
-                else            /* absolute pixels for "accents" */
-                    height = evalterm(mimestore, widtharg);
-            }
-        }
-
-    /* --- end-of-if(**expression=='[') --- */
-    /* -------------------------------------------------------------------------
-       obtain {subexpr} argument
-       -------------------------------------------------------------------------- */
-    /* --- parse for {subexpr} arg, and bump expression past it --- */
-    *expression = texsubexpr(*expression, subexpr, 0, "{", "}", 0, 0);
-/* --- rasterize subexpression to be framed --- */
-    if (width < 0 || height < 0) {      /* no explicit dimensions given */
-        if ((framesp = rasterize(subexpr, size))        /* rasterize subexpression */
-            == NULL)
-            goto end_of_job;
-    } /* and quit if failed */
-    else {
-        char composexpr[8192];  /* compose subexpr with empty box */
-        sprintf(composexpr, "\\compose{\\hspace{%d}\\vspace{%d}}{%.8000s}",
-                width, height, subexpr);
-        if ((framesp = rasterize(composexpr, size))     /* rasterize subexpression */
-            == NULL)
-            goto end_of_job;
-    }                           /* and quit if failed */
-/* -------------------------------------------------------------------------
-draw frame, reset params, and return it to caller
--------------------------------------------------------------------------- */
-/* --- draw border --- */
-    if (fsides > 0)
-        fthick += (100 * fsides);       /* embed fsides in fthick arg */
-    if ((bp = border_raster(framesp->image, -fwidth, -fwidth, fthick, 1))
-        == NULL)
-        goto end_of_job;        /* draw border and quit if failed */
-/* --- replace original image and raise baseline to accommodate frame --- */
-    framesp->image = bp;        /* replace image with framed one */
-    if (!iscompose)             /* simple border around subexpr */
-        framesp->baseline += fwidth;    /* so just raise baseline */
-    else
-        framesp->baseline = (framesp->image)->height - 1;       /* set at bottom */
-/* --- return framed subexpr to caller --- */
-  end_of_job:
-    return framesp;
-}
-
-/* ==========================================================================
- * Function:    rasteval ( expression, size, basesp, arg1, arg2, arg3 )
- * Purpose: handle \eval
- * --------------------------------------------------------------------------
- * Arguments:   expression (I/O) char **  to first char of null-terminated
- *              string immediately following \eval,
- *              and returning ptr immediately
- *              following last character processed.
- *      size (I)    int containing 0-7 default font size
- *      basesp (I)  subraster *  to character (or subexpression)
- *              immediately preceding \eval
- *              (unused, but passed for consistency)
- *      arg1 (I)    int unused
- *      arg2 (I)    int unused
- *      arg3 (I)    int unused
- * --------------------------------------------------------------------------
- * Returns: ( subraster * ) subraster ptr to date stamp
- * --------------------------------------------------------------------------
- * Notes:     o
- * ======================================================================= */
-static subraster *rasteval(const char **expression, int size,
-                           subraster * basesp, int arg1, int arg2,
-                           int arg3) {
-    char subexpr[MAXSUBXSZ];    /* arg to be evaluated */
-    subraster *evalsp = NULL;   /* rasterize evaluated expression */
-    int value = 0;              /* evaluate expression */
-/* -------------------------------------------------------------------------
-Parse for subexpr to be \eval-uated, and bump expression past it
--------------------------------------------------------------------------- */
-    *expression = texsubexpr(*expression, subexpr, 0, "{", "}", 0, 0);
-    if (*subexpr == '\0')       /* couldn't get subexpression */
-        goto end_of_job;        /* nothing to do, so quit */
-/* -------------------------------------------------------------------------
-Evaluate expression, ascii-ize integer result, rasterize it
--------------------------------------------------------------------------- */
-/* --- evaluate expression --- */
-     value = evalterm(mimestore, subexpr);      /* evaluate expression */
-/* --- ascii-ize it --- */
-     sprintf(subexpr, "%d", value);     /* ascii version of value */
-/* --- rasterize ascii-ized expression value --- */
-     evalsp = rasterize(subexpr, size); /* rasterize evaluated expression */
-/* --- return evaluated expression raster to caller --- */
-     end_of_job:return (evalsp);
-}
-/* ==========================================================================
- * Function:    rastnoop ( expression, size, basesp, nargs, arg2, arg3 )
- * Purpose: no op -- flush \escape without error
- * --------------------------------------------------------------------------
- * Arguments:   expression (I/O) char **  to first char of null-terminated
- *              string immediately following \escape to be
- *              flushed, and returning ptr immediately
- *              following last character processed.
- *      size (I)    int containing 0-5 default font size
- *      basesp (I)  subraster *  to character (or subexpression)
- *              immediately preceding \escape
- *              (unused, but passed for consistency)
- *      nargs (I)   int containing number of {}-args after
- *              \escape to be flushed along with it
- *      arg2 (I)    int unused
- *      arg3 (I)    int unused
- * --------------------------------------------------------------------------
- * Returns: ( subraster * ) NULL subraster ptr
- * --------------------------------------------------------------------------
- * Notes:     o
- * ======================================================================= */
-    static subraster *rastnoop(const char **expression, int size,
-                               subraster * basesp, int nargs, int arg2,
-                               int arg3) {
-    char subexpr[MAXSUBXSZ + 1];        /*dummy args eaten by \escape */
-    subraster *noopsp = NULL;   /* rasterize subexpr */
-/* --- flush accompanying args if necessary --- */
-    if (nargs != NOVALUE && nargs > 0) {        /* and args to be flushed */
-        while (--nargs >= 0) {  /* count down */
-            *expression = texsubexpr(*expression, subexpr, 0, "{", "}", 0, 0);  /*flush arg */
-    }}
-                                                                                /* --- return null ptr to caller --- *//*end_of_job:*/ return noopsp;
-                                                                                /* return NULL ptr to caller */
-}
 
 /* ==========================================================================
  * Function:    strwrap ( s, linelen, tablen )
@@ -13573,17 +7298,18 @@ Evaluate expression, ascii-ize integer result, rasterize it
  *      for mathtex (where \n in verbatim mode instead of \\
  *      produced linebreaks).
  * ======================================================================= */
-char *strwrap(const char *s, int linelen, int tablen) {
+char *strwrap(const char *s, int linelen, int tablen)
+{
     static char sbuff[4096];    /* line-wrapped copy of s */
     char *sol = sbuff;          /* ptr to start of current line */
     char tab[32] = "                 "; /* tab string */
     int finalnewline = (lastchar(s) == '\n' ? 1 : 0);   /*newline at end of string? */
-    int istab = (tablen > 0 ? 1 : 0),   /* init true to indent first line */
-        iswhite = 0;            /* true if line break on whitespace */
-    int rhslen = 0,             /* remaining right hand side length */
-        thislen = 0,            /* length of current line segment */
-        thistab = 0,            /* length of tab on current line */
-        wordlen = 0;            /* length to next whitespace char */
+    int istab = (tablen > 0 ? 1 : 0);   /* init true to indent first line */
+    int iswhite = 0;            /* true if line break on whitespace */
+    int rhslen = 0;             /* remaining right hand side length */
+    int thislen = 0;            /* length of current line segment */
+    int thistab = 0;            /* length of tab on current line */
+    int wordlen = 0;            /* length to next whitespace char */
 /* -------------------------------------------------------------------------
 Make a clean copy of s
 -------------------------------------------------------------------------- */
@@ -13595,20 +7321,20 @@ Make a clean copy of s
          tablen = (-tablen);    /* set positive tablen */
     if (tablen >= linelen)
          tablen = linelen - 1;  /* tab was longer than line */
-     tab[min2(tablen, 16)] = '\0';      /* null-terminate tab string */
-     tablen = strlen(tab);      /* reset to actual tab length */
-     finalnewline = 0;          /* turned off for mimetex version */
+    tab[min2(tablen, 16)] = '\0';      /* null-terminate tab string */
+    tablen = strlen(tab);      /* reset to actual tab length */
+    finalnewline = 0;          /* turned off for mimetex version */
 /* --- start with copy of s --- */
-     strninit(sbuff, s, 3000);  /* leave room for \n's and tabs */
+    strninit(sbuff, s, 3000);  /* leave room for \n's and tabs */
     if (linelen < 1)
-         goto end_of_job;       /* can't do anything */
-     trimwhite(sbuff);          /*remove leading/trailing whitespace */
-     strreplace(sbuff, "\n", " ", 0);   /* remove any original \n's */
-     strreplace(sbuff, "\r", " ", 0);   /* remove any original \r's */
-     strreplace(sbuff, "\t", " ", 0);   /* remove any original \t's */
-     strreplace(sbuff, "\f", " ", 0);   /* remove any original \f's */
-     strreplace(sbuff, "\v", " ", 0);   /* remove any original \v's */
-     strreplace(sbuff, "\\\\", " ", 0); /* remove any original \\'s */
+        goto end_of_job;       /* can't do anything */
+    trimwhite(sbuff);          /*remove leading/trailing whitespace */
+    strreplace(sbuff, "\n", " ", 0);   /* remove any original \n's */
+    strreplace(sbuff, "\r", " ", 0);   /* remove any original \r's */
+    strreplace(sbuff, "\t", " ", 0);   /* remove any original \t's */
+    strreplace(sbuff, "\f", " ", 0);   /* remove any original \f's */
+    strreplace(sbuff, "\v", " ", 0);   /* remove any original \v's */
+    strreplace(sbuff, "\\\\", " ", 0); /* remove any original \\'s */
 /* -------------------------------------------------------------------------
 Insert \\'s and spaces as needed
 -------------------------------------------------------------------------- */
@@ -13625,11 +7351,10 @@ Insert \\'s and spaces as needed
         rhslen = strlen(sol);   /* remaining right hand side chars */
         if (rhslen + thistab <= linelen)
             break;              /* no more \\'s needed */
-        if (0 && msgfp != NULL && msglevel >= 99) {
-            fprintf(msgfp, "strwrap> rhslen=%d, sol=\"\"%s\"\"\n", rhslen,
-                    sol);
-            fflush(msgfp);
-        }
+#if DEBUG_LOG_LEVEL >= 10000
+        fprintf(msgfp, "strwrap> rhslen=%d, sol=\"\"%s\"\"\n", rhslen,
+                sol);
+#endif
         /* --- look for last whitespace preceding linelen --- */
         while (1) {             /* till we exceed linelen */
             wordlen = strcspn(sol + thislen, " \t\n\r\f\v :;.,");       /*ptr to next white/break */
@@ -13648,2141 +7373,30 @@ Insert \\'s and spaces as needed
         strchange(iswhite, sol + thislen - iswhite, "\\\\");    /* put \\ at end of line */
         sol += (thislen + 2 - iswhite); /* next line starts after \\ */
     }                           /* --- end-of-while(1) --- */
-  end_of_job:
+
+end_of_job:
     if (finalnewline)
         strcat(sbuff, "\\\\");  /* replace final newline */
-    return (sbuff);             /* back with clean copy of s */
-}                               /* --- end-of-function strwrap() --- */
-
-/* ==========================================================================
- * Function:    aalowpass ( rp, bytemap, grayscale )
- * Purpose: calculates a lowpass anti-aliased bytemap
- *      for rp->bitmap, with each byte 0...grayscale-1
- * --------------------------------------------------------------------------
- * Arguments:   rp (I)      raster *  to raster whose bitmap
- *              is to be anti-aliased
- *      bytemap (O) intbyte * to bytemap, calculated
- *              by applying lowpass filter to rp->bitmap,
- *              and returned (as you'd expect) in 1-to-1
- *              addressing correspondence with rp->bitmap
- *      grayscale (I)   int containing number of grayscales
- *              to be calculated, 0...grayscale-1
- *              (should typically be given as 256)
- * --------------------------------------------------------------------------
- * Returns: ( int )     1=success, 0=any error
- * --------------------------------------------------------------------------
- * Notes:     o If the center point of the box being averaged is black,
- *      then the entire "average" is forced black (grayscale-1)
- *      regardless of the surrounding points.  This is my attempt
- *      to avoid a "washed-out" appearance of thin (one-pixel-wide)
- *      lines, which would otherwise turn from black to a gray shade.
- *       o  Also, while the weights for neighbor points are fixed,
- *      you may adjust the center point weight on the compile line.
- *      A higher weight sharpens the resulting anti-aliased image;
- *      lower weights blur it out more (but keep the "center" black
- *      as per the preceding note).
- * ======================================================================= */
-int aalowpass(raster * rp, intbyte * bytemap, int grayscale) {
-    int status = 1;             /* 1=success, 0=failure to caller */
-    pixbyte *bitmap = (rp == NULL ? NULL : rp->pixmap); /*local rp->pixmap ptr */
-    int irow = 0, icol = 0;     /* rp->height, rp->width indexes */
-    int weights[9] = {
-    1, 3, 1, 3, 0, 3, 1, 3, 1}; /* matrix of weights */
-    int adjindex[9] = {
-    0, 1, 2, 7, -1, 3, 6, 5, 4};        /*clockwise from upper-left */
-    int totwts = 0;             /* sum of all weights in matrix */
-    int isforceavg = 1,         /*force avg black if center black? */
-        isminmaxwts = 1,        /*use wts or #pts for min/max test */
-        blackscale = 0;         /*(grayscale+1)/4; *//*force black if wgted avg>bs */
-/* -------------------------------------------------------------------------
-Initialization
--------------------------------------------------------------------------- */
-/* --- calculate total weights --- */
-    weights[4] = centerwt;      /* weight for center point */
-    weights[1] = weights[3] = weights[5] = weights[7] = adjacentwt;     /*adjacent pts */
-    totwts = centerwt + 4 * (1 + adjacentwt);   /* tot is center plus neighbors */
-/* -------------------------------------------------------------------------
-Calculate bytemap as 9-point weighted average over bitmap
--------------------------------------------------------------------------- */
-    for (irow = 0; irow < rp->height; irow++) {
-        for (icol = 0; icol < rp->width; icol++) {
-            int ipixel = icol + irow * (rp->width);     /* center pixel index */
-            int jrow = 0, jcol = 0,     /* box around ipixel */
-                bitval = 0,     /* value of bit/pixel at jrow,jcol */
-                iscenter = 0,   /* set true if center pixel black */
-                nadjacent = 0, wadjacent = 0,   /* #adjacent black pixels, their wts */
-                ngaps = 0,      /* #gaps in 8 pixels around center */
-                iwt = (-1), sumwts = 0; /* weights index, sum in-bound wts */
-            char adjmatrix[8];  /* adjacency "matrix" */
-            memset(adjmatrix, 0, 8);    /* zero out adjacency matrix */
-            bytemap[ipixel] = 0;        /* init pixel white */
-  /*--- for ipixel at irow,icol, get weighted average of adjacent pixels ---*/
-            for (jrow = irow - 1; jrow <= irow + 1; jrow++)     /* jrow = irow-1...irow+1 */
-                for (jcol = icol - 1; jcol <= icol + 1; jcol++) {       /* jcol = icol-1...icol+1 */
-                    int jpixel = jcol + jrow * (rp->width);     /* averaging index */
-                    iwt++;      /*always bump weight index */
-                    if (jrow < 0 || jrow >= rp->height  /* if row out pf bounds */
-                        || jcol < 0 || jcol >= rp->width)       /* or col out of bounds */
-                        continue;       /* ignore this point */
-                    bitval = (int) getlongbit(bitmap, jpixel);  /* value of bit at jrow,jcol */
-                    if (bitval) {       /* this is a black pixel */
-                        if (jrow == irow && jcol == icol)       /* and this is center point */
-                            iscenter = 1;       /* set flag for center point black */
-                        else {  /* adjacent point black */
-                            nadjacent++;        /* bump adjacent black count */
-                            adjmatrix[adjindex[iwt]] = 1;
-                        }       /*set "bit" in adjacency matrix */
-                        wadjacent += weights[iwt];
-                    }           /* sum weights for black pixels */
-                    sumwts += weights[iwt];     /* and sum weights for all pixels */
-                }               /* --- end-of-for(jrow,jcol) --- */
-            /* --- count gaps --- */
-            ngaps = (adjmatrix[7] != adjmatrix[0] ? 1 : 0);     /* init count */
-            for (iwt = 0; iwt < 7; iwt++)       /* clockwise around adjacency */
-                if (adjmatrix[iwt] != adjmatrix[iwt + 1])
-                    ngaps++;    /* black/white flip */
-            ngaps /= 2;         /*each gap has 2 black/white flips */
-            /* --- anti-alias pixel, but leave it black if it was already black --- */
-            if (isforceavg && iscenter) /* force avg if center point black */
-                bytemap[ipixel] = grayscale - 1;        /* so force grayscale-1=black */
-            else /* center point not black */ if (ngaps <= 2) { /*don't darken checkerboarded pixel */
-                bytemap[ipixel] =       /* 0=white ... grayscale-1=black */
-                    ((totwts / 2 - 1) + (grayscale - 1) * wadjacent) / totwts;  /* not /sumwts; */
-                if (blackscale > 0      /* blackscale kludge turned on */
-                    && bytemap[ipixel] > blackscale)    /* weighted avg > blackscale */
-                    bytemap[ipixel] = grayscale - 1;
-            }
-            /* so force it entirely black */
- /*--- only anti-alias pixels whose adjacent pixels fall within bounds ---*/
-            if (!iscenter) {    /* apply min/maxadjacent test */
-                if (isminmaxwts) {      /* min/max refer to adjacent weights */
-                    if (wadjacent < minadjacent /* wts of adjacent points too low */
-                        || wadjacent > maxadjacent)     /* or too high */
-                        bytemap[ipixel] = 0;
-                } /* so leave point white */
-                else {          /* min/max refer to #adjacent points */
-                    if (nadjacent < minadjacent /* too few adjacent points black */
-                        || nadjacent > maxadjacent)     /* or too many */
-                        bytemap[ipixel] = 0;
-                }
-            }                   /* so leave point white */
-        }
-    }
-/*end_of_job:*/
-    return status;
+    return sbuff;
 }
 
-/* ==========================================================================
- * Function:    aapnm ( rp, bytemap, grayscale )
- * Purpose: calculates a lowpass anti-aliased bytemap
- *      for rp->bitmap, with each byte 0...grayscale-1,
- *      based on the pnmalias.c algorithm
- * --------------------------------------------------------------------------
- * Arguments:   rp (I)      raster *  to raster whose bitmap
- *              is to be anti-aliased
- *      bytemap (O) intbyte * to bytemap, calculated
- *              by applying pnm-based filter to rp->bitmap,
- *              and returned (as you'd expect) in 1-to-1
- *              addressing correspondence with rp->bitmap
- *      grayscale (I)   int containing number of grayscales
- *              to be calculated, 0...grayscale-1
- *              (should typically be given as 256)
- * --------------------------------------------------------------------------
- * Returns: ( int )     1=success, 0=any error
- * --------------------------------------------------------------------------
- * Notes:    o  Based on the pnmalias.c algorithm in the netpbm package
- *      on sourceforge.
- * ======================================================================= */
-int aapnm(raster * rp, intbyte * bytemap, int grayscale) {
-    pixbyte *bitmap = rp->pixmap;       /* local rp->pixmap ptr */
-    int width = rp->width, height = rp->height, /* width, height of raster */
-        icol = 0, irow = 0,     /* width, height indexes */
-        imap = (-1);            /* pixel index = icol + irow*width */
-    int bgbitval = 0, fgbitval = 1;     /* background, foreground bitval */
-    int isfirstaa = 1;          /*debugging switch signals 1st pixel */
-#if 0
-    int totwts = 12, wts[9] = {
-    1, 1, 1, 1, 4, 1, 1, 1, 1}; /* pnmalias default wts */
-    int totwts = 16, wts[9] = {
-    1, 2, 1, 2, 4, 2, 1, 2, 1}; /* weights */
-#endif
-    int totwts = 18, wts[9] = {
-    1, 2, 1, 2, 6, 2, 1, 2, 1}; /* pnmalias default wts */
-    int isresetparams = 1,      /* true to set antialiasing params */
-        isfgalias = 1,          /* true to antialias fg bits */
-        isfgonly = 0,           /* true to only antialias fg bits */
-        isbgalias = 0,          /* true to antialias bg bits */
-        isbgonly = 0;           /* true to only antialias bg bits */
-/* -------------------------------------------------------------------------
-Initialization
--------------------------------------------------------------------------- */
-/* --- check for bold light --- */
-    if (0) {
-        if (weightnum > 2) {
-            isbgalias = 1;
-        }                       /* simulate bold */
-        if (weightnum < 1) {
-            isbgonly = 1;
-            isfgalias = 0;
-        }
-    }
-    /* simulate light */
-    /* --- reset wts[], etc, and calculate total weights --- */
-    if (isresetparams) {        /* wts[], etc taken from params */
-        int iwt = 0;            /* wts[iwt] index */
-        wts[4] = centerwt;      /* weight for center point */
-        wts[1] = wts[3] = wts[5] = wts[7] = adjacentwt; /* and adjacent points */
-        wts[0] = wts[2] = wts[6] = wts[8] = cornerwt;   /* and corner points */
-        for (totwts = 0, iwt = 0; iwt < 9; iwt++)
-            totwts += wts[iwt]; /* sum wts */
-        isfgalias = fgalias;    /* set isfgalias */
-        isfgonly = fgonly;      /* set isfgonly */
-        isbgalias = bgalias;    /* set isbgalias */
-        isbgonly = bgonly;
-    }
-    /* set isbgonly */
-    /* -------------------------------------------------------------------------
-       Calculate bytemap as 9-point weighted average over bitmap
-       -------------------------------------------------------------------------- */
-    for (irow = 0; irow < height; irow++)
-        for (icol = 0; icol < width; icol++) {
-            /* --- local allocations and declarations --- */
-            int bitval = 0,     /* value of rp bit at irow,icol */
-                nnbitval = 0, nebitval = 0, eebitval = 0, sebitval = 0, /*adjacent vals */
-                ssbitval = 0, swbitval = 0, wwbitval = 0, nwbitval = 0; /*compass pt names */
-            int isbgedge = 0, isfgedge = 0;     /*does pixel border a bg or fg edge */
-            int aabyteval = 0;  /* antialiased (or unchanged) value */
-            /* --- bump imap index and get center bit value --- */
-            imap++;             /* imap = icol + irow*width */
-            bitval = getlongbit(bitmap, imap);  /* value of rp input bit at imap */
-            aabyteval = (intbyte) (bitval == bgbitval ? 0 : grayscale - 1);     /* default aa val */
-            bytemap[imap] = (intbyte) (aabyteval);      /* init antialiased pixel */
-            /* --- check if we're antialiasing this pixel --- */
-            if ((isbgonly && bitval == fgbitval)        /* only antialias background bit */
-                ||(isfgonly && bitval == bgbitval))     /* only antialias foreground bit */
-                continue;       /* leave default and do next bit */
-            /* --- get surrounding bits --- */
-            if (irow > 0)       /* nn (north) bit available */
-                nnbitval = getlongbit(bitmap, imap - width);    /* nn bit value */
-            if (irow < height - 1)      /* ss (south) bit available */
-                ssbitval = getlongbit(bitmap, imap + width);    /* ss bit value */
-            if (icol > 0) {     /* ww (west) bit available */
-                wwbitval = getlongbit(bitmap, imap - 1);        /* ww bit value */
-                if (irow > 0)   /* nw bit available */
-                    nwbitval = getlongbit(bitmap, imap - width - 1);    /* nw bit value */
-                if (irow < height - 1)  /* sw bit available */
-                    swbitval = getlongbit(bitmap, imap + width - 1);
-            }                   /* sw bit value */
-            if (icol < width - 1) {     /* ee (east) bit available */
-                eebitval = getlongbit(bitmap, imap + 1);        /* ee bit value */
-                if (irow > 0)   /* ne bit available */
-                    nebitval = getlongbit(bitmap, imap - width + 1);    /* ne bit value */
-                if (irow < height - 1)  /* se bit available */
-                    sebitval = getlongbit(bitmap, imap + width + 1);
-            }
-            /* se bit value */
-            /* --- check for edges --- */
-            isbgedge =          /* current pixel borders a bg edge */
-                (nnbitval == bgbitval && eebitval == bgbitval) ||       /*upper-right edge */
-                (eebitval == bgbitval && ssbitval == bgbitval) ||       /*lower-right edge */
-                (ssbitval == bgbitval && wwbitval == bgbitval) ||       /*lower-left  edge */
-                (wwbitval == bgbitval && nnbitval == bgbitval); /*upper-left  edge */
-            isfgedge =          /* current pixel borders an fg edge */
-                (nnbitval == fgbitval && eebitval == fgbitval) ||       /*upper-right edge */
-                (eebitval == fgbitval && ssbitval == fgbitval) ||       /*lower-right edge */
-                (ssbitval == fgbitval && wwbitval == fgbitval) ||       /*lower-left  edge */
-                (wwbitval == fgbitval && nnbitval == fgbitval); /*upper-left  edge */
-            /* ---check top/bot left/right edges for corners (added by j.forkosh)--- */
-            if (1) {            /* true to perform test */
-                int isbghorz = 0, isfghorz = 0, isbgvert = 0, isfgvert = 0;     /* horz/vert edges */
-                isbghorz =      /* top or bottom edge is all bg */
-                    (nwbitval + nnbitval + nebitval == 3 * bgbitval) || /* top edge bg */
-                    (swbitval + ssbitval + sebitval == 3 * bgbitval);   /* bottom edge bg */
-                isfghorz =      /* top or bottom edge is all fg */
-                    (nwbitval + nnbitval + nebitval == 3 * fgbitval) || /* top edge fg */
-                    (swbitval + ssbitval + sebitval == 3 * fgbitval);   /* bottom edge fg */
-                isbgvert =      /* left or right edge is all bg */
-                    (nwbitval + wwbitval + swbitval == 3 * bgbitval) || /* left edge bg */
-                    (nebitval + eebitval + sebitval == 3 * bgbitval);   /* right edge bg */
-                isfgvert =      /* left or right edge is all bg */
-                    (nwbitval + wwbitval + swbitval == 3 * fgbitval) || /* left edge fg */
-                    (nebitval + eebitval + sebitval == 3 * fgbitval);   /* right edge fg */
-                if ((isbghorz && isbgvert && (bitval == fgbitval))      /* we're at an... */
-                    ||(isfghorz && isfgvert && (bitval == bgbitval)))   /*...inside corner */
-                    continue;   /* don't antialias */
-            }
-            /* --- end-of-if(1) --- */
-            /* --- check #gaps for checkerboard (added by j.forkosh) --- */
-            if (0) {            /* true to perform test */
-                int ngaps = 0, mingaps = 1, maxgaps = 2;        /* count #fg/bg flips (max=4 noop) */
-                if (nwbitval != nnbitval)
-                    ngaps++;    /* upper-left =? upper */
-                if (nnbitval != nebitval)
-                    ngaps++;    /* upper =? upper-right */
-                if (nebitval != eebitval)
-                    ngaps++;    /* upper-right =? right */
-                if (eebitval != sebitval)
-                    ngaps++;    /* right =? lower-right */
-                if (sebitval != ssbitval)
-                    ngaps++;    /* lower-right =? lower */
-                if (ssbitval != swbitval)
-                    ngaps++;    /* lower =? lower-left */
-                if (swbitval != wwbitval)
-                    ngaps++;    /* lower-left =? left */
-                if (wwbitval != nwbitval)
-                    ngaps++;    /* left =? upper-left */
-                if (ngaps > 0)
-                    ngaps /= 2; /* each gap has 2 bg/fg flips */
-                if (ngaps < mingaps || ngaps > maxgaps)
-                    continue;
-            }
-            /* --- end-of-if(1) --- */
-            /* --- antialias if necessary --- */
-            if ((isbgalias && isbgedge) /* alias pixel surrounding bg */
-                ||(isfgalias && isfgedge)       /* alias pixel surrounding fg */
-                ||(isbgedge && isfgedge)) {     /* neighboring fg and bg pixel */
-                int aasumval =  /* sum wts[]*bitmap[] */
-                    wts[0] * nwbitval + wts[1] * nnbitval +
-                    wts[2] * nebitval + wts[3] * wwbitval +
-                    wts[4] * bitval + wts[5] * eebitval +
-                    wts[6] * swbitval + wts[7] * ssbitval +
-                    wts[8] * sebitval;
-                double aawtval = ((double) aasumval) / ((double) totwts);       /* weighted val */
-                aabyteval = (int) (((double) (grayscale - 1)) * aawtval + 0.5); /*0...grayscale-1 */
-                bytemap[imap] = (intbyte) (aabyteval);  /* set antialiased pixel */
-                if (msglevel >= 99 && msgfp != NULL) {
-                    fprintf(msgfp,      /*diagnostic output */
-                            "%s> irow,icol,imap=%d,%d,%d aawtval=%.4f aabyteval=%d\n",
-                            (isfirstaa ? "aapnm algorithm" : "aapnm"),
-                            irow, icol, imap, aawtval, aabyteval);
-                    isfirstaa = 0;
-                }
-            }                   /* --- end-of-if(isedge) --- */
-        }                       /* --- end-of-for(irow,icol) --- */
-/* -------------------------------------------------------------------------
-Back to caller with gray-scale anti-aliased bytemap
--------------------------------------------------------------------------- */
-/*end_of_job:*/
-    return 1;
-}
-
-/* ==========================================================================
- * Function:    aapnmlookup ( rp, bytemap, grayscale )
- * Purpose: calculates a lowpass anti-aliased bytemap
- *      for rp->bitmap, with each byte 0...grayscale-1,
- *      based on the pnmalias.c algorithm.
- *      This version uses aagridnum() and aapatternnum() lookups
- *      to interpret 3x3 lowpass pixel grids.
- * --------------------------------------------------------------------------
- * Arguments:   rp (I)      raster *  to raster whose bitmap
- *              is to be anti-aliased
- *      bytemap (O) intbyte * to bytemap, calculated
- *              by applying pnm-based filter to rp->bitmap,
- *              and returned (as you'd expect) in 1-to-1
- *              addressing correspondence with rp->bitmap
- *      grayscale (I)   int containing number of grayscales
- *              to be calculated, 0...grayscale-1
- *              (should typically be given as 256)
- * --------------------------------------------------------------------------
- * Returns: ( int )     1=success, 0=any error
- * --------------------------------------------------------------------------
- * Notes:    o  Based on the pnmalias.c algorithm in the netpbm package
- *      on sourceforge.
- *       o  This version uses aagridnum() and aapatternnum() lookups
- *      to interpret 3x3 lowpass pixel grids.
- * ======================================================================= */
-int aapnmlookup(raster * rp, intbyte * bytemap, int grayscale) {
-    int width = rp->width, height = rp->height, /* width, height of raster */
-        icol = 0, irow = 0,     /* width, height indexes */
-        imap = (-1);            /* pixel index = icol + irow*width */
-    int bgbitval = 0, fgbitval = 1;     /* background, foreground bitval */
-    int isfirstaa = 1;          /*debugging switch signals 1st pixel */
-    int aacenterwt = centerwt, aaadjacentwt = adjacentwt, aacornerwt = cornerwt, totwts = centerwt + 4 * (adjacentwt + cornerwt);       /*pnmalias default wts */
-    int isfgalias = fgalias,    /*(1) true to antialias fg bits */
-        isfgonly = fgonly,      /*(0) true to only antialias fg bits */
-        isbgalias = bgalias,    /*(0) true to antialias bg bits */
-        isbgonly = bgonly;      /*(0) true to only antialias bg bits */
-    int gridnum = -1;           /* grid# for 3x3 grid at irow,icol */
-    int patternum = -1;         /*pattern#, 1-51, for input gridnum */
-/* ---
- * pattern number data
- * ------------------- */
-/* --- number of adjacent fg pixels set in pattern --- */
-    static int nadjacents[] = {
-        -1,                     /* #adjacent fg pixels for pattern */
-            0, 4, 0, 1, 4, 3, 1, 0, 1, 0,       /*  1-10 */
-            2, 2, 3, 4, 3, 4, 2, 2, 1, 2,       /* 11-20 */
-            1, 2, 1, 2, 0, 1, 3, 2, 3, 2,       /* 21-30 */
-            3, 2, 3, 2, 4, 3, 1, 2, 2, 2,       /* 31-40 */
-            2, 1, 2, 2, 3, 0, 3, 2, 2, 1, 4,    /* 41-51 */
-    -1};                        /* --- end-of-nadjacents[] --- */
-/* --- number of corner fg pixels set in pattern --- */
-    static int ncorners[] = {
-        -1,                     /* #corner fg pixels for pattern */
-            0, 4, 1, 0, 3, 4, 1, 2, 1, 2,       /*  1-10 */
-            0, 0, 3, 2, 3, 2, 4, 4, 2, 1,       /* 11-20 */
-            2, 1, 2, 1, 3, 2, 0, 1, 2, 3,       /* 21-30 */
-            2, 3, 2, 3, 1, 2, 4, 3, 2, 2,       /* 31-40 */
-            2, 3, 2, 2, 1, 4, 1, 2, 2, 3, 0,    /* 41-51 */
-    -1};                        /* --- end-of-ncorners[] --- */
-/* --- 0,1,2=pattern contains horizontal bg,fg,both edge; -1=no edge --- */
-    static int horzedges[] = {
-        -1,                     /* 0,1,2 = horz bg,fg,both edge */
-            0, 1, 0, 0, 1, 1, 0, 0, 0, -1,      /*  1-10 */
-            0, -1, 1, 1, 1, -1, 1, -1, 2, 0,    /* 11-20 */
-            -1, -1, -1, 0, -1, -1, -1, -1, 2, 1,        /* 21-30 */
-            -1, -1, -1, 1, -1, -1, -1, -1, 2, -1,       /* 31-40 */
-            -1, 1, 1, -1, -1, -1, 0, 0, -1, -1, -1,     /* 41-51 */
-    -1};                        /* --- end-of-horzedges[] --- */
-/* --- 0,1,2=pattern contains vertical bg,fg,both edge; -1=no edge --- */
-    static int vertedges[] = {
-        -1,                     /* 0,1,2 = vert bg,fg,both edge */
-            0, 1, 0, 0, 1, 1, 0, -1, -1, -1,    /*  1-10 */
-            0, 0, 1, -1, -1, -1, 1, 1, -1, -1,  /* 11-20 */
-            -1, 0, 0, 0, -1, -1, 0, -1, -1, -1, /* 21-30 */
-            -1, 1, 1, 1, -1, -1, 1, -1, -1, -1, /* 31-40 */
-            -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, /* 41-51 */
-    -1};                        /* --- end-of-vertedges[] --- */
-/* --- 0,1,2=pattern contains diagonal bg,fg,both edge; -1=no edge --- */
-    static int diagedges[] = {
-        -1,                     /* 0,1,2 = diag bg,fg,both edge */
-            0, 1, 0, 0, 1, 1, 0, 0, 0, 0,       /*  1-10 */
-            2, -1, 1, 1, 1, 1, 1, -1, 0, 2,     /* 11-20 */
-            0, -1, 0, 2, 0, -1, 1, 1, 1, 1,     /* 21-30 */
-            1, -1, 1, 2, 1, 1, -1, 1, 2, -1,    /* 31-40 */
-            1, 0, -1, 2, 1, 0, 1, -1, 1, -1, 1, /* 41-51 */
-    -1};                        /* --- end-of-diagedges[] --- */
-/* -------------------------------------------------------------------------
-Calculate bytemap as 9-point weighted average over bitmap
--------------------------------------------------------------------------- */
-    for (irow = 0; irow < height; irow++)
-        for (icol = 0; icol < width; icol++) {
-            /* --- local allocations and declarations --- */
-            int bitval = 0,     /* value of rp bit at irow,icol */
-                isbgdiag = 0, isfgdiag = 0,     /*does pixel border a bg or fg edge */
-                aabyteval = 0;  /* antialiased (or unchanged) value */
-            /* --- get gridnum and center bit value, init aabyteval --- */
-            imap++;             /* first set imap=icol + irow*width */
-            gridnum = aagridnum(rp, irow, icol);        /*grid# coding 3x3 grid at irow,icol */
-            bitval = (gridnum & 1);     /* center bit set if gridnum odd */
-            aabyteval = (intbyte) (bitval == bgbitval ? 0 : grayscale - 1);     /* default aa val */
-            bytemap[imap] = (intbyte) (aabyteval);      /* init antialiased pixel */
-            if (gridnum < 0 || gridnum > 511)
-                continue;       /* gridnum out of bounds */
-            /* --- check if we're antialiasing this pixel --- */
-            if ((isbgonly && bitval == fgbitval)        /* only antialias background bit */
-                ||(isfgonly && bitval == bgbitval))     /* only antialias foreground bit */
-                continue;       /* leave default and do next bit */
-            /* --- look up pattern number, 1-51, corresponding to input gridnum --- */
-            patternum = aapatternnum(gridnum);  /* look up pattern number */
-            if (patternum < 1 || patternum > 51)
-                continue;       /* some internal error */
-            /* --- special pattern number processing --- */
-            if ((aabyteval = aapatterns(rp, irow, icol, gridnum, patternum, grayscale)) >= 0) { /* special processing for pattern */
-                bytemap[imap] = (intbyte) (aabyteval);  /* set antialiased pixel */
-                continue;
-            }
-            /* and continue with next pixel */
-            /* --- check for diagonal edges --- */
-            isbgdiag = (diagedges[patternum] == 2 ||    /*current pixel borders a bg edge */
-                        diagedges[patternum] == 0);
-            isfgdiag = (diagedges[patternum] == 2 ||    /*current pixel borders a fg edge */
-                        diagedges[patternum] == 1);
-            /* ---check top/bot left/right edges for corners (added by j.forkosh)--- */
-            if (1) {            /* true to perform test */
-                int isbghorz = 0, isfghorz = 0, isbgvert = 0, isfgvert = 0,     /* horz/vert edges */
-                    horzedge = horzedges[patternum], vertedge =
-                    vertedges[patternum];
-                isbghorz = (horzedge == 2 || horzedge == 0);    /* top or bottom edge is all bg */
-                isfghorz = (horzedge == 2 || horzedge == 1);    /* top or bottom edge is all fg */
-                isbgvert = (vertedge == 2 || vertedge == 0);    /* left or right edge is all bg */
-                isfgvert = (vertedge == 2 || vertedge == 1);    /* left or right edge is all fg */
-                if ((isbghorz && isbgvert && (bitval == fgbitval))      /* we're at an... */
-                    ||(isfghorz && isfgvert && (bitval == bgbitval)))   /*...inside corner */
-                    continue;   /* don't antialias */
-            }                   /* --- end-of-if(1) --- */
-#if 0
-            /* --- check #gaps for checkerboard (added by j.forkosh) --- */
-            if (0) {            /* true to perform test */
-                int ngaps = 0, mingaps = 1, maxgaps = 2;        /* count #fg/bg flips (max=4 noop) */
-                if (nwbitval != nnbitval)
-                    ngaps++;    /* upper-left =? upper */
-                if (nnbitval != nebitval)
-                    ngaps++;    /* upper =? upper-right */
-                if (nebitval != eebitval)
-                    ngaps++;    /* upper-right =? right */
-                if (eebitval != sebitval)
-                    ngaps++;    /* right =? lower-right */
-                if (sebitval != ssbitval)
-                    ngaps++;    /* lower-right =? lower */
-                if (ssbitval != swbitval)
-                    ngaps++;    /* lower =? lower-left */
-                if (swbitval != wwbitval)
-                    ngaps++;    /* lower-left =? left */
-                if (wwbitval != nwbitval)
-                    ngaps++;    /* left =? upper-left */
-                if (ngaps > 0)
-                    ngaps /= 2; /* each gap has 2 bg/fg flips */
-                if (ngaps < mingaps || ngaps > maxgaps)
-                    continue;
-            }                   /* --- end-of-if(1) --- */
-#endif
-            /* --- antialias if necessary --- */
-            if ((isbgalias && isbgdiag) /* alias pixel surrounding bg */
-                ||(isfgalias && isfgdiag)       /* alias pixel surrounding fg */
-                ||(isbgdiag && isfgdiag)) {     /* neighboring fg and bg pixel */
-                int aasumval =  /* sum wts[]*bitmap[] */
-                    aacenterwt * bitval +       /* apply centerwt to center pixel */
-                    aaadjacentwt * nadjacents[patternum] +      /* similarly for adjacents */
-                    aacornerwt * ncorners[patternum];   /* and corners */
-                double aawtval = ((double) aasumval) / ((double) totwts);       /* weighted val */
-                aabyteval = (int) (((double) (grayscale - 1)) * aawtval + 0.5); /*0...grayscale-1 */
-                bytemap[imap] = (intbyte) (aabyteval);  /* set antialiased pixel */
-                if (msglevel >= 99 && msgfp != NULL) {
-                    fprintf(msgfp,      /*diagnostic output */
-                            "%s> irow,icol,imap=%d,%d,%d aawtval=%.4f aabyteval=%d",
-                            (isfirstaa ? "aapnmlookup algorithm" :
-                             "aapnm"), irow, icol, imap, aawtval,
-                            aabyteval);
-                    if (msglevel < 100)
-                        fprintf(msgfp, "\n");   /* no more output */
-                    else
-                        fprintf(msgfp, ", grid#,pattern#=%d,%d\n", gridnum,
-                                patternum);
-                    isfirstaa = 0;
-                }
-            }                   /* --- end-of-if(isedge) --- */
-        }                       /* --- end-of-for(irow,icol) --- */
-/* -------------------------------------------------------------------------
-Back to caller with gray-scale anti-aliased bytemap
--------------------------------------------------------------------------- */
-/*end_of_job:*/
-    return 1;
-}
-
-/* ==========================================================================
- * Function:    aapatterns ( rp, irow, icol, gridnum, patternum, grayscale )
- * Purpose: For patterns requireing special processing,
- *      calculates anti-aliased value for pixel at irow,icol,
- *      whose surrounding 3x3 pixel grid is coded by gridnum
- *      (which must correspond to a pattern requiring special
- *      processing).
- * --------------------------------------------------------------------------
- * Arguments:   rp (I)      raster *  to raster whose bitmap
- *              is to be anti-aliased
- *      irow (I)    int containing row, 0...height-1,
- *              of pixel to be antialiased
- *      icol (I)    int containing col, 0...width-1,
- *              of pixel to be antialiased
- *      gridnum (I) int containing 0...511 corresponding to
- *              3x3 pixel grid surrounding irow,icol
- *      patternum (I)   int containing 1...51 pattern# of
- *              the 3x3 grid surrounding irow,icol
- *      grayscale (I)   int containing number of grayscales
- *              to be calculated, 0...grayscale-1
- *              (should typically be given as 256)
- * --------------------------------------------------------------------------
- * Returns: ( int )     0...grayscale-1 for success,
- *              -1 = error, or no special processing required
- * --------------------------------------------------------------------------
- * Notes:    o
- * ======================================================================= */
-int aapatterns(raster * rp, int irow, int icol, int gridnum, int patternum,
-               int grayscale) {
-    int aaval = -1;             /* antialiased value returned */
-    int iscenter = (gridnum & 1);       /* true if center pixel set/black */
-/* -------------------------------------------------------------------------
-special pattern number processing
--------------------------------------------------------------------------- */
-    if (1) {
-        if (patternum < 1)      /* pattern# not supplied by caller */
-            patternum = aapatternnum(gridnum);  /* so look it up ourselves */
-        switch (patternum) {
-        default:
-            break;              /* no special processing */
-            case 11:case 24:aaval =
-                aapattern1124(rp, irow, icol, gridnum, grayscale);
-            break;
-            case 19:aaval =
-                aapattern19(rp, irow, icol, gridnum, grayscale);
-            break;
-            case 20:aaval =
-                aapattern20(rp, irow, icol, gridnum, grayscale);
-            break;
-            case 39:aaval =
-                aapattern39(rp, irow, icol, gridnum, grayscale);
-            break;
-            /* case 24: if ( (gridnum&1) == 0 ) aaval=0; break; */
-            case 29:aaval = (iscenter ? grayscale - 1 : 0);
-            break;              /* no antialiasing */
-    }}
-    return aaval;
-}
-#endif
-
-/* ==========================================================================
- * Function:    aapattern1124 ( rp, irow, icol, gridnum, grayscale )
- * Purpose: calculates anti-aliased value for pixel at irow,icol,
- *      whose surrounding 3x3 pixel grid is coded by gridnum
- *      (which must correspond to pattern #11 or #24).
- * --------------------------------------------------------------------------
- * Arguments:   rp (I)      raster *  to raster whose bitmap
- *              is to be anti-aliased
- *      irow (I)    int containing row, 0...height-1,
- *              of pixel to be antialiased
- *      icol (I)    int containing col, 0...width-1,
- *              of pixel to be antialiased
- *      gridnum (I) int containing 0...511 corresponding to
- *              3x3 pixel grid surrounding irow,icol
- *      grayscale (I)   int containing number of grayscales
- *              to be calculated, 0...grayscale-1
- *              (should typically be given as 256)
- * --------------------------------------------------------------------------
- * Returns: ( int )     0...grayscale-1 for success, -1=any error
- * --------------------------------------------------------------------------
- * Notes:    o  Handles the eight gridnum's
- *      (gridnum/2 shown to eliminate irrelevant low-order bit)
- *        ---        ---         -*-          -*-
- *        --* = 10   *-- = 18    --* = 72     *-- = 80  (pattern$11)
- *        -*-        -*-         ---          ---
- *
- *        ---        ---         -**          **-
- *        --* = 11   *-- = 22    --* = 104    *-- = 208 (pattern$24)
- *        -**        **-         ---          ---
- *       o  For black * center pixel, using grid#10 as an example,
- *      pixel stays ---      antialiased  ---*
- *      black if    -***     if part of   -**
- *      part of a   -*-      a diagonal   -*- 
- *      corner, eg,  *       line, eg,    *
- * ======================================================================= */
-static int aapattern1124(raster * rp, int irow, int icol, int gridnum,
-                         int grayscale) {
-    int aaval = -1;             /* antialiased value returned */
-    int iscenter = gridnum & 1; /* true if pixel at irow,icol black */
-    int patternum = 24;         /* init for pattern#24 default */
-    pixbyte *bitmap = rp->pixmap;       /* local rp->pixmap ptr */
-    int width = rp->width, height = rp->height; /* width, height of raster */
-    int jrow = irow, jcol = icol;       /* corner or diagonal row,col */
-    int vertcornval = 0, horzcornval = 0;       /* vertical, horizontal corner bits */
-    int topdiagval = 0, botdiagval = 0; /* upper,lower diagonal pixel bits */
-    int /* not used --cornval = 0, */ diagval = 0;      /* vert+horzcorn, top+botdiag */
-    int hdirection = 99, vdirection = 99;       /* horz,vert corner direction */
-    int hturn = 99, vturn = 99, aafollowline(); /* follow corner till turns */
-/* -------------------------------------------------------------------------
-Check corner and diagonal pixels
--------------------------------------------------------------------------- */
-    if (0) {
-        goto end_of_job;        /* true to turn off pattern1124 */
-    }
-    switch (gridnum / 2) {      /* check pattern#11,24 corner, diag */
-    default:
-        goto end_of_job;        /* not a pattern#11,24 gridnum */
-    case 10:
-        patternum = 11;
-    case 11:
-        hdirection = 2;
-        vdirection = -1;        /* directions to follow corner */
-        if ((jrow = irow + 2) < height) {       /* vert corner below center pixel */
-            vertcornval = getlongbit(bitmap, (icol + jrow * width));
-            if ((icol - 1) >= 0)        /* lower diag left of center */
-                botdiagval =
-                    getlongbit(bitmap, ((icol - 1) + jrow * width));
-        }
-        if ((jcol = icol + 2) < width) {        /* horz corner right of center */
-            horzcornval = getlongbit(bitmap, (jcol + irow * width));
-            if ((irow - 1) >= 0)        /* upper diag above center */
-                topdiagval =
-                    getlongbit(bitmap, (jcol + (irow - 1) * width));
-        }
-        break;
-    case 18:
-        patternum = 11;
-    case 22:
-        hdirection = -2;
-        vdirection = -1;        /* directions to follow corner */
-        if ((jrow = irow + 2) < height) {       /* vert corner below center pixel */
-            vertcornval = getlongbit(bitmap, (icol + jrow * width));
-            if ((icol + 1) < width)     /* lower diag right of center */
-                botdiagval =
-                    getlongbit(bitmap, ((icol + 1) + jrow * width));
-        }
-        if ((jcol = icol - 2) >= 0) {   /* horz corner left of center */
-            horzcornval = getlongbit(bitmap, (jcol + irow * width));
-            if ((irow - 1) >= 0)        /* upper diag above center */
-                topdiagval =
-                    getlongbit(bitmap, (jcol + (irow - 1) * width));
-        }
-        break;
-    case 72:
-        patternum = 11;
-    case 104:
-        hdirection = 2;
-        vdirection = 1;         /* directions to follow corner */
-        if ((jrow = irow - 2) >= 0) {   /* vert corner above center pixel */
-            vertcornval = getlongbit(bitmap, (icol + jrow * width));
-            if ((icol - 1) >= 0)        /* upper diag left of center */
-                topdiagval =
-                    getlongbit(bitmap, ((icol - 1) + jrow * width));
-        }
-        if ((jcol = icol + 2) < width) {        /* horz corner right of center */
-            horzcornval = getlongbit(bitmap, (jcol + irow * width));
-            if ((irow + 1) < height)    /* lower diag below center */
-                botdiagval =
-                    getlongbit(bitmap, (jcol + (irow + 1) * width));
-        }
-        break;
-    case 80:
-        patternum = 11;
-    case 208:
-        hdirection = -2;
-        vdirection = 1;         /* directions to follow corner */
-        if ((jrow = irow - 2) >= 0) {   /* vert corner above center pixel */
-            vertcornval = getlongbit(bitmap, (icol + jrow * width));
-            if ((icol + 1) < width)     /* upper diag right of center */
-                topdiagval =
-                    getlongbit(bitmap, ((icol + 1) + jrow * width));
-        }
-        if ((jcol = icol - 2) >= 0) {   /* horz corner left of center */
-            horzcornval = getlongbit(bitmap, (jcol + irow * width));
-            if ((irow + 1) < height)    /* lower diag below center */
-                botdiagval =
-                    getlongbit(bitmap, (jcol + (irow + 1) * width));
-        }
-        break;
-    }                           /* --- end-of-switch(gridnum/2) --- */
-    /* not used --cornval = vertcornval + horzcornval; *//* 0=no corner bits, 1, 2=both */
-    diagval = topdiagval + botdiagval;  /* 0=no diag bits, 1, 2=both */
-/* -------------------------------------------------------------------------
-Handle white center
--------------------------------------------------------------------------- */
-    if (1 && !iscenter) {
-        aaval = (patternum == 11 ? 51 : 64);
-        goto end_of_job;
-    }
-/* -------------------------------------------------------------------------
-Handle black center
--------------------------------------------------------------------------- */
-    if (diagval > 1)
-        aaval = (patternum == 24 ? 255 : 191);
-    else {
-        hturn = aafollowline(rp, irow, icol, hdirection);
-        vturn = aafollowline(rp, irow, icol, vdirection);
-        if (vturn * hdirection < 0 && hturn * vdirection < 0)
-            aaval = (patternum == 24 ? 255 : 191);
-        else
-            aaval = grayscale - 1;
-    }                           /* actual corner */
-/* -------------------------------------------------------------------------
-Back to caller with grayscale antialiased value for pixel at irow,icol
--------------------------------------------------------------------------- */
-  end_of_job:
-    if (aaval >= 0)             /* have antialiasing result */
-        if (msglevel >= 99 && msgfp != NULL)
-            fprintf(msgfp,      /* diagnostic output */
-                    "aapattern1124> irow,icol,grid#/2=%d,%d,%d, top,botdiag=%d,%d, "
-                    "vert,horzcorn=%d,%d, v,hdir=%d,%d, v,hturn=%d,%d, aaval=%d\n",
-                    irow, icol, gridnum / 2, topdiagval, botdiagval,
-                    vertcornval, horzcornval, vdirection, hdirection,
-                    vturn, hturn, aaval);
-    return (aaval);             /* back with antialiased value */
-}                               /* --- end-of-function aapattern1124() --- */
-
-
-/* ==========================================================================
- * Function:    aapattern19 ( rp, irow, icol, gridnum, grayscale )
- * Purpose: calculates anti-aliased value for pixel at irow,icol,
- *      whose surrounding 3x3 pixel grid is coded by gridnum
- *      (which must correspond to pattern #19).
- * --------------------------------------------------------------------------
- * Arguments:   rp (I)      raster *  to raster whose bitmap
- *              is to be anti-aliased
- *      irow (I)    int containing row, 0...height-1,
- *              of pixel to be antialiased
- *      icol (I)    int containing col, 0...width-1,
- *              of pixel to be antialiased
- *      gridnum (I) int containing 0...511 corresponding to
- *              3x3 pixel grid surrounding irow,icol
- *      grayscale (I)   int containing number of grayscales
- *              to be calculated, 0...grayscale-1
- *              (should typically be given as 256)
- * --------------------------------------------------------------------------
- * Returns: ( int )     0...grayscale-1 for success, -1=any error
- * --------------------------------------------------------------------------
- * Notes:    o  Handles the four gridnum's
- *      (gridnum/2 shown to eliminate irrelevant low-order bit)
- *        ---        --*         *--          ***
- *        --- = 7    --* = 41    *-- = 148    --- = 224
- *        ***        --*         *--          ---
- * ======================================================================= */
-static int aapattern19(raster * rp, int irow, int icol, int gridnum,
-                       int grayscale) {
-    int aaval = (-1);           /* antialiased value returned */
-    int iscenter = gridnum & 1; /* true if pixel at irow,icol black */
-    int orientation = 1,        /* 1=vertical, 2=horizontal */
-        jrow = irow, jcol = icol;       /* middle pixel of *** line */
-    int turn1 = 0, turn2 = 0, aafollowline();   /* follow *** line till it turns */
-/* -------------------------------------------------------------------------
-Initialization and calculation of antialiased value
--------------------------------------------------------------------------- */
-/* --- check input -- */
-    if (iscenter)
-         goto end_of_job;       /* we only antialias white pixels */
-/* --- set params --- */
-    switch (gridnum / 2) {      /* check pattern#19 orientation */
-    default:
-        goto end_of_job;        /* not a pattern#19 gridnum */
-        case 7:orientation = 2;
-        jrow++;
-        break;
-        case 41:orientation = 1;
-        jcol++;
-        break;
-        case 148:orientation = 1;
-        jcol--;
-        break;
-        case 224:orientation = 2;
-        jrow--;
-        break;
-    }                           /* --- end-of-switch(gridnum/2) --- */
-/* --- get turns in both directions --- */
-        if ((turn1 = aafollowline(rp, jrow, jcol, orientation)) == 0)
-        goto end_of_job;
-    if ((turn2 = aafollowline(rp, jrow, jcol, -orientation)) == 0)
-        goto end_of_job;
-    if (turn1 * turn2 >= 0)
-        goto end_of_job;        /* both turns in same direction */
-/* --- weight pixel --- */
-    aaval = grayscale / (3 + min2(abs(turn1), abs(turn2)));
-/* -------------------------------------------------------------------------
-Back to caller with grayscale antialiased value for pixel at irow,icol
--------------------------------------------------------------------------- */
-  end_of_job:
-    if (aaval >= 0)             /* have antialiasing result */
-        if (msglevel >= 99 && msgfp != NULL)
-            fprintf(msgfp,      /* diagnostic output */
-                    "aapattern19> irow,icol,grid#/2=%d,%d,%d, turn+%d,%d=%d,%d, aaval=%d\n",
-                    irow, icol, gridnum / 2, orientation, -orientation,
-                    turn1, turn2, aaval);
-    return (aaval);             /* back with antialiased value */
-}                               /* --- end-of-function aapattern19() --- */
-
-
-/* ==========================================================================
- * Function:    aapattern20 ( rp, irow, icol, gridnum, grayscale )
- * Purpose: calculates anti-aliased value for pixel at irow,icol,
- *      whose surrounding 3x3 pixel grid is coded by gridnum
- *      (which must correspond to pattern #20).
- * --------------------------------------------------------------------------
- * Arguments:   rp (I)      raster *  to raster whose bitmap
- *              is to be anti-aliased
- *      irow (I)    int containing row, 0...height-1,
- *              of pixel to be antialiased
- *      icol (I)    int containing col, 0...width-1,
- *              of pixel to be antialiased
- *      gridnum (I) int containing 0...511 corresponding to
- *              3x3 pixel grid surrounding irow,icol
- *      grayscale (I)   int containing number of grayscales
- *              to be calculated, 0...grayscale-1
- *              (should typically be given as 256)
- * --------------------------------------------------------------------------
- * Returns: ( int )     0...grayscale-1 for success, -1=any error
- * --------------------------------------------------------------------------
- * Notes:    o  Handles the eight gridnum's
- *      (gridnum/2 shown to eliminate irrelevant low-order bit)
- *        ---        ---         --*          -*-      
- *        --* = 14   *-- = 19    --* = 42     --* = 73
- *        **-        -**         -*-          --*     
- *
- *        -*-        -**         *--          **-      
- *        *-- = 84   *-- = 112   *-- = 146    --* = 200
- *        *--        ---         -*-          ---     
- * ======================================================================= */
-static int aapattern20(raster * rp, int irow, int icol, int gridnum,
-                       int grayscale) {
-    int aaval = (-1);           /* antialiased value returned */
-    int iscenter = gridnum & 1; /* true if pixel at irow,icol black */
-    int direction = 1,          /* direction to follow ** line */
-        jrow1 = irow, jcol1 = icol,     /* coords of * */
-        jrow2 = irow, jcol2 = icol;     /* coords of adjacent ** pixel */
-    int turn1 = 0, turn2 = 0, aafollowline();   /* follow *,** lines till turns */
-/* -------------------------------------------------------------------------
-Initialization and calculation of antialiased value
--------------------------------------------------------------------------- */
-/* --- check input -- */
-    if (1)
-         goto end_of_job;       /* don't want this one */
-    if (iscenter)
-         goto end_of_job;       /* we only antialias white pixels */
-/* --- set params --- */
-    switch (gridnum / 2) {      /* check pattern#20 orientation */
-    default:
-        goto end_of_job;        /* not a pattern#20 gridnum */
-        case 14:direction = -2;
-        jcol1++;
-        jrow2++;
-        break;
-        case 19:direction = 2;
-        jcol1--;
-        jrow2++;
-        break;
-        case 42:direction = 1;
-        jrow1++;
-        jcol2++;
-        break;
-        case 73:direction = -1;
-        jrow1--;
-        jcol2++;
-        break;
-        case 84:direction = -1;
-        jrow1--;
-        jcol2--;
-        break;
-        case 112:direction = 2;
-        jcol1--;
-        jrow2--;
-        break;
-        case 146:direction = 1;
-        jrow1++;
-        jcol2--;
-        break;
-        case 200:direction = -2;
-        jcol1++;
-        jrow2--;
-        break;
-    }                           /* --- end-of-switch(gridnum/2) --- */
-/* --- get turns in both directions --- */
-        if ((turn1 = aafollowline(rp, jrow1, jcol1, -direction)) == 0)
-        goto end_of_job;
-    if ((turn2 = aafollowline(rp, jrow2, jcol2, direction)) == 0)
-        goto end_of_job;
-    if (turn1 * turn2 >= 0)
-        goto end_of_job;        /* both turns in same direction */
-/* --- weight pixel --- */
-    aaval = grayscale / (3 + min2(abs(turn1), abs(turn2)));
-/* -------------------------------------------------------------------------
-Back to caller with grayscale antialiased value for pixel at irow,icol
--------------------------------------------------------------------------- */
-  end_of_job:
-    if (aaval >= 0)             /* have antialiasing result */
-        if (msglevel >= 99 && msgfp != NULL)
-            fprintf(msgfp,      /* diagnostic output */
-                    "aapattern20> irow,icol,grid#/2=%d,%d,%d, turn%d,%d=%d,%d, aaval=%d\n",
-                    irow, icol, gridnum / 2, -direction, direction, turn1,
-                    turn2, aaval);
-    return (aaval);             /* back with antialiased value */
-}                               /* --- end-of-function aapattern20() --- */
-
-
-/* ==========================================================================
- * Function:    aapattern39 ( rp, irow, icol, gridnum, grayscale )
- * Purpose: calculates anti-aliased value for pixel at irow,icol,
- *      whose surrounding 3x3 pixel grid is coded by gridnum
- *      (which must correspond to pattern #39).
- * --------------------------------------------------------------------------
- * Arguments:   rp (I)      raster *  to raster whose bitmap
- *              is to be anti-aliased
- *      irow (I)    int containing row, 0...height-1,
- *              of pixel to be antialiased
- *      icol (I)    int containing col, 0...width-1,
- *              of pixel to be antialiased
- *      gridnum (I) int containing 0...511 corresponding to
- *              3x3 pixel grid surrounding irow,icol
- *      grayscale (I)   int containing number of grayscales
- *              to be calculated, 0...grayscale-1
- *              (should typically be given as 256)
- * --------------------------------------------------------------------------
- * Returns: ( int )     0...grayscale-1 for success, -1=any error
- * --------------------------------------------------------------------------
- * Notes:    o  Handles the eight gridnum's
- *      (gridnum/2 shown to eliminate irrelevant low-order bit)
- *        ---        ---         --*          -**      
- *        --* = 15   *-- = 23    --* = 43     --* = 105
- *        ***        ***         -**          --*     
- *
- *        **-        ***         *--          ***      
- *        *-- = 212  *-- = 240   *-- = 150    --* = 232
- *        *--        ---         **-          ---     
- * ======================================================================= */
-static int aapattern39(raster * rp, int irow, int icol, int gridnum,
-                       int grayscale) {
-    int aaval = (-1);           /* antialiased value returned */
-    int iscenter = gridnum & 1; /* true if pixel at irow,icol black */
-    int direction = 1,          /* direction to follow ** line */
-        jrow1 = irow, jcol1 = icol,     /* coords of * */
-        jrow2 = irow, jcol2 = icol;     /* coords of adjacent ** pixel */
-    int turn1 = 0, turn2 = 0, aafollowline();   /* follow *,** lines till turns */
-/* -------------------------------------------------------------------------
-Initialization and calculation of antialiased value
--------------------------------------------------------------------------- */
-/* --- check input -- */
-    if (iscenter)
-         goto end_of_job;       /* we only antialias white pixels */
-/* --- set params --- */
-    switch (gridnum / 2) {      /* check pattern#39 orientation */
-    default:
-        goto end_of_job;        /* not a pattern#39 gridnum */
-        case 15:direction = -2;
-        jcol1++;
-        jrow2++;
-        break;
-        case 23:direction = 2;
-        jcol1--;
-        jrow2++;
-        break;
-        case 43:direction = 1;
-        jrow1++;
-        jcol2++;
-        break;
-        case 105:direction = -1;
-        jrow1--;
-        jcol2++;
-        break;
-        case 212:direction = -1;
-        jrow1--;
-        jcol2--;
-        break;
-        case 240:direction = 2;
-        jcol1--;
-        jrow2--;
-        break;
-        case 150:direction = 1;
-        jrow1++;
-        jcol2--;
-        break;
-        case 232:direction = -2;
-        jcol1++;
-        jrow2--;
-        break;
-    }                           /* --- end-of-switch(gridnum/2) --- */
-/* --- get turns directions (tunr1==1 signals inside corner) --- */
-        if ((turn1 = aafollowline(rp, jrow1, jcol1, -direction)) == 1) {
-        aaval = 0;
-        goto end_of_job;
-    }
-    if (1)
-        goto end_of_job;        /* stop here for now */
-    if ((turn2 = aafollowline(rp, jrow2, jcol2, direction)) == 0)
-        goto end_of_job;
-    if (turn1 * turn2 >= 0)
-        goto end_of_job;        /* both turns in same direction */
-/* --- weight pixel --- */
-    aaval = grayscale / (3 + min2(abs(turn1), abs(turn2)));
-/* -------------------------------------------------------------------------
-Back to caller with grayscale antialiased value for pixel at irow,icol
--------------------------------------------------------------------------- */
-  end_of_job:
-    if (aaval >= 0)             /* have antialiasing result */
-        if (msglevel >= 99 && msgfp != NULL)
-            fprintf(msgfp,      /* diagnostic output */
-                    "aapattern39> irow,icol,grid#/2=%d,%d,%d, turn%d,%d=%d,%d, aaval=%d\n",
-                    irow, icol, gridnum / 2, -direction, direction, turn1,
-                    turn2, aaval);
-    return (aaval);             /* back with antialiased value */
-}                               /* --- end-of-function aapattern39() --- */
-
-
-/* ==========================================================================
- * Function:    aafollowline ( rp, irow, icol, direction )
- * Purpose: starting with pixel at irow,icol, moves in
- *      specified direction looking for a "turn"
- * --------------------------------------------------------------------------
- * Arguments:   rp (I)      raster *  to raster containing pixel image
- *      irow (I)    int containing row, 0...height-1,
- *              of first pixel
- *      icol (I)    int containing col, 0...width-1,
- *              of first pixel
- *      direction (I)   int containing +1 to follow line up/north
- *              (decreasing irow), -1 to follow line
- *              down/south (increasing irow), +2 to follow
- *              line right/east (increasing icol),
- *              -2 to follow line left/west (decreasing icol)
- * --------------------------------------------------------------------------
- * Returns: ( int )     #rows or #cols traversed prior to turn,
- *              or 0 if no turn detected (or for any error).
- *              Sign is + if turn direction is right/east or
- *              up/north, or is - if left/west or down/south.
- * --------------------------------------------------------------------------
- * Notes:     o Here are some examples illustrating turn detection in
- *      +2 (right/east) direction.  Turns in other directions
- *      are detected similarly/symmetrically.  * denotes black
- *      bits (usually fg), - denotes white bits (usually bg),
- *      and ? denotes "don't care" bit (won't affect outcome).
- *      Arrow --> points to start pixel denoted by irow,icol.
- *
- *         *???         -???    turn=0 (no turn) is returned
- *      -->*???   or -->-???    because the start pixel isn't
- *         *???         -???    on an edge to begin with
- *
- *         ----         **--    turn=0 returned because the
- *      -->***-   or -->***-    line ends abruptly without
- *         ----         ----    turning (even the second case)
- *
- *         ---*         ---*    turn=0 returned because the
- *      -->***-   or -->****    line forms a Y or T rather
- *         ---*         ---*    than turning
- *
- *         ***-         ****    turn=+3 returned
- *      -->***-   or -->***-    (outside corner)
- *         ----         ----
- *
- *         *****        ****-   turn=-4 returned
- *      -->*****  or -->****-   (inside corner)
- *         ----*        ----*
- *
- *         ----*        ----*   turn=+4 returned
- *      -->****-  or -->*****   (outside or inside corner)
- *         -----        -----
- * ======================================================================= */
-
-int aafollowline(raster * rp, int irow, int icol, int direction)
+/* ============================================================================
+ * Sets loglevel and log output callback function.
+ * 
+ * @newmsglevel
+ * @user_data
+ * @error_log_func
+ * ===========================================================================*/
+void smalltex_setmsg(int newmsglevel, void *user_data, error_log_func_t error_log_func)
 {
-    pixbyte *bitmap = rp->pixmap;       /* local rp->pixmap ptr */
-    int width = rp->width, height = rp->height; /* width, height of raster */
-    int drow = 0, dcol = 0;     /* delta row,col to follow line */
-    int jrow = irow, jcol = icol;       /* current row,col following line */
-    int bitval = 1;             /* value of rp bit at irow,icol */
-    int fgval = 1, bgval = 0;   /* "fg" is whatever bitval is */
-    int bitminus = 0, bitplus = 0;      /* value of left/down, right/up bit */
-    int isline = 1, isedge = 0; /*isline signals one-pixel wide line */
-    int turn = 0;               /* detected turn back to caller */
-    int maxturn = maxfollow;    /* don't follow more than max pixels */
-
-    if (irow < 0 || irow >= height || icol < 0 || icol >= width) {
-         goto end_of_job;       /* icol out-of-bounds */
-    }
-/* --- adjust maxturn for magstep --- */
-    if (1) {                    /* guard */
-        if (magstep > 1 && magstep <= 10) {     /* sanity check */
-            maxturn *= magstep; /* factor in magnification */
-        }
-    }
-    /* --- starting bit -- see if we're following a fg (usual), or bg line --- */
-    bitval = getlongbit(bitmap, (icol + irow * width));
-
-    /* starting pixel (bg or fg) */
-    fgval = bitval;
-    bgval = (1 - bitval);       /* define "fg" as whatever bitval is */
-/* --- set drow,dcol corresponding to desired direction --- */
-    switch (direction) {        /* determine drow,dcol for direction */
-    default:
-        goto end_of_job;        /* unrecognized direction arg */
-    case 1:
-        drow = -1;
-        break;                  /* follow line up/north */
-    case -1:
-        drow = 1;
-        break;                  /* down/south */
-    case 2:
-        dcol = 1;
-        break;                  /* right/east */
-    case -2:
-        dcol = -1;
-        break;
-    }                           /* left/west */
-
-    /* --- set bitminus and bitplus --- */
-    if (drow == 0) {
-        /* we're following line right/left */
-        if (irow < height) {    /* there's a pixel below current */
-            bitminus = getlongbit(bitmap, (icol + (irow + 1) * width)); /* get it */
-        }
-        if (irow > 0) {         /* there's a pixel above current */
-            bitplus = getlongbit(bitmap, (icol + (irow - 1) * width));
-        }
-    }                           /* get it */
-    if (dcol == 0) {            /* we're following line up/down */
-        if (icol < width) {     /* there's a pixel to the right */
-            bitplus = getlongbit(bitmap, (icol + 1 + irow * width));    /* get it */
-        }
-        if (icol > 0) {         /* there's a pixel to the left */
-            bitminus = getlongbit(bitmap, (icol - 1 + irow * width));
-        }
-    }
-
-    /* --- check for lack of line to follow --- */
-    if (bitval == bitplus       /* starting pixel same as above */
-        && bitval == bitminus)  /* and below (or right and left) */
-        goto end_of_job;        /* so there's no line to follow */
-/* --- set isline and isedge (already initted for isline) --- */
-    if (bitval == bitplus) {    /* starting pixel same as above */
-        isedge = (-1);
-        isline = 0;
-    }                           /* so we're at an edge below */
-    if (bitval == bitminus) {   /* starting pixel same as below */
-        isedge = 1;
-        isline = 0;
-    }
-    /* so we're at an edge above */
-    /* -------------------------------------------------------------------------
-       follow line
-       -------------------------------------------------------------------------- */
-    while (1) {                 /* until turn found (or max) */
-        /* --- local allocations and declarations --- */
-        int dbitval = 0,        /* value of bit at jrow,jcol */
-            dbitminus = 0, dbitplus = 0;        /* value of left/down, right/up bit */
-        /* --- bump pixel count and indexes; check for max or end-of-raster --- */
-        turn++;                 /* bump #pixels followed */
-        jrow += drow;
-        jcol += dcol;           /* indexes of next pixel to check */
-        if (turn > maxturn      /* already followed max #pixels */
-            || jrow < 0 || jrow >= height       /* or jrow past end-of-raster */
-            || jcol < 0 || jcol >= width) {     /* or jcol past end-of-raster */
-            turn = 0;
-            goto end_of_job;
-        }
-        /* so quit without finding a turn */
-        /* --- set current bit (dbitval) --- */
-        dbitval = getlongbit(bitmap, (jcol + jrow * width));    /*value of jrow,jcol bit */
-        /* --- set dbitminus and dbitplus --- */
-        if (drow == 0) {        /* we're following line right/left */
-            if (irow < height) {  /* there's a pixel below current */
-                dbitminus = getlongbit(bitmap, (jcol + (irow + 1) * width));
-            }
-            if (irow > 0) {      /* there's a pixel above current */
-                dbitplus = getlongbit(bitmap, (jcol + (irow - 1) * width));
-            }
-        }                       /* get it */
-        if (dcol == 0) {        /* we're following line up/down */
-            if (icol < width) {  /* there's a pixel to the right */
-                dbitplus = getlongbit(bitmap, (icol + 1 + jrow * width));
-            }
-            if (icol > 0) {      /* there's a pixel to the left */
-                dbitminus = getlongbit(bitmap, (icol - 1 + jrow * width));
-            }
-        }
-        /* get it */
-        /* --- first check for abrupt end-of-line, or for T or Y --- */
-        if (isline != 0)        /* abrupt end or T,Y must be a line */
-            if ((bgval == dbitval       /* end-of-line if pixel flips to bg */
-                 && bgval == dbitplus   /* and bg same as above pixel */
-                 && bgval == dbitminus) /* and below (or right and left) */
-                ||(fgval == dbitplus    /* T or Y if fg same as above pixel */
-                   && fgval == dbitminus)) {    /* and below (or right and left) */
-                turn = 0;
-                goto end_of_job;
-            }
-        /* so we're at a T or Y */
-        /* --- check for turning line --- */
-        if (isline != 0) {      /* turning line must be a line */
-            if (fgval == dbitminus) {   /* turning down */
-                turn = -turn;
-                goto end_of_job;
-            } /* so return negative turn */
-            else if (fgval == dbitplus) /* turning up */
-                goto end_of_job;
-        }
-        /* so return positive turn */
-        /* --- check for inside corner at edge --- */
-        if (isedge != 0) {      /* inside corner must be a edge */
-            if (isedge < 0 && fgval == bitminus) {      /* corner below */
-                turn = -turn;
-                goto end_of_job;
-            }                   /* so return negative turn */
-            if (isedge > 0 && fgval == bitplus) { /* corner above */
-                goto end_of_job;
-            }
-        }
-        /* so return positive turn */
-        /* --- check for abrupt end at edge --- */
-        if (isedge != 0         /* abrupt edge end must be an edge */
-            && fgval == dbitval)        /* and line must not end */
-            if ((isedge < 0 && bgval == bitplus)        /* abrupt end above */
-                ||(isedge > 0 && bgval == bitminus)) {  /* or abrupt end below */
-                turn = 0;
-                goto end_of_job;
-            }
-        /* so edge ended abruptly */
-        /* --- check for outside corner at edge --- */
-        if (isedge != 0         /* outside corner must be a edge */
-            && bgval == dbitval) {      /* and line must end */
-            if (isedge > 0)
-                turn = -turn;   /* outside turn down from edge above */
-            goto end_of_job;
-        }
-    }
-
-/* -------------------------------------------------------------------------
-Back to caller with #rows or #cols traversed, and direction of detected turn
--------------------------------------------------------------------------- */
-  end_of_job:
-    if (msglevel >= 99 && msgfp != NULL) {
-        fprintf(msgfp,
-                "aafollowline> irow,icol,direction=%d,%d,%d, turn=%d\n",
-                irow, icol, direction, turn);
-    }
-    return turn;
 }
 
-/* ==========================================================================
- * Function:    aagridnum ( rp, irow, icol )
- * Purpose: calculates gridnum, 0-511 (see Notes below),
- *      for 3x3 grid centered at irow,icol
- * --------------------------------------------------------------------------
- * Arguments:   rp (I)      raster *  to raster containing
- *              bitmap image (to be anti-aliased)
- *      irow (I)    int containing row, 0...height-1,
- *              at center of 3x3 grid
- *      icol (I)    int containing col, 0...width-1,
- *              at center of 3x3 grid
- * --------------------------------------------------------------------------
- * Returns: ( int )     0-511 grid number, or -1=any error
- * --------------------------------------------------------------------------
- * Notes:     o Input gridnum is a 9-bit int, 0-511, coding a 3x3 pixel grid
- *      whose bit positions (and corresponding values) in gridnum are
- *        876     256 128  64
- *        504  =   32   1  16
- *        321       8   4   2
- *      Thus, for example (*=pixel set/black, -=pixel not set/white),
- *        *--         *--     -**         (note that 209 is the
- *        -*- = 259   *-- = 302   -** = 209    inverse, set<-->unset,
- *        --*         ***         ---          of 302)
- *        o A set pixel is considered black, an unset pixel considered
- *      white.
- * ======================================================================= */
-
-static int aagridnum(raster * rp, int irow, int icol)
+/* ---------------------------------------------------------------------------
+ * Output log message.
+ * 
+ * @loglevel: smaller, more important
+ * @fmt: format string like 'printf'
+ * ---------------------------------------------------------------------------*/
+void smalltex_putlog(int loglevel, const char *fmt, ...)
 {
-    pixbyte *bitmap = rp->pixmap;       /* local rp->pixmap ptr */
-    int width = rp->width, height = rp->height; /* width, height of raster */
-    int imap = icol + irow * width;     /* pixel index = icol + irow*width */
-    int bitval = 0;             /* value of rp bit at irow,icol */
-    int nnbitval = 0, nebitval = 0, eebitval = 0, sebitval = 0; /*adjacent vals */
-    int ssbitval = 0, swbitval = 0, wwbitval = 0, nwbitval = 0; /*compass pt names */
-    int gridnum = -1;           /* grid# 0-511 for above 9 bits */
-
-    if (irow < 0 || irow >= height|| icol < 0 || icol >= width) {
-         goto end_of_job;       /* icol out-of-bounds */
-    }
-
-/* -------------------------------------------------------------------------
-get the 9 bits comprising the 3x3 grid centered at irow,icol
--------------------------------------------------------------------------- */
-/* --- get center bit --- */
-     bitval = getlongbit(bitmap, imap); /* value of rp input bit at imap */
-/* --- get 8 surrounding bits --- */
-    if (irow > 0) {              /* nn (north) bit available */
-         nnbitval = getlongbit(bitmap, imap - width);   /* nn bit value */
-    }
-    if (irow < height - 1) {     /* ss (south) bit available */
-         ssbitval = getlongbit(bitmap, imap + width);   /* ss bit value */
-    }
-    if (icol > 0) {             /* ww (west) bit available */
-        wwbitval = getlongbit(bitmap, imap - 1);        /* ww bit value */
-        if (irow > 0) {          /* nw bit available */
-            nwbitval = getlongbit(bitmap, imap - width - 1);    /* nw bit value */
-        }
-        if (irow < height - 1) { /* sw bit available */
-            swbitval = getlongbit(bitmap, imap + width - 1);
-        }
-    } if (icol < width - 1) {        /* ee (east) bit available */
-        eebitval = getlongbit(bitmap, imap + 1);        /* ee bit value */
-        if (irow > 0) {          /* ne bit available */
-            nebitval = getlongbit(bitmap, imap - width + 1);    /* ne bit value */
-        }
-        if (irow < height - 1) { /* se bit available */
-            sebitval = getlongbit(bitmap, imap + width + 1);
-        }
-    }
-
-    /* --- set gridnum --- */
-    gridnum = 0;                /* clear all bits */
-    if (bitval)
-        gridnum = 1;            /* set1bit(gridnum,0); */
-    if (nwbitval)
-        gridnum += 256;         /* set1bit(gridnum,8); */
-    if (nnbitval)
-        gridnum += 128;         /* set1bit(gridnum,7); */
-    if (nebitval)
-        gridnum += 64;          /* set1bit(gridnum,6); */
-    if (wwbitval)
-        gridnum += 32;          /* set1bit(gridnum,5); */
-    if (eebitval)
-        gridnum += 16;          /* set1bit(gridnum,4); */
-    if (swbitval)
-        gridnum += 8;           /* set1bit(gridnum,3); */
-    if (ssbitval)
-        gridnum += 4;           /* set1bit(gridnum,2); */
-    if (sebitval)
-        gridnum += 2;           /* set1bit(gridnum,1); */
-/* -------------------------------------------------------------------------
-Back to caller with gridnum coding 3x3 grid centered at irow,icol
--------------------------------------------------------------------------- */
-  end_of_job:
-    return (gridnum);
-}                               /* --- end-of-function aagridnum() --- */
-
-
-/* ==========================================================================
- * Function:    aapatternnum ( gridnum )
- * Purpose: Looks up the pattern number 1...51
- *      corresponding to the 3x3 pixel grid coded by gridnum 0=no
- *      pixels set (white) to 511=all pixels set (black).
- * --------------------------------------------------------------------------
- * Arguments:   gridnum (I) int containing 0-511 coding a 3x3 pixel grid
- *              (see Notes below)
- * --------------------------------------------------------------------------
- * Returns: ( int )     1 to 51, or -1=error
- * --------------------------------------------------------------------------
- * Notes:     o Input gridnum is a 9-bit int, 0-511, coding a 3x3 pixel grid
- *      whose bit positions (and corresponding values) in gridnum are
- *        876     256 128  64
- *        504  =   32   1  16
- *        321       8   4   2
- *      Thus, for example (*=pixel set/black, -=pixel not set/white),
- *        *--         *--     -**         (note that 209 is the
- *        -*- = 259   *-- = 302   -** = 209    inverse, set<-->unset,
- *        --*         ***         ---          of 302)
- *        o A set pixel is considered black, an unset pixel considered
- *      white.
- *        o Ignoring whether the center pixel is set or unset, and
- *      taking rotation, reflection and inversion (set<-->unset)
- *      symmetries into account, there are 32 unique pixel patterns.
- *      If inversions are listed separately, there are 51 patterns.
- *        o Here are the 51 unique patterns, with ? always denoting the
- *      undetermined center pixel.  At the upper-left corner of each
- *      pattern is the "pattern index number" assigned to it in this
- *      function. At the upper-right is the pattern's multiplicity,
- *      i.e., the number of different patterns obtained by rotations
- *      and reflection of the illustrated one.  Inverse patters are
- *      illustrated immediately beneath the original (the first three
- *      four-pixel patterns have identical inverses).
- *      -------------------------------------------------------------
- *      No pixels set:
- *       #1 1 (in this case, 1 signifies that rotation
- *        ---  and reflection give no different grids)
- *        -?-
- *        ---
- *      Inverse, all eight pixels set
- *       #2 1 (the inverse multiplicity is always the same)
- *        ***
- *        *?*
- *        ***
- *      -------------------------------------------------------------
- *      One pixel set:
- *       #3 4  #4 4
- *        *--   -*-
- *        -?-   -?-
- *        ---   ---
- *      Inverse, seven pixels set:
- *       #5 4  #6 4
- *        -**   *-*
- *        *?*   *?*
- *        ***   ***
- *      -------------------------------------------------------------
- *      Two pixels set:
- *       #7 8  #8 4  #9 8  10 2  11 4  12 2
- *        **-   *-*   *--   *--   -*-   -*-
- *        -?-   -?-   -?*   -?-   -?*   -?-
- *        ---   ---   ---   --*   ---   -*-
- *      Inverse, six pixels set:
- *      #13 8  14 4  15 8  16 2  17 4  18 2
- *        --*   -*-   -**   -**   *-*   *-*
- *        *?*   *?*   *?-   *?*   *?-   *?*
- *        ***   ***   ***   **-   ***   *-*
- *      -------------------------------------------------------------
- *      Three pixels set:
- *      #19 4  20 8  21 8  22 8  23 8  24 4  25 4  26 4  27 4  28 4
- *        ***   **-   **-   **-   **-   **-   *-*   *-*   -*-   -*-
- *        -?-   -?*   -?-   -?-   -?-   *?-   -?-   -?-   -?*   -?*
- *        ---   ---   --*   -*-   *--   ---   --*   -*-   -*-   *--
- *      Inverse, five pixels set:
- *      #29 4  30 8  31 8  32 8  33 8  34 4  35 4  36 4  37 4  38 4
- *        ---   --*   --*   --*   --*   --*   -*-   -*-   *-*   *-*
- *        *?*   *?-   *?*   *?*   *?*   -?*   *?*   *?*   *?-   *?-
- *        ***   ***   **-   *-*   -**   ***   **-   *-*   *-*   -**
- *      -------------------------------------------------------------
- *      Four pixels set (including inverses):
- *      #39 8  40 4  41 8  42 8  43 4  44 4  45 8  46 1
- *        ***   **-   **-   ***   ***   **-   **-   *-*
- *        -?*   -?-   -?*   -?-   -?-   -?*   -?*   -?-
- *        ---   -**   *--   --*   -*-   --*   -*-   *-*
- *
- *                        #47 8  48 4  49 4  50 8  51 1
- *                          ---   ---   --*   --*   -*-
- *                          *?*   *?*   *?-   *?-   *?*
- *                          **-   *-*   **-   *-*   -*-
- * ======================================================================= */
-static int aapatternnum(int gridnum) {
-    int pattern = (-1);         /*pattern#, 1-51, for input gridnum */
-/* ---
- * pattern number corresponding to input gridnum/2 code
- * ( gridnum/2 strips off gridnum's low bit because it's
- * the same pattern whether or not center pixel is set )
- * --- */
-    static int patternnum[] = {
-        1, 3, 4, 7, 3, 8, 7, 19, 4, 7, 11, 24, 9, 23, 20, 39,   /*   0- 15 */
-            4, 9, 11, 20, 7, 23, 24, 39, 12, 22, 27, 47, 22, 48, 47, 29,        /*  16- 31 */
-            3, 8, 9, 23, 10, 25, 21, 42, 7, 19, 20, 39, 21, 42, 44, 34, /*  32- 47 */
-            9, 26, 28, 41, 21, 50, 49, 30, 22, 43, 45, 33, 40, 32, 31, 13,      /*  48- 63 */
-            4, 9, 12, 22, 9, 26, 22, 43, 11, 20, 27, 47, 28, 41, 45, 33,        /*  64- 79 */
-            11, 28, 27, 45, 20, 41, 47, 33, 27, 45, 51, 35, 45, 36, 35, 14,     /*  80- 95 */
-            7, 23, 22, 48, 21, 50, 40, 32, 24, 39, 47, 29, 49, 30, 31, 13,      /*  96-111 */
-            20, 41, 45, 36, 44, 38, 31, 15, 47, 33, 35, 14, 31, 15, 16, 5,      /* 112-127 */
-            3, 10, 9, 21, 8, 25, 23, 42, 9, 21, 28, 49, 26, 50, 41, 30, /* 128-143 */
-            7, 21, 20, 44, 19, 42, 39, 34, 22, 40, 45, 31, 43, 32, 33, 13,      /* 144-159 */
-            8, 25, 26, 50, 25, 46, 50, 37, 23, 42, 41, 30, 50, 37, 38, 17,      /* 160-175 */
-            23, 50, 41, 38, 42, 37, 30, 17, 48, 32, 36, 15, 32, 18, 15, 6,      /* 176-191 */
-            7, 21, 22, 40, 23, 50, 48, 32, 20, 44, 45, 31, 41, 38, 36, 15,      /* 192-207 */
-            24, 49, 47, 31, 39, 30, 29, 13, 47, 31, 35, 16, 33, 15, 14, 5,      /* 208-223 */
-            19, 42, 43, 32, 42, 37, 32, 18, 39, 34, 33, 13, 30, 17, 15, 6,      /* 224-239 */
-            39, 30, 33, 15, 34, 17, 13, 6, 29, 13, 14, 5, 13, 6, 5, 2,  /* 240-255 */
-    -1};                        /* --- end-of-patternnum[] --- */
-/* -------------------------------------------------------------------------
-look up pattern number for gridnum
--------------------------------------------------------------------------- */
-/* --- first check input --- */
-    if (gridnum < 0 || gridnum > 511)
-        goto end_of_job;        /* gridnum out of bounds */
-/* --- look up pattern number, 1-51, corresponding to input gridnum --- */
-    pattern = patternnum[gridnum / 2];  /* /2 strips off gridnum's low bit */
-    if (pattern < 1 || pattern > 51)
-        pattern = (-1);         /* some internal error */
-  end_of_job:
-    return (pattern);           /* back to caller with pattern# */
-}                               /* --- end-of-function aapatternnum() --- */
-
-
-/* ==========================================================================
- * Function:    aalookup ( gridnum )
- * Purpose: Looks up the grayscale value 0=white to 255=black
- *      corresponding to the 3x3 pixel grid coded by gridnum 0=no
- *      pixels set (white) to 511=all pixels set (black).
- * --------------------------------------------------------------------------
- * Arguments:   gridnum (I) int containing 0-511 coding a 3x3 pixel grid
- * --------------------------------------------------------------------------
- * Returns: ( int )     0=white to 255=black, or -1=error
- * --------------------------------------------------------------------------
- * Notes:     o Input gridnum is a 9-bit int, 0-511, coding a 3x3 pixel grid
- *        o A set pixel is considered black, an unset pixel considered
- *      white.  Likewise, the returned grayscale is 255 for black,
- *      0 for white.  You'd more typically want to use 255-grayscale
- *      so that 255 is white and 0 is black.
- *        o The returned number is the (lowpass) antialiased grayscale
- *      for the center pixel (gridnum bit 0) of the grid.
- * ======================================================================= */
-static int aalookup(int gridnum) {
-    int grayscale = (-1);       /*returned grayscale, init for error */
-    int pattern = (-1), aapatternnum(); /*pattern#, 1-51, for input gridnum */
-    int iscenter = gridnum & 1; /*low-order bit set for center pixel */
-/* --- gray scales --- */
-#define WHT 0
-#define LGT 64
-#define GRY 128
-#define DRK 192
-#define BLK 255
-#if 1
-/* ---
- * modified aapnm() grayscales (second try)
- * --- */
-/* --- grayscale for each pattern when center pixel set/black --- */
-    static int grayscale1[] = {
-        -1,                     /* [0] index not used */
-            BLK, BLK, BLK, BLK, 242, 230, BLK, BLK, BLK, 160,   /*  1-10 */
-            /* BLK,BLK,BLK,BLK,242,230,BLK,BLK,BLK,BLK, *//*  1-10 */
-            BLK, BLK, 217, 230, 217, 230, 204, BLK, BLK, 166,   /* 11-20 */
-            BLK, BLK, BLK, BLK, BLK, BLK, 178, 166, 204, 191,   /* 21-30 */
-            204, BLK, 204, 191, 217, 204, BLK, 191, 178, BLK,   /* 31-40 */
-            178, BLK, BLK, 178, 191, BLK, 191, BLK, 178, BLK, 204,      /* 41-51 */
-    -1};                        /* --- end-of-grayscale1[] --- */
-/* --- grayscale for each pattern when center pixel not set/white --- */
-    static int grayscale0[] = {
-        -1,                     /* [0] index not used */
-            WHT, WHT, WHT, WHT, WHT, WHT, WHT, WHT, WHT, WHT,   /*  1-10 */
-            64, WHT, WHT, 128, 115, 128, WHT, WHT, WHT, 64,     /* 11-20 */
-            /* 51,WHT,WHT,128,115,128,WHT,WHT,WHT, 64, *//* 11-20 */
-            WHT, WHT, WHT, 64, WHT, WHT, 76, 64, 102, 89,       /* 21-30 */
-            102, WHT, 102, WHT, 115, 102, WHT, 89, 76, WHT,     /* 31-40 */
-            76, WHT, WHT, 76, 89, WHT, 89, WHT, 76, WHT, 102,   /* 41-51 */
-    -1};                        /* --- end-of-grayscale0[] --- */
-#endif
-#if 0
-/* ---
- * modified aapnm() grayscales (first try)
- * --- */
-/* --- grayscale for each pattern when center pixel set/black --- */
-    static int grayscale1[] = {
-        -1,                     /* [0] index not used */
-            BLK, BLK, BLK, BLK, 242, 230, GRY, BLK, BLK, BLK,   /*  1-10 */
-            /* BLK,BLK,BLK,BLK,242,230,BLK,BLK,BLK,BLK, *//*  1-10 */
-            BLK, BLK, 217, 230, 217, 230, 204, BLK, BLK, 166,   /* 11-20 */
-            BLK, BLK, BLK, BLK, BLK, BLK, BLK, 166, 204, 191,   /* 21-30 */
-            /* BLK,BLK,BLK,BLK,BLK,BLK,178,166,204,191, *//* 21-30 */
-            204, BLK, 204, BLK, 217, 204, BLK, 191, GRY, BLK,   /* 31-40 */
-            /* 204,BLK,204,191,217,204,BLK,191,178,BLK, *//* 31-40 */
-            178, BLK, BLK, 178, 191, BLK, BLK, BLK, 178, BLK, 204,      /* 41-51 */
-            /* 178,BLK,BLK,178,191,BLK,191,BLK,178,BLK,204, *//* 41-51 */
-    -1};                        /* --- end-of-grayscale1[] --- */
-/* --- grayscale for each pattern when center pixel not set/white --- */
-    static int grayscale0[] = {
-        -1,                     /* [0] index not used */
-            WHT, WHT, WHT, WHT, WHT, WHT, WHT, WHT, WHT, WHT,   /*  1-10 */
-            GRY, WHT, WHT, 128, 115, 128, WHT, WHT, WHT, GRY,   /* 11-20 */
-            /*  51,WHT,WHT,128,115,128,WHT,WHT,WHT, 64, *//* 11-20 */
-            WHT, WHT, WHT, GRY, WHT, WHT, 76, 64, 102, 89,      /* 21-30 */
-            /* WHT,WHT,WHT, 64,WHT,WHT, 76, 64,102, 89, *//* 21-30 */
-            102, WHT, 102, WHT, 115, 102, WHT, 89, GRY, WHT,    /* 31-40 */
-            /* 102,WHT,102,WHT,115,102,WHT, 89, 76,WHT, *//* 31-40 */
-            76, WHT, WHT, GRY, 89, WHT, 89, WHT, 76, WHT, 102,  /* 41-51 */
-            /*  76,WHT,WHT, 76, 89,WHT, 89,WHT, 76,WHT,102, *//* 41-51 */
-    -1};                        /* --- end-of-grayscale0[] --- */
-#endif
-#if 0
-/* ---
- * these grayscales _exactly_ correspond to the aapnm() algorithm
- * --- */
-/* --- grayscale for each pattern when center pixel set/black --- */
-    static int grayscale1[] = {
-        -1,                     /* [0] index not used */
-            BLK, BLK, BLK, BLK, 242, 230, BLK, BLK, BLK, BLK,   /*  1-10 */
-            BLK, BLK, 217, 230, 217, 230, 204, BLK, BLK, 166,   /* 11-20 */
-            BLK, BLK, BLK, BLK, BLK, BLK, 178, 166, 204, 191,   /* 21-30 */
-            204, BLK, 204, 191, 217, 204, BLK, 191, 178, BLK,   /* 31-40 */
-            178, BLK, BLK, 178, 191, BLK, 191, BLK, 178, BLK, 204,      /* 41-51 */
-    -1};                        /* --- end-of-grayscale1[] --- */
-/* --- grayscale for each pattern when center pixel not set/white --- */
-    static int grayscale0[] = {
-        -1,                     /* [0] index not used */
-            WHT, WHT, WHT, WHT, WHT, WHT, WHT, WHT, WHT, WHT,   /*  1-10 */
-            51, WHT, WHT, 128, 115, 128, WHT, WHT, WHT, 64,     /* 11-20 */
-            WHT, WHT, WHT, 64, WHT, WHT, 76, 64, 102, 89,       /* 21-30 */
-            102, WHT, 102, WHT, 115, 102, WHT, 89, 76, WHT,     /* 31-40 */
-            76, WHT, WHT, 76, 89, WHT, 89, WHT, 76, WHT, 102,   /* 41-51 */
-    -1};                        /* --- end-of-grayscale0[] --- */
-#endif
-/* -------------------------------------------------------------------------
-look up grayscale for gridnum
--------------------------------------------------------------------------- */
-/* --- first check input --- */
-    if (gridnum < 0 || gridnum > 511)
-        goto end_of_job;        /* gridnum out of bounds */
-/* --- look up pattern number, 1-51, corresponding to input gridnum --- */
-    pattern = aapatternnum(gridnum);    /* look up pattern number */
-    if (pattern < 1 || pattern > 51)
-        goto end_of_job;        /* some internal error */
-    if (ispatternnumcount) {    /* counts being accumulated */
-        if (iscenter)
-            patternnumcount1[pattern] += 1;     /* bump diagnostic count */
-        else
-            patternnumcount0[pattern] += 1;
-    }
-/* --- look up grayscale for this pattern --- */
-    grayscale = (iscenter ? grayscale1[pattern] : grayscale0[pattern]);
-  end_of_job:
-    return grayscale;
 }
-
-
-/* ==========================================================================
- * Function:    aalowpasslookup ( rp, bytemap, grayscale )
- * Purpose: calls aalookup() for each pixel in rp->bitmap
- *      to create anti-aliased bytemap
- * --------------------------------------------------------------------------
- * Arguments:   rp (I)      raster *  to raster whose bitmap
- *              is to be anti-aliased
- *      bytemap (O) intbyte * to bytemap, calculated
- *              by calling aalookup() for each pixel
- *              in rp->bitmap
- *      grayscale (I)   int containing number of grayscales
- *              to be calculated, 0...grayscale-1
- *              (should typically be given as 256)
- * --------------------------------------------------------------------------
- * Returns: ( int )     1=success, 0=any error
- * --------------------------------------------------------------------------
- * Notes:    o
- * ======================================================================= */
-int aalowpasslookup(raster * rp, intbyte * bytemap, int grayscale) {
-    int width = rp->width, height = rp->height, /* width, height of raster */
-        icol = 0, irow = 0, imap = (-1);        /* width, height, bitmap indexes */
-    int bgbitval = 0 /*, fgbitval=1 */ ;        /* background, foreground bitval */
-    int bitval = 0,             /* value of rp bit at irow,icol */
-        aabyteval = 0;          /* antialiased (or unchanged) value */
-    int gridnum = 0, aagridnum(),       /* grid# for 3x3 grid at irow,icol */
-        aalookup();             /* table look up  antialiased value */
-/* -------------------------------------------------------------------------
-generate bytemap by table lookup for each pixel of bitmap
--------------------------------------------------------------------------- */
-    for (irow = 0; irow < height; irow++)
-        for (icol = 0; icol < width; icol++) {
-            /* --- get gridnum and center bit value, init aabyteval --- */
-            gridnum = aagridnum(rp, irow, icol);        /*grid# coding 3x3 grid at irow,icol */
-            bitval = (gridnum & 1);     /* center bit set if gridnum odd */
-            aabyteval = (intbyte) (bitval == bgbitval ? 0 : grayscale - 1);     /* default aa val */
-            imap++;             /* first bump bitmap[] index */
-            bytemap[imap] = (intbyte) (aabyteval);      /* init antialiased pixel */
-            /* --- look up antialiased value for this grid --- */
-            aabyteval = aalookup(gridnum);      /* look up on grid# */
-            if (aabyteval >= 0 && aabyteval <= 255)     /* check for success */
-                bytemap[imap] = (intbyte) (aabyteval);  /* init antialiased pixel */
-        }                       /* --- end-of-for(irow,icol) --- */
-    ispatternnumcount = 0;      /* accumulate counts only once */
-
-/*end_of_job:*/
-    return 1;
-}
-
-/* ==========================================================================
- * Function:    aasupsamp ( rp, aa, sf, grayscale )
- * Purpose: calculates a supersampled anti-aliased bytemap
- *      for rp->bitmap, with each byte 0...grayscale-1
- * --------------------------------------------------------------------------
- * Arguments:   rp (I)      raster *  to raster whose bitmap
- *              is to be anti-aliased
- *      aa (O)      address of raster * to supersampled bytemap,
- *              calculated by supersampling rp->bitmap
- *      sf (I)      int containing supersampling shrinkfactor
- *      grayscale (I)   int containing number of grayscales
- *              to be calculated, 0...grayscale-1
- *              (should typically be given as 256)
- * --------------------------------------------------------------------------
- * Returns: ( int )     1=success, 0=any error
- * --------------------------------------------------------------------------
- * Notes:     o If the center point of the box being averaged is black,
- *      then the entire "average" is forced black (grayscale-1)
- *      regardless of the surrounding points.  This is my attempt
- *      to avoid a "washed-out" appearance of thin (one-pixel-wide)
- *      lines, which would otherwise turn from black to a gray shade.
- * ======================================================================= */
-static int aasupsamp(raster * rp, raster ** aa, int sf, int grayscale)
-{
-    int status = 0;             /* 1=success, 0=failure to caller */
-    int rpheight = rp->height, rpwidth = rp->width,     /*bitmap raster dimensions */
-        heightrem = 0, widthrem = 0,    /* rp+rem is a multiple of shrinkf */
-        aaheight = 0, aawidth = 0,      /* supersampled dimensions */
-        aapixsz = 8;            /* output pixels are 8-bit bytes */
-    int maxaaval = -9999,       /* max grayscale val set in matrix */
-        isrescalemax = 1;       /* 1=rescale maxaaval to grayscale */
-    int irp = 0, jrp = 0, iaa = 0, jaa = 0, iwt = 0, jwt = 0;   /*indexes, i=width j=height */
-    raster *aap = NULL;         /* raster for supersampled image */
-    static raster *aawts = NULL;        /* aaweights() resultant matrix */
-    static int prevshrink = NOVALUE,    /* shrinkfactor from previous call */
-        sumwts = 0;             /* sum of weights */
-    static int blackfrac = 40,  /* force black if this many pts are */
-        /*grayfrac = 20, */
-        maxwt = 10,             /* max weight in weight matrix */
-        minwtfrac = 10, maxwtfrac = 70; /* force light pts white, dark black */
-
-/* --- check args --- */
-    if (aa == NULL)
-        goto end_of_job;        /* no ptr for return output arg */
-    *aa = NULL;                 /* init null ptr for error return */
-    if (rp == NULL              /* no ptr to input arg */
-        || sf < 1               /* invalid shrink factor */
-        || grayscale < 2)
-        goto end_of_job;        /* invalid grayscale */
-/* --- get weight matrix (or use current one) --- */
-    if (sf != prevshrink) {     /* have new shrink factor */
-        if (aawts != NULL)      /* have unneeded weight matrix */
-            delete_raster(aawts);       /* so free it */
-        sumwts = 0;             /* reinitialize sum of weights */
-        aawts = aaweights(sf, sf);      /* get new weight matrix */
-        if (aawts != NULL)      /* got weight matrix okay */
-            for (jwt = 0; jwt < sf; jwt++)      /* for each row */
-                for (iwt = 0; iwt < sf; iwt++) {        /* and each column */
-                    int wt = (int) (getpixel(aawts, jwt, iwt)); /* weight */
-                    if (wt > maxwt) {   /* don't overweight center pts */
-                        wt = maxwt;     /* scale it back */
-                        setpixel(aawts, jwt, iwt, wt);
-                    } /* and replace it in matrix */ sumwts += wt;
-                }               /* add weight to sum */
-        prevshrink = sf;
-    }                           /* save new shrink factor */
-    if (msgfp != NULL && msglevel >= 999) {
-        fprintf(msgfp, "aasupsamp> sf=%d, sumwts=%d weights=...\n", sf,
-                sumwts);
-        type_bytemap((intbyte *) aawts->pixmap, grayscale, aawts->width,
-                     aawts->height, msgfp);
-    }
-/* --- calculate supersampled height,width and allocate output raster */
-    heightrem = rpheight % sf;  /* remainder after division... */
-    widthrem = rpwidth % sf;    /* ...by shrinkfactor */
-    aaheight = 1 + (rpheight + sf - (heightrem + 1)) / sf;      /* ss height */
-    aawidth = 1 + (rpwidth + sf - (widthrem + 1)) / sf; /* ss width */
-    if (msgfp != NULL && msglevel >= 999) {
-        fprintf(msgfp,
-                "aasupsamp> rpwid,ht=%d,%d wd,htrem=%d,%d aawid,ht=%d,%d\n",
-                rpwidth, rpheight, widthrem, heightrem, aawidth, aaheight);
-        fprintf(msgfp, "aasupsamp> dump of original bitmap image...\n");
-        type_raster(rp, msgfp);
-    }                           /* ascii image of rp raster */
-    if ((aap = new_raster(aawidth, aaheight, aapixsz)) == NULL) {
-        goto end_of_job;        /* quit if alloc fails */
-    }
-/* -------------------------------------------------------------------------
-Step through rp->bitmap, applying aawts to each "submatrix" of bitmap
--------------------------------------------------------------------------- */
-    for (jaa = 0, jrp = (-(heightrem + 1) / 2); jrp < rpheight; jrp += sf) {    /* height */
-        for (iaa = 0, irp = (-(widthrem + 1) / 2); irp < rpwidth; irp += sf) {  /* width */
-            int aaval = 0;      /* weighted rpvals */
-            int nrp = 0, mrp = 0;       /* #rp bits set, #within matrix */
-            for (jwt = 0; jwt < sf; jwt++)
-                for (iwt = 0; iwt < sf; iwt++) {
-                    int i = irp + iwt, j = jrp + jwt;   /* rp->pixmap point */
-                    int rpval = 0;      /* rp->pixmap value at i,j */
-                    if (i >= 0 && i < rpwidth   /* i within actual pixmap */
-                        && j >= 0 && j < rpheight) {    /* ditto j */
-                        mrp++;  /* count another bit within matrix */
-                        rpval = (int) (getpixel(rp, j, i));
-                    }           /* get actual pixel value */
-                    if (rpval != 0) {
-                        nrp++;  /* count another bit set */
-                        aaval += (int) (getpixel(aawts, jwt, iwt));
-                    }           /* sum weighted vals */
-                }               /* --- end-of-for(iwt,jwt) --- */
-            if (aaval > 0) {    /*normalize and rescale non-zero val */
-                int aafrac = (100 * aaval) / sumwts;    /* weighted percent of black points */
-                /*if((100*nrp)/mrp >=blackfrac) *//* many black interior pts */
-                if (aafrac >= maxwtfrac)        /* high weight of sampledblack pts */
-                    aaval = grayscale - 1;      /* so set supersampled pt black */
-                else if (aafrac <= minwtfrac)   /* low weight of sampledblack pts */
-                    aaval = 0;  /* so set supersampled pt white */
-                else            /* rescale calculated weight */
-                    aaval =
-                        ((sumwts / 2 - 1) +
-                         (grayscale - 1) * aaval) / sumwts;
-            }
-            maxaaval = max2(maxaaval, aaval);   /* largest aaval so far */
-            if (msgfp != NULL && msglevel >= 999)
-                fprintf(msgfp, "aasupsamp> jrp,irp=%d,%d jaa,iaa=%d,%d"
-                        " mrp,nrp=%d,%d aaval=%d\n",
-                        jrp, irp, jaa, iaa, mrp, nrp, aaval);
-            if (jaa < aaheight && iaa < aawidth)        /* bounds check */
-                setpixel(aap, jaa, iaa, aaval); /*weighted val in supersamp raster */
-            else if (msgfp != NULL && msglevel >= 9)    /* emit error if out-of-bounds */
-                fprintf(msgfp,
-                        "aasupsamp> Error: aaheight,aawidth=%d,%d jaa,iaa=%d,%d\n",
-                        aaheight, aawidth, jaa, iaa);
-            iaa++;              /* bump aa col index */
-        }                       /* --- end-of-for(irp) --- */
-        jaa++;                  /* bump aa row index */
-    }                           /* --- end-of-for(jrp) --- */
-/* --- rescale supersampled image so darkest points become black --- */
-    if (isrescalemax) {         /* flag set to rescale maxaaval */
-        double scalef = ((double) (grayscale - 1)) / ((double) maxaaval);
-        for (jaa = 0; jaa < aaheight; jaa++)    /* height */
-            for (iaa = 0; iaa < aawidth; iaa++) {       /* width */
-                int aafrac, aaval = getpixel(aap, jaa, iaa);    /* un-rescaled value */
-                aaval = (int) (0.5 + ((double) aaval) * scalef);        /*multiply by scale factor */
-                aafrac = (100 * aaval) / (grayscale - 1);       /* fraction of blackness */
-                if (aafrac >= blackfrac)        /* high weight of sampledblack pts */
-                    aaval = grayscale - 1;      /* so set supersampled pt black */
-                else if (0 && aafrac <= minwtfrac)      /* low weight of sampledblack pts */
-                    aaval = 0;  /* so set supersampled pt white */
-                setpixel(aap, jaa, iaa, aaval);
-            }                   /* replace rescaled val in raster */
-    }                           /* --- end-of-if(isrescalemax) --- */
-    *aa = aap;                  /* return supersampled image */
-    status = 1;                 /* set successful status */
-    if (msgfp != NULL && msglevel >= 999) {
-        fprintf(msgfp, "aasupsamp> anti-aliased image...\n");
-        type_bytemap((intbyte *) aap->pixmap, grayscale,
-                     aap->width, aap->height, msgfp);
-        fflush(msgfp);
-    }
-  end_of_job:
-    return (status);
-}
-
-#if 0
-/* ==========================================================================
- * Function:    aacolormap ( bytemap, nbytes, colors, colormap )
- * Purpose: searches bytemap, returning a list of its discrete values
- *      in ascending order in colors[], and returning an "image"
- *      of bytemap (where values are replaced by colors[]
- *      indexes) in colormap[].
- * --------------------------------------------------------------------------
- * Arguments:   bytemap (I) intbyte *  to bytemap containing
- *              grayscale values (usually 0=white
- *              through 255=black) for which colors[]
- *              and colormap[] will be constructed.
- *      nbytes (I)  int containing #bytes in bytemap
- *              (usually just #rows * #cols)
- *      colors (O)  intbyte *  (to be interpreted as ints)
- *              returning a list of the discrete/different
- *              values in bytemap, in ascending value order,
- *              and with gamma correction applied
- *      colormap (O)    intbyte *  returning a bytemap "image",
- *              i.e., in one-to-one pixel correspondence
- *              with bytemap, but where the values have been
- *              replaced with corresponding colors[] indexes.
- * --------------------------------------------------------------------------
- * Returns: ( int )     #colors in colors[], or 0 for any error
- * --------------------------------------------------------------------------
- * Notes:     o
- * ======================================================================= */
-static int aacolormap(intbyte * bytemap, int nbytes, intbyte * colors,
-                      intbyte * colormap) {
-    int ncolors = 0,            /* #different values in bytemap */
-        igray, grayscale = 256; /* bytemap contains intbyte's */
-    intbyte *bytevalues = NULL; /* 1's where bytemap contains value */
-    int ibyte;                  /* bytemap/colormap index */
-    int isscale = 0,            /* true to scale largest val to 255 */
-        isgamma = 1;            /* true to apply gamma correction */
-    int maxcolors = 0;          /* maximum ncolors */
-/* -------------------------------------------------------------------------
-Accumulate colors[] from values occurring in bytemap
--------------------------------------------------------------------------- */
-/* --- initialization --- */
-    if ((bytevalues = (intbyte *) malloc(grayscale))    /*alloc bytevalues */
-        == NULL)
-        goto end_of_job;        /* signal error if malloc() failed */
-     memset(bytevalues, 0, grayscale);  /* zero out bytevalues */
-/* --- now set 1's at offsets corresponding to values found in bytemap --- */
-    for (ibyte = 0; ibyte < nbytes; ibyte++)    /* for each byte in bytemap */
-         bytevalues[(int) bytemap[ibyte]] = 1;  /*use its value to index bytevalues */
-/* --- collect the 1's indexes in colors[] --- */
-    for (igray = 0; igray < grayscale; igray++) /* check all possible values */
-        if ((int) bytevalues[igray]) {  /*bytemap contains igray somewheres */
-            colors[ncolors] = (intbyte) igray;  /* so store igray in colors */
-            bytevalues[igray] = (intbyte) ncolors;      /* save colors[] index */
-            if (maxcolors > 0 && ncolors >= maxcolors)  /* too many color indexes */
-                bytevalues[igray] = (intbyte) (maxcolors - 1);  /*so scale back to max */
-            ncolors++;
-        }
-    /* and bump #colors *//* --- rescale colors so largest, colors[ncolors-1], is black --- */
-    if (isscale)
-        /* only rescale if requested */
-        if (ncolors > 1)        /* and if not a "blank" raster */
-            if (colors[ncolors - 1] > 0) {      /*and at least one pixel non-white */
-                /* --- multiply each colors[] by factor that scales largest to 255 --- */
-                double scalefactor =
-                    ((double) (grayscale - 1)) /
-                    ((double) colors[ncolors - 1]);
-                for (igray = 1; igray < ncolors; igray++) {     /* re-scale each colors[] */
-                    colors[igray] =
-                        min2(grayscale - 1,
-                             (int) (scalefactor * colors[igray] + 0.5));
-                    if (igray > 5)
-                        colors[igray] =
-                            min2(grayscale - 1, colors[igray] + 2 * igray);
-                }
-            }
-    /* --- end-of-if(isscale) --- */
-    /* --- apply gamma correction --- */
-    if (isgamma                 /* only gamma correct if requested */
-        && gammacorrection > 0.0001)    /* and if we have gamma correction */
-        if (ncolors > 1)        /* and if not a "blank" raster */
-            if (colors[ncolors - 1] > 0) {      /*and at least one pixel non-white */
-                for (igray = 1; igray < ncolors; igray++) {     /*gamma correct each colors[] */
-                    int grayval = colors[igray],        /* original 0=white to 255=black */
-                        gmax = grayscale - 1;   /* should be 255 */
-                    double dgray = ((double) (gmax - grayval)) / ((double) gmax);       /*0=black 1=white */
-                    dgray = pow(dgray, (1.0 / gammacorrection));        /* apply gamma correction */
-                    grayval = (int) (gmax * (1.0 - dgray) + 0.5);       /* convert back to grayval */
-                    colors[igray] = grayval;
-                }               /* store back in colors[] */
-            }
-    /* --- end-of-if(isgamma) --- */
-    /* -------------------------------------------------------------------------
-       Construct colormap
-       -------------------------------------------------------------------------- */
-    for (ibyte = 0; ibyte < nbytes; ibyte++)    /* for each byte in bytemap */
-        colormap[ibyte] = bytevalues[(int) bytemap[ibyte]];     /*index for this value */
-/* -------------------------------------------------------------------------
-back to caller with #colors, or 0 for any error
--------------------------------------------------------------------------- */
-  end_of_job:
-    if (bytevalues != NULL)
-        free(bytevalues);       /* free working memory */
-    if (maxcolors > 0 && ncolors > maxcolors)   /* too many color indexes */
-        ncolors = maxcolors;    /* return maximum to caller */
-    return (ncolors);           /* back with #colors, or 0=error */
-}                               /* --- end-of-function aacolormap() --- */
-#endif
-
-/* ==========================================================================
- * Function:    aaweights ( width, height )
- *      Builds "canonical" weight matrix, width x height, in a raster
- *      (see Notes below for discussion).
- * --------------------------------------------------------------------------
- * Arguments:   width (I)   int containing width (#cols) of returned
- *              raster/matrix of weights
- *      height (I)  int containing height (#rows) of returned
- *              raster/matrix of weights
- * --------------------------------------------------------------------------
- * Returns: ( raster * )    ptr to raster containing width x height
- *              weight matrix, or NULL for any error
- * --------------------------------------------------------------------------
- * Notes:     o For example, given width=7, height=5, builds the matrix
- *          1 2 3  4 3 2 1
- *          2 4 6  8 6 4 2
- *          3 6 9 12 9 6 3
- *          2 4 6  8 6 4 2
- *          1 2 3  4 3 2 1
- *      If an even dimension given, the two center numbers stay
- *      the same, e.g., 123321 for the top row if width=6.
- *        o For an odd square n x n matrix, the sum of all n^2
- *      weights will be ((n+1)/2)^4.
- *        o The largest weight (in the allocated pixsz=8 raster) is 255,
- *      so the largest square matrix is 31 x 31.  Any weight that
- *      tries to grow beyond 255 is held constant at 255.
- *        o A new_raster(), pixsz=8, is allocated for the caller.
- *      To avoid memory leaks, be sure to delete_raster() when done.
- * ======================================================================= */
-static raster *aaweights(int width, int height)
-{
-    raster *weights = NULL;
-    int irow = 0;
-    int icol = 0;
-    int weight = 0;             /*running weight, as per Notes above */
-
-    if ((weights = new_raster(width, height, 8)) == NULL) {
-        goto end_of_job;
-    }
-/* -------------------------------------------------------------------------
-Fill weight matrix, as per Notes above
--------------------------------------------------------------------------- */
-    for (irow = 0; irow < height; irow++) {
-        /* outer loop over rows */
-        for (icol = 0; icol < width; icol++) {  /* inner loop over cols */
-            int jrow = height - irow - 1,       /* backwards irow, height-1,...,0 */
-                jcol = width - icol - 1;        /* backwards icol,  width-1,...,0 */
-            weight = min2(irow + 1, jrow + 1) * min2(icol + 1, jcol + 1);       /* weight */
-            if (aaalgorithm == 1)
-                weight = 1;     /* force equal weights */
-            setpixel(weights, irow, icol, min2(255, weight));   /*store weight in matrix */
-        }
-    }
-  end_of_job:
-    return weights;
-}
-
-/* ==========================================================================
- * Function:    aawtpixel ( image, ipixel, weights, rotate )
- * Purpose: Applies matrix of weights to the pixels
- *      surrounding ipixel in image, rotated clockwise
- *      by rotate degrees (typically 0 or 30).
- * --------------------------------------------------------------------------
- * Arguments:   image (I)   raster * to bitmap (though it can be bytemap)
- *              containing image with pixels to be averaged.
- *      ipixel (I)  int containing index (irow*width+icol) of
- *              center pixel of image for weighted average.
- *      weights (I) raster * to bytemap of relative weights
- *              (0-255), whose dimensions (usually odd width
- *              and odd height) determine the "subgrid" of
- *              image surrounding ipixel to be averaged.
- *      rotate (I)  int containing degrees clockwise rotation
- *              (typically 0 or 30), i.e., imagine weights
- *              rotated clockwise and then averaging the
- *              image pixels "underneath" it now.
- * --------------------------------------------------------------------------
- * Returns: ( int )     0-255 weighted average, or -1 for any error
- * --------------------------------------------------------------------------
- * Notes:     o The rotation matrix used (when requested) is
- *          / x' \     / cos(theta)  sin(theta)/a \  / x \
- *          |    |  =  |                          |  |   |
- *                  \ y' /     \ -a*sin(theta) cos(theta) /  \ y /
- *      where a=1 (current default) is the pixel (not screen)
- *      aspect ratio width:height, and theta is rotate (converted
- *      from degrees to radians).  Then x=col,y=row are the integer
- *      pixel coords relative to the input center ipixel, and
- *      x',y' are rotated coords which aren't necessarily integer.
- *      The actual pixel used is the one nearest x',y'.
- * ======================================================================= */
-int aawtpixel(raster * image, int ipixel, raster * weights, int rotate)
-{
-    int aaimgval = 0,           /* weighted avg returned to caller */
-        totwts = 0, sumwts = 0; /* total of all wts, sum wts used */
-    int pixsz = image->pixsz,   /* #bits per image pixel */
-        black1 = 1, black8 = 255,       /* black for 1-bit, 8-bit pixels */
-        black = (pixsz == 1 ? black1 : black8), /* black value for our image */
-        scalefactor = (black1 + black8 - black),        /* only scale 1-bit images */
-        iscenter = 0;           /* set true if center pixel black */
-/* --- grid dimensions and indexes --- */
-    int wtheight = weights->height,     /* #rows in weight matrix */
-        wtwidth = weights->width,       /* #cols in weight matrix */
-        imgheight = image->height,      /* #rows in image */
-        imgwidth = image->width;        /* #cols in image */
-    int wtrow, wtrow0 = wtheight / 2,   /* center row index for weights */
-        wtcol, wtcol0 = wtwidth / 2,    /* center col index for weights */
-        imgrow, imgrow0 = ipixel / imgwidth,    /* center row index for ipixel */
-        imgcol, imgcol0 = ipixel - (imgrow0 * imgwidth);        /*center col for ipixel */
-/* --- rotated grid variables --- */
-    static int prevrotate = 0;  /* rotate from previous call */
-    static double costheta = 1.0,       /* cosine for previous rotate */
-        sintheta = 0.0;         /* and sine for previous rotate */
-    double a = 1.0;             /* default aspect ratio */
-/* -------------------------------------------------------------------------
-Initialization
--------------------------------------------------------------------------- */
-/* --- refresh trig functions for rotate when it changes --- */
-    if (rotate != prevrotate) { /* need new sine/cosine */
-        costheta = cos(((double) rotate) / 57.29578);   /*cos of rotate in radians */
-        sintheta = sin(((double) rotate) / 57.29578);   /*sin of rotate in radians */
-        prevrotate = rotate;
-    }
-    /* save current rotate as prev *//* -------------------------------------------------------------------------
-       Calculate aapixel as weighted average over image points around ipixel
-       -------------------------------------------------------------------------- */
-        for (wtrow = 0; wtrow < wtheight; wtrow++) {
-        for (wtcol = 0; wtcol < wtwidth; wtcol++) {
-            /* --- allocations and declarations --- */
-            int wt = (int) getpixel(weights, wtrow, wtcol);     /* weight for irow,icol */
-            int drow = wtrow - wtrow0,  /* delta row offset from center */
-                dcol = wtcol - wtcol0;  /* delta col offset from center */
-            /* not used --int iscenter = 0; *//* set true if center point black */
-            /* --- initialization --- */
-            totwts += wt;       /* sum all weights */
-            /* --- rotate (if requested) --- */
-            if (rotate != 0) {  /* non-zero rotation */
-                /* --- apply rotation matrix to (x=dcol,y=drow) --- */
-                double dx = (double) dcol, dy = (double) drow, dtemp;   /* need floats */
-                dtemp = dx * costheta + dy * sintheta / a;      /* save new dx' */
-                dy = -a * dx * sintheta + dy * costheta;        /* dy becomes new dy' */
-                dx = dtemp;     /* just for notational convenience */
-                /* --- replace original (drow,dcol) with nearest rotated point --- */
-                drow = (int) (dy + 0.5);        /* round dy for nearest row */
-                dcol = (int) (dx + 0.5);        /* round dx for nearest col */
-            }
-            /* --- end-of-if(rotate!=0) --- */
-            /* --- select image pixel to be weighted --- */
-            imgrow = imgrow0 + drow;    /*apply displacement to center row */
-            imgcol = imgcol0 + dcol;    /*apply displacement to center col */
-            /* --- if pixel in bounds, accumulate weighted average --- */
-            if (imgrow >= 0 && imgrow < imgheight) {    /* row is in bounds */
-                if (imgcol >= 0 && imgcol < imgwidth) { /* and col is in bounds */
-                    /* --- accumulate weighted average --- */
-                    int imgval = (int) getpixel(image, imgrow, imgcol); /* image value */
-                    aaimgval += wt * imgval;    /* weighted sum of image values */
-                    sumwts += wt;       /* and also sum weights used */
-                    /* --- check if center image pixel black --- */
-                    if (drow == 0 && dcol == 0) {       /* this is center ipixel */
-                        if (imgval == black) {  /* and it's black */
-                            /* not used --iscenter = 1; *//* so set black center flag true */
-                        }
-                    }
-                }
-            }
-        }
-    }
-    if (0 && iscenter) {         /* center point is black */
-        aaimgval = black8;
-    } else {                        /* center point not black */
-        aaimgval = ((totwts / 2 - 1) + scalefactor * aaimgval) / totwts;
-    }
-    return aaimgval;
-}
-
-/* ==========================================================================
- * Function:    mimetexsetmsg ( newmsglevel, newmsgfp )
- * Purpose: Sets msglevel and msgfp, usually called from
- *      an external driver (i.e., DRIVER not defined
- *      in this module).
- * --------------------------------------------------------------------------
- * Arguments:   newmsglevel (I) int containing new msglevel
- *              (unchanged if newmsglevel<0)
- *      newmsgfp (I)    FILE * containing new msgfp
- *              (unchanged if newmsgfp=NULL)
- * --------------------------------------------------------------------------
- * Returns: ( int )     always 1
- * --------------------------------------------------------------------------
- * Notes:     o
- * ======================================================================= */
-int mimetexsetmsg(int newmsglevel, FILE * newmsgfp)
-{
-    if (newmsglevel >= 0)
-        msglevel = newmsglevel;
-    if (newmsgfp != NULL)
-        msgfp = newmsgfp;
-    return 1;
-}
-

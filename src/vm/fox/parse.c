@@ -3391,14 +3391,19 @@ static int parse_pragma(RefNode *module, Tok *tk, Str line)
     switch (key.p[0]) {
     case 'c':
         if (str_eq(key.p, key.size, "cgi", -1)) {
-            fs->cgi_mode = TRUE;
+            if (fs->running_mode == RUNNING_MODE_GUI) {
+                throw_errorf(fs->mod_lang, "CompileError", "CGI mode is not supported");
+                add_stack_trace(tk->module, NULL, tk->v.line);
+                return FALSE;
+            }
+            fs->running_mode = RUNNING_MODE_CGI;
             return TRUE;
         }
         break;
     case 'f':
         if (str_eq(key.p, key.size, "foxinfo", -1)) {
             if (module == fv->startup) {
-                if (fs->cgi_mode) {
+                if (fs->running_mode == RUNNING_MODE_CGI) {
                     cgi_init_responce();
                 }
                 init_fox_stack();
