@@ -826,7 +826,7 @@ static void define_func(RefNode *m)
     fs->define_native_func_a(n, net_getifaddrs, 0, 0, NULL);
 
 #ifdef WIN32
-    n = fs->define_identifier_p(m, m, fs->str_dispose, NODE_FUNC_N, 0);
+    n = fs->define_identifier_p(m, m, fs->str_dtor, NODE_FUNC_N, 0);
     fs->define_native_func_a(n, net_dispose, 0, 0, NULL);
 #endif
 }
@@ -857,7 +857,7 @@ static void define_class(RefNode *m)
     n = fs->define_identifier_p(m, cls, fs->str_new, NODE_NEW_N, 0);
     fs->define_native_func_a(n, socket_new, 2, 2, NULL, NULL, fs->cls_int);
 
-    n = fs->define_identifier_p(m, cls, fs->str_dispose, NODE_FUNC_N, 0);
+    n = fs->define_identifier_p(m, cls, fs->str_dtor, NODE_FUNC_N, 0);
     fs->define_native_func_a(n, socket_close, 0, 0, NULL);
     n = fs->define_identifier(m, cls, "close", NODE_FUNC_N, 0);
     fs->define_native_func_a(n, socket_close, 0, 0, NULL);
@@ -877,7 +877,7 @@ static void define_class(RefNode *m)
     n = fs->define_identifier_p(m, cls, fs->str_new, NODE_NEW_N, 0);
     fs->define_native_func_a(n, listener_new, 2, 2, NULL, cls_ipaddr, fs->cls_int);
 
-    n = fs->define_identifier_p(m, cls, fs->str_dispose, NODE_FUNC_N, 0);
+    n = fs->define_identifier_p(m, cls, fs->str_dtor, NODE_FUNC_N, 0);
     fs->define_native_func_a(n, listener_close, 0, 0, NULL);
     n = fs->define_identifier(m, cls, "close", NODE_FUNC_N, 0);
     fs->define_native_func_a(n, listener_close, 0, 0, NULL);
@@ -962,5 +962,8 @@ void define_module(RefNode *m, const FoxStatic *a_fs, FoxGlobal *a_fg)
 }
 const char *module_version(const FoxStatic *a_fs)
 {
+    if (a_fs->revision != FOX_INTERFACE_REVISION) {
+        return NULL;
+    }
     return "Build at\t" __DATE__ "\n";
 }

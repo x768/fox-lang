@@ -1,4 +1,4 @@
-word "0-9A-Za-z_"
+word "0-9A-Za-z_$"
 define comment
 define comment_line
 define quot
@@ -10,7 +10,7 @@ define typename word
 "/*" = _ comment comment
 "*/" = comment comment _
 "//" = _ comment_line comment_line
-"\n" = comment_line comment_line _
+"\n" = comment_line _ _
 
 "'" = _ quot quot
 "L'" = _ quot quot

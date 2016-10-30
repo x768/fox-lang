@@ -203,8 +203,8 @@ static int file_relative(Value *vret, Value *v, RefNode *node)
     }
 #endif
     if (invalid_utf8_pos(relpath.p, relpath.size) >= 0) {
-        *vret = cstr_Value_conv(rs_tmp->c, rs_tmp->size, NULL);
-        Value_dec(tmp);
+        *vret = cstr_Value(NULL, rs_tmp->c, rs_tmp->size);
+        unref(tmp);
     } else {
         *vret = tmp;
     }
@@ -352,7 +352,7 @@ static int file_path(Value *vret, Value *v, RefNode *node)
         return TRUE;
     }
     if (type < FILEPATH_PATH_BYTES) {
-        *vret = cstr_Value_conv(path.p, path.size, NULL);
+        *vret = cstr_Value(NULL, path.p, path.size);
     } else {
         *vret = cstr_Value(fs->cls_bytes, path.p, path.size);
     }
@@ -735,7 +735,7 @@ static int diriter_close(Value *vret, Value *v, RefNode *node)
         closedir_fox(r->dir);
         r->dir = NULL;
     }
-    Value_dec(r->vfile);
+    unref(r->vfile);
     r->vfile = VALUE_NULL;
 
     return TRUE;
@@ -941,7 +941,7 @@ static int file_fopen(Value *vret, Value *v, RefNode *node)
     Ref *ref;
 
     if (!fileio_new(&tmp, v, node)) {
-        Value_dec(tmp);
+        unref(tmp);
         return FALSE;
     }
     ref = ref_new(fs->cls_textio);
@@ -1397,7 +1397,7 @@ static int file_chdir(Value *vret, Value *v, RefNode *node)
     free(path);
 
     path = get_current_directory();
-    Value_dec(vp_Value(fv->cur_dir));
+    unref(vp_Value(fv->cur_dir));
     fv->cur_dir = Value_vp(cstr_Value(fs->cls_file, path, -1));
     free(path);
 
@@ -1414,7 +1414,7 @@ static int file_dir(Value *vret, Value *v, RefNode *node)
             return FALSE;
         }
         *v = vf;
-        Value_dec(v[1]);
+        unref(v[1]);
     }
     fg->stk_top = fg->stk_base + 1;
 
@@ -1618,7 +1618,7 @@ static void define_file_class(RefNode *m)
     cls = cls_diriter;
     n = define_identifier_p(m, cls, fs->str_next, NODE_FUNC_N, 0);
     define_native_func_a(n, diriter_next, 0, 0, NULL);
-    n = define_identifier_p(m, cls, fs->str_dispose, NODE_FUNC_N, 0);
+    n = define_identifier_p(m, cls, fs->str_dtor, NODE_FUNC_N, 0);
     define_native_func_a(n, diriter_close, 0, 0, NULL);
     extends_method(cls, fs->cls_iterator);
 

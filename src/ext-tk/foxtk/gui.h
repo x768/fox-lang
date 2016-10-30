@@ -100,7 +100,7 @@ int confirm_dialog(RefStr *msg, RefStr *title, WndHandle parent);
 int file_open_dialog(Value *vret, const char *title, RefArray *filter, WndHandle parent, int type);
 
 // form.c
-void create_form_window(Value *v, WndHandle parent, int *size);
+void create_form_window(Ref *r, WndHandle parent, int *size);
 
 void window_destroy(WndHandle window);
 void window_set_drop_handler(WndHandle window);

@@ -1,0 +1,49 @@
+import util.assert
+
+switch [1, 2] {
+case [1]
+    assert_fail()
+case [1, 1]
+    assert_fail()
+case [1, 2]
+}
+
+switch 1 {
+case "1"
+    assert_fail()
+case 2
+    assert_fail()
+default
+}
+
+switch 2 {
+case 1
+    assert_fail()
+case 2
+case 3
+    assert_fail()
+case 2
+    assert_fail()
+default
+    assert_fail()
+}
+
+
+switch 15 {
+case in 0..10
+    assert_fail()
+case in 10..20
+case in 20..30
+    assert_fail()
+}
+
+def switch_fail()
+{
+    switch 1 {
+    case 2
+    case 3
+    }
+}
+
+assert_error switch_fail, SwitchError
+

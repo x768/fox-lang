@@ -1,4 +1,5 @@
 #include "fox_parse.h"
+#include "bigint.h"
 #include <string.h>
 #include <stdio.h>
 
@@ -178,7 +179,7 @@ Str Value_str(Value v)
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void Value_inc(Value v)
+void addref(Value v)
 {
     if (Value_isref(v)) {
         RefHeader *rh = Value_ref_header(v);
@@ -187,7 +188,7 @@ void Value_inc(Value v)
         }
     }
 }
-void Value_dec(Value v)
+void unref(Value v)
 {
     if (Value_isref(v)) {
         RefHeader *rh = Value_ref_header(v);
@@ -240,7 +241,7 @@ void Value_push(const char *fmt, ...)
         case 'v': { // Value
             Value v = va_arg(va, Value);
             *fg->stk_top = v;
-            Value_inc(v);
+            addref(v);
             break;
         }
         case 'i': {  // const Node *type, int
@@ -291,10 +292,25 @@ Value float_Value(RefNode *klass, double dval)
     return v;
 }
 
+/**
+ * klass == NULLの場合
+ * Str型
+ * UTF-8の不正シーケンスは置き換え
+ */
 Value cstr_Value(RefNode *klass, const char *p, int size)
 {
     RefStr *r;
 
+    if (klass == NULL) {
+        if (invalid_utf8_pos(p, size) >= 0) {
+            StrBuf buf;
+            StrBuf_init_refstr(&buf, size);
+            alt_utf8_string(&buf, p, size);
+            return StrBuf_str_Value(&buf, fs->cls_str);
+        } else {
+            klass = fs->cls_str;
+        }
+    }
     if (size < 0) {
         size = strlen(p);
     }
@@ -398,34 +414,6 @@ RefStr *refstr_new_n(RefNode *klass, int size)
     return r;
 }
 
-/**
- * 文字コードをUTF-8に変換してセットする
- * cs == NULLなら、入力はUTF-8
- * 変換できない文字は置き換え
- */
-Value cstr_Value_conv(const char *p, int size, RefCharset *cs)
-{
-    if (cs == NULL || cs == fs->cs_utf8) {
-        if (invalid_utf8_pos(p, size) >= 0) {
-            StrBuf buf;
-            StrBuf_init_refstr(&buf, size);
-            alt_utf8_string(&buf, p, size);
-            return StrBuf_str_Value(&buf, fs->cls_str);
-        } else {
-            return cstr_Value(fs->cls_str, p, size);
-        }
-    } else {
-        IconvIO ic;
-        if (IconvIO_open(&ic, cs, fs->cs_utf8, UTF8_ALTER_CHAR)) {
-            StrBuf buf;
-            StrBuf_init_refstr(&buf, 0);
-            IconvIO_conv(&ic, &buf, p, size, FALSE, TRUE);
-            IconvIO_close(&ic);
-            return StrBuf_str_Value(&buf, fs->cls_str);
-        }
-    }
-    return VALUE_NULL;
-}
 Value printf_Value(const char *fmt, ...)
 {
     StrBuf buf;

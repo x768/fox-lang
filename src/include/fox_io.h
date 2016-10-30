@@ -38,17 +38,6 @@ typedef struct {
     FileHandle fd_write;
 } RefFileHandle;
 
-struct IconvIO {
-    RefCharset *cs_from;
-    RefCharset *cs_to;
-    const char *trans;
-    void *ic;
-    const char *inbuf;
-    size_t inbytesleft;
-    char *outbuf;
-    size_t outbytesleft;
-};
-
 typedef struct {
     RefHeader rh;
 

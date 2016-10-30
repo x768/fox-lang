@@ -146,13 +146,12 @@ static int call_dispose(Value v, RefNode *type)
 {
     // sub -> superの順に実行
     while (type != fs->cls_obj) {
-        RefNode *dispose = Hash_get_p(&type->u.c.h, fs->str_dispose);
+        RefNode *dispose = Hash_get_p(&type->u.c.h, fs->str_dtor);
 
         if (dispose != NULL && (dispose->type == NODE_FUNC || dispose->type == NODE_FUNC_N)) {
             RefHeader *rf = Value_ref_header(v);
             *fg->stk_top++ = v;
-            rf->nref += 2; // 再帰的にdisposeが発生しないように
-
+            rf->nref += 2;      // 再帰的にdisposeが発生しないように
             if (!call_function(dispose, 0)) {
                 // デストラクタで例外を吐くことはできないので、即終了
                 fatal_errorf("Cannot throw in %n:_dispose (%n)", type, Value_type(fg->error));
@@ -181,7 +180,7 @@ void Value_release_ref(Value v)
         int i;
         int n_memb = r->rh.n_memb;
         for (i = 0; i < n_memb; i++) {
-            Value_dec(r->v[i]);
+            unref(r->v[i]);
         }
         // 弱参照を削除
         if (r->rh.weak_ref != NULL) {
@@ -212,7 +211,7 @@ void dispose_opcode(RefNode *func)
         if (p->type == OP_NONE) {
             break;
         } else if (p->type == OP_LITERAL) {
-            Value_dec(p->op[0]);
+            unref(p->op[0]);
             pc += 2;
         } else if (p->type > OP_SIZE_3) {
             pc += 3;
@@ -290,7 +289,7 @@ int call_property(RefStr *name)
             break;
         }
         case NODE_CONST:
-            Value_dec(*v);
+            unref(*v);
             *v = Value_cp(memb->u.k.val);
             break;
         case NODE_FUNC:
@@ -524,7 +523,7 @@ NORMAL:
         }
         case OP_RETURN: // return
         case OP_RETURN_VAL: // return value
-            Value_dec(*fg->stk_base);
+            unref(*fg->stk_base);
 
             if (p->type == OP_RETURN_VAL) {
                 fg->stk_top--;
@@ -554,7 +553,7 @@ NORMAL:
             RefNode *type;
 
             if (fg->error != VALUE_NULL) {
-                Value_dec(fg->error);
+                unref(fg->error);
                 fg->error = VALUE_NULL;
             }
             v = fg->stk_top[-1];
@@ -593,7 +592,7 @@ NORMAL:
                 if (Value_isref(node->u.k.val)) {
                     RefHeader *rh = Value_vp(node->u.k.val);
                     // メンバ変数かデストラクタを持っているオブジェクトだけを追加
-                    if (rh->n_memb > 0 || Hash_get_p(&rh->type->u.c.h, fs->str_dispose) != NULL) {
+                    if (rh->n_memb > 0 || Hash_get_p(&rh->type->u.c.h, fs->str_dtor) != NULL) {
                         PtrList_add_p(&fv->const_refs, rh, &fg->st_mem);
                     }
                 }
@@ -682,7 +681,7 @@ NORMAL:
             break;
         case OP_SET_LOCAL: {
             Value *v = fg->stk_base + p->s;
-            Value_dec(*v);
+            unref(*v);
             fg->stk_top--;
             *v = *fg->stk_top;
             pc += 1;
@@ -705,7 +704,7 @@ NORMAL:
             RefNode *klass = Value_vp(p->op[0]);
             Ref *r = Value_ref(*fg->stk_base);
             Value *v = &r->v[p->s + klass->u.c.n_offset];
-            Value_dec(*v);
+            unref(*v);
             fg->stk_top--;
             *v = *fg->stk_top;
             pc += 2;
@@ -729,7 +728,7 @@ NORMAL:
             if (!call_member_func(fs->str_next, 0, TRUE)) {
                 if (Value_type(fg->error) == fs->cls_stopiter) {
                     // throw StopIterationでjmp
-                    Value_dec(fg->error);
+                    unref(fg->error);
                     fg->error = VALUE_NULL;
                     pc = (int)p->op[1];
 
@@ -802,24 +801,20 @@ NORMAL:
                         if (!call_member_func(fs->str_toplevel, p->s, TRUE)) {
                             goto THROW;
                         }
-                    } else {
+                    } else if (r->type == NODE_FUNC || r->type == NODE_FUNC_N) {
                         if (!call_function(r, p->s)) {
+                            goto THROW;
+                        }
+                    } else {
+                        if (!call_member_func(fs->symbol_stock[T_LP], p->s, TRUE)) {
                             goto THROW;
                         }
                     }
                 }
             } else {
-                goto OP_CALL_FAULT;
-            }
-            if (p->type == OP_CALL_POP) {
-                Value_pop();
-            }
-            pc += 2;
-            break;
-        OP_CALL_FAULT:
-            // 関数呼び出しメソッド'op_call'を呼び出す
-            if (!call_member_func(fs->symbol_stock[T_LP], p->s, TRUE)) {
-                goto THROW;
+                if (!call_member_func(fs->symbol_stock[T_LP], p->s, TRUE)) {
+                    goto THROW;
+                }
             }
             if (p->type == OP_CALL_POP) {
                 Value_pop();
@@ -837,8 +832,8 @@ NORMAL:
 
             if (v1 == v2) {
                 result = !neq;
-                Value_dec(v1);
-                Value_dec(v2);
+                unref(v1);
+                unref(v2);
                 fg->stk_top--;
             } else {
                 RefNode *type = Value_type(v1);
@@ -871,7 +866,7 @@ NORMAL:
 
                         if (Value_bool(v1)) {
                             // 参照オブジェクトの可能性がある
-                            Value_dec(v1);
+                            unref(v1);
                             result = !neq;
                         } else {
                             // false or null
@@ -938,7 +933,7 @@ NORMAL:
                         } else {
                             cmp = 1;
                         }
-                        Value_dec(v1);
+                        unref(v1);
                     } else {
                         throw_errorf(fs->mod_lang, "TypeError", "op_cmp return value must be 'Int' but %n", type);
                         goto THROW;
@@ -977,7 +972,7 @@ NORMAL:
         case OP_NOT: {
             Value *v = fg->stk_top - 1;
             if (Value_bool(*v)) {
-                Value_dec(*v);
+                unref(*v);
                 *v = VALUE_FALSE;
             } else {
                 *v = VALUE_TRUE;
@@ -988,10 +983,10 @@ NORMAL:
         case OP_JMP: // 無条件ジャンプ
             pc = (int)p->op[0];
             break;
-        case OP_JIF: { // stk_topを取り出して真ならjmp
+        case OP_POP_IF_J: { // stk_topを取り出して真ならjmp
             Value v = fg->stk_top[-1];
             if (Value_bool(v)) {
-                Value_dec(v);
+                unref(v);
                 pc = (int)p->op[0];
             } else {
                 pc += 2;
@@ -999,10 +994,10 @@ NORMAL:
             fg->stk_top--;
             break;
         }
-        case OP_JIF_N: { // stk_topを取り出して偽ならjmp
+        case OP_POP_IFN_J: { // stk_topを取り出して偽ならjmp
             Value v = fg->stk_top[-1];
             if (Value_bool(v)) {
-                Value_dec(v);
+                unref(v);
                 pc += 2;
             } else {
                 pc = (int)p->op[0];
@@ -1010,7 +1005,7 @@ NORMAL:
             fg->stk_top--;
             break;
         }
-        case OP_IF_P: { // 真ならjmp,偽ならpop
+        case OP_IF_J_POP: { // 真ならjmp,偽ならpop
             Value v = fg->stk_top[-1];
             if (Value_bool(v)) {
                 pc = (int)p->op[0];
@@ -1020,10 +1015,10 @@ NORMAL:
             }
             break;
         }
-        case OP_IF_NP: { // 真ならpop,偽ならjmp
+        case OP_IF_POP_J: { // 真ならpop,偽ならjmp
             Value v = fg->stk_top[-1];
             if (Value_bool(v)) {
-                Value_dec(v);
+                unref(v);
                 fg->stk_top--;
                 pc += 2;
             } else {
@@ -1031,24 +1026,22 @@ NORMAL:
             }
             break;
         }
-        case OP_IFP: { // 真ならpop,jmp
+        case OP_IFN_POPJ: { // 偽ならpop,jmp
             Value v = fg->stk_top[-1];
             if (Value_bool(v)) {
-                Value_dec(v);
+                pc += 2;
+            } else {
                 fg->stk_top--;
                 pc = (int)p->op[0];
-            } else {
-                pc += 2;
             }
             break;
         }
-        case OP_IFP_N: { // 偽ならpop,jmp
+        case OP_IFNULL_J: { // nullならjmp
             Value v = fg->stk_top[-1];
-            if (Value_bool(v)) {
-                pc += 2;
-            } else {
-                fg->stk_top--;
+            if (v == VALUE_NULL) {
                 pc = (int)p->op[0];
+            } else {
+                pc += 2;
             }
             break;
         }
@@ -1285,7 +1278,7 @@ int call_function_obj(int argc)
         fg->stk_base = fg->stk_top - argc - 1;
 
         if (!validate_arguments(node, argc)) {
-            Value_dec(vp_Value(r));
+            unref(vp_Value(r));
             fg->stk_base = stk_base;
             return FALSE;
         }
@@ -1302,10 +1295,10 @@ int call_function_obj(int argc)
             for (i = 0; i < n_memb; i++) {
                 *fg->stk_top++ = Value_cp(r->v[INDEX_FUNC_LOCAL + i]);
             }
-            Value_dec(vp_Value(r));
+            unref(vp_Value(r));
             ret = invoke_code(node, 0);
         } else if ((node->type & NODEMASK_FUNC_N) != 0) {
-            Value_dec(vp_Value(r));
+            unref(vp_Value(r));
             ret = invoke_native(node);
         } else {
             fatal_errorf("invoke_function_obj : unknown node type : %d (%n)", node->type, node);
@@ -1326,7 +1319,7 @@ static void dispose_all_modules()
         HashEntry *entry;
         for (entry = fg->mod_root.entry[i]; entry != NULL; entry = entry->next) {
             RefNode *m = entry->p;
-            RefNode *fn = Hash_get_p(&m->u.m.h, fs->str_dispose);
+            RefNode *fn = Hash_get_p(&m->u.m.h, fs->str_dtor);
             if (fn != NULL) {
                 *fg->stk_top++ = VALUE_NULL;
                 if (!call_function(fn, 0)) {
@@ -1355,11 +1348,11 @@ int fox_run(RefNode *mod)
 
         // 戻り値を除去
         fg->stk_base = fg->stk;
-        Value_dec(*fg->stk_base);
+        unref(*fg->stk_base);
 
         // 定数オブジェクトを削除
         for (p = fv->const_refs; p != NULL; p = p->next) {
-            Value_dec(vp_Value(p->u.p));
+            unref(vp_Value(p->u.p));
         }
 
         dispose_all_modules();

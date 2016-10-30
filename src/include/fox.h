@@ -117,17 +117,6 @@ enum {
     T_PLUS,   // +
     T_MINUS,  // -
 
-    T_LET,    // =
-    T_L_ADD,  // +=
-    T_L_SUB,  // -=
-    T_L_MUL,  // *=
-    T_L_DIV,  // /=
-    T_L_MOD,  // %=
-    T_L_LSH,  // <<=
-    T_L_RSH,  // >>=
-    T_L_AND,  // &=
-    T_L_OR,   // |=
-    T_L_XOR,  // ^=
     T_INC,    // ++
     T_DEC,    // --
     T_IN,     // in
@@ -219,8 +208,6 @@ typedef struct FoxGlobal FoxGlobal;
 
 typedef struct RefTimeZone RefTimeZone;
 typedef struct TimeOffset TimeOffset;
-
-typedef struct IconvIO IconvIO;
 
 typedef uint64_t Value;
 typedef struct Tok Tok;
@@ -392,6 +379,8 @@ struct HashValueEntry {
 // 外部モジュールに公開(定数)
 struct FoxStatic
 {
+    int revision;
+
     RefStr *fox_home;
     int running_mode;
     Hash envs;
@@ -412,9 +401,9 @@ struct FoxStatic
     RefTimeZone *tz_utc;
 
     RefStr *symbol_stock[T_INDEX_NUM];
-    RefStr *str_0;  // ""
+    RefStr *str_0;      // ""
     RefStr *str_new;
-    RefStr *str_dispose;
+    RefStr *str_dtor;   // ~this
     RefStr *str_tostr;
     RefStr *str_hash;
     RefStr *str_iterator;
@@ -492,7 +481,7 @@ struct FoxStatic
     char *(*str_dup_p)(const char *p, int size, Mem *mem);
     char *(*str_printf)(const char *fmt, ...);
     void (*add_backslashes_sub)(StrBuf *buf, const char *src_p, int src_size, int mode);
-    int (*parse_hex)(const char **pp, const char *end, int n);
+    int32_t (*parse_hex)(const char **pp, const char *end, int n);
 
     RefNode *(*Value_type)(Value v);
     int32_t (*Value_int32)(Value v);
@@ -504,7 +493,6 @@ struct FoxStatic
     Value (*int64_Value)(int64_t i);
     Value (*float_Value)(RefNode *klass, double dval);
     Value (*cstr_Value)(RefNode *klass, const char *p, int size);
-    Value (*cstr_Value_conv)(const char *p, int size, RefCharset *cs);
     Value (*time_Value)(int64_t ts, RefTimeZone *tz);
 
     Value (*printf_Value)(const char *fmt, ...);
@@ -513,8 +501,8 @@ struct FoxStatic
     void *(*buf_new)(RefNode *klass, int size);
     RefStr *(*refstr_new_n)(RefNode *klass, int size);
 
-    void (*Value_inc)(Value v);
-    void (*Value_dec)(Value v);
+    void (*addref)(Value v);
+    void (*unref)(Value v);
     void (*Value_push)(const char *fmt, ...);
     void (*Value_pop)(void);
     RefNode *(*get_node_member)(RefNode *node, ...);
@@ -598,11 +586,6 @@ struct FoxStatic
     int (*utf8_codepoint_at)(const char *p);
     RefCharset *(*get_charset_from_name)(const char *name_p, int name_size);
 
-    int (*IconvIO_open)(IconvIO *ic, RefCharset *from, RefCharset *to, const char *trans);
-    void (*IconvIO_close)(IconvIO *ic);
-    int (*IconvIO_next)(IconvIO *ic);
-    int (*IconvIO_conv)(IconvIO *ic, StrBuf *dst, const char *src_p, int src_size, int from_uni, int raise_error);
-
     RefArray *(*refarray_new)(int size);
     Value *(*refarray_push)(RefArray *r);
     int (*refarray_set_size)(RefArray *ra, int size);
@@ -637,9 +620,7 @@ struct FoxGlobal
 
 ////////////////////////////////////////////////////////////////////////////////
 
-#define FOX_VERSION_MAJOR    0
-#define FOX_VERSION_MINOR    17
-#define FOX_VERSION_REVISION 0
+#define FOX_INTERFACE_REVISION 1
 
 
 extern const char *fox_ctype_flags;
@@ -659,14 +640,15 @@ extern const char *fox_ctype_flags;
 
 #define tolower_fox(c)    (isupper_fox(c) ? (c) | ('A' ^ 'a') : (c))
 
-#define VALUE_NULL  ((Value)0ULL)
-#define VALUE_FALSE ((Value)0x0000000000000001ULL)
-#define VALUE_TRUE  ((Value)0x0000000100000001ULL)
+#define VALUE_NULL    ((Value)0ULL)
+#define VALUE_FALSE   ((Value)0x0000000000000001ULL)
+#define VALUE_TRUE    ((Value)0x0000000100000001ULL)
+#define VALUE_INVALID ((Value)0xFFFFFFFFFFFFFFFDULL)
 
 #define Value_isref(v)       ((v) != 0ULL && ((v) & 3ULL) == 0ULL)
-#define Value_isintegral(v)  ((v) != 0ULL && ((v) & 3ULL) == 1ULL)
+#define Value_isintegral(v)  (((v) & 3ULL) == 1ULL)
 #define Value_isint(v)       (((v) & 0xFFFFFFFFULL) == 5ULL)
-#define Value_isptr(v)       ((v) != 0ULL && ((v) & 3ULL) == 2ULL)
+#define Value_isptr(v)       (((v) & 3ULL) == 2ULL)
 
 #define Value_vp(v)          ((void*)(uintptr_t)((v) | 0))
 #define Value_ptr(v)         ((void*)((uintptr_t)((v) & ~3)))

@@ -1,5 +1,6 @@
 #define DEFINE_GLOBALS
 #include "fox_xml.h"
+#include "m_codecvt.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -17,8 +18,21 @@ typedef struct {
     int pretty;
     int keep_space;
     RefCharset *cs;
-    IconvIO ic;
+    CodeCVT ic;
 } XMLOutputFormat;
+
+static CodeCVTStatic *codecvt;
+
+void CodeCVTStatic_init()
+{
+    if (codecvt == NULL) {
+        RefNode *mod = fs->get_module_by_name("text.codecvt", -1, TRUE, TRUE);
+        if (mod == NULL) {
+            fs->fatal_errorf("Cannot load module 'text.codecvt'");
+        }
+        codecvt = mod->u.m.ext;
+    }
+}
 
 static int xml_elem_attr(Value *vret, Value *v, RefNode *node);
 
@@ -147,7 +161,8 @@ static int stream_write_xmldata(Value dst, StrBuf *buf, XMLOutputFormat *xof)
     } else {
         StrBuf sb;
         fs->StrBuf_init(&sb, buf->size);
-        if (!fs->IconvIO_conv(&xof->ic, &sb, buf->p, buf->size, TRUE, FALSE)) {
+        CodeCVTStatic_init();
+        if (!codecvt->CodeCVT_conv(&xof->ic, &sb, buf->p, buf->size, TRUE, FALSE)) {
             return FALSE;
         }
         if (!fs->stream_write_data(dst, sb.p, sb.size)) {
@@ -343,12 +358,13 @@ FOUND:
 }
 static void convert_encoding_sub(StrBuf *sb, const char *p, int size, RefCharset *cs)
 {
-    IconvIO ic;
+    CodeCVT ic;
 
-    fs->IconvIO_open(&ic, cs, fs->cs_utf8, UTF8_ALTER_CHAR);
-    fs->IconvIO_conv(&ic, sb, p, size, FALSE, FALSE);
+    CodeCVTStatic_init();
+    codecvt->CodeCVT_open(&ic, cs, fs->cs_utf8, UTF8_ALTER_CHAR);
+    codecvt->CodeCVT_conv(&ic, sb, p, size, FALSE, FALSE);
     fs->StrBuf_add_c(sb, '\0');
-    fs->IconvIO_close(&ic);
+    codecvt->CodeCVT_close(&ic);
 }
 static int parse_xml(Value *vret, Value *v, RefNode *node)
 {
@@ -479,10 +495,10 @@ static int parse_xml(Value *vret, Value *v, RefNode *node)
             if (tmp_type == cls_text) {
                 RefStr *rs = Value_vp(tmp);
                 if (!loose || Str_isspace(rs->c, rs->size)) {
-                    fs->Value_dec(tmp);
+                    fs->unref(tmp);
                 } else {
                     fs->throw_errorf(mod_xml, "XMLParseError", "Illigal text found (%d)", tk.line);
-                    fs->Value_dec(tmp);
+                    fs->unref(tmp);
                     goto ERROR_END;
                 }
             } else {
@@ -492,7 +508,7 @@ static int parse_xml(Value *vret, Value *v, RefNode *node)
             if (tmp_type == cls_elem) {
                 if (r->v[INDEX_DOCUMENT_ROOT] == VALUE_NULL) {
                     r->v[INDEX_DOCUMENT_ROOT] = tmp;
-                    fs->Value_inc(tmp);
+                    fs->addref(tmp);
                 } else if (!loose) {
                     fs->throw_errorf(mod_xml, "XMLParseError", "Additional root node found (%d)", tk.line);
                     goto ERROR_END;
@@ -987,7 +1003,8 @@ static int parse_output_format_charset(XMLOutputFormat *xof, Value *v)
                 fs->throw_errorf(fs->mod_lang, "ValueError", "Encoding %r is not supported", xof->cs->name);
                 return FALSE;
             }
-            if (!fs->IconvIO_open(&xof->ic, fs->cs_utf8, xof->cs, "&#d;")) {
+            CodeCVTStatic_init();
+            if (!codecvt->CodeCVT_open(&xof->ic, fs->cs_utf8, xof->cs, "&#d;")) {
                 return FALSE;
             }
         }
@@ -1011,7 +1028,7 @@ static int xml_node_save(Value *vret, Value *v, RefNode *node)
     }
 
     if (!parse_output_format_charset(&xof, v)) {
-        fs->Value_dec(writer);
+        fs->unref(writer);
         return FALSE;
     }
 
@@ -1040,16 +1057,18 @@ static int xml_node_save(Value *vret, Value *v, RefNode *node)
         goto ERROR_END;
     }
     StrBuf_close(&buf);
-    fs->Value_dec(writer);
+    fs->unref(writer);
     if (xof.cs != fs->cs_utf8) {
-        fs->IconvIO_close(&xof.ic);
+        CodeCVTStatic_init();
+        codecvt->CodeCVT_close(&xof.ic);
     }
     return TRUE;
 ERROR_END:
-    fs->Value_dec(writer);
+    fs->unref(writer);
     StrBuf_close(&buf);
     if (xof.cs != fs->cs_utf8) {
-        fs->IconvIO_close(&xof.ic);
+        CodeCVTStatic_init();
+        codecvt->CodeCVT_close(&xof.ic);
     }
     return FALSE;
 }
@@ -1156,7 +1175,7 @@ static int xml_elem_index_key(Value *vret, Value *v, RefNode *node)
 
     if (key->size >= 1 && key->c[0] == '@') {
         Value vkey = fs->cstr_Value(fs->cls_str, key->c + 1, key->size - 1);
-        fs->Value_dec(v[1]);
+        fs->unref(v[1]);
         v[1] = vkey;
         return xml_elem_attr(vret, v, node);
     } else {
@@ -1187,7 +1206,7 @@ static int xml_elem_set_index_key(Value *vret, Value *v, RefNode *node)
 
     if (key->size >= 1 && key->c[0] == '@') {
         Value vkey = fs->cstr_Value(fs->cls_str, key->c + 1, key->size - 1);
-        fs->Value_dec(v[1]);
+        fs->unref(v[1]);
         v[1] = vkey;
         return xml_elem_attr(vret, v, node);
     } else {
@@ -1356,7 +1375,7 @@ static int xml_elem_push(Value *vret, Value *v, RefNode *node)
         }
     }
     if (v1_type == fs->cls_str) {
-        fs->Value_dec(tmp);
+        fs->unref(tmp);
     }
 
     return TRUE;
@@ -1456,7 +1475,7 @@ static int xml_elem_attr(Value *vret, Value *v, RefNode *node)
                             return FALSE;
                         }
                         if (rm->count == 0) {
-                            fs->Value_dec(pr->v[INDEX_ELEM_ATTR]);
+                            fs->unref(pr->v[INDEX_ELEM_ATTR]);
                             pr->v[INDEX_ELEM_ATTR] = VALUE_NULL;
                         }
                     }
@@ -1649,11 +1668,11 @@ static int xml_node_remove_css(Value *vret, Value *v, RefNode *node)
     } else if (v1_type == cls_elem) {
         RefArray ra2;
         Value va = v[1];
-        fs->Value_inc(va);
+        fs->addref(va);
         ra2.p = &va;
         ra2.size = 1;
         result = delete_nodelist(vret, ra->p, ra->size, &ra2);
-        fs->Value_dec(va);
+        fs->unref(va);
     } else {
         fs->throw_errorf(fs->mod_lang, "TypeError", "Str, XMLElem or XMLRefNodeList required but %n (argument #2)", v1_type);
         return FALSE;
@@ -1673,7 +1692,7 @@ static int xml_node_list_index_key(Value *vret, Value *v, RefNode *node)
         RefStr *key = Value_vp(v[1]);
         if (key->size >= 1 && key->c[0] == '@') {
             Value vkey = fs->cstr_Value(fs->cls_str, key->c + 1, key->size - 1);
-            fs->Value_dec(v[1]);
+            fs->unref(v[1]);
             v[1] = vkey;
             return xml_elem_attr(vret, v, node);
         } else {
@@ -1775,9 +1794,9 @@ static int xml_document_set_dtd(Value *vret, Value *v, RefNode *node)
 
     // default value
     r->v[INDEX_DOCUMENT_IS_PUBLIC] = VALUE_TRUE;
-    fs->Value_dec(r->v[INDEX_DOCUMENT_FPI]);
+    fs->unref(r->v[INDEX_DOCUMENT_FPI]);
     r->v[INDEX_DOCUMENT_FPI] = VALUE_NULL;
-    fs->Value_dec(r->v[INDEX_DOCUMENT_DTD_URI]);
+    fs->unref(r->v[INDEX_DOCUMENT_DTD_URI]);
     r->v[INDEX_DOCUMENT_DTD_URI] = VALUE_NULL;
     if (!parse_doctype_declaration(r, &tk)) {
         fs->throw_errorf(mod_xml, "XMLParseError", "Illigal DOCTYPE");
@@ -1947,7 +1966,7 @@ static int xml_document_save(Value *vret, Value *v, RefNode *node)
     }
 
     if (!parse_output_format_charset(&xof, v)) {
-        fs->Value_dec(writer);
+        fs->unref(writer);
         return FALSE;
     }
 
@@ -1976,16 +1995,18 @@ static int xml_document_save(Value *vret, Value *v, RefNode *node)
         }
     }
     StrBuf_close(&buf);
-    fs->Value_dec(writer);
+    fs->unref(writer);
     if (xof.cs != fs->cs_utf8) {
-        fs->IconvIO_close(&xof.ic);
+        CodeCVTStatic_init();
+        codecvt->CodeCVT_close(&xof.ic);
     }
     return TRUE;
 ERROR_END:
-    fs->Value_dec(writer);
+    fs->unref(writer);
     StrBuf_close(&buf);
     if (xof.cs != fs->cs_utf8) {
-        fs->IconvIO_close(&xof.ic);
+        CodeCVTStatic_init();
+        codecvt->CodeCVT_close(&xof.ic);
     }
     return FALSE;
 }
@@ -2069,8 +2090,8 @@ static void define_class(RefNode *m)
 
     // XMLRefNodeList
     cls = cls_nodelist;
-    n = fs->define_identifier_p(m, cls, fs->str_dispose, NODE_FUNC_N, 0);
-    fs->define_native_func_a(n, get_function_ptr(fs->cls_list, fs->str_dispose), 0, 0, NULL);
+    n = fs->define_identifier_p(m, cls, fs->str_dtor, NODE_FUNC_N, 0);
+    fs->define_native_func_a(n, get_function_ptr(fs->cls_list, fs->str_dtor), 0, 0, NULL);
 
     n = fs->define_identifier_p(m, cls, fs->str_tostr, NODE_FUNC_N, 0);
     fs->define_native_func_a(n, xml_node_tostr, 0, 2, (void*)FALSE, fs->cls_str, fs->cls_locale);
@@ -2215,5 +2236,8 @@ void define_module(RefNode *m, const FoxStatic *a_fs, FoxGlobal *a_fg)
 
 const char *module_version(const FoxStatic *a_fs)
 {
+    if (a_fs->revision != FOX_INTERFACE_REVISION) {
+        return NULL;
+    }
     return "Build at\t" __DATE__ "\n";
 }

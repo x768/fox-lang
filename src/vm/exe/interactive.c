@@ -82,7 +82,7 @@ static void print_error(void)
     stream_write_data(fg->v_cio, sb.p, sb.size);
     StrBuf_close(&sb);
 
-    Value_dec(fg->error);
+    unref(fg->error);
     fg->error = VALUE_NULL;
 }
 
@@ -163,12 +163,12 @@ void fox_intaractive(RefNode *module)
                     fg->stk_base = fg->stk;
                 }
                 while (fg->stk_top > stk_prev) {
-                    Value_dec(fg->stk_top[-1]);
+                    unref(fg->stk_top[-1]);
                     fg->stk_top--;
                 }
                 print_error();
                 stream_flush_sub(fg->v_cio);
-                Value_dec(fg->error);
+                unref(fg->error);
                 fg->error = VALUE_NULL;
                 buf.size = 0;
             }

@@ -3,6 +3,12 @@
 
 #include "fox.h"
 
+enum {
+    BIGINT_OP_AND,
+    BIGINT_OP_OR,
+    BIGINT_OP_XOR,
+};
+
 void BigInt_set_max_alloc(int max);
 
 void BigInt_init(BigInt *bi);
@@ -32,9 +38,7 @@ int BigInt_get_recurrence(BigInt *mp, int *ret, int limit);
 
 int BigInt_lsh(BigInt *bi, uint32_t sh);
 void BigInt_rsh(BigInt *bi, uint32_t sh);
-void BigInt_and(BigInt *a, const BigInt *b);
-void BigInt_or(BigInt *a, const BigInt *b);
-void BigInt_xor(BigInt *a, const BigInt *b);
+void BigInt_bitop(BigInt *a, const BigInt *b, int type);
 
 int BigInt_add(BigInt *a, const BigInt *b);
 int BigInt_add_d(BigInt *a, int b);

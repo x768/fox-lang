@@ -207,12 +207,12 @@ int refmap_del(Value *val, RefMap *rm, Value key)
     ep = *epp;
     if (ep != NULL) {
         // 一致（削除）
-        Value_dec(ep->key);
+        unref(ep->key);
         *epp = ep->next;
         if (val != NULL) {
             *val = ep->val;
         } else {
-            Value_dec(ep->val);
+            unref(ep->val);
         }
         free(ep);
         rm->count--;
@@ -271,8 +271,8 @@ int map_dispose(Value *vret, Value *v, RefNode *node)
         HashValueEntry *p = r->entry[i];
         while (p != NULL) {
             HashValueEntry *prev = p;
-            Value_dec(p->key);
-            Value_dec(p->val);
+            unref(p->key);
+            unref(p->val);
             p = p->next;
 
             free(prev);
@@ -331,19 +331,19 @@ static int map_marshal_read(Value *vret, Value *v, RefNode *node)
 
             ve = refmap_add(rm, key, TRUE, FALSE);
             if (ve == NULL) {
-                Value_dec(key);
-                Value_dec(val);
+                unref(key);
+                unref(val);
                 return FALSE;
             }
             ve->val = val;
         } else {
             // Set
             if (refmap_add(rm, key, TRUE, FALSE) == NULL) {
-                Value_dec(key);
+                unref(key);
                 return FALSE;
             }
         }
-        Value_dec(key);
+        unref(key);
     }
 
     return TRUE;
@@ -409,8 +409,8 @@ static int map_clear(Value *vret, Value *v, RefNode *node)
         HashValueEntry *p = r->entry[i];
         while (p != NULL) {
             HashValueEntry *prev = p;
-            Value_dec(p->key);
-            Value_dec(p->val);
+            unref(p->key);
+            unref(p->val);
             p = p->next;
 
             free(prev);
@@ -531,7 +531,7 @@ int map_index_of(Value *vret, Value *v, RefNode *node)
                     }
                     fg->stk_top--;
                     if (Value_bool(*fg->stk_top)) {
-                        Value_dec(*fg->stk_top);
+                        unref(*fg->stk_top);
                         if (ret_index) {
                             *vret = Value_cp(ep->key);
                         } else {
@@ -956,7 +956,7 @@ void define_lang_map_class(RefNode *m)
     n = define_identifier_p(m, cls, fs->str_marshal_read, NODE_NEW_N, 0);
     define_native_func_a(n, map_marshal_read, 1, 1, (void*) TRUE, fs->cls_marshaldumper);
 
-    n = define_identifier_p(m, cls, fs->str_dispose, NODE_FUNC_N, 0);
+    n = define_identifier_p(m, cls, fs->str_dtor, NODE_FUNC_N, 0);
     define_native_func_a(n, map_dispose, 0, 0, NULL);
 
     n = define_identifier_p(m, cls, fs->str_marshal_write, NODE_FUNC_N, 0);
@@ -1010,7 +1010,7 @@ void define_lang_map_class(RefNode *m)
     // MapIter
     cls = cls_mapiter;
     cls->u.c.n_memb = INDEX_MAPITER_NUM;
-    n = define_identifier_p(m, cls, fs->str_dispose, NODE_FUNC_N, 0);
+    n = define_identifier_p(m, cls, fs->str_dtor, NODE_FUNC_N, 0);
     define_native_func_a(n, mapiter_dispose, 0, 0, NULL);
     n = define_identifier_p(m, cls, fs->str_next, NODE_FUNC_N, 0);
     define_native_func_a(n, mapiter_next, 0, 0, NULL);
@@ -1046,7 +1046,7 @@ void define_lang_map_class(RefNode *m)
     n = define_identifier_p(m, cls, fs->str_marshal_read, NODE_NEW_N, 0);
     define_native_func_a(n, map_marshal_read, 1, 1, (void*) FALSE, fs->cls_marshaldumper);
 
-    n = define_identifier_p(m, cls, fs->str_dispose, NODE_FUNC_N, 0);
+    n = define_identifier_p(m, cls, fs->str_dtor, NODE_FUNC_N, 0);
     define_native_func_a(n, map_dispose, 0, 0, NULL);
 
     n = define_identifier_p(m, cls, fs->str_tostr, NODE_FUNC_N, 0);

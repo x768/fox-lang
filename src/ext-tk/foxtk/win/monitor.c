@@ -39,7 +39,7 @@ static void CALLBACK timeout_callback(HWND hwnd, UINT msg, UINT_PTR id, DWORD ti
             sender_r->v[INDEX_TIMER_ID] = VALUE_NULL;
 
             // カウンタを1減らす
-            fs->Value_dec(vp_Value(sender_r));
+            fs->unref(vp_Value(sender_r));
             KillTimer(NULL, id);
         }
     } else {
@@ -146,11 +146,11 @@ static void CALLBACK file_monitor_callback(DWORD errorCode, DWORD bytesTransfere
 
             v_tmp = fs->cstr_Value(fs->cls_str, action_val, -1);
             event_object_add(*evt, "action", v_tmp);
-            fs->Value_dec(v_tmp);
+            fs->unref(v_tmp);
 
             v_tmp = wstr_to_file(Value_vp(sender_r->v[INDEX_FILEMONITOR_FILE]), notify->FileName, notify->FileNameLength / sizeof(wchar_t));
             event_object_add(*evt, "file", v_tmp);
-            fs->Value_dec(v_tmp);
+            fs->unref(v_tmp);
 
             ret_code = fs->call_function_obj(1);
             if (!ret_code && fg->error != VALUE_NULL) {
@@ -161,7 +161,7 @@ static void CALLBACK file_monitor_callback(DWORD errorCode, DWORD bytesTransfere
         CONTINUE:
             ;
         } while (notify->NextEntryOffset != 0);
-        fs->Value_dec(v_other);
+        fs->unref(v_other);
     }
     if (fm->valid) {
         refresh_dirmonitor(fm, FALSE);

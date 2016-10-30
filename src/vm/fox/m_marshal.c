@@ -53,7 +53,7 @@ static int marshal_load(Value *vret, Value *v, RefNode *node)
         return FALSE;
     }
     if (!validate_fox_object(reader)) {
-        Value_dec(reader);
+        unref(reader);
         return FALSE;
     }
     // readerの所有権がMarshalWriterに移る
@@ -96,17 +96,17 @@ static int marshal_bytes(Value *vret, Value *v, RefNode *node)
 
     // writerの所有権がMarshalWriterに移る
     init_marshaldumper(fg->stk_top, &writer);
-    Value_inc(writer);
+    addref(writer);
     fg->stk_top++;
     Value_push("v", v[1]);
     if (!call_member_func(fs->str_write, 1, TRUE)) {
-        Value_dec(writer);
+        unref(writer);
         return FALSE;
     }
     Value_pop();
 
     *vret = cstr_Value(fs->cls_bytes, mb->buf.p, mb->buf.size);
-    Value_dec(writer);
+    unref(writer);
     return TRUE;
 }
 
@@ -527,7 +527,7 @@ void define_marshal_class(RefNode *m)
     n = define_identifier_p(m, cls, fs->str_new, NODE_NEW_N, 0);
     define_native_func_a(n, loopref_new, 0, 0, NULL);
 
-    n = define_identifier_p(m, cls, fs->str_dispose, NODE_FUNC_N, 0);
+    n = define_identifier_p(m, cls, fs->str_dtor, NODE_FUNC_N, 0);
     define_native_func_a(n, loopref_dispose, 0, 0, NULL);
     n = define_identifier(m, cls, "push", NODE_FUNC_N, 0);
     define_native_func_a(n, loopref_push, 1, 1, NULL, NULL);

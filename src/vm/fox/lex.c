@@ -1,4 +1,5 @@
 #include "fox_parse.h"
+#include "bigint.h"
 #include <string.h>
 #include <errno.h>
 #include <pcre.h>
@@ -1172,6 +1173,9 @@ START:
             } else {
                 v->type = T_DOT2;
             }
+        } else if (*tk->p == '?') {
+            tk->p++;
+            v->type = T_QMEMB;
         } else {
             v->type = T_MEMB;
         }
@@ -1240,7 +1244,12 @@ START:
         tk->p++;
         if (*tk->p == '|') {
             tk->p++;
-            v->type = T_LOR;
+            if (*tk->p == '=') {
+                tk->p++;
+                v->type = T_L_LOR;
+            } else {
+                v->type = T_LOR;
+            }
         } else if (*tk->p == '=') {
             tk->p++;
             v->type = T_L_OR;
@@ -1252,7 +1261,12 @@ START:
         tk->p++;
         if (*tk->p == '&') {
             tk->p++;
-            v->type = T_LAND;
+            if (*tk->p == '=') {
+                tk->p++;
+                v->type = T_L_LAND;
+            } else {
+                v->type = T_LAND;
+            }
         } else if (*tk->p == '=') {
             tk->p++;
             v->type = T_L_AND;

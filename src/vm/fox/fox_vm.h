@@ -3,9 +3,8 @@
 
 #include "fox_io.h"
 #include "m_number.h"
-#include "compat.h"
+#include "m_codecvt.h"
 #include "compat_vm.h"
-#include "bigint.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -82,11 +81,6 @@ enum {
     INDEX_ENTRY_NUM,
 };
 
-enum {
-    ICONV_OK,
-    ICONV_OUTBUF,
-    ICONV_INVALID,
-};
 enum {
     LOCALE_LANGUAGE,
     LOCALE_SCRIPT,
@@ -181,6 +175,10 @@ typedef struct
 
 /////////////////////////////////////////////////////////////////////////////////////
 
+#define FOX_VERSION_MAJOR    0
+#define FOX_VERSION_MINOR    18
+#define FOX_VERSION_REVISION 0
+
 #define int32_hash(v) (((v) * 31) & INT32_MAX)
 #define Value_bytesio(val) ((RefBytesIO*)(uintptr_t)(Value_ref((val))->v[INDEX_TEXTIO_STREAM]))
 
@@ -191,6 +189,7 @@ typedef struct
 extern FoxStatic *fs;
 extern FoxGlobal *fg;
 extern FoxVM *fv;
+CodeCVTStatic *codecvt;
 
 #ifdef DEFINE_GLOBALS
 #undef extern
@@ -242,8 +241,8 @@ char *read_from_file(int *psize, const char *path, Mem *mem);
 
 
 // util_str.c
-int parse_hex(const char **pp, const char *end, int n);
-int parse_int(const char *src_p, int src_size, int max);
+int32_t parse_hex(const char **pp, const char *end, int n);
+int32_t parse_int(const char *src_p, int src_size, int max);
 int str_hash(const char *p, int size);
 char *str_dup_p(const char *p, int size, Mem *mem);
 char *str_printf(const char *fmt, ...);
@@ -280,13 +279,12 @@ char *Value_frac_s(Value v, int max_frac);
 Value int64_Value(int64_t i);
 Value float_Value(RefNode *klass, double dval);
 Value cstr_Value(RefNode *klass, const char *p, int size);
-Value cstr_Value_conv(const char *p, int size, RefCharset *cs);
 Value frac_s_Value(const char *str);
 
 Value printf_Value(const char *fmt, ...);
 
-void Value_inc(Value v);
-void Value_dec(Value v);
+void addref(Value v);
+void unref(Value v);
 void Value_push(const char *fmt, ...);
 void Value_pop(void);
 
@@ -368,17 +366,12 @@ void init_cgi_module_1(void);
 
 
 // m_charset.c
+void CodeCVTStatic_init(void);
 RefCharset *get_charset_from_name(const char *name_p, int name_size);
-
 int convert_str_to_bin_sub(StrBuf *dst_buf, const char *src_p, int src_size, RefCharset *cs, const char *alt_s);
 int convert_str_to_bin(Value *dst, StrBuf *dst_buf, int arg);
 int convert_bin_to_str_sub(StrBuf *dst_buf, const char *src_p, int src_size, RefCharset *cs, int alt_b);
 int convert_bin_to_str(Value *dst, const Str *src_str, int arg);
-
-int IconvIO_open(IconvIO *ic, RefCharset *from, RefCharset *to, const char *trans);
-void IconvIO_close(IconvIO *ic);
-int IconvIO_next(IconvIO *ic);
-int IconvIO_conv(IconvIO *ic, StrBuf *dst, const char *src_p, int src_size, int from_uni, int raise_error);
 void define_charset_class(RefNode *m);
 
 

@@ -17,8 +17,7 @@ static GFile *value_to_gfile(Value v)
     if (type == fs->cls_str || type == fs->cls_file) {
         return filename_to_gfile(Value_vp(v));
     } else if (type == fs->cls_uri) {
-        RefStr *rs = Value_vp(v);
-        GFile *gf = g_file_new_for_uri(rs->c);
+        GFile *gf = g_file_new_for_uri(Value_cstr(v));
         return gf;
     } else {
         fs->throw_errorf(fs->mod_lang, "TypeError", "Str, File or Uri required but %n", type);
@@ -29,17 +28,21 @@ static GFile *value_to_gfile(Value v)
 int uri_to_file_sub(Value *dst, Value src)
 {
     GFile *gf = value_to_gfile(src);
-    char *pdst = g_file_get_path(gf);
-    if (pdst != NULL) {
-        *dst = fs->cstr_Value(fs->cls_file, pdst, -1);
-        g_free(pdst);
-        g_object_unref(G_OBJECT(gf));
+    if (gf != NULL) {
+        char *pdst = g_file_get_path(gf);
+        if (pdst != NULL) {
+            *dst = fs->cstr_Value(fs->cls_file, pdst, -1);
+            g_free(pdst);
+            g_object_unref(G_OBJECT(gf));
+        } else {
+            fs->throw_errorf(fs->mod_lang, "ValueError", "Cannot convert to File");
+            g_object_unref(G_OBJECT(gf));
+            return FALSE;
+        }
+        return TRUE;
     } else {
-        fs->throw_errorf(fs->mod_lang, "ValueError", "Cannot convert to File");
-        g_object_unref(G_OBJECT(gf));
         return FALSE;
     }
-    return TRUE;
 }
 
 int exio_trash_sub(Value vdst)

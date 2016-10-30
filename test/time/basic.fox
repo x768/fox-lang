@@ -9,7 +9,7 @@ assert_equal time.day_of_week, 4
 assert_equal time.hour, 12
 assert_equal time.minute, 3
 assert_equal time.second, 4
-assert_equal time.millisec, 567
+assert_equal time.millisecond, 567
 assert_equal time.to_str('yyyy/MM/dd HH:mm:ss.SSS'), "2014/01/02 12:03:04.567"
 
 let time2 = DateTime('Asia/Tokyo', 2015, 1, 2, 12, 3, 4, 567)

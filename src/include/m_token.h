@@ -4,16 +4,31 @@
 #include "fox.h"
 
 enum {
-    T_RP = T_INDEX_NUM, // )
-    T_LC,    // {
-    T_RC,    // }
-    T_RB,    // ]
-    T_LP_C,  // f (
-    T_LB_C,  // a [
+    T_L_ADD = T_INDEX_NUM,  // +=
+    T_L_SUB,  // -=
+    T_L_MUL,  // *=
+    T_L_DIV,  // /=
+    T_L_MOD,  // %=
+    T_L_LSH,  // <<=
+    T_L_RSH,  // >>=
+    T_L_AND,  // &=
+    T_L_OR,   // |=
+    T_L_XOR,  // ^=
+    T_L_LAND, // &&=
+    T_L_LOR,  // ||=
+
+    T_LET,    // =
+    T_RP,     // )
+    T_LC,     // {
+    T_RC,     // }
+    T_RB,     // ]
+    T_LP_C,   // f (
+    T_LB_C,   // a [
     T_COMMA,
     T_SEMICL,
-    T_MEMB,
-    T_LAMBDA,// (a)=>
+    T_MEMB,   // .memb
+    T_QMEMB,  // .?memb
+    T_LAMBDA, // (a)=>
 
     TL_PRAGMA,
     TL_INT,

@@ -240,6 +240,24 @@ static int bool_empty(Value *vret, Value *v, RefNode *node)
     *vret = bool_Value(!b);
     return TRUE;
 }
+static int bool_and(Value *vret, Value *v, RefNode *node)
+{
+    int b = Value_bool(v[0]) && Value_bool(v[1]);
+    *vret = bool_Value(b);
+    return TRUE;
+}
+static int bool_or(Value *vret, Value *v, RefNode *node)
+{
+    int b = Value_bool(v[0]) || Value_bool(v[1]);
+    *vret = bool_Value(b);
+    return TRUE;
+}
+static int bool_xor(Value *vret, Value *v, RefNode *node)
+{
+    int b = Value_bool(v[0]) != Value_bool(v[1]);
+    *vret = bool_Value(b);
+    return TRUE;
+}
 
 /////////////////////////////////////////////////////////////////////////////////////
 
@@ -661,7 +679,7 @@ static int lang_env(Value *vret, Value *v, RefNode *node)
             if (ve == NULL) {
                 return FALSE;
             }
-            ve->val = cstr_Value_conv(he->p, -1, NULL);
+            ve->val = cstr_Value(NULL, he->p, -1);
         }
     }
 
@@ -674,7 +692,7 @@ static int lang_argv(Value *vret, Value *v, RefNode *node)
     *vret = vp_Value(ar);
 
     for (i = 0; i < fv->argc; i++) {
-        ar->p[i] = cstr_Value_conv(fv->argv[i], -1, NULL);
+        ar->p[i] = cstr_Value(NULL, fv->argv[i], -1);
     }
     return TRUE;
 }
@@ -819,6 +837,12 @@ static void define_lang_class(RefNode *m)
     n = define_identifier_p(m, cls, fs->str_marshal_write, NODE_FUNC_N, 0);
     define_native_func_a(n, bool_marshal_write, 1, 1, NULL, fs->cls_marshaldumper);
     extends_method(cls, fs->cls_obj);
+    n = define_identifier_p(m, cls, fs->symbol_stock[T_AND], NODE_FUNC_N, 0);
+    define_native_func_a(n, bool_and, 1, 1, NULL, fs->cls_bool);
+    n = define_identifier_p(m, cls, fs->symbol_stock[T_OR], NODE_FUNC_N, 0);
+    define_native_func_a(n, bool_or, 1, 1, NULL, fs->cls_bool);
+    n = define_identifier_p(m, cls, fs->symbol_stock[T_XOR], NODE_FUNC_N, 0);
+    define_native_func_a(n, bool_xor, 1, 1, NULL, fs->cls_bool);
 
     // Module
     cls = fs->cls_module;
@@ -899,7 +923,7 @@ static void define_lang_class(RefNode *m)
     define_native_func_a(n, error_new, 0, 1, cls, fs->cls_str);
     n = define_identifier_p(m, cls, fs->str_tostr, NODE_FUNC_N, 0);
     define_native_func_a(n, error_tostr, 0, 2, NULL, fs->cls_str, fs->cls_locale);
-    n = define_identifier_p(m, cls, fs->str_dispose, NODE_FUNC_N, 0);
+    n = define_identifier_p(m, cls, fs->str_dtor, NODE_FUNC_N, 0);
     define_native_func_a(n, error_dispose, 0, 0, NULL);
 
     n = define_identifier(m, cls, "stack_trace", NODE_FUNC_N, NODEOPT_PROPERTY);
@@ -948,6 +972,9 @@ static void define_lang_class(RefNode *m)
     define_error_class(cls, cls2, m);
 
     cls = define_identifier(m, m, "NotSupportedError", NODE_CLASS, 0);
+    define_error_class(cls, cls2, m);
+
+    cls = define_identifier(m, m, "NotImplementedError", NODE_CLASS, 0);
     define_error_class(cls, cls2, m);
 
 

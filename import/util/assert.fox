@@ -2,21 +2,25 @@ import math
 
 class AssertError : Error
 {
-    new(msg:Str){
+    this(msg:Str){
         super(msg)
     }
 }
 
+def assert_fail()
+{
+    throw AssertError("Assertion failed")
+}
 def assert_true(b)
 {
     if !b {
-        throw AssertError("Assertion fault")
+        throw AssertError("Assertion failed")
     }
 }
 def assert_false(b)
 {
     if b {
-        throw AssertError("Assertion fault")
+        throw AssertError("Assertion failed")
     }
 }
 def assert_equal(a, b)

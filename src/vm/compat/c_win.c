@@ -242,6 +242,9 @@ int set_current_directory(const char *path)
 static int parse_envs(Str *key, const char **val, const char *src)
 {
     const char *p = src;
+    if (*p == '=') {
+        return FALSE;
+    }
     while (isalnum(*p) || *p == '_') {
         p++;
     }

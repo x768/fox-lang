@@ -1,6 +1,7 @@
 #define DEFINE_GLOBALS
 #include "zipfile.h"
 #include "m_number.h"
+#include "m_codecvt.h"
 #include <string.h>
 #include <stdlib.h>
 
@@ -17,6 +18,19 @@ enum {
 static RefNode *cls_zipentry;
 static RefNode *cls_zipentryiter;
 static RefNode *cls_fileio;
+static CodeCVTStatic *codecvt;
+
+
+void CodeCVTStatic_init()
+{
+    if (codecvt == NULL) {
+        RefNode *mod = fs->get_module_by_name("text.codecvt", -1, TRUE, TRUE);
+        if (mod == NULL) {
+            fs->fatal_errorf("Cannot load module 'text.codecvt'");
+        }
+        codecvt = mod->u.m.ext;
+    }
+}
 
 
 static int get_reader_file_size(int *pret, Value reader)
@@ -383,7 +397,7 @@ static int zip_randomreader_new(Value *vret, Value *v, RefNode *node)
     cdir = get_central_dir(reader, file_size, cs, tz);
 
     if (cdir == NULL) {
-        fs->Value_dec(reader);
+        fs->unref(reader);
         return FALSE;
     }
     r->v[INDEX_ZIPREADER_READER] = reader;
@@ -469,12 +483,13 @@ static int zip_randomreader_index(Value *vret, Value *v, RefNode *node)
         fs->StrBuf_init(&sb, 0);
         // 文字コードを変換
         if (cdir->cs != fs->cs_utf8) {
-            IconvIO ic;
-            if (fs->IconvIO_open(&ic, fs->cs_utf8, cdir->cs, "?")) {
-                if (fs->IconvIO_conv(&ic, &sb, name->c, name->size, TRUE, FALSE)) {
+            CodeCVT ic;
+            CodeCVTStatic_init();
+            if (codecvt->CodeCVT_open(&ic, fs->cs_utf8, cdir->cs, "?")) {
+                if (codecvt->CodeCVT_conv(&ic, &sb, name->c, name->size, TRUE, FALSE)) {
                     local_str = TRUE;
                 }
-                fs->IconvIO_close(&ic);
+                codecvt->CodeCVT_close(&ic);
             }
         }
         for (i = 0; i < cdir->cdir_size; i++) {
@@ -615,7 +630,7 @@ static int zipwriter_close(Value *vret, Value *v, RefNode *node)
         write_end_of_cdir(cdir, r->v[INDEX_ZIPWRITER_DEST]);
         CentralDirEnd_free(cdir);
         r->v[INDEX_ZIPWRITER_CDIR] = VALUE_NULL;
-        fs->Value_dec(r->v[INDEX_ZIPWRITER_DEST]);
+        fs->unref(r->v[INDEX_ZIPWRITER_DEST]);
         r->v[INDEX_ZIPWRITER_DEST] = VALUE_NULL;
     }
 
@@ -1029,7 +1044,12 @@ static int zipentry_filename(Value *vret, Value *v, RefNode *node)
             // UTF-8フラグが立っていなければZipReaderの引数で指定した文字コード
             cs = cd->cs;
         }
-        *vret = fs->cstr_Value_conv(cd->filename.p, cd->filename.size, cs);
+        if (cs != fs->cs_utf8) {
+            CodeCVTStatic_init();
+            *vret = codecvt->cstr_Value_conv(cd->filename.p, cd->filename.size, cs);
+        } else {
+            *vret = fs->cstr_Value(NULL, cd->filename.p, cd->filename.size);
+        }
     }
 
     return TRUE;
@@ -1169,7 +1189,7 @@ static void define_class(RefNode *m)
     n = fs->define_identifier_p(m, cls, fs->str_new, NODE_NEW_N, 0);
     fs->define_native_func_a(n, zip_randomreader_new, 1, 3, cls, NULL, fs->cls_charset, fs->cls_timezone);
 
-    n = fs->define_identifier_p(m, cls, fs->str_dispose, NODE_FUNC_N, 0);
+    n = fs->define_identifier_p(m, cls, fs->str_dtor, NODE_FUNC_N, 0);
     fs->define_native_func_a(n, zip_randomreader_close, 0, 0, NULL);
 
     n = fs->define_identifier(m, cls, "close", NODE_FUNC_N, 0);
@@ -1194,7 +1214,7 @@ static void define_class(RefNode *m)
     n = fs->define_identifier_p(m, cls, fs->str_new, NODE_NEW_N, 0);
     fs->define_native_func_a(n, zipreader_new, 1, 3, cls, NULL, fs->cls_charset, fs->cls_timezone);
 
-    n = fs->define_identifier_p(m, cls, fs->str_dispose, NODE_FUNC_N, 0);
+    n = fs->define_identifier_p(m, cls, fs->str_dtor, NODE_FUNC_N, 0);
     fs->define_native_func_a(n, zipreader_close, 0, 0, NULL);
     n = fs->define_identifier(m, cls, "next", NODE_FUNC_N, NODEOPT_PROPERTY);
     fs->define_native_func_a(n, zipreader_next, 0, 0, NULL);
@@ -1212,7 +1232,7 @@ static void define_class(RefNode *m)
     n = fs->define_identifier_p(m, cls, fs->str_new, NODE_NEW_N, 0);
     fs->define_native_func_a(n, zipwriter_new, 1, 2, cls, NULL, fs->cls_timezone);
 
-    n = fs->define_identifier_p(m, cls, fs->str_dispose, NODE_FUNC_N, 0);
+    n = fs->define_identifier_p(m, cls, fs->str_dtor, NODE_FUNC_N, 0);
     fs->define_native_func_a(n, zipwriter_close, 0, 0, NULL);
 
     n = fs->define_identifier(m, cls, "write", NODE_FUNC_N, 0);
@@ -1230,7 +1250,7 @@ static void define_class(RefNode *m)
     n = fs->define_identifier_p(m, cls, fs->str_new, NODE_NEW_N, 0);
     fs->define_native_func_a(n, zipentry_new, 1, 2, NULL, fs->cls_str, fs->cls_int);
 
-    n = fs->define_identifier_p(m, cls, fs->str_dispose, NODE_FUNC_N, 0);
+    n = fs->define_identifier_p(m, cls, fs->str_dtor, NODE_FUNC_N, 0);
     fs->define_native_func_a(n, zipentry_close, 0, 0, NULL);
 
     n = fs->define_identifier(m, cls, "_read", NODE_FUNC_N, 0);
@@ -1304,5 +1324,8 @@ void define_module(RefNode *m, const FoxStatic *a_fs, FoxGlobal *a_fg)
 
 const char *module_version(const FoxStatic *a_fs)
 {
+    if (a_fs->revision != FOX_INTERFACE_REVISION) {
+        return NULL;
+    }
     return "Build at\t" __DATE__ "\nzlib\t" ZLIB_VERSION "\n";
 }

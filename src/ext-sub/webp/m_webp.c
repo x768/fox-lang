@@ -340,6 +340,9 @@ const char *module_version(const FoxStatic *a_fs)
 {
     static char *buf = NULL;
 
+    if (a_fs->revision != FOX_INTERFACE_REVISION) {
+        return NULL;
+    }
     if (buf == NULL) {
         int webp_ver = WebPGetDecoderVersion();
         buf = malloc(256);

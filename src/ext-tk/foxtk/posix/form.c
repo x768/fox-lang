@@ -16,7 +16,7 @@ static gboolean signal_close(GtkWidget *widget, GdkEvent *event, gpointer user_d
         if (!invoke_event_handler(&result, *eh, evt)) {
             //
         }
-        fs->Value_dec(evt);
+        fs->unref(evt);
     }
     return !result;
 }
@@ -55,7 +55,7 @@ static void signal_drag_data_received(
 
         evt = event_object_new(sender_r);
         event_object_add(evt, "files", vp_Value(afile));
-        fs->Value_dec(vp_Value(afile));
+        fs->unref(vp_Value(afile));
 
         event_object_add(evt, "x", int32_Value(x));
         event_object_add(evt, "y", int32_Value(y));
@@ -63,7 +63,7 @@ static void signal_drag_data_received(
             //
         }
 
-        fs->Value_dec(evt);
+        fs->unref(evt);
     }
 }
 
@@ -91,7 +91,7 @@ static int button_proc_sub(GtkWidget *widget, const char *type, int button, int 
         if (button_val != NULL) {
             v_tmp = fs->cstr_Value(fs->cls_str, button_val, -1);
             event_object_add(evt, "button", v_tmp);
-            fs->Value_dec(v_tmp);
+            fs->unref(v_tmp);
         }
         event_object_add(evt, "x", int32_Value(x));
         event_object_add(evt, "y", int32_Value(y));
@@ -104,7 +104,7 @@ static int button_proc_sub(GtkWidget *widget, const char *type, int button, int 
             //
         }
 
-        fs->Value_dec(evt);
+        fs->unref(evt);
     }
     return TRUE;
 }
@@ -148,11 +148,8 @@ void connect_widget_events(WndHandle window)
     g_signal_connect(G_OBJECT(window), "button-release-event", G_CALLBACK(signal_button_released), NULL);
     g_signal_connect(G_OBJECT(window), "scroll-event", G_CALLBACK(signal_mousewheel), NULL);
 }
-
-// v : FormのサブクラスでValue_new_ref済みの値を渡す
-void create_form_window(Value *v, WndHandle parent, int *size)
+void create_form_window(Ref *r, WndHandle parent, int *size)
 {
-    Ref *r = Value_ref(*v);
     GtkWidget *window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
 
     r->v[INDEX_WIDGET_HANDLE] = handle_Value(window);
@@ -199,7 +196,7 @@ void window_set_opacity(Ref *r, double opacity)
 void window_get_title(Value *vret, WndHandle window)
 {
     const char *title = gtk_window_get_title(GTK_WINDOW(window));
-    *vret = fs->cstr_Value_conv(title, -1, NULL);
+    *vret = fs->cstr_Value(NULL, title, -1);
 }
 void window_set_title(WndHandle window, const char *s)
 {
@@ -284,7 +281,7 @@ void create_image_pane_window(Value *v, WndHandle parent)
 
     r->v[INDEX_WIDGET_HANDLE] = handle_Value(window);
 
-    fs->Value_inc(*v);
+    fs->addref(*v);
 }
 int image_pane_set_image_sub(WndHandle window, RefImage *img)
 {

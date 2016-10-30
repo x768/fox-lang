@@ -37,7 +37,6 @@ set_target_properties(foxrtd
 
 if("${TARGET_OS}" STREQUAL "win")
   set(LIBS
-    iconv
     pcre
   )
   target_link_libraries(foxrt
@@ -50,7 +49,6 @@ if("${TARGET_OS}" STREQUAL "win")
 elseif("${TARGET_OS}" STREQUAL "osx")
   set(LIBS
     dl
-    iconv
     pcre
   )
   find_library(FOUNDATION_LIBRARY Foundation)

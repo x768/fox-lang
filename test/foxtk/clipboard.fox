@@ -1,0 +1,11 @@
+import util.assert
+import foxtk
+
+
+let str = "the quick brown fox jumps over the lazy dog"
+
+clip_set str
+
+assert_true is_clip_available(Str)
+assert_equal clip_get(Str), str
+

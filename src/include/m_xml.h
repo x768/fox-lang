@@ -20,4 +20,4 @@ typedef struct {
     int (*is_valid_elem_name)(const char *s_p, int s_size);
 } XMLStatic;
 
-#endif /* _M_UNICODE_H_ */
+#endif /* _M_XML_H_ */

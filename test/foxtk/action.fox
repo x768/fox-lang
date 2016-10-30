@@ -1,0 +1,22 @@
+import util.assert
+import foxtk
+
+
+def RESULT = []
+
+def action1(a, b)
+{
+	RESULT.push "action1: $a, $b"
+}
+def action2(a, b)
+{
+	RESULT.push "action2: $a, $b"
+}
+
+let eh = EventHandler()
+eh.push action1
+eh.push action2
+eh("hello", "world")
+
+assert_equal RESULT, ["action2: hello, world", "action1: hello, world"]
+

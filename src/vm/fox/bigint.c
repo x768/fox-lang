@@ -1014,41 +1014,73 @@ void BigInt_rsh(BigInt *bi, uint32_t sh)
         BigInt_shrink(bi);
     }
 }
-void BigInt_and(BigInt *a, const BigInt *b)
+static void BigInt_inv(BigInt *a)
 {
     int i;
-
-    if (a->size < b->size) {
-        BigInt_reserve(a, b->size);
-        a->size = b->size;
-    }
+    
     for (i = 0; i < a->size; i++) {
-        a->d[i] &= b->d[i];
-    }
-    BigInt_shrink(a);
-}
-void BigInt_or(BigInt *a, const BigInt *b)
-{
-    int i;
-
-    if (a->size < b->size) {
-        BigInt_reserve(a, b->size);
-        a->size = b->size;
-    }
-    for (i = 0; i < a->size; i++) {
-        a->d[i] |= b->d[i];
+        a->d[i] = ~a->d[i];
     }
 }
-void BigInt_xor(BigInt *a, const BigInt *b)
+void BigInt_bitop(BigInt *a, const BigInt *b, int type)
 {
+    BigInt tmp;
     int i;
 
     if (a->size < b->size) {
         BigInt_reserve(a, b->size);
         a->size = b->size;
     }
-    for (i = 0; i < a->size; i++) {
-        a->d[i] ^= b->d[i];
+
+    if (a->sign < 0) {
+        BigInt_add_d(a, -1);
+        BigInt_inv(a);
+    }
+    if (b->sign < 0) {
+        BigInt_init(&tmp);
+        BigInt_copy(&tmp, b);
+        BigInt_add_d(&tmp, -1);
+        BigInt_inv(&tmp);
+        b = &tmp;
+    }
+
+    switch (type) {
+    case BIGINT_OP_AND:
+        for (i = 0; i < b->size; i++) {
+            a->d[i] &= b->d[i];
+        }
+        if (b->sign == 0) {
+            a->sign = 0;
+        } else if (b->sign > 0) {
+            a->sign = 1;
+        }
+        break;
+    case BIGINT_OP_OR:
+        for (i = 0; i < b->size; i++) {
+            a->d[i] |= b->d[i];
+        }
+        if (a->sign == 0 && b->sign > 0) {
+            a->sign = 1;
+        } else if (b->sign < 0) {
+            a->sign = -1;
+        }
+        break;
+    case BIGINT_OP_XOR:
+        for (i = 0; i < b->size; i++) {
+            a->d[i] ^= b->d[i];
+        }
+        if (b->sign < 0) {
+            a->sign *= -1;
+        }
+        break;
+    }
+
+    if (b->sign < 0) {
+        BigInt_close(&tmp);
+    }
+    if (a->sign < 0) {
+        BigInt_inv(a);
+        BigInt_add_d(a, -1);
     }
     BigInt_shrink(a);
 }

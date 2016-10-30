@@ -103,7 +103,7 @@ def _TRANS_BW = {
 
 class Code39Error : BarcodeError
 {
-    new(s)
+    this(s)
     {
         super(s)
     }
@@ -114,7 +114,7 @@ class Code39
     var m_src
     var m_data
 
-    new(src:Sequence, cksum:Bool = null) {
+    this(src:Sequence, cksum:Bool = null) {
         m_src = src
         var src_b = src
         if typeof(src) == Str {

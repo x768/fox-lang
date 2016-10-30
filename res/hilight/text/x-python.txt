@@ -1,0 +1,56 @@
+word "0-9A-Za-z_"
+define comment_line
+define quot
+define dquot
+define tquot
+define keyword word
+
+"#" = _ comment_line comment_line
+"\n" = comment_line _ _
+
+"'" = _ quot quot
+'\\' = quot quot quot
+"\\'" = quot quot quot
+"'" = quot quot _
+
+'"' = _ dquot dquot
+'\\' = dquot dquot dquot
+'\"' = dquot dquot dquot
+'"' = dquot dquot _
+
+'"""' = _ tquot tquot
+'"""' = tquot tquot _
+
+"False" = _ keyword _
+"None" = _ keyword _
+"True" = _ keyword _
+"and" = _ keyword _
+"as" = _ keyword _
+"assert" = _ keyword _
+"break" = _ keyword _
+"class" = _ keyword _
+"continue" = _ keyword _
+"def" = _ keyword _
+"del" = _ keyword _
+"elif" = _ keyword _
+"else" = _ keyword _
+"except" = _ keyword _
+"finally" = _ keyword _
+"for" = _ keyword _
+"from" = _ keyword _
+"global" = _ keyword _
+"if" = _ keyword _
+"import" = _ keyword _
+"in" = _ keyword _
+"is" = _ keyword _
+"lambda" = _ keyword _
+"nonlocal" = _ keyword _
+"not" = _ keyword _
+"or" = _ keyword _
+"pass" = _ keyword _
+"raise" = _ keyword _
+"return" = _ keyword _
+"try" = _ keyword _
+"while" = _ keyword _
+"with" = _ keyword _
+"yield" = _ keyword _

@@ -25,7 +25,10 @@ void define_module(RefNode *m, const FoxStatic *a_fs, FoxGlobal *a_fg)
 const char *module_version(const FoxStatic *a_fs)
 {
     static char *buf = NULL;
-    
+
+    if (a_fs->revision != FOX_INTERFACE_REVISION) {
+        return NULL;
+    }
     if (buf == NULL) {
         buf = malloc(256);
         sprintf(buf, "Build at\t" __DATE__ "\n");

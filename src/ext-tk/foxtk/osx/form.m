@@ -9,8 +9,7 @@
 void connect_widget_events(WndHandle window)
 {
 }
-// v : FormのサブクラスでValue_new_ref済みの値を渡す
-void create_form_window(Value *v, WndHandle parent, int *size)
+void create_form_window(Ref *r, WndHandle parent, int *size)
 {
 }
 void window_destroy(WndHandle window)

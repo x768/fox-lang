@@ -1,6 +1,6 @@
 abstract class BarcodeError : Error
 {
-    new(s)
+    this(s)
     {
         super(s)
     }

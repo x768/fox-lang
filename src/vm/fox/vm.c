@@ -1,5 +1,6 @@
 #include "fox_parse.h"
 #include "datetime.h"
+#include "bigint.h"
 #include <string.h>
 #include <time.h>
 
@@ -60,7 +61,6 @@ void init_so_func(void)
     fs->int64_Value = int64_Value;
     fs->float_Value = float_Value;
     fs->cstr_Value = cstr_Value;
-    fs->cstr_Value_conv = cstr_Value_conv;
     fs->time_Value = time_Value;
     fs->printf_Value = printf_Value;
 
@@ -68,8 +68,8 @@ void init_so_func(void)
     fs->buf_new = buf_new;
     fs->refstr_new_n = refstr_new_n;
 
-    fs->Value_inc = Value_inc;
-    fs->Value_dec = Value_dec;
+    fs->addref = addref;
+    fs->unref = unref;
     fs->Value_push = Value_push;
     fs->Value_pop = Value_pop;
     fs->get_node_member = get_node_member;
@@ -128,10 +128,6 @@ void init_so_func(void)
     fs->utf8_next = utf8_next;
     fs->utf8_codepoint_at = utf8_codepoint_at;
     fs->get_charset_from_name = get_charset_from_name;
-
-    fs->IconvIO_open = IconvIO_open;
-    fs->IconvIO_close = IconvIO_close;
-    fs->IconvIO_conv = IconvIO_conv;
 
     fs->call_function = call_function;
     fs->call_function_obj = call_function_obj;
@@ -200,7 +196,7 @@ void init_fox_vm(int running_mode)
     fv = malloc(sizeof(FoxVM));
     memset(fv, 0, sizeof(FoxVM));
 
-
+    fs->revision = FOX_INTERFACE_REVISION;
     fs->max_alloc = 32 * 1024 * 1024;  // 一時的
     init_first_classes();
     g_intern_init();
@@ -235,7 +231,7 @@ void init_fox_vm(int running_mode)
 
     fs->str_0 = intern(NULL, 0);
     fs->str_new = intern("new", -1);
-    fs->str_dispose = intern("_dispose", -1);
+    fs->str_dtor = intern("~this", -1);
     fs->str_tostr = intern("to_str", -1);
     fs->str_hash = intern("hash", -1);
     fs->str_iterator = intern("iterator", -1);
@@ -473,7 +469,7 @@ void extends_method(RefNode *klass, RefNode *base)
         for (p = src->entry[i]; p != NULL; p = p->next) {
             RefNode *node = p->p;
 
-            if ((node->type == NODE_FUNC || node->type == NODE_FUNC_N) && node->name != fs->str_dispose) {
+            if ((node->type == NODE_FUNC || node->type == NODE_FUNC_N) && node->name != fs->str_dtor) {
                 HashEntry *he = Hash_get_add_entry(dst, &fg->st_mem, p->key);
                 if (he->p == NULL) {
                     he->p = node;

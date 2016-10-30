@@ -29,7 +29,7 @@ def _min(a, b) => a < b ? a : b
 
 class OLEReadError : Error
 {
-    new(s) {
+    this(s) {
         super(s)
     }
 }
@@ -40,7 +40,7 @@ class OLEReadProperty
     var m_start_block
     var m_size
 
-    new(name:Str, type:Int, start_block:Int, size:Int)
+    this(name:Str, type:Int, start_block:Int, size:Int)
     {
         m_name = name
         m_type = type
@@ -71,7 +71,7 @@ class OLERead
     var m_wrkbook
     var m_rootentry
 
-    new(src:StreamIO)
+    this(src:StreamIO)
     {
         m_data = src
 

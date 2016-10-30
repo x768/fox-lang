@@ -692,7 +692,7 @@ static int parse_json_sub(Value *v, JSTok *tk)
 
                 key = fs->cstr_Value(fs->cls_str, key_s.p, key_s.size);
                 ve = fs->refmap_add(rm, key, TRUE, FALSE);
-                fs->Value_dec(key);
+                fs->unref(key);
                 if (ve == NULL) {
                     return FALSE;
                 }
@@ -785,5 +785,8 @@ void define_module(RefNode *m, const FoxStatic *a_fs, FoxGlobal *a_fg)
 
 const char *module_version(const FoxStatic *a_fs)
 {
+    if (a_fs->revision != FOX_INTERFACE_REVISION) {
+        return NULL;
+    }
     return "Build at\t" __DATE__ "\n";
 }

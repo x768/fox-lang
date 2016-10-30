@@ -1,4 +1,5 @@
 #include "fox_parse.h"
+#include "bigint.h"
 #include <pcre.h>
 
 #ifndef WIN32
@@ -25,11 +26,11 @@ typedef struct OpBuf
 
 static const char *token_name[] = {
     "[EOF]", "T_ERR", "[\\n]", "(", "[", "]=", "==", "!=", "<=>", "<", "<=", ">", ">=", ":", "?",
-    "+", "-", "*", "/", "%", "<<", ">>", "&", "|", "^",
-    "&&", "||", "..", "...", "=>", "~X", "!X", "+X", "-X",
-    "=", "+=", "-=", "*=", "/=", "%=", "<<=", ">>=", "&=", "|=", "^=", "++", "--", "in",
+    "+", "-", "*", "/", "%", "<<", ">>", "&", "|", "^", "&&", "||",
+    "..", "...", "=>", "~X", "!X", "+X", "-X", "++", "--", "in",
+    "+=", "-=", "*=", "/=", "%=", "<<=", ">>=", "&=", "|=", "^=", "&&=", "||=",
 
-    ")", "{", "}", "]", "(", "[", ",", ";", ".X", "a=>",
+    "=", ")", "{", "}", "]", "(", "[", ",", ";", ".X", ".?X", "a=>",
 
     "(Pragma)", "(Int)", "(Int)", "(Float)", "(Rational)", "(Str)", "(Bytes)", "(Regex)", "(Class)", "(var)", "(const)",
     "(Str)", "(Str)", "(Str)", "(Str)",
@@ -1042,11 +1043,14 @@ static int parse_elem(OpBuf *buf, Block *bk, Tok *tk)
 
 static int parse_post_op(OpBuf *buf, Block *bk, Tok *tk)
 {
-    /* A() , A[] , A.memb */
+    int label;
+
+    /* a() , a[] , a.memb , a.?memb */
     if (!parse_elem(buf, bk, tk)) {
         return FALSE;
     }
 
+    label = 0;
     for (;;) {
         switch (tk->v.type) {
         case T_LP:
@@ -1103,6 +1107,7 @@ static int parse_post_op(OpBuf *buf, Block *bk, Tok *tk)
         }
         case T_MEMB: {
             RefStr *name;
+            int private;
 
             Tok_next(tk);
             if (tk->v.type != TL_CLASS && tk->v.type != TL_VAR && tk->v.type != TL_CONST) {
@@ -1110,6 +1115,8 @@ static int parse_post_op(OpBuf *buf, Block *bk, Tok *tk)
                 return FALSE;
             }
             name = intern(tk->str_val.p, tk->str_val.size);
+            private = (name->c[0] == '_');
+
             if (buf->cur > 0) {
                 OpCode *op = OpBuf_prev(buf);
                 switch (op->type) {
@@ -1146,12 +1153,9 @@ static int parse_post_op(OpBuf *buf, Block *bk, Tok *tk)
                     add_unresolved_memb(tk, bk->func, name, buf->prev);
                     break;
                 default:
-                    if (op->type != OP_GET_LOCAL || op->s != 0) {
-                        // 直前のOPがthisでない場合
-                        if (name->c[0] == '_') {
-                            throw_define_error(tk, "%r is private", name);
-                            return FALSE;
-                        }
+                    // 直前のOPがthisの場合
+                    if (op->type == OP_GET_LOCAL && op->s == 0) {
+                        private = FALSE;
                     }
                     OpBuf_add_op3(buf, OP_GET_PROP, 0, (Value)tk->v.line, vp_Value(name));
                     break;
@@ -1159,8 +1163,51 @@ static int parse_post_op(OpBuf *buf, Block *bk, Tok *tk)
             } else {
                 OpBuf_add_op3(buf, OP_GET_PROP, 0, (Value)tk->v.line, vp_Value(name));
             }
+            if (private) {
+                throw_define_error(tk, "%r is private", name);
+                return FALSE;
+            }
             Tok_next(tk);
 
+            break;
+        }
+        case T_QMEMB: {
+            RefStr *name;
+            int private;
+
+            Tok_next(tk);
+            if (tk->v.type != TL_CLASS && tk->v.type != TL_VAR && tk->v.type != TL_CONST) {
+                unexpected_token_error(tk);
+                return FALSE;
+            }
+            name = intern(tk->str_val.p, tk->str_val.size);
+            private = (name->c[0] == '_');
+
+            if (buf->cur > 0) {
+                OpCode *op = OpBuf_prev(buf);
+                switch (op->type) {
+                case OP_MODULE:
+                case OP_CLASS:
+                    unexpected_token_error(tk);
+                    return FALSE;
+                default:
+                    // 直前のOPがthisの場合
+                    if (op->type == OP_GET_LOCAL && op->s == 0) {
+                        unexpected_token_error(tk);
+                        return FALSE;
+                    }
+                    break;
+                }
+            }
+            if (private) {
+                throw_define_error(tk, "%r is private", name);
+                return FALSE;
+            }
+            // if null -> goto
+            label = OpBuf_add_op2(buf, OP_IFNULL_J, 0, (Value)label);
+            OpBuf_add_op3(buf, OP_GET_PROP, 0, (Value)tk->v.line, vp_Value(name));
+
+            Tok_next(tk);
             break;
         }
         default:
@@ -1168,6 +1215,12 @@ static int parse_post_op(OpBuf *buf, Block *bk, Tok *tk)
         }
     }
 BREAK:
+    // 逆順にたどる
+    while (label > 0) {
+        int next = (int)buf->p[label].op[0];
+        buf->p[label].op[0] = (Value)buf->cur;
+        label = next;
+    }
     return TRUE;
 }
 static int parse_pre_op(OpBuf *buf, Block *bk, Tok *tk)
@@ -1373,7 +1426,7 @@ static int parse_logand(OpBuf *buf, Block *bk, Tok *tk)
     label = 0;
     while (tk->v.type == T_LAND) {
         Tok_next(tk);
-        label = OpBuf_add_op2(buf, OP_IF_NP, 0, (Value)label);
+        label = OpBuf_add_op2(buf, OP_IF_POP_J, 0, (Value)label);
         if (!parse_equal(buf, bk, tk)) {
             return FALSE;
         }
@@ -1399,7 +1452,7 @@ static int parse_logor(OpBuf *buf, Block *bk, Tok *tk)
     label = 0;
     while (tk->v.type == T_LOR) {
         Tok_next(tk);
-        label = OpBuf_add_op2(buf, OP_IF_P, 0, (Value)label);
+        label = OpBuf_add_op2(buf, OP_IF_J_POP, 0, (Value)label);
         if (!parse_logand(buf, bk, tk)) {
             return FALSE;
         }
@@ -1425,7 +1478,7 @@ static int parse_expr(OpBuf *buf, Block *bk, Tok *tk)
         int label1, label2;
         Tok_next(tk);
 
-        label1 = OpBuf_add_op2(buf, OP_JIF_N, 0, VALUE_NULL);
+        label1 = OpBuf_add_op2(buf, OP_POP_IFN_J, 0, VALUE_NULL);
         tk->wait_colon++;
         if (!parse_expr(buf, bk, tk)) {
             return FALSE;
@@ -1514,7 +1567,7 @@ static int parse_super(OpBuf *buf, Block *bk, Tok *tk, RefNode *klass)
     if (tk->v.type == T_NL || tk->v.type == T_SEMICL) {
         Tok_next(tk);
         return TRUE;
-    } else if (tk->v.type == T_EOF) {
+    } else if (tk->v.type == T_RC) {
         return TRUE;
     }
     unexpected_token_error(tk);
@@ -1623,8 +1676,8 @@ static int parse_expr_statement(OpBuf *buf, Block *bk, Tok *tk)
             OpBuf_add_op3(buf, OP_CALL_M_POP, 1, u.lop.op[0], vp_Value(set_prop_name));
             break;
         case OP_GET_FIELD:
-            // i += 1
-            // i = i + 1
+            // m_i += 1
+            // m_i = m_i + 1
             if (!parse_expr(buf, bk, tk)) {
                 return FALSE;
             }
@@ -1653,6 +1706,78 @@ static int parse_expr_statement(OpBuf *buf, Block *bk, Tok *tk)
         default:
             throw_syntax_error(tk, "Invalid lvalue");
             return FALSE;
+        }
+        break;
+    }
+    case T_L_LAND: case T_L_LOR: {
+        RefStr *set_prop_name = NULL;
+        int op_jmp = (tk->v.type == T_L_LOR ? OP_POP_IF_J : OP_POP_IFN_J);
+        int jmp = 0;
+
+        memcpy(&u, buf->p + buf->prev, (buf->cur - buf->prev) * sizeof(int64_t));
+        if (u.lop.type == OP_GET_PROP) {
+            set_prop_name = ident_add_equal(tk);
+        }
+        Tok_next(tk);
+
+        switch (u.lop.type) {
+        case OP_GET_LOCAL_V:
+            // i ||= 1
+            // if !i { i = 1 }
+            jmp = OpBuf_add_op2(buf, op_jmp, 0, 0);
+            if (!parse_expr(buf, bk, tk)) {
+                return FALSE;
+            }
+            OpBuf_add_op1(buf, OP_SET_LOCAL, u.lop.s);
+            break;
+        case OP_GET_PROP:
+            // a.memb ||= 1
+            // if !a.memb { a.memb = 1 }
+            buf->cur = buf->prev;
+            buf->prev = -1;
+
+            OpBuf_add_op1(buf, OP_DUP, 1);
+            OpBuf_add_op3(buf, OP_GET_PROP, 0, (Value)tk->v.line, u.lop.op[1]);
+            jmp = OpBuf_add_op2(buf, op_jmp, 0, 0);
+            if (!parse_expr(buf, bk, tk)) {
+                return FALSE;
+            }
+            OpBuf_add_op3(buf, OP_CALL_M_POP, 1, u.lop.op[0], vp_Value(set_prop_name));
+            break;
+        case OP_GET_FIELD:
+            // m_i ||= 1
+            // if !m_i { m_i = 1 }
+            jmp = OpBuf_add_op2(buf, op_jmp, 0, 0);
+            if (!parse_expr(buf, bk, tk)) {
+                return FALSE;
+            }
+            OpBuf_add_op2(buf, OP_SET_FIELD, u.lop.s, vp_Value(tk->parse_cls));
+            break;
+        case OP_CALL_M:
+            if (Value_vp(u.lop.op[1]) == fs->symbol_stock[T_LB]) {
+                // a[i] ||= 1
+                // if !a[i] { a[i] = 1 }
+                buf->cur = buf->prev;
+                buf->prev = -1;
+
+                OpBuf_add_op1(buf, OP_DUP, 2);
+                OpBuf_add_op3(buf, OP_CALL_M, 1, u.lop.op[0], vp_Value(fs->symbol_stock[T_LB]));
+                jmp = OpBuf_add_op2(buf, op_jmp, 0, 0);
+                if (!parse_expr(buf, bk, tk)) {
+                    return FALSE;
+                }
+                OpBuf_add_op3(buf, OP_CALL_M_POP, 2, u.lop.op[0], vp_Value(fs->symbol_stock[T_LET_B]));
+            } else {
+                throw_syntax_error(tk, "Invalid lvalue");
+                return FALSE;
+            }
+            break;
+        default:
+            throw_syntax_error(tk, "Invalid lvalue");
+            return FALSE;
+        }
+        if (jmp > 0) {
+            buf->p[jmp].op[0] = buf->cur;
         }
         break;
     }
@@ -1932,9 +2057,9 @@ static int parse_if(OpBuf *buf, Block *bk, Tok *tk)
             if (!Block_add_var(b, tk, c_name, NODEOPT_READONLY)) {
                 return FALSE;
             }
-            jmp = OpBuf_add_op2(buf, OP_IFP_N, 0, VALUE_NULL);
+            jmp = OpBuf_add_op2(buf, OP_IFN_POPJ, 0, VALUE_NULL);
         } else {
-            jmp = OpBuf_add_op2(buf, OP_JIF_N, 0, VALUE_NULL);
+            jmp = OpBuf_add_op2(buf, OP_POP_IFN_J, 0, VALUE_NULL);
         }
         if (tk->v.type != T_LC) {
             unexpected_token_error(tk);
@@ -2111,9 +2236,9 @@ static int parse_while(OpBuf *buf, Block *bk, Tok *tk)
         if (!Block_add_var(b, tk, c_name, NODEOPT_READONLY)) {
             return FALSE;
         }
-        jmp = OpBuf_add_op2(buf, OP_IFP_N, 0, VALUE_NULL);
+        jmp = OpBuf_add_op2(buf, OP_IFN_POPJ, 0, VALUE_NULL);
     } else {
-        jmp = OpBuf_add_op2(buf, OP_JIF_N, 0, VALUE_NULL);
+        jmp = OpBuf_add_op2(buf, OP_POP_IFN_J, 0, VALUE_NULL);
     }
 
     bk->continue_p = label;
@@ -2222,7 +2347,7 @@ static int parse_switch(OpBuf *buf, Block *bk, Tok *tk)
                     OpBuf_add_op1(buf, OP_GET_LOCAL, tmp_offset);
                     OpBuf_add_op3(buf, OP_CALL_M, 1, (Value)tk->v.line, vp_Value(fs->symbol_stock[T_IN]));
                     if (tk->v.type == T_NL || tk->v.type == T_SEMICL || tk->v.type == T_RC) {
-                        jmp_next = OpBuf_add_op2(buf, OP_JIF_N, 0, VALUE_NULL);
+                        jmp_next = OpBuf_add_op2(buf, OP_POP_IFN_J, 0, VALUE_NULL);
                     } else {
                         unexpected_token_error(tk);
                         return FALSE;
@@ -2239,9 +2364,9 @@ static int parse_switch(OpBuf *buf, Block *bk, Tok *tk)
                         // コンマで連結した場合は、or と同じ
                         if (tk->v.type == T_COMMA) {
                             Tok_next_skip(tk);
-                            jmp_expr = OpBuf_add_op2(buf, OP_JIF, 0, (Value)jmp_expr);
+                            jmp_expr = OpBuf_add_op2(buf, OP_POP_IF_J, 0, (Value)jmp_expr);
                         } else if (tk->v.type == T_NL || tk->v.type == T_SEMICL || tk->v.type == T_RC) {
-                            jmp_next = OpBuf_add_op2(buf, OP_JIF_N, 0, VALUE_NULL);
+                            jmp_next = OpBuf_add_op2(buf, OP_POP_IFN_J, 0, VALUE_NULL);
                             break;
                         } else {
                             unexpected_token_error(tk);
@@ -2291,7 +2416,7 @@ static int parse_switch(OpBuf *buf, Block *bk, Tok *tk)
         if (switch_fault_message == VALUE_NULL) {
             switch_fault_message = cstr_Value(fs->cls_str, "None of the case expressions match", -1);
         } else {
-            Value_inc(switch_fault_message);
+            addref(switch_fault_message);
         }
         OpBuf_add_op2(buf, OP_LITERAL, 0, switch_fault_message);
         OpBuf_add_op2(buf, OP_CALL, 1, (Value)expr_line);
@@ -2871,9 +2996,9 @@ static int parse_function(RefNode *node, Tok *tk, RefNode *construct)
         return FALSE;
     }
 
-    if (node->name == fs->str_dispose) {
+    if (node->name == fs->str_dtor) {
         if (node->u.f.arg_max > 0) {
-            throw_syntax_error(tk, "'_dispose' not allowed any arguments");
+            throw_syntax_error(tk, "Destructor is not allowed any arguments");
             return FALSE;
         }
     }
@@ -3054,31 +3179,48 @@ static int parse_class_statement(RefNode *module, Tok *tk, int abst)
 
     for (;;) {
         switch (tk->v.type) {
-        case TL_VAR: {
-            // new constructor(...)
+        case TT_THIS: {
+            // this(...)
+            // this.new(...)
             RefNode *nd;
 
-            name = Tok_intern(tk);
-            if (name != fs->str_new) {
-                unexpected_token_error(tk);
-                return FALSE;
-            }
-            Tok_next(tk);
-            if (tk->v.type == TL_VAR) {
-                // 名前つきコンストラクタ
-                name = Tok_intern(tk);
-                if (name == fs->str_new) {
+            if (Tok_peek(tk, 0) == T_MEMB) {
+                Tok_next(tk);
+                Tok_next(tk);
+                if (tk->v.type != TL_VAR) {
                     unexpected_token_error(tk);
                     return FALSE;
                 }
-                Tok_next(tk);
+                name = Tok_intern(tk);
+            } else {
+                name = fs->str_new;
             }
             nd = Node_define_tk(klass, tk, name, NODE_NEW);
             if (nd == NULL) {
                 return FALSE;
             }
+            Tok_next(tk);
             nd->u.f.klass = klass;
             if (!parse_function(nd, tk, klass)) {
+                return FALSE;
+            }
+            break;
+        }
+        case T_INV: {
+            // ~this()
+            RefNode *nd;
+            Tok_next(tk);
+            if (tk->v.type != TT_THIS) {
+                unexpected_token_error(tk);
+                return FALSE;
+            }
+            Tok_next(tk);
+            nd = Node_define_tk(klass, tk, fs->str_dtor, NODE_FUNC);
+            if (nd == NULL) {
+                return FALSE;
+            }
+            nd->u.f.klass = klass;
+            if (!parse_function(nd, tk, NULL)) {
                 return FALSE;
             }
             break;
@@ -3515,6 +3657,29 @@ BREAK2:
                 return FALSE;
             }
             break;
+        case T_INV: {
+            RefNode *nd;
+            Tok_next(tk);
+            if (tk->v.type != TT_THIS) {
+                unexpected_token_error(tk);
+                return FALSE;
+            }
+            nd = Node_define_tk(module, tk, fs->str_dtor, NODE_FUNC);
+            if (nd == NULL) {
+                return FALSE;
+            }
+            nd->u.f.klass = NULL;
+
+            Tok_next(tk);
+            if (tk->v.type != T_LP) {
+                unexpected_token_error(tk);
+                return FALSE;
+            }
+            if (!parse_function(nd, tk, NULL)) {
+                return FALSE;
+            }
+            break;
+        }
         case TT_LET:
             Tok_next(tk);
             if (!parse_local_var(&buf, bk, tk, FALSE)) {

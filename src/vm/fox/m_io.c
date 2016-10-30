@@ -1,4 +1,5 @@
 #include "fox_vm.h"
+#include "bigint.h"
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
@@ -79,14 +80,14 @@ static int stream_close(Value *vret, Value *v, RefNode *node)
     Value *v2 = &r->v[INDEX_WRITE_MEMIO];
 
     if (*v1 != VALUE_NULL) {
-        Value_dec(*v1);
+        unref(*v1);
         *v1 = VALUE_NULL;
     }
     if (*v2 != VALUE_NULL) {
         if (!stream_flush_sub(*v)) {
             //TODO Stream.flush失敗時の対応
         }
-        Value_dec(*v2);
+        unref(*v2);
         *v2 = VALUE_NULL;
     }
 
@@ -2161,7 +2162,7 @@ static void define_io_class(RefNode *m)
     n = define_identifier(m, cls, "_both", NODE_NEW_N, 0);
     define_native_func_a(n, stream_open, 0, 0, (void*)(STREAM_READ|STREAM_WRITE));
 
-    n = define_identifier_p(m, cls, fs->str_dispose, NODE_FUNC_N, 0);
+    n = define_identifier_p(m, cls, fs->str_dtor, NODE_FUNC_N, 0);
     define_native_func_a(n, stream_close, 0, 0, NULL);
 
     n = define_identifier_p(m, cls, fs->str_read, NODE_FUNC_N, 0);
@@ -2222,7 +2223,7 @@ static void define_io_class(RefNode *m)
     n = define_identifier(m, cls, "sized", NODE_NEW_N, 0);
     define_native_func_a(n, bytesio_new_sized, 1, 2, NULL, fs->cls_int, fs->cls_int);
 
-    n = define_identifier_p(m, cls, fs->str_dispose, NODE_FUNC_N, 0);
+    n = define_identifier_p(m, cls, fs->str_dtor, NODE_FUNC_N, 0);
     define_native_func_a(n, bytesio_dispose, 0, 0, NULL);
     n = define_identifier(m, cls, "empty", NODE_FUNC_N, NODEOPT_PROPERTY);
     define_native_func_a(n, bytesio_empty, 0, 0, NULL);

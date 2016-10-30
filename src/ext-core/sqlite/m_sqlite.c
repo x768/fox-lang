@@ -76,7 +76,7 @@ static Value cursor_get_sub(sqlite3_stmt *stmt, int i)
     case SQLITE_TEXT: {
         const char *p = (const char*)sqlite3_column_text(stmt, i);
         int len = sqlite3_column_bytes(stmt, i);
-        return fs->cstr_Value_conv(p, len, NULL);
+        return fs->cstr_Value(NULL, p, len);
     }
     case SQLITE_BLOB: {
         const char *p = (const char*)sqlite3_column_blob(stmt, i);
@@ -341,7 +341,7 @@ static void sqlite_callback_args(int argc, sqlite3_value **argv)
         case SQLITE_TEXT: {
             const char *p = (const char*)sqlite3_value_text(sv);
             int len = sqlite3_value_bytes(sv);
-            *vp = fs->cstr_Value_conv(p, len, NULL);
+            *vp = fs->cstr_Value(NULL, p, len);
             break;
         }
         case SQLITE_BLOB: {
@@ -466,7 +466,7 @@ static void sqlite_callback_final(sqlite3_context *ctx)
     }
     fs->Value_pop();
 
-    fs->Value_dec(*v);
+    fs->unref(*v);
     *v = VALUE_NULL;
 
     return;
@@ -523,7 +523,7 @@ static int cursor_close(Value *vret, Value *v, RefNode *node)
         sqlite3_finalize(rc->stmt);
         rc->stmt = NULL;
     }
-    fs->Value_dec(rc->connect);
+    fs->unref(rc->connect);
     rc->connect = VALUE_NULL;
 
     return TRUE;
@@ -573,13 +573,13 @@ static int cursor_get(Value *vret, RefCursor *rc)
 
         for (i = 0; i < num; i++) {
             const char *key_p = sqlite3_column_name(rc->stmt, i);
-            Value key = fs->cstr_Value_conv(key_p, -1, NULL);
+            Value key = fs->cstr_Value(NULL, key_p, -1);
             HashValueEntry *ve = fs->refmap_add(rm, key, TRUE, FALSE);
 
             if (ve != NULL) {
                 ve->val = cursor_get_sub(rc->stmt, i);
             }
-            fs->Value_dec(key);
+            fs->unref(key);
         }
     } else {
         RefArray *ra = fs->refarray_new(num);
@@ -652,7 +652,7 @@ static void define_class(RefNode *m)
     n = fs->define_identifier(m, cls, "memory", NODE_NEW_N, 0);
     fs->define_native_func_a(n, conn_memory, 0, 0, NULL);
 
-    n = fs->define_identifier_p(m, cls, fs->str_dispose, NODE_FUNC_N, 0);
+    n = fs->define_identifier_p(m, cls, fs->str_dtor, NODE_FUNC_N, 0);
     fs->define_native_func_a(n, conn_close, 0, 0, NULL);
 
     n = fs->define_identifier(m, cls, "close", NODE_FUNC_N, 0);
@@ -672,7 +672,7 @@ static void define_class(RefNode *m)
 
 
     cls = cls_cursor;
-    n = fs->define_identifier_p(m, cls, fs->str_dispose, NODE_FUNC_N, 0);
+    n = fs->define_identifier_p(m, cls, fs->str_dtor, NODE_FUNC_N, 0);
     fs->define_native_func_a(n, cursor_close, 0, 0, NULL);
 
     n = fs->define_identifier(m, cls, "bind", NODE_FUNC_N, 0);
@@ -702,5 +702,8 @@ void define_module(RefNode *m, const FoxStatic *a_fs, FoxGlobal *a_fg)
 
 const char *module_version(const FoxStatic *a_fs)
 {
+    if (a_fs->revision != FOX_INTERFACE_REVISION) {
+        return NULL;
+    }
     return "Build at\t" __DATE__ "\nSQLite\t" SQLITE_VERSION "\n";
 }

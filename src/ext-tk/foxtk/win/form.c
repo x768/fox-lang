@@ -33,7 +33,7 @@ static int wndproc_drop_event(Ref *sender_r, HDROP hDrop)
 
         evt = event_object_new(sender_r);
         event_object_add(evt, "files", vp_Value(afile));
-        fs->Value_dec(vp_Value(afile));
+        fs->unref(vp_Value(afile));
 
         event_object_add(evt, "x", int32_Value(pt.x));
         event_object_add(evt, "y", int32_Value(pt.y));
@@ -41,7 +41,7 @@ static int wndproc_drop_event(Ref *sender_r, HDROP hDrop)
         if (!invoke_event_handler(&result, *eh, evt)) {
             //
         }
-        fs->Value_dec(evt);
+        fs->unref(evt);
     }
     return TRUE;
 }
@@ -53,7 +53,7 @@ static LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lPara
     case WM_DESTROY: {
         Ref *r = (Ref*)GetWindowLongPtr(hWnd, GWLP_USERDATA);
         widget_handler_destroy(r);
-        fs->Value_dec(r->v[INDEX_WIDGET_HANDLE]);
+        fs->unref(r->v[INDEX_WIDGET_HANDLE]);
         r->v[INDEX_WIDGET_HANDLE] = VALUE_NULL;
         return 0;
     }
@@ -67,7 +67,7 @@ static LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lPara
             if (!invoke_event_handler(&result, *eh, evt)) {
                 //
             }
-            fs->Value_dec(evt);
+            fs->unref(evt);
         }
         if (fg->error != VALUE_NULL) {
             PostQuitMessage(0);
@@ -91,7 +91,7 @@ static LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lPara
         if (sender_r != NULL) {
             Value evt = event_object_new(sender_r);
             invoke_event(evt, sender_r->v[INDEX_MENUITEM_FN]);
-            fs->Value_dec(evt);
+            fs->unref(evt);
         }
         return 0;
     }
@@ -156,7 +156,7 @@ static int button_proc_sub(Ref *sender_r, const char *type, int button, int x, i
         if (button_val != NULL) {
             Value v_tmp = fs->cstr_Value(fs->cls_str, button_val, -1);
             event_object_add(evt, "button", v_tmp);
-            fs->Value_dec(v_tmp);
+            fs->unref(v_tmp);
         }
 
         event_object_add(evt, "x", int32_Value(x));
@@ -170,7 +170,7 @@ static int button_proc_sub(Ref *sender_r, const char *type, int button, int x, i
             //
         }
 
-        fs->Value_dec(evt);
+        fs->unref(evt);
     }
     return TRUE;
 }
@@ -223,11 +223,8 @@ void connect_widget_events(WndHandle window)
 {
     SetWindowLongPtr(window, GWLP_WNDPROC, (LONG_PTR)WndProcBase);
 }
-
-// v : FormのサブクラスでValue_new_ref済みの値を渡す
-void create_form_window(Value *v, WndHandle parent, int *size)
+void create_form_window(Ref *r, WndHandle parent, int *size)
 {
-    Ref *r = Value_ref(*v);
     HWND window = NULL;
     DWORD style;
 
@@ -696,7 +693,7 @@ void create_image_pane_window(Value *v, WndHandle parent)
     ShowWindow(window, SW_SHOW);
 
     r->v[INDEX_WIDGET_HANDLE] = handle_Value(window);
-    fs->Value_inc(*v);
+    fs->addref(*v);
 }
 int image_pane_set_image_sub(WndHandle window, RefImage *img)
 {

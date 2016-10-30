@@ -208,35 +208,40 @@ static void show_lib_version_sub(Mem *mem, StrBuf *path, StrBuf *package, const 
 
             if (module_version != NULL) {
                 const char *libver = module_version(fs);
-                const char *p = libver;
-
                 stream_write_data(fg->v_cio, "<h1>", -1);
                 stream_write_data(fg->v_cio, title, -1);
                 stream_write_data(fg->v_cio, package->p, -1);
                 stream_write_data(fg->v_cio, "</h1>\n", -1);
                 stream_write_data(fg->v_cio, tbegin, -1);
-                while (*p != '\0') {
-                    while (*p != '\0' && *p != '\t') {
-                        p++;
-                    }
-                    write_html_encode(libver, p - libver);
-                    stream_write_data(fg->v_cio, "</th><td>", -1);
-                    if (*p != '\0') {
-                        p++;
-                    }
-                    libver = p;
-                    while (*p != '\0' && *p != '\n') {
-                        p++;
-                    }
-                    write_html_encode(libver, p - libver);
-                    if (*p != '\0') {
-                        p++;
-                    }
-                    libver = p;
 
-                    if (*p != '\0') {
-                        stream_write_data(fg->v_cio, tlend, -1);
+                if (libver != NULL) {
+                    const char *p = libver;
+
+                    while (*p != '\0') {
+                        while (*p != '\0' && *p != '\t') {
+                            p++;
+                        }
+                        write_html_encode(libver, p - libver);
+                        stream_write_data(fg->v_cio, "</th><td>", -1);
+                        if (*p != '\0') {
+                            p++;
+                        }
+                        libver = p;
+                        while (*p != '\0' && *p != '\n') {
+                            p++;
+                        }
+                        write_html_encode(libver, p - libver);
+                        if (*p != '\0') {
+                            p++;
+                        }
+                        libver = p;
+
+                        if (*p != '\0') {
+                            stream_write_data(fg->v_cio, tlend, -1);
+                        }
                     }
+                } else {
+                    stream_write_data(fg->v_cio, "<span class=\"err\">INVALID MODULE VERSION</span>", -1);
                 }
                 stream_write_data(fg->v_cio, tend, -1);
             }

@@ -3,20 +3,18 @@ define comment
 define comment_line
 define quot
 define dquot
-define keyword, word
-define keyword2, word
-define typename, word
+define keyword word
 
 "/*" = _ comment comment
 "*/" = comment comment _
 "//" = _ comment_line comment_line
-"\n" = comment_line comment_line _
+"\n" = comment_line _ _
 
 "'" = _ quot quot
 "b'" = _ quot quot
 '\\' = quot quot quot
 "\\'" = quot quot quot
-"'" = quot uot _
+"'" = quot quot _
 
 '"' = _ dquot dquot
 'b"' = _ dquot dquot
@@ -51,71 +49,3 @@ define typename, word
 "var" = _ keyword _
 "while" = _ keyword _
 "yield" = _ keyword _
-
-"Audio" = _ keyword _
-"Bool" = _ keyword _
-"Bytes" = _ keyword _
-"BytesIO" = _ keyword _
-"Charset" = _ keyword _
-"Class" = _ keyword _
-"Color" = _ keyword _
-"Complex" = _ keyword _
-"DeflateIO" = _ keyword _
-"Date" = _ keyword _
-"DateTime" = _ keyword _
-"Entry" = _ keyword _
-"Error" = _ keyword _
-"File" = _ keyword _
-"FileIO" = _ keyword _
-"Float" = _ keyword _
-"Frac" = _ keyword _
-"Function" = _ keyword _
-"Image" = _ keyword _
-"Int" = _ keyword _
-"IPAddr" = _ keyword _
-"IPAddrRange" = _ keyword _
-"List" = _ keyword _
-"Locale" = _ keyword _
-"Map" = _ keyword _
-"Matches" = _ keyword _
-"Matrix" = _ keyword _
-"MimeData" = _ keyword _
-"MimeType" = _ keyword _
-"Module" = _ keyword _
-"Null" = _ keyword _
-"NullIO" = _ keyword _
-"Number" = _ keyword _
-"Object" = _ keyword _
-"Palette" = _ keyword _
-"PipeIO" = _ keyword _
-"Range" = _ keyword _
-"RangeIter" = _ keyword _
-"Rect" = _ keyword _
-"Ref" = _ keyword _
-"Regex" = _ keyword _
-"Resource" = _ keyword _
-"Set" = _ keyword _
-"Sequence" = _ keyword _
-"SocketIO" = _ keyword _
-"SQLite" = _ keyword _
-"Str" = _ keyword _
-"StrIO" = _ keyword _
-"StreamIO" = _ keyword _
-"TextIO" = _ keyword _
-"TimeDelta" = _ keyword _
-"TimeStamp" = _ keyword _
-"TimeZone" = _ keyword _
-"Uri" = _ keyword _
-"Vector" = _ keyword _
-"WeakRef" = _ keyword _
-"XMLComment" = _ keyword _
-"XMLDeclaration" = _ keyword _
-"XMLDocument" = _ keyword _
-"XMLElem" = _ keyword _
-"XMLNode" = _ keyword _
-"XMLNodeList" = _ keyword _
-"XMLText" = _ keyword _
-"ZipEntry" = _ keyword _
-"ZipRandomReader" = _ keyword _
-"ZipReader" = _ keyword _
-"ZipWriter" = _ keyword _

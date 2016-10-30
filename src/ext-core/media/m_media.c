@@ -152,10 +152,10 @@ static int audio_load(Value *vret, Value *v, RefNode *node)
     snd = fs->buf_new(cls_audio, sizeof(RefAudio));
     *vret = vp_Value(snd);
     if (!audio_load_wav(snd, reader, FUNC_INT(node))) {
-        fs->Value_dec(reader);
+        fs->unref(reader);
         return FALSE;
     }
-    fs->Value_dec(reader);
+    fs->unref(reader);
 
     return TRUE;
 }
@@ -181,10 +181,10 @@ static int audio_save(Value *vret, Value *v, RefNode *node)
     }
 
     if (!audio_save_wav(snd, writer)) {
-        fs->Value_dec(writer);
+        fs->unref(writer);
         return FALSE;
     }
-    fs->Value_dec(writer);
+    fs->unref(writer);
 
     return TRUE;
 }
@@ -626,12 +626,12 @@ static int mediareader_new(Value *vret, Value *v, RefNode *node)
     }
 
     if (type == NULL && !detect_file_type(&type, reader)) {
-        fs->Value_dec(reader);
+        fs->unref(reader);
         return FALSE;
     }
 
 
-    fs->Value_dec(reader);
+    fs->unref(reader);
     return TRUE;
 }
 static int mediareader_close(Value *vret, Value *v, RefNode *node)
@@ -661,7 +661,7 @@ static void define_class(RefNode *m)
     n = fs->define_identifier_p(m, cls, fs->str_marshal_read, NODE_NEW_N, 0);
     fs->define_native_func_a(n, audio_marshal_read, 1, 1, NULL, fs->cls_marshaldumper);
 
-    n = fs->define_identifier_p(m, cls, fs->str_dispose, NODE_FUNC_N, 0);
+    n = fs->define_identifier_p(m, cls, fs->str_dtor, NODE_FUNC_N, 0);
     fs->define_native_func_a(n, audio_close, 0, 0, NULL);
     n = fs->define_identifier_p(m, cls, fs->str_tostr, NODE_FUNC_N, 0);
     fs->define_native_func_a(n, audio_tostr, 0, 2, NULL, fs->cls_str, fs->cls_locale);
@@ -707,7 +707,7 @@ static void define_class(RefNode *m)
     n = fs->define_identifier_p(m, cls, fs->str_new, NODE_NEW_N, 0);
     fs->define_native_func_a(n, mediareader_new, 1, 1, NULL, NULL, fs->cls_mimetype);
 
-    n = fs->define_identifier_p(m, cls, fs->str_dispose, NODE_FUNC_N, 0);
+    n = fs->define_identifier_p(m, cls, fs->str_dtor, NODE_FUNC_N, 0);
     fs->define_native_func_a(n, mediareader_close, 0, 0, NULL);
     fs->extends_method(cls, fs->cls_obj);
 
@@ -739,6 +739,10 @@ void define_module(RefNode *m, const FoxStatic *a_fs, FoxGlobal *a_fg)
 const char *module_version(const FoxStatic *a_fs)
 {
     static char *buf = NULL;
+
+    if (a_fs->revision != FOX_INTERFACE_REVISION) {
+        return NULL;
+    }
 
     fs = a_fs;
     if (buf == NULL) {

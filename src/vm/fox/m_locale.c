@@ -665,7 +665,7 @@ static Ref *get_locale_from_name(const char *name, int name_size, int loose)
     // 最も適合するLocaleを取得
     loc = get_locale_from_ref(r);
     if (loc == NULL) {
-        Value_dec(vp_Value(r));
+        unref(vp_Value(r));
         return NULL;
     }
     r->v[INDEX_LOCALE_LOCALE] = ptr_Value(loc);
@@ -1028,7 +1028,7 @@ static RefResource *load_resource_from_locale(RefStr *name_r, const char *loc_na
             for (;;) {
                 if (!load_resource_sub(res, fpath)) {
                     free(fpath);
-                    Value_dec(vp_Value(res));
+                    unref(vp_Value(res));
                     return NULL;
                 }
                 if (fname[0] == '!') {
@@ -1076,7 +1076,7 @@ static int resource_new(Value *vret, Value *v, RefNode *node)
 static int resource_dispose(Value *vret, Value *v, RefNode *node)
 {
     RefResource *res = Value_vp(*v);
-    Value_dec(res->locale);
+    unref(res->locale);
     res->locale = VALUE_NULL;
     Mem_close(&res->mem);
     return TRUE;
@@ -1258,7 +1258,7 @@ static void define_locale_class(RefNode *m)
     n = define_identifier_p(m, cls, fs->str_marshal_read, NODE_NEW_N, 0);
     define_native_func_a(n, locale_marshal_read, 1, 1, NULL, fs->cls_marshaldumper);
 
-    n = define_identifier_p(m, cls, fs->str_dispose, NODE_FUNC_N, 0);
+    n = define_identifier_p(m, cls, fs->str_dtor, NODE_FUNC_N, 0);
     define_native_func_a(n, locale_dispose, 0, 0, NULL);
 
     n = define_identifier_p(m, cls, fs->str_tostr, NODE_FUNC_N, 0);
@@ -1297,7 +1297,7 @@ static void define_locale_class(RefNode *m)
 
     n = define_identifier_p(m, cls, fs->str_new, NODE_NEW_N, 0);
     define_native_func_a(n, resource_new, 1, 2, NULL, fs->cls_str, fs->cls_locale);
-    n = define_identifier_p(m, cls, fs->str_dispose, NODE_FUNC_N, 0);
+    n = define_identifier_p(m, cls, fs->str_dtor, NODE_FUNC_N, 0);
     define_native_func_a(n, resource_dispose, 0, 0, NULL);
 
     n = define_identifier_p(m, cls, fs->str_missing, NODE_FUNC_N, 0);

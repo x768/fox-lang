@@ -1,4 +1,5 @@
 #include "fox_vm.h"
+#include "bigint.h"
 #include <errno.h>
 #include <string.h>
 #include <stdio.h>
@@ -8,14 +9,14 @@
 
 
 typedef struct NumberFormat {
-    char sign;    // 符号(\0なら表示しない)
-    char padding; // パディング文字
-    char other;   // 認識できない文字
-    int upper;    // 11進数以上の場合、大文字を使う
-    int group;    // 桁区切り
-    int base;     // 基数
-    int width;    // 整数部
-    int width_f;  // 小数部
+    char sign;      // 符号 '+'=0以上の場合+を表示、'-'=0以上の場合スペース、'~'=負の数は補数表示 '\0'=表示しない
+    char padding;   // パディング文字
+    char other;     // 認識できない文字
+    int upper;      // 11進数以上の場合、大文字を使う
+    int group;      // 桁区切り
+    int base;       // 基数
+    int width;      // 整数部
+    int width_f;    // 小数部
 } NumberFormat;
 
 #define Value_bigint(v) (((RefInt*)(intptr_t)(v))->bi)
@@ -29,7 +30,7 @@ void fix_bigint(Value *v, BigInt *bi)
     // 絶対値が 0x4000 0000 より小さいか
     if (bi->size < 2 || (bi->size == 2 && (bi->d[1] & 0x8000) == 0)) {
         int32_t ret = BigInt_int32(bi);
-        Value_dec(*v);
+        unref(*v);
         *v = int32_Value(ret);
     }
 }
@@ -514,7 +515,7 @@ static int integer_mul(Value *vret, Value *v, RefNode *node)
             BigInt_close(&m1);
         }
         if (mp->bi.sign == 0) {
-            Value_dec(*vret);
+            unref(*vret);
             *vret = int32_Value(0);
         }
     }
@@ -703,16 +704,15 @@ static int integer_logical(Value *vret, Value *v, RefNode *node)
         } else {
             m1 = Value_bigint(v1);
         }
-        // TODO:負の数に対応
         switch (type) {
         case T_AND:
-            BigInt_and(&mp->bi, &m1);
+            BigInt_bitop(&mp->bi, &m1, BIGINT_OP_AND);
             break;
         case T_OR:
-            BigInt_or(&mp->bi, &m1);
+            BigInt_bitop(&mp->bi, &m1, BIGINT_OP_OR);
             break;
         case T_XOR:
-            BigInt_xor(&mp->bi, &m1);
+            BigInt_bitop(&mp->bi, &m1, BIGINT_OP_XOR);
             break;
         }
         if (Value_isint(v1)) {
@@ -823,6 +823,7 @@ static int integer_sign(Value *vret, Value *v, RefNode *node)
 {
     if (Value_isref(*v)) {
         RefInt *mp = Value_vp(*v);
+        // 0は考慮する必要がない
         if (mp->bi.sign < 0) {
             *vret = int32_Value(-1);
         } else {
@@ -930,6 +931,37 @@ static char *ltostr(char *dst, int64_t i, int base, int upper)
     return dst;
 }
 /**
+ * 2の補数
+ * i < 0
+ * dstの後ろから詰める
+ */
+static char *ltostr_complement(char *dst, int64_t i, int base, int upper)
+{
+    char al = (upper ? 'A' : 'a') - 10;
+    int cmax = base - 1;
+
+    i = -i - 1;
+    *--dst = '\0';
+
+    while (i > 0) {
+        int m = cmax - i % base;
+        i /= base;
+        if (m < 10) {
+            *--dst = m + '0';
+        } else {
+            *--dst = m + al;
+        }
+    }
+    if (cmax < 10) {
+        *--dst = cmax + '0';
+    } else {
+        *--dst = cmax + al;
+    }
+    *--dst = '~';
+
+    return dst;
+}
+/**
  * 数値のフォーマット文字列解析
  */
 static int parse_format_str(NumberFormat *nf, const char *fmt_p, int fmt_size)
@@ -948,7 +980,7 @@ static int parse_format_str(NumberFormat *nf, const char *fmt_p, int fmt_size)
     // フォーマット文字列解析
     // 5  -> "   12"
     // 05 -> "00012"
-    if (i < fmt_size && (fmt_p[i] == '+' || fmt_p[i] == '-')) {
+    if (i < fmt_size && (fmt_p[i] == '+' || fmt_p[i] == '-' || fmt_p[i] == '~')) {
         nf->sign = fmt_p[i];
         i++;
     }
@@ -1042,6 +1074,16 @@ static int parse_format_str(NumberFormat *nf, const char *fmt_p, int fmt_size)
         throw_errorf(fs->mod_lang, "FormatError", "Invalid use '.%d' for integer", nf->width_f);
         return FALSE;
     }
+    // 2の補数のパディング
+    if (nf->sign == '~' && nf->padding == '0') {
+        int cmax = nf->base - 1;
+        if (cmax < 10) {
+            nf->padding = cmax + '0';
+        } else {
+            char al = (nf->upper ? 'A' : 'a') - 10;
+            nf->padding = cmax + al;
+        }
+    }
 
     return TRUE;
 }
@@ -1089,10 +1131,10 @@ static void number_format_str(char *dst, int *plen, const char *src, NumberForma
     int n, i;
 
     // 符号
-    if (*src == '-') {
-        *p++ = '-';
+    if (*src == '-' || *src == '~') {
+        *p++ = *src;
         src++;
-    } else if (nf->sign != '\0') {
+    } else if (nf->sign != '\0' && nf->sign != '~') {
         *p++ = nf->sign;
     }
 
@@ -1312,7 +1354,7 @@ static int integer_tostr_sub(Value *vret, Value v, RefStr *fmt, const LocaleData
         char *ptr = NULL;
         RefStr *rs;
         int len;
-        char c_buf[32];
+        char c_buf[40];
 
         if (nf.other == 'f') {
             nf.base = 10;
@@ -1321,7 +1363,12 @@ static int integer_tostr_sub(Value *vret, Value v, RefStr *fmt, const LocaleData
 
         // X進数に変換する
         if (Value_isint(v)) {
-            ptr = ltostr(c_buf + sizeof(c_buf) - 4, Value_integral(v), nf.base, nf.upper);
+            int32_t val = Value_integral(v);
+            if (nf.sign == '~' && val < 0) {
+                ptr = ltostr_complement(c_buf + sizeof(c_buf) - 4, val, nf.base, nf.upper);
+            } else {
+                ptr = ltostr(c_buf + sizeof(c_buf) - 4, val, nf.base, nf.upper);
+            }
         } else {
             RefInt *mp = Value_vp(v);
             p_ptr = malloc(BigInt_str_bufsize(&mp->bi, nf.base) + 8);
@@ -1824,6 +1871,14 @@ static int frac_tostr(Value *vret, Value *v, RefNode *node)
         if (!parse_format_str(&nf, fmt->c, fmt->size)) {
             return FALSE;
         }
+        if (nf.base != 10) {
+            throw_errorf(fs->mod_lang, "FormatError", "Frac format is decimal only");
+            return FALSE;
+        }
+        if (nf.sign == '~') {
+            throw_errorf(fs->mod_lang, "FormatError", "Format ~ is only for Int");
+            return FALSE;
+        }
 
         if (fg->stk_top > v + 2) {
             loc = Value_locale_data(v[2]);
@@ -2158,7 +2213,11 @@ static int float_tostr(Value *vret, Value *v, RefNode *node)
             return FALSE;
         }
         if (nf.base != 10) {
-            throw_errorf(fs->mod_lang, "FormatError", "Float format is allowed decimal only");
+            throw_errorf(fs->mod_lang, "FormatError", "Float format is decimal only");
+            return FALSE;
+        }
+        if (nf.sign == '~') {
+            throw_errorf(fs->mod_lang, "FormatError", "Format ~ is only for Int");
             return FALSE;
         }
 
@@ -2437,11 +2496,11 @@ static int number_minmax(Value *vret, Value *v, RefNode *node)
     for (i = 2; i <= argc; i++) {
         int cmp = value_cmp_invoke(result, v[i], VALUE_NULL);
         if (cmp == VALUE_CMP_ERROR) {
-            Value_dec(result);
+            unref(result);
             return FALSE;
         }
         if ((is_min && cmp == VALUE_CMP_GT) || (!is_min && cmp == VALUE_CMP_LT)) {
-            Value_dec(result);
+            unref(result);
             result = Value_cp(v[i]);
         }
     }
@@ -2460,7 +2519,7 @@ static int number_clamp(Value *vret, Value *v, RefNode *node)
             goto ERROR_END;
         }
         if (cmp == VALUE_CMP_LT) {
-            Value_dec(result);
+            unref(result);
             result = Value_cp(lower);
         }
     }
@@ -2470,20 +2529,20 @@ static int number_clamp(Value *vret, Value *v, RefNode *node)
             goto ERROR_END;
         }
         if (cmp == VALUE_CMP_GT) {
-            Value_dec(result);
+            unref(result);
             result = Value_cp(upper);
         }
     }
 
-    Value_dec(lower);
-    Value_dec(upper);
+    unref(lower);
+    unref(upper);
     *vret = result;
     return TRUE;
 
 ERROR_END:
-    Value_dec(result);
-    Value_dec(lower);
-    Value_dec(upper);
+    unref(result);
+    unref(lower);
+    unref(upper);
     return FALSE;
 }
 
@@ -2730,7 +2789,7 @@ void define_lang_number_class(RefNode *m)
     define_native_func_a(n, integer_parse, 1, 2, NULL, fs->cls_str, fs->cls_int);
     n = define_identifier_p(m, cls, fs->str_marshal_read, NODE_NEW_N, 0);
     define_native_func_a(n, integer_marshal_read, 1, 1, NULL, fs->cls_marshaldumper);
-    n = define_identifier_p(m, cls, fs->str_dispose, NODE_FUNC_N, 0);
+    n = define_identifier_p(m, cls, fs->str_dtor, NODE_FUNC_N, 0);
     define_native_func_a(n, integer_dispose, 0, 0, NULL);
 
     n = define_identifier_p(m, cls, empty, NODE_FUNC_N, NODEOPT_PROPERTY);
@@ -2794,7 +2853,7 @@ void define_lang_number_class(RefNode *m)
     define_native_func_a(n, frac_parse, 1, 1, NULL, fs->cls_str);
     n = define_identifier_p(m, cls, fs->str_marshal_read, NODE_NEW_N, 0);
     define_native_func_a(n, frac_marshal_read, 1, 1, NULL, fs->cls_marshaldumper);
-    n = define_identifier_p(m, cls, fs->str_dispose, NODE_FUNC_N, 0);
+    n = define_identifier_p(m, cls, fs->str_dtor, NODE_FUNC_N, 0);
     define_native_func_a(n, frac_dispose, 0, 0, NULL);
 
     n = define_identifier_p(m, cls, empty, NODE_FUNC_N, NODEOPT_PROPERTY);

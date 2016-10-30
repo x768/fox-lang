@@ -272,7 +272,7 @@ def _convert_bytes(dat_val:List, dat_bit:List, max_words:Int)
 
 class QRCodeError : BarcodeError
 {
-    new(s)
+    this(s)
     {
         super(s)
     }
@@ -281,7 +281,7 @@ class _StrlenAcc
 {
     var m_count
 
-    new() {
+    this() {
         m_count = 0
     }
     def fn_1(m) {
@@ -315,7 +315,7 @@ class _QRVFile
     def ecc_words => m_ecc_code_word
     def rs_block_order => m_rs_block_order
 
-    new(byte_num:Int, version:Int, ecc:Int) {
+    this(byte_num:Int, version:Int, ecc:Int) {
         let f = resource_stream("barcode.qrcode.qrv${version}_${ecc}", "dat")
 
         m_mat_x = f.read(byte_num)
@@ -586,7 +586,7 @@ class QRCode
         }
     }
 
-    new(source:Sequence, mode:Str, ecc_s:Str)
+    this(source:Sequence, mode:Str, ecc_s:Str)
     {
         m_ecc = _ecc_to_code(ecc_s)
         m_mode = "auto"

@@ -21,7 +21,7 @@ int getifaddrs_sub(RefArray *ra)
         r = fs->ref_new(cls_ifaddr);
         *v = vp_Value(r);
 
-        r->v[INDEX_IFADDR_NAME] = fs->cstr_Value_conv(ifa->ifa_name, -1, NULL);
+        r->v[INDEX_IFADDR_NAME] = fs->cstr_Value(NULL, ifa->ifa_name, -1);
         if (ifa->ifa_netmask != NULL) {
             RefSockAddr *addr = new_refsockaddr(ifa->ifa_addr, TRUE);
             addr->mask_bits = sockaddr_get_bit_count(ifa->ifa_netmask);

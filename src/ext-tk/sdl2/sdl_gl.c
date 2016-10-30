@@ -69,7 +69,7 @@ void define_gl_class(RefNode *m)
 
     n = fs->define_identifier(m, cls, "close", NODE_FUNC_N, 0);
     fs->define_native_func_a(n, context_close, 0, 0, NULL);
-    n = fs->define_identifier_p(m, cls, fs->str_dispose, NODE_FUNC_N, 0);
+    n = fs->define_identifier_p(m, cls, fs->str_dtor, NODE_FUNC_N, 0);
     fs->define_native_func_a(n, context_close, 0, 0, NULL);
 
     n = fs->define_identifier(m, cls, "swap_interval", NODE_FUNC_N, 0);

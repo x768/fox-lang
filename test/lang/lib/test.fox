@@ -7,7 +7,7 @@ class Add
     var m_a
     var m_b
 
-    new(a, b) {
+    this(a, b) {
         m_a = a
         m_b = b
     }

@@ -194,7 +194,7 @@ static Value header_key_normalize(const char *src, int size)
     for (i = 0; i < size; i++) {
         int ch = src[i];
         if (!isalnumu_fox(ch) && ch != '-') {
-            Value_dec(v);
+            unref(v);
             return VALUE_NULL;
         }
         if (ch == '_') {
@@ -229,7 +229,7 @@ static int add_header_to_val(RefMap *header, const char *key_p, int key_size, Va
         } else {
             result = FALSE;
         }
-        Value_dec(vkey);
+        unref(vkey);
     } else {
         result = FALSE;
     }
@@ -239,10 +239,18 @@ static int add_header_to_val(RefMap *header, const char *key_p, int key_size, Va
 // 左右の空白を除去
 static int add_header_to_str(RefMap *header, const char *key_p, int key_size, const char *val_p, int val_size, RefCharset *cs)
 {
-    Value vval = cstr_Value_conv(val_p, val_size, cs);
-    int result = add_header_to_val(header, key_p, key_size, vval);
-    Value_dec(vval);
-    return result;
+    Value vval;
+    if (cs != fs->cs_utf8) {
+        CodeCVTStatic_init();
+        vval = codecvt->cstr_Value_conv(val_p, val_size, cs);
+    } else {
+        vval = cstr_Value(NULL, val_p, val_size);
+    }
+    {
+        int result = add_header_to_val(header, key_p, key_size, vval);
+        unref(vval);
+        return result;
+    }
 }
 int parse_header_sub(Str *s_ret, const char *subkey_p, int subkey_size, const char *src_p, int src_size)
 {
@@ -308,10 +316,10 @@ int mimedata_get_header_sub(int *p_found, Str *s_ret, RefMap *map, const char *k
 
     v_key = cstr_Value(fs->cls_str, key_p, key_size);
     if (!refmap_get(&ret, map, v_key)) {
-        Value_dec(v_key);
+        unref(v_key);
         return FALSE;
     }
-    Value_dec(v_key);
+    unref(v_key);
 
     if (ret != NULL) {
         RefStr *rs = Value_vp(ret->val);
@@ -399,7 +407,7 @@ int mimereader_next_sub(Value *vret, Value v, const char *boundary_p, int bounda
     headers = vp_Value(rm_headers);
     rm_headers->rh.type = fv->cls_mimeheader;
     if (!read_header_from_stream(rm_headers, v, cs)) {
-        Value_dec(headers);
+        unref(headers);
         return FALSE;
     }
 
@@ -455,7 +463,7 @@ int mimereader_next_sub(Value *vret, Value v, const char *boundary_p, int bounda
 
     // EOF
     if (mb->buf.size == 0) {
-        Value_dec(*vret);
+        unref(*vret);
         *vret = VALUE_NULL;
         return TRUE;
     }
@@ -571,7 +579,7 @@ int mimerandomreader_sub(
                 if (val == VALUE_NULL) {
                     RefBytesIO *mb = Value_vp(r2->v[INDEX_MIMEDATA_BUF]);
                     he->val = cstr_Value(fs->cls_str, mb->buf.p, mb->buf.size);
-                    Value_dec(tmp);
+                    unref(tmp);
                 } else if (val == VALUE_FALSE) {
                     he->val = tmp;
                 } else if (Value_type(val) == fs->cls_list) {
@@ -584,21 +592,21 @@ int mimerandomreader_sub(
                     if (!found) {
                         RefBytesIO *mb = Value_vp(r2->v[INDEX_MIMEDATA_BUF]);
                         *dst = cstr_Value(fs->cls_str, mb->buf.p, mb->buf.size);
-                        Value_dec(tmp);
+                        unref(tmp);
                     } else {
                         *dst = tmp;
                     }
                 } else {
                     // 何もしない
-                    Value_dec(tmp);
+                    unref(tmp);
                 }
             }
         } else {
             Value vkey = cstr_Value(fs->cls_str, name.p, name.size);
             HashValueEntry *ve = refmap_add(rm, vkey, FALSE, FALSE);
-            Value_dec(vkey);
+            unref(vkey);
             if (ve == NULL) {
-                Value_dec(tmp);
+                unref(tmp);
                 return FALSE;
             }
             ve->val = tmp;
@@ -640,21 +648,21 @@ static int mimerandomreader_new(Value *vret, Value *v, RefNode *node)
         int found = FALSE;
         RefMap *hdr = refmap_new(16);
         if (!read_header_from_stream(hdr, reader, cs)) {
-            Value_dec(vp_Value(hdr));
+            unref(vp_Value(hdr));
             return TRUE;
         }
         if (!mimedata_get_header_sub(&found, &boundary, hdr, "Content-Type", -1, "boudary", -1)) {
-            Value_dec(vp_Value(hdr));
+            unref(vp_Value(hdr));
             return TRUE;
         }
-        Value_dec(vp_Value(hdr));
+        unref(vp_Value(hdr));
     }
 
     if (!mimerandomreader_sub(rm, reader, boundary.p, boundary.size, cs, key->c, key->size, subkey->c, subkey->size, FALSE)) {
-        Value_dec(reader);
+        unref(reader);
         return FALSE;
     }
-    Value_dec(reader);
+    unref(reader);
 
     return TRUE;
 }
@@ -1212,10 +1220,10 @@ static int mimeheader_index(Value *vret, Value *v, RefNode *node)
     }
 
     if (!refmap_get(&ret, Value_vp(*v), vkey)) {
-        Value_dec(vkey);
+        unref(vkey);
         return FALSE;
     }
-    Value_dec(vkey);
+    unref(vkey);
 
     if (ret != NULL) {
         *vret = Value_cp(ret->val);
@@ -1325,12 +1333,12 @@ static int mimeheader_index_set(Value *vret, Value *v, RefNode *node)
         }
         ve->val = StrBuf_str_Value(&sb, fs->cls_str);
     }
-    Value_dec(vkey);
+    unref(vkey);
     return TRUE;
 
 ERROR_END:
     StrBuf_close(&sb);
-    Value_dec(vkey);
+    unref(vkey);
     return FALSE;
 }
 
@@ -1365,10 +1373,10 @@ static int mimeheader_get_list(Value *vret, Value *v, RefNode *node)
         return FALSE;
     }
     if (!refmap_get(&ret, Value_vp(*v), vkey)) {
-        Value_dec(vkey);
+        unref(vkey);
         return FALSE;
     }
-    Value_dec(vkey);
+    unref(vkey);
 
     if (ret != NULL) {
         MimeTok tk;
@@ -1405,10 +1413,10 @@ static int mimeheader_get_map(Value *vret, Value *v, RefNode *node)
             return FALSE;
         }
         if (!refmap_get(&ret, Value_vp(*v), vkey)) {
-            Value_dec(vkey);
+            unref(vkey);
             return FALSE;
         }
-        Value_dec(vkey);
+        unref(vkey);
     }
 
     if (ret != NULL) {
@@ -1443,7 +1451,7 @@ static int mimeheader_get_map(Value *vret, Value *v, RefNode *node)
                     }
                     ve = refmap_add(rm, vkey, TRUE, FALSE);
                     ve->val = cstr_Value(fs->cls_str, sval.p, sval.size);
-                    Value_dec(vkey);
+                    unref(vkey);
                 }
                 skey = fs->Str_EMPTY;
                 sval = fs->Str_EMPTY;
@@ -1474,10 +1482,10 @@ static int mimeheader_content_type(Value *vret, Value *v, RefNode *node)
         rs = resolve_mimetype_alias(rs);
         if (!mimetype_new_sub(vret, rs)) {
             throw_errorf(fs->mod_lang, "ValueError", "Illigal MIME-Type format");
-            Value_dec(tmp);
+            unref(tmp);
             return FALSE;
         }
-        Value_dec(tmp);
+        unref(tmp);
     } else {
         throw_errorf(fs->mod_lang, "ValueError", "Content-Type not found");
         return FALSE;
@@ -1535,7 +1543,7 @@ static int mimeheader_set_content_type(Value *vret, Value *v, RefNode *node)
         return FALSE;
     }
     ve->val = StrBuf_str_Value(&buf, fs->cls_str);
-    Value_dec(vkey);
+    unref(vkey);
 
     return TRUE;
 }
@@ -2163,7 +2171,7 @@ static void define_mime_class(RefNode *m)
     n = define_identifier_p(m, cls, fs->str_new, NODE_NEW_N, 0);
     define_native_func_a(n, mimerandomreader_new, 3, 5, cls, NULL, fs->cls_str, fs->cls_str, fs->cls_charset, fs->cls_str);
 
-    n = define_identifier_p(m, cls, fs->str_dispose, NODE_FUNC_N, 0);
+    n = define_identifier_p(m, cls, fs->str_dtor, NODE_FUNC_N, 0);
     define_native_func_a(n, map_dispose, 0, 0, NULL);
 
     n = define_identifier_p(m, cls, fs->symbol_stock[T_LB], NODE_FUNC_N, 0);

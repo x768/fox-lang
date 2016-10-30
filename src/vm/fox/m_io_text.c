@@ -1,4 +1,6 @@
 #include "fox_vm.h"
+#include "bigint.h"
+#include "m_codecvt.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -9,8 +11,8 @@ typedef struct {
     RefCharset *cs;
     int trans;
 
-    IconvIO in;
-    IconvIO out;
+    CodeCVT in;
+    CodeCVT out;
 } RefTextIO;
 
 
@@ -24,7 +26,7 @@ static int stream_write_sub_s(Value v, StrBuf *sb, const char *s_p, int s_size, 
     if (s_size < 0) {
         s_size = strlen(s_p);
     }
-    // TODO:未検証
+
     if (v != VALUE_NULL) {
         RefBytesIO *mb = Value_vp(v);
         if (mb->rh.type == fs->cls_bytesio) {
@@ -39,12 +41,13 @@ static int stream_write_sub_s(Value v, StrBuf *sb, const char *s_p, int s_size, 
             }
             return TRUE;
         } else {
+            CodeCVTStatic_init();
             if (tio->out.ic == (void*)-1) {
-                if (!IconvIO_open(&tio->out, fs->cs_utf8, tio->cs, tio->trans ? "?" : NULL)) {
+                if (!codecvt->CodeCVT_open(&tio->out, fs->cs_utf8, tio->cs, tio->trans ? "?" : NULL)) {
                     return FALSE;
                 }
             }
-            if (!IconvIO_conv(&tio->out, sb, s_p, s_size, TRUE, TRUE)) {
+            if (!codecvt->CodeCVT_conv(&tio->out, sb, s_p, s_size, TRUE, TRUE)) {
                 return FALSE;
             }
             return TRUE;
@@ -54,7 +57,7 @@ static int stream_write_sub_s(Value v, StrBuf *sb, const char *s_p, int s_size, 
             return stream_write_data(v, s_p, s_size);
         } else {
             Ref *r = Value_ref(v);
-            IconvIO *ic = &tio->out;
+            CodeCVT *ic = &tio->out;
             Value *vmb = &r->v[INDEX_WRITE_MEMIO];
             RefBytesIO *mb;
             int max = Value_integral(r->v[INDEX_WRITE_MAX]);
@@ -64,7 +67,8 @@ static int stream_write_sub_s(Value v, StrBuf *sb, const char *s_p, int s_size, 
                 return FALSE;
             }
             if (tio->out.ic == (void*)-1) {
-                if (!IconvIO_open(&tio->out, fs->cs_utf8, tio->cs, tio->trans ? "?" : NULL)) {
+                CodeCVTStatic_init();
+                if (!codecvt->CodeCVT_open(&tio->out, fs->cs_utf8, tio->cs, tio->trans ? "?" : NULL)) {
                     return FALSE;
                 }
             }
@@ -87,11 +91,11 @@ static int stream_write_sub_s(Value v, StrBuf *sb, const char *s_p, int s_size, 
             ic->outbytesleft = max - mb->buf.size;
 
             for (;;) {
-                switch (IconvIO_next(ic)) {
-                case ICONV_OK:
+                switch (codecvt->CodeCVT_next(ic)) {
+                case CODECVT_OK:
                     mb->buf.size = ic->outbuf - mb->buf.p;
                     goto BREAK;
-                case ICONV_OUTBUF:
+                case CODECVT_OUTBUF:
                     mb->buf.size = ic->outbuf - mb->buf.p;
                     if (!stream_flush_sub(v)) {
                         return FALSE;
@@ -99,7 +103,7 @@ static int stream_write_sub_s(Value v, StrBuf *sb, const char *s_p, int s_size, 
                     ic->outbuf = mb->buf.p;
                     ic->outbytesleft = max;
                     break;
-                case ICONV_INVALID:
+                case CODECVT_INVALID:
                     if (tio->trans) {
                         const char *ptr;
                         if (ic->outbytesleft == 0) {
@@ -122,7 +126,7 @@ static int stream_write_sub_s(Value v, StrBuf *sb, const char *s_p, int s_size, 
                     } else {
                         RefCharset *cs = tio->cs;
                         throw_errorf(fs->mod_lang, "CharsetError", "Cannot convert %U to %S",
-                                utf8_codepoint_at(ic->inbuf), cs->name);
+                            utf8_codepoint_at(ic->inbuf), cs->name);
                         return FALSE;
                     }
                     break;
@@ -168,13 +172,14 @@ static int textio_close(Value *vret, Value *v, RefNode *node)
 
     if (tio != NULL) {
         if (tio != (RefTextIO*)fv->ref_textio_utf8) {
-            IconvIO_close(&tio->in);
-            IconvIO_close(&tio->out);
+            CodeCVTStatic_init();
+            codecvt->CodeCVT_close(&tio->in);
+            codecvt->CodeCVT_close(&tio->out);
             free(tio);
         }
         r->v[INDEX_TEXTIO_TEXTIO] = VALUE_NULL;
     }
-    Value_dec(r->v[INDEX_TEXTIO_STREAM]);
+    unref(r->v[INDEX_TEXTIO_STREAM]);
     r->v[INDEX_TEXTIO_STREAM] = VALUE_NULL;
 
     return TRUE;
@@ -212,29 +217,29 @@ static int textio_gets_sub(Value *vret, Ref *ref, int trim)
             }
         }
         if (tio->cs == fs->cs_utf8) {
-            if (invalid_utf8_pos(result.p, result.size) >= 0) {
-                if (tio->trans) {
-                    // 不正な文字をU+FFFDに置き換える
-                    *vret = cstr_Value_conv(result.p, result.size, NULL);
-                } else {
+            if (tio->trans) {
+                // 不正な文字をU+FFFDに置き換える
+                *vret = cstr_Value(NULL, result.p, result.size);
+            } else {
+                if (invalid_utf8_pos(result.p, result.size) >= 0) {
                     throw_error_select(THROW_INVALID_UTF8);
                     ret = FALSE;
                     goto FINALLY;
                 }
-            } else {
                 *vret = cstr_Value(fs->cls_str, result.p, result.size);
             }
         } else {
             StrBuf buf2;
             if (tio->in.ic == (void*)-1) {
-                if (!IconvIO_open(&tio->in, tio->cs, fs->cs_utf8, tio->trans ? UTF8_ALTER_CHAR : NULL)) {
+                CodeCVTStatic_init();
+                if (!codecvt->CodeCVT_open(&tio->in, tio->cs, fs->cs_utf8, tio->trans ? UTF8_ALTER_CHAR : NULL)) {
                     ret = FALSE;
                     goto FINALLY;
                 }
             }
 
             StrBuf_init(&buf2, result.size);
-            if (!IconvIO_conv(&tio->in, &buf2, result.p, result.size, FALSE, TRUE)) {
+            if (!codecvt->CodeCVT_conv(&tio->in, &buf2, result.p, result.size, FALSE, TRUE)) {
                 StrBuf_close(&buf2);
                 ret = FALSE;
                 goto FINALLY;
@@ -825,7 +830,7 @@ static void define_io_text_class(RefNode *m)
     n = define_identifier_p(m, cls, fs->str_new, NODE_NEW_N, 0);
     define_native_func_a(n, textio_new, 2, 4, NULL, fs->cls_streamio, fs->cls_charset, fs->cls_bool, fs->cls_str);
 
-    n = define_identifier_p(m, cls, fs->str_dispose, NODE_FUNC_N, 0);
+    n = define_identifier_p(m, cls, fs->str_dtor, NODE_FUNC_N, 0);
     define_native_func_a(n, textio_close, 0, 0, NULL);
 
     n = define_identifier(m, cls, "gets", NODE_FUNC_N, 0);

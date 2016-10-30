@@ -3,7 +3,7 @@
 void throw_stopiter()
 {
     if (fg->error != VALUE_NULL) {
-        Value_dec(fg->error);
+        unref(fg->error);
     }
     fg->error = vp_Value(ref_new(fs->cls_stopiter));
 }
@@ -19,7 +19,7 @@ void throw_error_vprintf(RefNode *err_m, const char *err_name, const char *fmt, 
     }
 
     if (fg->error != VALUE_NULL) {
-        Value_dec(fg->error);
+        unref(fg->error);
     }
     r = ref_new(err);
     fg->error = vp_Value(r);

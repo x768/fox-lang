@@ -1,0 +1,66 @@
+word "0-9A-Za-z_$"
+define comment
+define comment_line
+define quot
+define dquot
+define keyword word
+define keyword2 word
+
+"/*" = _ comment comment
+"*/" = comment comment _
+"//" = _ comment_line comment_line
+"\n" = comment_line _ _
+
+"'" = _ quot quot
+'\\' = quot quot quot
+"\\'" = quot quot quot
+"'" = quot quot _
+
+'"' = _ dquot dquot
+'\\' = dquot dquot dquot
+'\"' = dquot dquot dquot
+'"' = dquot dquot _
+
+"abstract" = _ keyword _
+"break" = _ keyword _
+"case" = _ keyword _
+"class" = _ keyword _
+"catch" = _ keyword _
+"const" = _ keyword _
+"continue" = _ keyword _
+"debugger" = _ keyword _
+"default" = _ keyword _
+"delete" = _ keyword _
+"do" = _ keyword _
+"else" = _ keyword _
+"enum" = _ keyword _
+"export" = _ keyword _
+"extends" = _ keyword _
+"false" = _ keyword _
+"finally" = _ keyword _
+"for" = _ keyword _
+"function" = _ keyword _
+"if" = _ keyword _
+"import" = _ keyword _
+"in" = _ keyword _
+"instanceof" = _ keyword _
+"let" = _ keyword _
+"new" = _ keyword _
+"null" = _ keyword _
+"return" = _ keyword _
+"super" = _ keyword _
+"switch" = _ keyword _
+"this" = _ keyword _
+"throw" = _ keyword _
+"true" = _ keyword _
+"try" = _ keyword _
+"typeof" = _ keyword _
+"var" = _ keyword _
+"void" = _ keyword _
+"while" = _ keyword _
+"with" = _ keyword _
+"yield" = _ keyword _
+
+"Infinity" = _ keyword2 _
+"NaN" = _ keyword2 _
+"undefined" = _ keyword2 _

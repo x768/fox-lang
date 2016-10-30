@@ -555,7 +555,7 @@ int refarray_set_size(RefArray *ra, int size)
     } else if (size < ra->size) {
         int i;
         for (i = size; i < ra->size; i++) {
-            Value_dec(ra->p[i]);
+            unref(ra->p[i]);
         }
         ra->size = size;
     } else if (size > ra->size) {
@@ -668,7 +668,7 @@ static int array_dispose(Value *vret, Value *v, RefNode *node)
 
     if (r->p != NULL) {
         for (i = 0; i < r->size; i++) {
-            Value_dec(r->p[i]);
+            unref(r->p[i]);
         }
         free(r->p);
         r->p = NULL;
@@ -779,7 +779,7 @@ static int array_index_set(Value *vret, Value *v, RefNode *node)
         throw_error_select(THROW_INVALID_INDEX__VAL_INT, v[1], ra->size);
         return FALSE;
     }
-    Value_dec(ra->p[idx]);
+    unref(ra->p[idx]);
     ra->p[idx] = Value_cp(v[2]);
 
     return TRUE;
@@ -840,7 +840,7 @@ static int array_new_cat(Value *vret, Value *v, RefNode *node)
     }
 
     for (i = 0; i < ra->size; i++) {
-        Value_inc(ra->p[i]);
+        addref(ra->p[i]);
     }
     *vret = vp_Value(ra);
 
@@ -867,7 +867,7 @@ static int array_mul(Value *vret, Value *v, RefNode *node)
         memcpy(r->p + r1->size * i, r1->p, r1->size * sizeof(Value));
     }
     for (i = 0; i < r->size; i++) {
-        Value_inc(r->p[i]);
+        addref(r->p[i]);
     }
 
     return TRUE;
@@ -915,7 +915,7 @@ static int array_sub(Value *vret, Value *v, RefNode *node)
 
         memcpy(r2p, r->p + begin, size2 * sizeof(Value));
         for (i = 0; i < size2; i++) {
-            Value_inc(r2p[i]);
+            addref(r2p[i]);
         }
         *vret = vp_Value(r2);
     }
@@ -989,7 +989,7 @@ static int array_push(Value *vret, Value *v, RefNode *node)
     array_grow_size(ra, argc);
     memcpy(ra->p + prev_size, v1, sizeof(Value) * argc);
     for (i = 0; i < argc; i++) {
-        Value_inc(v1[i]);
+        addref(v1[i]);
     }
 
     return TRUE;
@@ -1036,7 +1036,7 @@ static int array_unshift(Value *vret, Value *v, RefNode *node)
     memmove(&ra->p[argc], &ra->p[0], sizeof(Value) * prev_size);
     memcpy(ra->p, v1, sizeof(Value) * argc);
     for (i = 0; i < argc; i++) {
-        Value_inc(ra->p[i]);
+        addref(ra->p[i]);
     }
 
     return TRUE;
@@ -1119,7 +1119,7 @@ static int array_clear(Value *vret, Value *v, RefNode *node)
     if (ra->p != NULL) {
         int i;
         for (i = 0; i < ra->size; i++) {
-            Value_dec(ra->p[i]);
+            unref(ra->p[i]);
         }
     }
     ra->size = 0;
@@ -1356,7 +1356,7 @@ static void array_dispose_all(Value *v, int size)
 {
     int i;
     for (i = 0; i < size; i++) {
-        Value_dec(v[i]);
+        unref(v[i]);
     }
 }
 /**
@@ -1457,7 +1457,7 @@ static int array_sort_by_self(Value *vret, Value *v, RefNode *node)
         // ソートキーを作成
         memcpy(by, ra->p, size * sizeof(Value));
         for (i = 0; i < size; i++) {
-            Value_inc(by[i]);
+            addref(by[i]);
         }
         if (!array_map_sub(by, size, v[1])) {
             goto ERROR_END;
@@ -1517,7 +1517,7 @@ static int array_map_sub(Value *va, int size, Value fn)
         if (!call_function_obj(1)) {
             return FALSE;
         }
-        Value_dec(va[i]);
+        unref(va[i]);
         fg->stk_top--;
         va[i] = *fg->stk_top;
     }
@@ -1565,7 +1565,7 @@ static int array_select_self(Value *vret, Value *v, RefNode *node)
         // 途中で例外が発生しても参照カウンタが狂わないようにする
         fg->stk_top--;
         if (Value_bool(*fg->stk_top)) {
-            Value_dec(*fg->stk_top);
+            unref(*fg->stk_top);
 
             if (j < i) {
                 ra->p[j] = ra->p[i];
@@ -1573,7 +1573,7 @@ static int array_select_self(Value *vret, Value *v, RefNode *node)
             }
             j++;
         } else {
-            Value_dec(ra->p[i]);
+            unref(ra->p[i]);
             ra->p[i] = VALUE_NULL;
         }
     }
@@ -1634,7 +1634,7 @@ static int array_index_of(Value *vret, Value *v, RefNode *node)
                         }
                         fg->stk_top--;
                         if (Value_bool(*fg->stk_top)) {
-                            Value_dec(*fg->stk_top);
+                            unref(*fg->stk_top);
                             break;
                         }
                     }
@@ -1947,7 +1947,7 @@ static int range_iter(Value *vret, Value *v, RefNode *node)
 
     memcpy(r2v, r->v, sizeof(Value) * INDEX_RANGE_NUM);
     for (i = 0; i < INDEX_RANGE_NUM; i++) {
-        Value_inc(r2v[i]);
+        addref(r2v[i]);
     }
 
     return TRUE;
@@ -2021,7 +2021,7 @@ static int rangeiter_next(Value *vret, Value *v, RefNode *node)
                 if (!call_member_func(sym, 0, TRUE)) {
                     return FALSE;
                 }
-                Value_dec(*pbegin);
+                unref(*pbegin);
                 fg->stk_top--;
                 *pbegin = *fg->stk_top;
             } else {
@@ -2030,7 +2030,7 @@ static int rangeiter_next(Value *vret, Value *v, RefNode *node)
                 if (!call_member_func(fs->symbol_stock[T_ADD], 1, TRUE)) {
                     return FALSE;
                 }
-                Value_dec(*pbegin);
+                unref(*pbegin);
                 fg->stk_top--;
                 *pbegin = *fg->stk_top;
             }
@@ -2106,7 +2106,7 @@ static int iterator_to_list(Value *vret, Value *v, RefNode *node)
         if (!call_member_func(fs->str_next, 0, TRUE)) {
             if (Value_type(fg->error) == fs->cls_stopiter) {
                 // throw StopIteration
-                Value_dec(fg->error);
+                unref(fg->error);
                 fg->error = VALUE_NULL;
                 break;
             } else {
@@ -2138,7 +2138,7 @@ static int iterator_to_set(Value *vret, Value *v, RefNode *node)
         if (!call_member_func(fs->str_next, 0, TRUE)) {
             if (Value_type(fg->error) == fs->cls_stopiter) {
                 // throw StopIteration
-                Value_dec(fg->error);
+                unref(fg->error);
                 fg->error = VALUE_NULL;
                 break;
             } else {
@@ -2168,7 +2168,7 @@ static int iterator_join(Value *vret, Value *v, RefNode *node)
         if (!call_member_func(fs->str_next, 0, TRUE)) {
             if (Value_type(fg->error) == fs->cls_stopiter) {
                 // throw StopIteration
-                Value_dec(fg->error);
+                unref(fg->error);
                 fg->error = VALUE_NULL;
                 break;
             } else {
@@ -2205,7 +2205,7 @@ static int iterator_count(Value *vret, Value *v, RefNode *node)
         if (!call_member_func(fs->str_next, 0, TRUE)) {
             if (Value_type(fg->error) == fs->cls_stopiter) {
                 // throw StopIteration
-                Value_dec(fg->error);
+                unref(fg->error);
                 fg->error = VALUE_NULL;
                 break;
             } else {
@@ -2236,7 +2236,7 @@ static int iterator_count_if(Value *vret, Value *v, RefNode *node)
         if (!call_member_func(fs->str_next, 0, TRUE)) {
             if (Value_type(fg->error) == fs->cls_stopiter) {
                 // throw StopIteration
-                Value_dec(fg->error);
+                unref(fg->error);
                 fg->error = VALUE_NULL;
                 break;
             } else {
@@ -2245,7 +2245,7 @@ static int iterator_count_if(Value *vret, Value *v, RefNode *node)
         }
         fg->stk_top[0] = fg->stk_top[-1];
         fg->stk_top[-1] = *v_fn;
-        Value_inc(*v_fn);
+        addref(*v_fn);
         fg->stk_top += 1;
         if (!call_function_obj(1)) {
             return FALSE;
@@ -2269,7 +2269,7 @@ static int iterator_find_if(Value *vret, Value *v, RefNode *node)
         if (!call_member_func(fs->str_next, 0, TRUE)) {
             if (Value_type(fg->error) == fs->cls_stopiter) {
                 // throw StopIteration
-                Value_dec(fg->error);
+                unref(fg->error);
                 fg->error = VALUE_NULL;
                 break;
             } else {
@@ -2278,8 +2278,8 @@ static int iterator_find_if(Value *vret, Value *v, RefNode *node)
         }
         fg->stk_top[1] = fg->stk_top[-1];
         fg->stk_top[0] = *v_fn;
-        Value_inc(fg->stk_top[-1]);
-        Value_inc(*v_fn);
+        addref(fg->stk_top[-1]);
+        addref(*v_fn);
         fg->stk_top += 2;
         if (!call_function_obj(1)) {
             return FALSE;
@@ -2309,7 +2309,7 @@ static int iterator_skip(Value *vret, Value *v, RefNode *node)
         if (!call_member_func(fs->str_next, 0, TRUE)) {
             if (Value_type(fg->error) == fs->cls_stopiter) {
                 // throw StopIteration
-                Value_dec(fg->error);
+                unref(fg->error);
                 fg->error = VALUE_NULL;
                 break;
             } else {
@@ -2346,7 +2346,7 @@ static int iterator_reduce(Value *vret, Value *v, RefNode *node)
         if (!call_member_func(fs->str_next, 0, TRUE)) {
             if (Value_type(fg->error) == fs->cls_stopiter) {
                 // throw StopIteration
-                Value_dec(fg->error);
+                unref(fg->error);
                 fg->error = VALUE_NULL;
                 break;
             } else {
@@ -2375,7 +2375,7 @@ static int iterator_all_any(Value *vret, Value *v, RefNode *node)
         if (!call_member_func(fs->str_next, 0, TRUE)) {
             if (Value_type(fg->error) == fs->cls_stopiter) {
                 // throw StopIteration
-                Value_dec(fg->error);
+                unref(fg->error);
                 fg->error = VALUE_NULL;
                 break;
             } else {
@@ -2384,7 +2384,7 @@ static int iterator_all_any(Value *vret, Value *v, RefNode *node)
         }
         fg->stk_top[0] = fg->stk_top[-1];
         fg->stk_top[-1] = *v_fn;
-        Value_inc(*v_fn);
+        addref(*v_fn);
         fg->stk_top += 1;
         if (!call_function_obj(1)) {
             return FALSE;
@@ -2415,7 +2415,7 @@ static int iterator_each(Value *vret, Value *v, RefNode *node)
         if (!call_member_func(fs->str_next, 0, TRUE)) {
             if (Value_type(fg->error) == fs->cls_stopiter) {
                 // throw StopIteration
-                Value_dec(fg->error);
+                unref(fg->error);
                 fg->error = VALUE_NULL;
                 break;
             } else {
@@ -2424,7 +2424,7 @@ static int iterator_each(Value *vret, Value *v, RefNode *node)
         }
         fg->stk_top[0] = fg->stk_top[-1];
         fg->stk_top[-1] = *v_fn;
-        Value_inc(*v_fn);
+        addref(*v_fn);
         fg->stk_top += 1;
         if (!call_function_obj(1)) {
             return FALSE;
@@ -2468,7 +2468,7 @@ static int iterator_group_by(Value *vret, Value *v, RefNode *node)
         if (!call_member_func(fs->str_next, 0, TRUE)) {
             if (Value_type(fg->error) == fs->cls_stopiter) {
                 // throw StopIteration
-                Value_dec(fg->error);
+                unref(fg->error);
                 fg->error = VALUE_NULL;
                 break;
             } else {
@@ -2761,7 +2761,7 @@ void define_lang_col_class(RefNode *m)
     define_native_func_a(n, array_new_cat, 0, -1, NULL);
     n = define_identifier_p(m, cls, fs->str_marshal_read, NODE_NEW_N, 0);
     define_native_func_a(n, array_marshal_read, 1, 1, NULL, fs->cls_marshaldumper);
-    n = define_identifier_p(m, cls, fs->str_dispose, NODE_FUNC_N, 0);
+    n = define_identifier_p(m, cls, fs->str_dtor, NODE_FUNC_N, 0);
     define_native_func_a(n, array_dispose, 0, 0, NULL);
 
     n = define_identifier_p(m, cls, fs->str_tostr, NODE_FUNC_N, 0);
@@ -2835,7 +2835,7 @@ void define_lang_col_class(RefNode *m)
     // ListIter
     cls = cls_listiter;
     cls->u.c.n_memb = INDEX_LISTITER_NUM;
-    n = define_identifier_p(m, cls, fs->str_dispose, NODE_FUNC_N, 0);
+    n = define_identifier_p(m, cls, fs->str_dtor, NODE_FUNC_N, 0);
     define_native_func_a(n, arrayiter_dispose, 0, 0, NULL);
     n = define_identifier_p(m, cls, fs->str_next, NODE_FUNC_N, 0);
     define_native_func_a(n, arrayiter_next, 0, 0, NULL);

@@ -142,7 +142,7 @@ void GuiHash_del_p(RefGuiHash *h, const void *key)
         GuiEntry *pg = *ppg;
         if (pg->key == key) {
             *ppg = pg->next;
-            fs->Value_dec(pg->val);
+            fs->unref(pg->val);
             free(pg);
             break;
         }
@@ -157,7 +157,7 @@ void GuiHash_close(RefGuiHash *h)
         while (ge != NULL) {
             GuiEntry *prev = ge;
             ge = ge->next;
-            fs->Value_dec(prev->val);
+            fs->unref(prev->val);
             free(prev);
         }
     }
@@ -181,7 +181,7 @@ void event_object_add(Value evt, const char *name, Value val)
     RefStr *k = fs->intern(name, -1);
     Value *v = GuiHash_add_p(h, k);
 
-    fs->Value_dec(*v);
+    fs->unref(*v);
     *v = fs->Value_cp(val);
 }
 
@@ -428,13 +428,17 @@ static int value_to_winhandle(WndHandle *pwh, Value v, int argc, RefNode *a_type
 static int form_new_sub(Value *vret, Value *v, WndHandle parent, int *size)
 {
     RefNode *type = fs->Value_type(*v);
+    Ref *r;
+
     // 継承可能なクラス
     if (type == fs->cls_fn) {
-        *vret = vp_Value(fs->ref_new(cls_form));
+        r = fs->ref_new(cls_form);
+        *vret = vp_Value(r);
     } else {
+        r = Value_vp(*v);
         *vret = fs->Value_cp(*v);
     }
-    create_form_window(vret, parent, size);
+    create_form_window(r, parent, size);
 
     return TRUE;
 }
@@ -736,7 +740,7 @@ static int timer_close(Value *vret, Value *v, RefNode *node)
     if (r->v[INDEX_TIMER_ID] != VALUE_NULL) {
         native_timer_remove(r);
     }
-    fs->Value_dec(r->v[INDEX_TIMER_FN]);
+    fs->unref(r->v[INDEX_TIMER_FN]);
     r->v[INDEX_TIMER_FN] = VALUE_NULL;
     return TRUE;
 }
@@ -800,7 +804,7 @@ static int dirmonitor_close(Value *vret, Value *v, RefNode *node)
         native_dirmonitor_remove(r);
         r->v[INDEX_FILEMONITOR_STRUCT] = VALUE_NULL;
     }
-    fs->Value_dec(r->v[INDEX_FILEMONITOR_FN]);
+    fs->unref(r->v[INDEX_FILEMONITOR_FN]);
     r->v[INDEX_FILEMONITOR_FN] = VALUE_NULL;
     return TRUE;
 }
@@ -974,7 +978,7 @@ static int evthandler_del(Value *vret, Value *v, RefNode *node)
         }
 
         if (nfn == nf) {
-            fs->Value_dec(f);
+            fs->unref(f);
             if (i < ra->size - 1) {
                 memmove(&ra->p[i], &ra->p[i + 1], sizeof(Value) * (ra->size - i - 1));
             }
@@ -1048,7 +1052,7 @@ static void define_func(RefNode *m)
     n = fs->define_identifier(m, m, "mv_trash", NODE_FUNC_N, 0);
     fs->define_native_func_a(n, exio_trash, 1, 1, NULL, NULL);
 
-    n = fs->define_identifier_p(m, m, fs->str_dispose, NODE_FUNC_N, 0);
+    n = fs->define_identifier_p(m, m, fs->str_dtor, NODE_FUNC_N, 0);
     fs->define_native_func_a(n, gui_quit, 0, 0, NULL);
 }
 static void define_list_method_0(RefNode *cls, const char *name, int type, RefNode *m)
@@ -1114,7 +1118,7 @@ static void define_class(RefNode *m)
     fs->define_native_func_a(n, form_new, 0, 1, NULL, NULL);
     n = fs->define_identifier(m, cls, "fixed", NODE_NEW_N, 0);
     fs->define_native_func_a(n, form_fixed, 2, 3, NULL, fs->cls_int, fs->cls_int, NULL);
-    n = fs->define_identifier_p(m, cls, fs->str_dispose, NODE_FUNC_N, 0);
+    n = fs->define_identifier_p(m, cls, fs->str_dtor, NODE_FUNC_N, 0);
     fs->define_native_func_a(n, form_close, 0, 0, NULL);
 
     n = fs->define_identifier(m, cls, "close", NODE_FUNC_N, 0);
@@ -1164,7 +1168,7 @@ static void define_class(RefNode *m)
 
 
     cls = cls_event;
-    n = fs->define_identifier_p(m, cls, fs->str_dispose, NODE_FUNC_N, 0);
+    n = fs->define_identifier_p(m, cls, fs->str_dtor, NODE_FUNC_N, 0);
     fs->define_native_func_a(n, event_close, 0, 0, NULL);
 
     n = fs->define_identifier_p(m, cls, fs->str_missing, NODE_FUNC_N, 0);
@@ -1175,7 +1179,7 @@ static void define_class(RefNode *m)
     cls = cls_timer;
     n = fs->define_identifier_p(m, cls, fs->str_new, NODE_NEW_N, 0);
     fs->define_native_func_a(n, timer_new, 2, 2, NULL, fs->cls_int, fs->cls_fn);
-    n = fs->define_identifier_p(m, cls, fs->str_dispose, NODE_FUNC_N, 0);
+    n = fs->define_identifier_p(m, cls, fs->str_dtor, NODE_FUNC_N, 0);
     fs->define_native_func_a(n, timer_close, 0, 0, NULL);
 
     n = fs->define_identifier(m, cls, "close", NODE_FUNC_N, 0);
@@ -1189,7 +1193,7 @@ static void define_class(RefNode *m)
     cls = cls_dirmonitor;
     n = fs->define_identifier_p(m, cls, fs->str_new, NODE_NEW_N, 0);
     fs->define_native_func_a(n, dirmonitor_new, 2, 2, NULL, NULL, fs->cls_fn);
-    n = fs->define_identifier_p(m, cls, fs->str_dispose, NODE_FUNC_N, 0);
+    n = fs->define_identifier_p(m, cls, fs->str_dtor, NODE_FUNC_N, 0);
     fs->define_native_func_a(n, dirmonitor_close, 0, 0, NULL);
 
     n = fs->define_identifier(m, cls, "close", NODE_FUNC_N, 0);
@@ -1205,7 +1209,7 @@ static void define_class(RefNode *m)
     cls = cls_menu;
     n = fs->define_identifier_p(m, cls, fs->str_new, NODE_NEW_N, 0);
     fs->define_native_func_a(n, menu_new, 0, -1, NULL);
-    n = fs->define_identifier_p(m, cls, fs->str_dispose, NODE_FUNC_N, 0);
+    n = fs->define_identifier_p(m, cls, fs->str_dtor, NODE_FUNC_N, 0);
     fs->define_native_func_a(n, menu_close, 0, 0, NULL);
 
     n = fs->define_identifier(m, cls, "add", NODE_FUNC_N, 0);
@@ -1226,8 +1230,8 @@ static void define_class(RefNode *m)
     n = fs->define_identifier_p(m, cls, fs->str_new, NODE_NEW_N, 0);
     fs->define_native_func_a(n, evthandler_new, 0, 0, cls, NULL);
 
-    n = fs->define_identifier_p(m, cls, fs->str_dispose, NODE_FUNC_N, 0);
-    fs->define_native_func_a(n, get_function_ptr(fs->cls_list, fs->str_dispose), 0, 0, NULL);
+    n = fs->define_identifier_p(m, cls, fs->str_dtor, NODE_FUNC_N, 0);
+    fs->define_native_func_a(n, get_function_ptr(fs->cls_list, fs->str_dtor), 0, 0, NULL);
     n = fs->define_identifier_p(m, cls, fs->symbol_stock[T_LP], NODE_FUNC_N, 0);
     fs->define_native_func_a(n, evthandler_call, 0, -1, NULL);
     n = fs->define_identifier(m, cls, "del", NODE_FUNC_N, 0);
@@ -1292,6 +1296,10 @@ void define_module(RefNode *m, const FoxStatic *a_fs, FoxGlobal *a_fg)
 const char *module_version(const FoxStatic *a_fs)
 {
     static char *buf = NULL;
+
+    if (a_fs->revision != FOX_INTERFACE_REVISION) {
+        return NULL;
+    }
     if (buf == NULL) {
         char *ver = get_toolkit_version();
         buf = malloc(256);

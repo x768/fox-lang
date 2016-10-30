@@ -73,10 +73,10 @@ char *str_printf(const char *fmt, ...)
  * 変換できなければ-1
  * オーバーフローしたら-2
  */
-int parse_hex(const char **pp, const char *end, int n)
+int32_t parse_hex(const char **pp, const char *end, int n)
 {
     const char *p = *pp;
-    int ret = 0;
+    int32_t ret = 0;
     int i = 0;
 
     if ((end != NULL && p >= end) || !isxdigit(*p)) {
@@ -103,9 +103,9 @@ int parse_hex(const char **pp, const char *end, int n)
  * 整数のみ
  * エラー:-1
  */
-int parse_int(const char *src_p, int src_size, int max)
+int32_t parse_int(const char *src_p, int src_size, int max)
 {
-    int ret = 0;
+    int32_t ret = 0;
     const char *p = src_p;
     const char *end;
 

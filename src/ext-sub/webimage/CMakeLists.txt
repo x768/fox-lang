@@ -29,7 +29,7 @@ set_target_properties(m_webimage
 if("${TARGET_OS}" STREQUAL "win")
   target_link_libraries(m_webimage
     jpeg
-    png
+    png16
     z
   )
 elseif("${TARGET_OS}" STREQUAL "osx")

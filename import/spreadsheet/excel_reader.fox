@@ -341,7 +341,7 @@ def _read16bitstring(data:StreamIO)
 
 class ExcelReaderError : Error
 {
-    new(s)
+    this(s)
     {
         super(s)
     }
@@ -362,7 +362,7 @@ class ExcelSheet
 
     var m_cells
 
-    new(name:Str, offset:Int, day_offset:Float)
+    this(name:Str, offset:Int, day_offset:Float)
     {
         m_name = name
         m_offset = offset
@@ -426,7 +426,7 @@ class ExcelCell
     var m_day_offset
     var m_visible
 
-    new(day_offset:Float)
+    this(day_offset:Float)
     {
         m_day_offset = day_offset
         m_colspan = 1
@@ -613,7 +613,7 @@ class ExcelFont
     var m_bold
     var m_font
 
-    new(height:Float, italic:Bool, color:Int, underline:Bool, bold:Bool, font:Str)
+    this(height:Float, italic:Bool, color:Int, underline:Bool, bold:Bool, font:Str)
     {
         m_height = height
         m_italic = italic
@@ -647,7 +647,7 @@ class ExcelXF
     var m_fgcolor_neg
     var m_type
 
-    new(font_records:List, index_code:Int, align:Int, font_index:Int, bgcolor:Int, fill_pattern:Int, border:Int, format:Str)
+    this(font_records:List, index_code:Int, align:Int, font_index:Int, bgcolor:Int, fill_pattern:Int, border:Int, format:Str)
     {
         m_font_records = font_records
         m_index_code = index_code
@@ -719,7 +719,7 @@ class ExcelXFBorder
     var m_style
     var m_color
 
-    new(style:Int, color:Int)
+    this(style:Int, color:Int)
     {
         m_style = _LINE_STYLES[style]
         if color in _COLORS {
@@ -731,7 +731,7 @@ class ExcelXFBorder
 }
 class ErrorCell
 {
-    new(){}
+    this(){}
 
     def to_str(fmt:Str = null, loc:Locale = null) => "#ERR!"
 }
@@ -758,7 +758,7 @@ class ExcelReader
     var m_ole
     var m_default_format
 
-    new(src:StreamIO)
+    this(src:StreamIO)
     {
         m_standard_col_width = 0
         m_default_col_width = 0

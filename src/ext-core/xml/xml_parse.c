@@ -1099,11 +1099,11 @@ static int xml_elem_add_attr(Value *v, Str skey, Str sval, int loose)
         Value key = fs->cstr_Value(fs->cls_str, skey.p, skey.size);
         HashValueEntry *ve = fs->refmap_add(rm, key, loose, TRUE);
         if (ve == NULL) {
-            fs->Value_dec(key);
+            fs->unref(key);
             return FALSE;
         }
         ve->val = fs->cstr_Value(fs->cls_str, sval.p, sval.size);
-        fs->Value_dec(key);
+        fs->unref(key);
     }
     return TRUE;
 }
@@ -1368,7 +1368,7 @@ static int parse_html_sub(Value *v, RefArray *v_ra, HTMLDoc *html, XMLTok *tk, S
                         if (ve != NULL) {
                             ve->val = fs->cstr_Value(fs->cls_str, tk->val.p, tk->val.size);
                         }
-                        fs->Value_dec(key);
+                        fs->unref(key);
                         XMLTok_next_tag(tk);
                     }
                 } else {
@@ -1377,7 +1377,7 @@ static int parse_html_sub(Value *v, RefArray *v_ra, HTMLDoc *html, XMLTok *tk, S
                     if (ve != NULL) {
                         ve->val = key;
                     } else {
-                        fs->Value_dec(key);
+                        fs->unref(key);
                     }
                 }
                 break;

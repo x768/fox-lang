@@ -232,7 +232,7 @@ static void define_class(RefNode *m)
     n = fs->define_identifier_p(m, cls, fs->str_new, NODE_NEW_N, 0);
     fs->define_native_func_a(n, process_new, 2, 2, (void*)FALSE, NULL, fs->cls_list);
 
-    n = fs->define_identifier_p(m, cls, fs->str_dispose, NODE_FUNC_N, 0);
+    n = fs->define_identifier_p(m, cls, fs->str_dtor, NODE_FUNC_N, 0);
     fs->define_native_func_a(n, process_close, 0, 0, NULL);
 
     n = fs->define_identifier(m, cls, "kill", NODE_FUNC_N, 0);
@@ -253,7 +253,7 @@ static void define_class(RefNode *m)
     n = fs->define_identifier_p(m, cls, fs->str_new, NODE_NEW_N, 0);
     fs->define_native_func_a(n, process_new, 3, 3, (void*)TRUE, NULL, fs->cls_list, fs->cls_str);
 
-    n = fs->define_identifier_p(m, cls, fs->str_dispose, NODE_FUNC_N, 0);
+    n = fs->define_identifier_p(m, cls, fs->str_dtor, NODE_FUNC_N, 0);
     fs->define_native_func_a(n, pipeio_close, 0, 0, NULL);
 
     n = fs->define_identifier(m, cls, "close", NODE_FUNC_N, 0);
@@ -291,5 +291,8 @@ void define_module(RefNode *m, const FoxStatic *a_fs, FoxGlobal *a_fg)
 
 const char *module_version(const FoxStatic *a_fs)
 {
+    if (a_fs->revision != FOX_INTERFACE_REVISION) {
+        return NULL;
+    }
     return "Build at\t" __DATE__ "\n";
 }

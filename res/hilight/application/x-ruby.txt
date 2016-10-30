@@ -1,0 +1,61 @@
+word "0-9A-Za-z_?!$@"
+define comment_line
+define quot
+define dquot
+define keyword word
+define keyword2 word
+
+"#" = _ comment_line comment_line
+"\n" = comment_line _ _
+
+"'" = _ quot quot
+'\\' = quot quot quot
+"\\'" = quot quot quot
+"'" = quot quot _
+
+'"' = _ dquot dquot
+'\\' = dquot dquot dquot
+'\"' = dquot dquot dquot
+'"' = dquot dquot _
+
+"BEGIN" = _ keyword _
+"END" = _ keyword _
+"alias" = _ keyword _
+"and" = _ keyword _
+"begin" = _ keyword _
+"case" = _ keyword _
+"class" = _ keyword _
+"def" = _ keyword _
+"defined?" = _ keyword _
+"do" = _ keyword _
+"else" = _ keyword _
+"elsif" = _ keyword _
+"end" = _ keyword _
+"ensure" = _ keyword _
+"false" = _ keyword _
+"for" = _ keyword _
+"if" = _ keyword _
+"in" = _ keyword _
+"module" = _ keyword _
+"next" = _ keyword _
+"nil" = _ keyword _
+"not" = _ keyword _
+"or" = _ keyword _
+"redo" = _ keyword _
+"rescue" = _ keyword _
+"retry" = _ keyword _
+"return" = _ keyword _
+"self" = _ keyword _
+"super" = _ keyword _
+"then" = _ keyword _
+"true" = _ keyword _
+"undef" = _ keyword _
+"unless" = _ keyword _
+"until" = _ keyword _
+"when" = _ keyword _
+"while" = _ keyword _
+"yield" = _ keyword _
+
+"__LINE__" = _ keyword2 _
+"__FILE__" = _ keyword2 _
+"__ENCODING" = _ keyword2 _

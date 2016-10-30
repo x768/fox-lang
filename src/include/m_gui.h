@@ -64,4 +64,4 @@ typedef struct {
 } FoxtkStatic;
 
 
-#endif /* _M_GUILIB_H_ */
+#endif /* _M_GUI_H_ */

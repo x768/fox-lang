@@ -163,31 +163,37 @@ static void show_lib_version_sub(Mem *mem, StrBuf *path, StrBuf *package, const 
 
             if (module_version != NULL) {
                 const char *libver = module_version(fs);
-                const char *p = libver;
 
                 stream_write_data(fg->v_cio, "[", 1);
                 stream_write_data(fg->v_cio, title, -1);
                 stream_write_data(fg->v_cio, package->p, -1);
                 stream_write_data(fg->v_cio, "]\n", 2);
-                while (*p != '\0') {
-                    while (*p != '\0' && *p != '\t') {
-                        p++;
+
+                if (libver != NULL) {
+                    const char *p = libver;
+
+                    while (*p != '\0') {
+                        while (*p != '\0' && *p != '\t') {
+                            p++;
+                        }
+                        stream_write_data(fg->v_cio, libver, p - libver);
+                        stream_write_data(fg->v_cio, ": ", 2);
+                        if (*p != '\0') {
+                            p++;
+                        }
+                        libver = p;
+                        while (*p != '\0' && *p != '\n') {
+                            p++;
+                        }
+                        stream_write_data(fg->v_cio, libver, p - libver);
+                        if (*p != '\0') {
+                            p++;
+                        }
+                        libver = p;
+                        stream_write_data(fg->v_cio, "\n", 1);
                     }
-                    stream_write_data(fg->v_cio, libver, p - libver);
-                    stream_write_data(fg->v_cio, ": ", 2);
-                    if (*p != '\0') {
-                        p++;
-                    }
-                    libver = p;
-                    while (*p != '\0' && *p != '\n') {
-                        p++;
-                    }
-                    stream_write_data(fg->v_cio, libver, p - libver);
-                    if (*p != '\0') {
-                        p++;
-                    }
-                    libver = p;
-                    stream_write_data(fg->v_cio, "\n", 1);
+                } else {
+                    stream_write_data(fg->v_cio, "*INVALID MODULE VERSION*\n", -1);
                 }
             }
         } else if (str_is_subdir(name)) {

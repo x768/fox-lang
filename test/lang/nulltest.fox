@@ -1,0 +1,10 @@
+import util.assert
+
+assert_equal null  ? 1 : 2, 2
+assert_equal false ? 1 : 2, 2
+assert_equal 0     ? 1 : 2, 1
+assert_equal []    ? 1 : 2, 1
+
+assert_error ()=>null.size, NameError
+assert_equal null.?size, null
+assert_equal null.?op_call(1), null

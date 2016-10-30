@@ -1,0 +1,29 @@
+import util.assert
+
+
+def RESULT = []
+
+abstract class Base
+{
+    this._new() {
+        RESULT.push "Base._new"
+    }
+    ~this() {
+        RESULT.push "~Base"
+    }
+}
+
+class Derived : Base
+{
+    this() {
+        super._new()
+        RESULT.push "Derived.new"
+    }
+    ~this() {
+        RESULT.push "~Derived"
+    }
+}
+
+Derived()
+
+assert_equal RESULT, ["Base._new", "Derived.new", "~Derived", "~Base"]

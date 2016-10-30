@@ -992,8 +992,8 @@ static int get_timezone(Value *vret, Value *v, RefNode *node)
 static int set_timezone(Value *vret, Value *v, RefNode *node)
 {
     RefTimeZone *tz = Value_vp(v[1]);
-    fs->Value_dec(vp_Value(default_tz));
-    fs->Value_inc(vp_Value(tz));
+    fs->unref(vp_Value(default_tz));
+    fs->addref(vp_Value(tz));
     default_tz = tz;
     return TRUE;
 }
@@ -1048,7 +1048,7 @@ static void define_func(RefNode *m)
 {
     RefNode *n;
 
-    n = fs->define_identifier_p(m, m, fs->str_dispose, NODE_FUNC_N, 0);
+    n = fs->define_identifier_p(m, m, fs->str_dtor, NODE_FUNC_N, 0);
     fs->define_native_func_a(n, windows_dispose, 0, 0, NULL);
 
     n = fs->define_identifier(m, m, "set_timezone", NODE_FUNC_N, 0);
@@ -1073,7 +1073,7 @@ static void define_class(RefNode *m)
     n = fs->define_identifier_p(m, cls, fs->str_new, NODE_NEW_N, 0);
     fs->define_native_func_a(n, ole_new, 1, 1, NULL, fs->cls_str);
 
-    n = fs->define_identifier_p(m, cls, fs->str_dispose, NODE_FUNC_N, 0);
+    n = fs->define_identifier_p(m, cls, fs->str_dtor, NODE_FUNC_N, 0);
     fs->define_native_func_a(n, ole_close, 0, 0, NULL);
 
     n = fs->define_identifier_p(m, cls, fs->str_method_missing, NODE_FUNC_N, 0);
@@ -1093,7 +1093,7 @@ static void define_class(RefNode *m)
 
 
     cls = cls_oleenum;
-    n = fs->define_identifier_p(m, cls, fs->str_dispose, NODE_FUNC_N, 0);
+    n = fs->define_identifier_p(m, cls, fs->str_dtor, NODE_FUNC_N, 0);
     fs->define_native_func_a(n, oleenum_close, 0, 0, NULL);
 
     n = fs->define_identifier(m, cls, "next", NODE_FUNC_N, 0);
@@ -1106,7 +1106,7 @@ static void define_class(RefNode *m)
     n = fs->define_identifier_p(m, cls, fs->str_new, NODE_NEW_N, 0);
     fs->define_native_func_a(n, regkey_new, 1, 1, NULL, fs->cls_str);
 
-    n = fs->define_identifier_p(m, cls, fs->str_dispose, NODE_FUNC_N, 0);
+    n = fs->define_identifier_p(m, cls, fs->str_dtor, NODE_FUNC_N, 0);
     fs->define_native_func_a(n, regkey_close, 0, 0, NULL);
 
     n = fs->define_identifier_p(m, cls, fs->str_tostr, NODE_FUNC_N, 0);
@@ -1160,5 +1160,8 @@ void define_module(RefNode *m, const FoxStatic *a_fs, FoxGlobal *a_fg)
 
 const char *module_version(const FoxStatic *a_fs)
 {
+    if (a_fs->revision != FOX_INTERFACE_REVISION) {
+        return NULL;
+    }
     return "Build at\t" __DATE__ "\n";
 }

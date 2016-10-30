@@ -33,13 +33,13 @@ enum {
 
     OP_SIZE_2,
 
-    OP_JMP,         // 無条件ジャンプ
-    OP_JIF,         // pop ならジャンプ
-    OP_JIF_N,       // !pop ならジャンプ
-    OP_IF_P,        // !=null ならジャンプ else pop
-    OP_IF_NP,       // ==null ならジャンプ else pop
-    OP_IFP,         // !=null ならpop,jmp
-    OP_IFP_N,       // ==null ならpop,jmp
+    OP_JMP,         // jmp
+    OP_POP_IF_J,    // pop!=null,false then jmp
+    OP_POP_IFN_J,   // pop==null,false then jmp
+    OP_IF_J_POP,    // !=null,false then jmp else pop
+    OP_IF_POP_J,    // !=null,false then pop else jmp
+    OP_IFN_POPJ,    // ==null,false then pop,jmp
+    OP_IFNULL_J,    // ==null then jmp
     OP_GET_FIELD,   // フィールド取得
     OP_SET_FIELD,   // フィールド設定
     OP_THROW,       // stk_topをthrow
@@ -64,12 +64,12 @@ enum {
 
     OP_LITERAL_P,   // 即値(定数シンボル)
     OP_PUSH_CATCH,  // スタックにcatchハンドラを積む
-    OP_GET_PROP,    // プロパティ取得(Str*)
-    OP_CALL_M,      // メソッド呼び出し(Str*)
-    OP_CALL_M_POP,  // メソッド呼び出し(Str*)、戻り値を捨てる
+    OP_GET_PROP,    // プロパティ取得(RefStr*)
+    OP_CALL_M,      // メソッド呼び出し(RefStr*)
+    OP_CALL_M_POP,  // メソッド呼び出し(RefStr*)、戻り値を捨てる
     OP_CALL_INIT,   // super constructor呼び出し
     OP_CALL_NEXT,   // next()を呼び出し、StopIterationならjmp
-    OP_CATCH_JMP,   // catch節の型を比較し、違った場合ジャンプ
+    OP_CATCH_JMP,   // catch節の型を比較し、違う場合ジャンプ
 };
 
 #ifdef DEBUGGER

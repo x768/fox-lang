@@ -1063,10 +1063,10 @@ static int save_image_gif(Value *vret, Value *v, RefNode *node)
     }
 
     if (!save_gif_sub(image, v[2])) {
-        fs->Value_dec(tmp);
+        fs->unref(tmp);
         return FALSE;
     }
-    fs->Value_dec(tmp);
+    fs->unref(tmp);
 
     return TRUE;
 }
@@ -1115,7 +1115,10 @@ void define_module(RefNode *m, const FoxStatic *a_fs, FoxGlobal *a_fg)
 const char *module_version(const FoxStatic *a_fs)
 {
     static char *buf = NULL;
-    
+
+    if (a_fs->revision != FOX_INTERFACE_REVISION) {
+        return NULL;
+    }
     if (buf == NULL) {
         buf = malloc(256);
         sprintf(buf, "Build at\t" __DATE__ "\nlibpng\t" PNG_LIBPNG_VER_STRING "\nlibjpeg\t%d\ngiflib\t%d.%d.%d\n",

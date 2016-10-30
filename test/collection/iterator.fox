@@ -4,7 +4,7 @@ import util.assert
 class CountDown : Iterable
 {
     var m_i
-    new(i:Int) {
+    this(i:Int) {
         super._new()
         m_i = i
     }
@@ -13,7 +13,7 @@ class CountDown : Iterable
 class CountDownIter : Iterator
 {
     var m_i
-    new(i:Int) {
+    this(i:Int) {
         super._new()
         m_i = i
     }

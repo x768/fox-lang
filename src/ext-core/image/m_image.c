@@ -1149,14 +1149,14 @@ static int image_load(Value *vret, Value *v, RefNode *node)
 
     *vret = vp_Value(fs->buf_new(cls_image, sizeof(RefImage)));
     if (type == NULL && !detect_image_type(&type, reader)) {
-        fs->Value_dec(reader);
+        fs->unref(reader);
         return FALSE;
     }
     if (!image_load_from_reader(*vret, reader, type, FUNC_INT(node))) {
-        fs->Value_dec(reader);
+        fs->unref(reader);
         return FALSE;
     }
-    fs->Value_dec(reader);
+    fs->unref(reader);
 
     return TRUE;
 }
@@ -1207,11 +1207,11 @@ static int image_save(Value *vret, Value *v, RefNode *node)
     if (!image_save_to_writer(*v, writer, type, param)) {
         goto ERROR_END;
     }
-    fs->Value_dec(writer);
+    fs->unref(writer);
     return TRUE;
 
 ERROR_END:
-    fs->Value_dec(writer);
+    fs->unref(writer);
     return FALSE;
 }
 static int image_close(Value *vret, Value *v, RefNode *node)
@@ -1498,6 +1498,7 @@ static int image_index(Value *vret, Value *v, RefNode *node)
     int64_t y = fs->Value_int64(v[2], NULL);
     uint32_t color;
     uint8_t *line;
+    int is_color = FUNC_INT(node);
 
     if (image->data == NULL) {
         throw_already_closed();
@@ -1512,20 +1513,32 @@ static int image_index(Value *vret, Value *v, RefNode *node)
     switch (image->bands) {
     case BAND_L: {
         uint8_t l = line[x];
-        color = (l << COLOR_R_SHIFT) | (l << COLOR_G_SHIFT) | (l << COLOR_B_SHIFT) | COLOR_A_MASK;
+        if (is_color) {
+            color = (l << COLOR_R_SHIFT) | (l << COLOR_G_SHIFT) | (l << COLOR_B_SHIFT) | COLOR_A_MASK;
+        } else {
+            color = l;
+        }
         break;
     }
     case BAND_LA: {
         uint8_t l = line[x * 2 + 0];
         uint8_t a = line[x * 2 + 1];
-        color = (l << COLOR_R_SHIFT) | (l << COLOR_G_SHIFT) | (l << COLOR_B_SHIFT) | (a << COLOR_A_SHIFT);
+        if (is_color) {
+            color = (l << COLOR_R_SHIFT) | (l << COLOR_G_SHIFT) | (l << COLOR_B_SHIFT) | (a << COLOR_A_SHIFT);
+        } else {
+            color = l | a << 8;
+        }
         break;
     }
     case BAND_RGB: {
         uint8_t r = line[x * 3 + 0];
         uint8_t g = line[x * 3 + 1];
         uint8_t b = line[x * 3 + 2];
-        color = (r << COLOR_R_SHIFT) | (g << COLOR_G_SHIFT) | (b << COLOR_B_SHIFT) | COLOR_A_MASK;
+        if (is_color) {
+            color = (r << COLOR_R_SHIFT) | (g << COLOR_G_SHIFT) | (b << COLOR_B_SHIFT) | COLOR_A_MASK;
+        } else {
+            color = (r << COLOR_R_SHIFT) | (g << COLOR_G_SHIFT) | (b << COLOR_B_SHIFT);
+        }
         break;
     }
     case BAND_RGBA: {
@@ -1537,18 +1550,22 @@ static int image_index(Value *vret, Value *v, RefNode *node)
         break;
     }
     case BAND_P:
-        if (FUNC_INT(node)) {
+        if (is_color) {
             color = image->palette[line[x]];
         } else {
-            *vret = integral_Value(fs->cls_int, line[x]);
-            return TRUE;
+            color = line[x];
         }
         break;
     default:
         fs->fatal_errorf("Unknown image->bands (%d)", image->bands);
         return FALSE;
     }
-    *vret = integral_Value(cls_color, color);
+
+    if (is_color) {
+        *vret = integral_Value(cls_color, color);
+    } else {
+        *vret = fs->int64_Value(color);
+    }
 
     return TRUE;
 }
@@ -2157,7 +2174,7 @@ static void define_class(RefNode *m, RefNode *mod_math)
     n = fs->define_identifier_p(m, cls, fs->str_marshal_read, NODE_NEW_N, 0);
     fs->define_native_func_a(n, palette_marshal_read, 1, 1, cls, fs->cls_marshaldumper);
 
-    n = fs->define_identifier_p(m, cls, fs->str_dispose, NODE_FUNC_N, 0);
+    n = fs->define_identifier_p(m, cls, fs->str_dtor, NODE_FUNC_N, 0);
     fs->define_native_func_a(n, palette_dispose, 0, 0, NULL);
     n = fs->define_identifier_p(m, cls, fs->str_marshal_write, NODE_FUNC_N, 0);
     fs->define_native_func_a(n, palette_marshal_write, 1, 1, NULL, fs->cls_marshaldumper);
@@ -2208,7 +2225,7 @@ static void define_class(RefNode *m, RefNode *mod_math)
     n = fs->define_identifier_p(m, cls, fs->str_marshal_read, NODE_NEW_N, 0);
     fs->define_native_func_a(n, image_marshal_read, 1, 1, NULL, fs->cls_marshaldumper);
 
-    n = fs->define_identifier_p(m, cls, fs->str_dispose, NODE_FUNC_N, 0);
+    n = fs->define_identifier_p(m, cls, fs->str_dtor, NODE_FUNC_N, 0);
     fs->define_native_func_a(n, image_close, 0, 0, NULL);
     n = fs->define_identifier_p(m, cls, fs->str_tostr, NODE_FUNC_N, 0);
     fs->define_native_func_a(n, image_tostr, 0, 2, NULL, fs->cls_str, fs->cls_locale);
@@ -2226,8 +2243,8 @@ static void define_class(RefNode *m, RefNode *mod_math)
     n = fs->define_identifier(m, cls, "save", NODE_FUNC_N, 0);
     fs->define_native_func_a(n, image_save, 1, 3, NULL, NULL, NULL, fs->cls_map);
     n = fs->define_identifier_p(m, cls, fs->symbol_stock[T_LB], NODE_FUNC_N, 0);
-    fs->define_native_func_a(n, image_index, 2, 2, (void*)FALSE, fs->cls_int, fs->cls_int);
-    n = fs->define_identifier(m, cls, "at", NODE_FUNC_N, 0);
+    fs->define_native_func_a(n, image_index, 2, 2, (void*)TRUE, fs->cls_int, fs->cls_int);
+    n = fs->define_identifier(m, cls, "get_int", NODE_FUNC_N, 0);
     fs->define_native_func_a(n, image_index, 2, 2, (void*)FALSE, fs->cls_int, fs->cls_int);
     n = fs->define_identifier_p(m, cls, fs->symbol_stock[T_LET_B], NODE_FUNC_N, 0);
     fs->define_native_func_a(n, image_index_set, 3, 3, NULL, fs->cls_int, fs->cls_int, NULL);
@@ -2303,6 +2320,10 @@ void define_module(RefNode *m, const FoxStatic *a_fs, FoxGlobal *a_fg)
 const char *module_version(const FoxStatic *a_fs)
 {
     static char *buf = NULL;
+
+    if (a_fs->revision != FOX_INTERFACE_REVISION) {
+        return NULL;
+    }
 
     fs = a_fs;
     if (buf == NULL) {

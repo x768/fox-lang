@@ -237,7 +237,7 @@ static int sequence_from_iterator(Value *vret, Value v, int is_str)
         Value_push("v", fg->stk_top[-1]);
         if (!call_member_func(fs->str_next, 0, TRUE)) {
             if (Value_type(fg->error) == fs->cls_stopiter) {
-                Value_dec(fg->error);
+                unref(fg->error);
                 fg->error = VALUE_NULL;
                 break;
             } else {
@@ -638,7 +638,7 @@ static int sequence_replace(Value *vret, Value *v, RefNode *node)
                 RefMatches *r;
 
                 *fg->stk_top++ = v2;
-                Value_inc(v2);
+                addref(v2);
 
                 r = buf_new(cls_matches, sizeof(RefMatches) + sizeof(int) * 2);
                 *fg->stk_top++ = vp_Value(r);
@@ -705,7 +705,7 @@ static int sequence_replace(Value *vret, Value *v, RefNode *node)
                 int name_size = 0;
 
                 *fg->stk_top++ = v2;
-                Value_inc(v2);
+                addref(v2);
 
                 pcre_fullinfo(re, NULL, PCRE_INFO_NAMECOUNT, &name_count);
                 if (name_count > 0) {
@@ -1122,7 +1122,7 @@ static int string_new(Value *vret, Value *v, RefNode *node)
             v[1] = VALUE_NULL;
         } else if (type == fs->cls_bytes) {
             RefStr *src = Value_vp(v1);
-            *vret = cstr_Value_conv(src->c, src->size, NULL);
+            *vret = cstr_Value(NULL, src->c, src->size);
         } else {
             // 引数に積んだ値をthisとして、to_strを呼び出す
             if (!call_member_func(fs->str_tostr, 0, TRUE)) {
@@ -1797,7 +1797,7 @@ static int regex_capture_index(Value *vret, Value *v, RefNode *node)
 static int matches_dispose(Value *vret, Value *v, RefNode *node)
 {
     RefMatches *r = Value_vp(*v);
-    Value_dec(r->source);
+    unref(r->source);
     r->source = VALUE_NULL;
     return TRUE;
 }
@@ -1923,7 +1923,7 @@ static int str_base64decode(Value *vret, Value *v, RefNode *node)
     rs->c[size] = '\0';
     rs->size = size;
 
-    Value_dec(v[1]);
+    unref(v[1]);
     v[1] = vp_Value(rs);
 
     if (!convert_bin_to_str(vret, NULL, 1)) {
@@ -1976,7 +1976,7 @@ static int str_hexdecode(Value *vret, Value *v, RefNode *node)
     }
     rs->c[rs->size] = '\0';
 
-    Value_dec(v[1]);
+    unref(v[1]);
     v[1] = vp_Value(rs);
     if (!convert_bin_to_str(vret, NULL, 1)) {
         return FALSE;
@@ -2170,7 +2170,7 @@ void define_lang_str_class(RefNode *m)
     define_native_func_a(n, regex_new, 1, 2, NULL, fs->cls_sequence, fs->cls_str);
     n = define_identifier_p(m, cls, fs->str_marshal_read, NODE_NEW_N, 0);
     define_native_func_a(n, regex_marshal_read, 1, 1, NULL, fs->cls_marshaldumper);
-    n = define_identifier_p(m, cls, fs->str_dispose, NODE_FUNC_N, 0);
+    n = define_identifier_p(m, cls, fs->str_dtor, NODE_FUNC_N, 0);
     define_native_func_a(n, regex_dispose, 0, 0, NULL);
 
     n = define_identifier_p(m, cls, fs->str_hash, NODE_FUNC_N, NODEOPT_PROPERTY);
@@ -2193,7 +2193,7 @@ void define_lang_str_class(RefNode *m)
 
     // Matches
     cls = cls_matches;
-    n = define_identifier_p(m, cls, fs->str_dispose, NODE_FUNC_N, 0);
+    n = define_identifier_p(m, cls, fs->str_dtor, NODE_FUNC_N, 0);
     define_native_func_a(n, matches_dispose, 0, 0, NULL);
 
     n = define_identifier_p(m, cls, fs->symbol_stock[T_LB], NODE_FUNC_N, 0);

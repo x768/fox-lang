@@ -125,8 +125,8 @@ static void xmlelem_add_attr(Ref *r, const char *ckey, const char *cval)
     }
     key = fs->cstr_Value(fs->cls_str, ckey, -1);
     ve = fs->refmap_add(rm, key, TRUE, FALSE);
-    fs->Value_dec(key);
-    fs->Value_dec(ve->val);
+    fs->unref(key);
+    fs->unref(ve->val);
     ve->val = fs->cstr_Value(fs->cls_str, cval, -1);
 }
 
@@ -137,7 +137,14 @@ static int xml_convert_line(Ref *r, MDNode *node)
     for (; node != NULL; node = node->next) {
         switch (node->type) {
         case MD_TEXT:
-            xmlelem_add(r, Value_vp(fs->cstr_Value(cls_xmltext, node->cstr, -1)));
+            if (node->href != NULL) {
+                Ref *span = xmlelem_new("span");
+                xmlelem_add(r, span);
+                xmlelem_add_attr(span, "class", node->href);
+                xmlelem_add(span, Value_vp(fs->cstr_Value(cls_xmltext, node->cstr, -1)));
+            } else {
+                xmlelem_add(r, Value_vp(fs->cstr_Value(cls_xmltext, node->cstr, -1)));
+            }
             break;
         case MD_LINK: {
             Ref *child = xmlelem_new("a");
@@ -212,12 +219,6 @@ static int xml_convert_line(Ref *r, MDNode *node)
             break;
         }
     }
-    return TRUE;
-}
-static int xml_source_code(Ref *r, const char *code, const char *type)
-{
-    // TODO 色分け
-    xmlelem_add(r, Value_vp(fs->cstr_Value(cls_xmltext, code, -1)));
     return TRUE;
 }
 static int xml_convert_listitem(Ref *r, MDNode *node, int gen_id)
@@ -313,10 +314,8 @@ static int xml_from_markdown(Ref *root, Markdown *r, MDNode *node)
             Ref *code = xmlelem_new("code");
             xmlelem_add(root, pre);
             xmlelem_add(pre, code);
-            if (node->child != NULL) {
-                if (!xml_source_code(code, node->child->cstr, node->cstr)) {
-                    return FALSE;
-                }
+            if (!xml_convert_line(code, node->child)) {
+                return FALSE;
             }
             break;
         }
@@ -612,7 +611,7 @@ static void define_class(RefNode *m)
     n = fs->define_identifier_p(m, cls, fs->str_new, NODE_NEW_N, 0);
     fs->define_native_func_a(n, markdown_new, 0, 0, cls);
 
-    n = fs->define_identifier_p(m, cls, fs->str_dispose, NODE_NEW_N, 0);
+    n = fs->define_identifier_p(m, cls, fs->str_dtor, NODE_NEW_N, 0);
     fs->define_native_func_a(n, markdown_dispose, 0, 0, cls);
     n = fs->define_identifier(m, cls, "enable_semantic", NODE_FUNC_N, NODEOPT_PROPERTY);
     fs->define_native_func_a(n, markdown_enable_semantic, 0, 0, NULL);
@@ -672,5 +671,8 @@ void define_module(RefNode *m, const FoxStatic *a_fs, FoxGlobal *a_fg)
 
 const char *module_version(const FoxStatic *a_fs)
 {
+    if (a_fs->revision != FOX_INTERFACE_REVISION) {
+        return NULL;
+    }
     return "Build at\t" __DATE__ "\n";
 }

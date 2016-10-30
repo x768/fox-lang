@@ -51,7 +51,7 @@ Value utf16_str_Value(const wchar_t *src)
     char *buf = malloc(clen + 1);
     utf16_to_utf8(buf, src, wlen);
 
-    v = fs->cstr_Value_conv(buf, -1, NULL);
+    v = fs->cstr_Value(NULL, buf, -1);
     free(buf);
     return v;
 }

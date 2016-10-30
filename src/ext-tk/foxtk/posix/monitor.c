@@ -111,12 +111,12 @@ void signal_file_changed(
 
     v_tmp = fs->cstr_Value(fs->cls_str, action_val, -1);
     event_object_add(*evt, "action", v_tmp);
-    fs->Value_dec(v_tmp);
+    fs->unref(v_tmp);
 
     if (file != NULL) {
         v_tmp = gfile_to_value(file);
         event_object_add(*evt, "file", v_tmp);
-        fs->Value_dec(v_tmp);
+        fs->unref(v_tmp);
     }
     ret_code = fs->call_function_obj(1);
     if (!ret_code && fg->error != VALUE_NULL) {
@@ -133,11 +133,11 @@ void signal_file_changed(
 
         v_tmp = fs->cstr_Value(fs->cls_str, action_val, -1);
         event_object_add(*evt, "action", v_tmp);
-        fs->Value_dec(v_tmp);
+        fs->unref(v_tmp);
 
         v_tmp = gfile_to_value(other_file);
         event_object_add(*evt, "file", v_tmp);
-        fs->Value_dec(v_tmp);
+        fs->unref(v_tmp);
 
         ret_code = fs->call_function_obj(1);
         if (!ret_code && fg->error != VALUE_NULL) {

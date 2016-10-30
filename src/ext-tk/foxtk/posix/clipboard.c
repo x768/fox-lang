@@ -174,7 +174,7 @@ Value clipboard_get_text()
     if (p_clipboard != NULL) {
         gchar *str = gtk_clipboard_wait_for_text(p_clipboard);
         if (str != NULL) {
-            return fs->cstr_Value_conv(str, -1, NULL);
+            return fs->cstr_Value(NULL, str, -1);
         }
     }
     return VALUE_NULL;

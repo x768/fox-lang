@@ -224,11 +224,14 @@ static int param_string_to_hash(RefMap *v_map, const char *p, Value keys, RefCha
 {
     StrBuf sb;
 
+    if (!param_string_init_hash(v_map, keys)) {
+        return FALSE;
+    }
     if (p == NULL) {
         return TRUE;
     }
-    if (!param_string_init_hash(v_map, keys)) {
-        return FALSE;
+    if (cs != fs->cs_utf8) {
+        CodeCVTStatic_init();
     }
 
     StrBuf_init(&sb, 0);
@@ -252,7 +255,11 @@ static int param_string_to_hash(RefMap *v_map, const char *p, Value keys, RefCha
 
                 sb.size = 0;
                 urldecode_sub(&sb, top, sep - top);
-                v1 = cstr_Value_conv(sb.p, sb.size, cs);
+                if (cs == fs->cs_utf8) {
+                    v1 = cstr_Value(NULL, sb.p, sb.size);
+                } else {
+                    v1 = codecvt->cstr_Value_conv(sb.p, sb.size, cs);
+                }
 
                 if (!refmap_get(&ve, v_map, v1)) {
                     return FALSE;
@@ -264,7 +271,11 @@ static int param_string_to_hash(RefMap *v_map, const char *p, Value keys, RefCha
 
                 sb.size = 0;
                 urldecode_sub(&sb, sep + 1, (p - sep) - 1);
-                v2 = cstr_Value_conv(sb.p, sb.size, cs);
+                if (cs == fs->cs_utf8) {
+                    v2 = cstr_Value(NULL, sb.p, sb.size);
+                } else {
+                    v2 = codecvt->cstr_Value_conv(sb.p, sb.size, cs);
+                }
 
                 if (ve->val == VALUE_NULL) {
                     ve->val = v2;
@@ -327,15 +338,15 @@ static int http_header_string_to_hash(RefMap *v_map, const char *p, int keys)
         }
 
         if (key.size > 0 && key.size < fs->max_alloc && val.size > 0 && val.size < fs->max_alloc) {
-            Value vkey = cstr_Value_conv(key.p, key.size, NULL);
+            Value vkey = cstr_Value(NULL, key.p, key.size);
             if (keys) {
                 HashValueEntry *ve;
                 if (!refmap_get(&ve, v_map, vkey)) {
-                    Value_dec(vkey);
+                    unref(vkey);
                     return FALSE;
                 }
                 if (ve != NULL) {
-                    Value vval = cstr_Value_conv(val.p, val.size, NULL);
+                    Value vval = cstr_Value(NULL, val.p, val.size);
                     if (ve->val == VALUE_NULL) {
                         ve->val = vval;
                     } else if (Value_type(ve->val) == fs->cls_list) {
@@ -346,9 +357,9 @@ static int http_header_string_to_hash(RefMap *v_map, const char *p, int keys)
             } else {
                 // 同じ名前なら先に来る要素を優先させる
                 HashValueEntry *ve = refmap_add(v_map, vkey, FALSE, FALSE);
-                ve->val = cstr_Value_conv(val.p, val.size, NULL);
+                ve->val = cstr_Value(NULL, val.p, val.size);
             }
-            Value_dec(vkey);
+            unref(vkey);
         }
     }
     return TRUE;
@@ -389,20 +400,20 @@ static int cgi_req_param(Value *vret, Value *v, RefNode *node)
                         pkey[j - 5] = c;
                     }
 
-                    vkey = cstr_Value_conv(pkey, key->size - 5, NULL);
+                    vkey = cstr_Value(NULL, pkey, key->size - 5);
                     free(pkey);
 
                     // 上書きしない
                     ve = refmap_add(rm, vkey, FALSE, FALSE);
-                    ve->val = cstr_Value_conv(he->p, -1, NULL);
-                    Value_dec(vkey);
+                    ve->val = cstr_Value(NULL, he->p, -1);
+                    unref(vkey);
                 } else if (strcmp(key->c, "CONTENT_TYPE") == 0) {
                     HashValueEntry *ve;
                     Value vkey = cstr_Value(fs->cls_str, "Content-Type", -1);
 
                     // 上書きしない
                     ve = refmap_add(rm, vkey, FALSE, FALSE);
-                    ve->val = cstr_Value_conv(he->p, -1, NULL);
+                    ve->val = cstr_Value(NULL, he->p, -1);
                 }
             }
         }
@@ -427,7 +438,7 @@ static int cgi_get_string(Value *vret, Value *v, RefNode *node)
 {
     const char *ptr = Hash_get_p(&fs->envs, FUNC_VP(node));
     if (ptr != NULL) {
-        *vret = cstr_Value_conv(ptr, -1, NULL);
+        *vret = cstr_Value(NULL, ptr, -1);
     }
     return TRUE;
 }
@@ -442,7 +453,7 @@ static int cgi_get_integer(Value *vret, Value *v, RefNode *node)
 static int cgi_get_pathinfo(Value *vret, Value *v, RefNode *node)
 {
     if (fv->path_info != NULL) {
-        *vret = cstr_Value_conv(fv->path_info, -1, NULL);
+        *vret = cstr_Value(NULL, fv->path_info, -1);
     }
     return TRUE;
 }
@@ -642,7 +653,7 @@ static int cookie_set_value(Value *vret, Value *v, RefNode *node)
             if (ref_set_cookie == VALUE_NULL) {
                 ref_set_cookie = vp_Value(refmap_new(0));
             }
-            Value_dec(ve->val);
+            unref(ve->val);
             ve->val = v2;
 
             ve2 = refmap_add(Value_vp(ref_set_cookie), v1, TRUE, FALSE);
@@ -705,7 +716,7 @@ static int cgi_session_id(Value *vret, Value *v, RefNode *node)
     get_random(rs->c, RAND_LEN);
 
     Value_push("Nrs", rs, "sha256");
-    Value_dec(vp_Value(rs));
+    unref(vp_Value(rs));
     if (!call_function(func_hash, 2)) {
         return FALSE;
     }
