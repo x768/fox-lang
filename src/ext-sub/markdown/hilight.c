@@ -248,6 +248,7 @@ static int load_hilight_sub(Hilight *h, Markdown *r, char *buf, RefStr *type)
                 word->self = state[1];
                 word->right = state[2];
                 {
+                    // 後から追加したほうが優先
                     int hash = word->c[0] & (STATE_WORD_SIZE - 1);
                     word->next = state[0]->left[hash];
                     state[0]->left[hash] = word;
@@ -348,6 +349,7 @@ static void hilight_code_main(MDNode **ppnode, Markdown *r, Hilight *h, const ch
 
     while (ptr < src_end) {
         Word *w;
+        int found = FALSE;
         for (w = cur->left[*ptr & (STATE_WORD_SIZE - 1)]; w != NULL; w = w->next) {
             if (ptr + w->len > src_end) {
                 continue;
@@ -367,10 +369,16 @@ static void hilight_code_main(MDNode **ppnode, Markdown *r, Hilight *h, const ch
                 ptr += w->len;
                 top = ptr;
                 cur = w->right;
+                found = TRUE;
                 break;
             }
         }
-        ptr++;
+        if (!found) {
+            ptr++;
+        }
+    }
+    if (ptr > src_end) {
+        ptr = src_end;
     }
     hilight_add_word(&cs, r, top, ptr, cur);
     hilight_add_word(&cs, r, NULL, NULL, NULL);

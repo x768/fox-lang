@@ -5,13 +5,6 @@
 #include <limits.h>
 
 
-typedef struct SymbolEntry
-{
-    struct SymbolEntry *next;
-    uint32_t hash;
-    RefStr *s;
-} SymbolEntry;
-
 typedef struct RefStrEntry
 {
     struct RefStrEntry *next;
@@ -163,7 +156,7 @@ static void SymbolTable_grow(void)
 
     RefStrEntry **e = Mem_get(&fg->st_mem, sizeof(RefStrEntry*) * n * 2);
     memcpy(e, symbol_table, sizeof(RefStrEntry*) * n);
-    memset(e + n, 0, sizeof(SymbolEntry*) * n);
+    memset(e + n, 0, sizeof(RefStrEntry*) * n);
 
     symbol_table_size *= 2;
 
@@ -270,8 +263,8 @@ void g_intern_init(void)
 
     symbol_table_size = 256;
     symbol_table_count = 0;
-    symbol_table = malloc(sizeof(SymbolEntry*) * symbol_table_size);
-    memset(symbol_table, 0, sizeof(SymbolEntry*) * symbol_table_size);
+    symbol_table = malloc(sizeof(RefStrEntry*) * symbol_table_size);
+    memset(symbol_table, 0, sizeof(RefStrEntry*) * symbol_table_size);
 
     u.tm = get_now_time();
     fv->hash_seed = u.s.lo ^ u.s.hi;

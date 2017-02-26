@@ -1,6 +1,7 @@
 word "0-9A-Za-z_$"
 define comment
 define comment_line
+define line_command
 define quot
 define dquot
 define keyword word
@@ -11,6 +12,10 @@ define typename word
 "*/" = comment comment _
 "//" = _ comment_line comment_line
 "\n" = comment_line _ _
+
+"#" = _ line_command line_command
+" " = line_command _ _
+"\n" = line_command _ _
 
 "'" = _ quot quot
 "L'" = _ quot quot

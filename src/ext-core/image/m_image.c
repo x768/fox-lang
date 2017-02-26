@@ -1181,11 +1181,13 @@ static int image_save(Value *vret, Value *v, RefNode *node)
             type = Value_vp(v[2]);
         } else if (v2_type == fs->cls_str) {
             type = fs->mimetype_from_name_refstr(Value_vp(v[2]));
+        } else if (v2_type == fs->cls_null) {
         } else {
-            fs->throw_error_select(THROW_ARGMENT_TYPE2__NODE_NODE_NODE_INT, fs->cls_mimetype, fs->cls_str, v2_type, 2);
+            fs->throw_errorf(fs->mod_lang, "TypeError", "MimeType, Str or Null required but %r (argument #2", v2_type);
             return FALSE;
         }
-    } else if (type == NULL) {
+    }
+    if (type == NULL) {
         // typeを設定
         RefStr *fname = Value_vp(v[1]);
         if (fname->size > 0) {

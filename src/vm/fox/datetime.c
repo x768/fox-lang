@@ -356,13 +356,15 @@ void Timestamp_to_DateTime(Date *dt, Time *tm, int64_t ts)
 
     JulianDay_to_Date(dt, jd);
 
-    // rem >= 0
-    tm->hour = rem / MSECS_PER_HOUR;
-    rem %= MSECS_PER_HOUR;
-    tm->minute = rem / MSECS_PER_MINUTE;
-    rem %= MSECS_PER_MINUTE;
-    tm->second = rem / MSECS_PER_SECOND;
-    tm->millisec = rem % MSECS_PER_SECOND;
+    if (tm != NULL) {
+        // rem >= 0
+        tm->hour = rem / MSECS_PER_HOUR;
+        rem %= MSECS_PER_HOUR;
+        tm->minute = rem / MSECS_PER_MINUTE;
+        rem %= MSECS_PER_MINUTE;
+        tm->second = rem / MSECS_PER_SECOND;
+        tm->millisec = rem % MSECS_PER_SECOND;
+    }
 }
 
 // (year != INT32_MIN) year, month, day_of_month
@@ -375,7 +377,11 @@ int64_t DateTime_to_Timestamp(const Date *dt, const Time *tm)
     } else {
         days_s = Date_week_to_JulianDay(dt) * MSECS_PER_DAY;
     }
-    return days_s + tm->hour * MSECS_PER_HOUR + tm->minute * MSECS_PER_MINUTE + tm->second * MSECS_PER_SECOND + tm->millisec;
+    if (tm != NULL) {
+        return days_s + tm->hour * MSECS_PER_HOUR + tm->minute * MSECS_PER_MINUTE + tm->second * MSECS_PER_SECOND + tm->millisec;
+    } else {
+        return days_s;
+    }
 }
 
 void JulianDay_to_Date(Date *dt, int32_t jd)

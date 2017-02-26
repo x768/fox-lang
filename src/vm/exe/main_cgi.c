@@ -573,7 +573,7 @@ int main_fox(int argc, const char **argv)
     init_stdio();
 
     // デフォルト値
-    fs->max_alloc = 32 * 1024 * 1024; // 32MB
+    fs->max_alloc = 64 * 1024 * 1024; // 64MB
     fs->max_stack = 32768;
 
     fox_init_compile(FALSE);

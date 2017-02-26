@@ -66,20 +66,6 @@ void dump_mdtree(MDNode *node, int level)
 
 #endif
 
-static int all_chars_equal(StrBuf *sb, int ch)
-{
-    const char *p = sb->p;
-    const char *end = p + sb->size;
-
-    while (p < end) {
-        if (*p != ch) {
-            return FALSE;
-        }
-        p++;
-    }
-    return TRUE;
-}
-
 ///////////////////////////////////////////////////////////////////////////////////////
 
 // markdown字句解析
@@ -118,6 +104,7 @@ static int MDTok_parse_text(MDTok *tk, const char *term, int term_strike)
             char *dst = cbuf;
 
             if (*p == '#') {
+                p++;
                 if (*p == 'x' || *p == 'X') {
                     // 16進数
                     p++;
@@ -238,7 +225,7 @@ static int MDTok_parse_list(MDTok *tk, int term)
         int ch;
 
         MDTok_skip_space(tk);
-        ch = *tk->p;
+        ch = *tk->p & 0xFF;
         if (ch == term || ch == '\n' || ch == '\0') {
             return TRUE;
         }
@@ -252,6 +239,43 @@ static int MDTok_parse_list(MDTok *tk, int term)
             if (ch == '\\') {
                 ch = *tk->p;
                 if (ch != '\0') {
+                    if (!fs->StrBuf_add_c(&tk->val, ch)) {
+                        return FALSE;
+                    }
+                    tk->p++;
+                }
+            } else if (ch == '"') {
+                for (;;) {
+                    ch = *tk->p & 0xFF;
+                    if (ch == '\0') {
+                        break;
+                    }
+                    if (ch == '"') {
+                        tk->p++;
+                        break;
+                    }
+                    if (ch == '\\') {
+                        tk->p++;
+                        ch = *tk->p & 0xFF;
+                        if (ch == '\0') {
+                            break;
+                        }
+                    }
+                    if (!fs->StrBuf_add_c(&tk->val, ch)) {
+                        return FALSE;
+                    }
+                    tk->p++;
+                }
+            } else if (ch == '\'') {
+                for (;;) {
+                    ch = *tk->p & 0xFF;
+                    if (ch == '\0') {
+                        break;
+                    }
+                    if (ch == '\'') {
+                        tk->p++;
+                        break;
+                    }
                     if (!fs->StrBuf_add_c(&tk->val, ch)) {
                         return FALSE;
                     }
@@ -317,8 +341,45 @@ static void MDTok_next(MDTok *tk)
             }
             MDTok_skip_space(tk);
             return;
-        case '-':
         case '=':
+            {
+                // =begin:class-name
+                // =end
+                const char *top = tk->p + 1;
+                const char *p = top;
+                while (isalnumu_fox(*p)) {
+                    p++;
+                }
+                if (*p == ':' || *p == '\n' || *p == '\0') {
+                    if (str_eqi(top, p - top, "begin", 5)) {
+                        tk->val.size = 0;
+                        if (*p == ':') {
+                            p++;
+                            top = p;
+                            while (*p != '\0' && *p != '\n') {
+                                p++;
+                            }
+                            fs->StrBuf_add(&tk->val, top, p - top);
+                        }
+                        if (*p == '\n') {
+                            p++;
+                        }
+                        tk->p = p;
+                        tk->type = MD_DIV_BLOCK;
+                        tk->head = TRUE;
+                        return;
+                    } else if (str_eqi(top, p - top, "end", 3)) {
+                        if (*tk->p == '\n') {
+                            tk->p++;
+                        }
+                        tk->p = p;
+                        tk->type = MD_DIV_BLOCK_END;
+                        tk->head = TRUE;
+                        return;
+                    }
+                }
+            }
+        case '-':
             {
                 // 1行全て '='か'-'
                 const char *top = tk->p;
@@ -465,29 +526,25 @@ RETRY:
         tk->prev_link = FALSE;
         return;
     case ':':
+        if (tk->table_row) {
+            break;
+        }
         tk->p++;
         tk->type = MD_COLON;
         tk->prev_link = FALSE;
         return;
-    case '<': {
-        const char *top = tk->p + 1;
-        const char *p = top;
-
-        if (isalphau_fox(*p)) {
-            tk->p++;
-            if (!MDTok_parse_text(tk, "\n>", FALSE)) {
-                tk->type = MD_FATAL_ERROR;
-                return;
-            }
-            if (*tk->p == '>') {
-                tk->p++;
-            }
-            tk->type = MD_LINK;
-            tk->prev_link = FALSE;
+    case '<':
+        tk->p++;
+        if (!MDTok_parse_text(tk, "\n>", FALSE)) {
+            tk->type = MD_FATAL_ERROR;
             return;
         }
-        break;
-    }
+        if (*tk->p == '>') {
+            tk->p++;
+        }
+        tk->type = MD_LINK;
+        tk->prev_link = FALSE;
+        return;
     case '!':
         if (tk->p[1] == '[') {
             tk->p += 2;
@@ -550,12 +607,6 @@ RETRY:
             return;
         }
         break;
-    case '\n':
-        tk->p++;
-        tk->head = TRUE;
-        tk->prev_link = FALSE;
-        tk->type = MD_NEWLINE;
-        return;
     case '|':
         if (tk->table_row) {
             tk->p++;
@@ -568,12 +619,18 @@ RETRY:
             return;
         }
         break;
+    case '\n':
+        tk->p++;
+        tk->head = TRUE;
+        tk->prev_link = FALSE;
+        tk->type = MD_NEWLINE;
+        return;
     default:
         break;
     }
 
     tk->prev_link = FALSE;
-    if (!MDTok_parse_text(tk, tk->table_row ? "\n*`[:|" : "\n*`[:", TRUE)) {
+    if (!MDTok_parse_text(tk, tk->table_row ? "\n*`[|<" : "\n*`[:<", TRUE)) {
         tk->type = MD_FATAL_ERROR;
         return;
     }
@@ -596,6 +653,7 @@ static void MDTok_next_code(MDTok *tk)
         while (*tk->p != '\0' && *tk->p != '\n' && *tk->p != '\r') {
             tk->p++;
         }
+        // TODO:3つ以上の`に対応
         if (tk->p - top == 3 && memcmp(top, "```", 3) == 0) {
             if (*tk->p == '\r') {
                 tk->p++;
@@ -630,6 +688,47 @@ static void MDTok_next_code_inline(MDTok *tk)
     fs->StrBuf_add(&tk->val, top, tk->p - top);
     if (*tk->p == '`') {
         tk->p++;
+    }
+}
+static int MDTok_query_tablesep(MDTok *tk)
+{
+    if (tk->type != MD_TEXT || tk->opt != OPT_TEXT_NO_BACKSLASHES) {
+        return TABLESEP_NONE;
+    }
+    if (tk->val.size < 3) {
+        return TABLESEP_NONE;
+    }
+    {
+        const char *p = tk->val.p;
+        const char *end = p + tk->val.size - 1;
+        int type;
+        
+        if (*p == ':') {
+            type = TABLESEP_LEFT;
+        } else if (*p == '#') {
+            type = TABLESEP_TH;
+        } else if (*p == '-') {
+            type = TABLESEP_LINE;
+        } else {
+            return TABLESEP_NONE;
+        }
+        p++;
+        while (p < end) {
+            if (*p != '-') {
+                return TABLESEP_NONE;
+            }
+            p++;
+        }
+        if (*p == ':') {
+            if (type == TABLESEP_LEFT) {
+                return TABLESEP_CENTER;
+            } else if (type == TABLESEP_LINE) {
+                return TABLESEP_RIGHT;
+            }
+        } else if (*p == '-') {
+            return type;
+        }
+        return TABLESEP_NONE;
     }
 }
 static int MDTok_is_next_colon(MDTok *tk)
@@ -823,28 +922,46 @@ static int parse_markdown_list_block(Markdown *r, MDTok *tk, MDNode **ppnode)
 }
 // | cell1 | cell2 |
 // | ....
-static int parse_markdown_list_table_block(Markdown *r, MDTok *tk, MDNode **ppnode)
+static int parse_markdown_list_table_block(Markdown *r, MDTok *tk, MDNode *table, MDNode **ppnode)
 {
     int head = TRUE;
     MDNode **pproot = ppnode;
     MDNode *node;
 
     for (;;) {
+        int table_sep;
+
         if (tk->type != MD_TABLE) {
             break;
         }
         MDTok_next(tk);
-        if (tk->type == MD_TEXT && tk->opt == OPT_TEXT_NO_BACKSLASHES && all_chars_equal(&tk->val, '-')) {
-            if (head) {
-                MDNode *p;
-                for (p = *pproot; p != NULL; p = p->next) {
-                    MDNode *q;
-                    for (q = p->child; q != NULL; q = q->next) {
-                        q->type = MD_TABLE_HEADER;
-                    }
+        table_sep = (head ? MDTok_query_tablesep(tk) : TABLESEP_NONE);
+        if (table_sep != TABLESEP_NONE) {
+            MDNode *p;
+            StrBuf sb;
+            for (p = *pproot; p != NULL; p = p->next) {
+                MDNode *q;
+                for (q = p->child; q != NULL; q = q->next) {
+                    q->type = MD_TABLE_HEADER;
                 }
-                head = FALSE;
             }
+
+            fs->StrBuf_init(&sb, 64);
+            while (table_sep != TABLESEP_NONE) {
+                fs->StrBuf_add_c(&sb, table_sep);
+                MDTok_next(tk);
+                if (tk->type != MD_TABLE || tk->head) {
+                    break;
+                }
+                MDTok_next(tk);
+                table_sep = MDTok_query_tablesep(tk);
+            }
+            table->cstr = fs->Mem_get(&r->mem, sb.size + 1);
+            memcpy(table->cstr, sb.p, sb.size);
+            table->cstr[sb.size] = TABLESEP_NONE;
+            StrBuf_close(&sb);
+
+            head = FALSE;
         } else {
             MDNode **ppcell;
             node = MDNode_new(MD_TABLE_ROW, r);
@@ -941,7 +1058,7 @@ static int parse_markdown_block(Markdown *r, MDTok *tk, MDNode **ppnode, int bq_
             prev_node = node;
             *ppnode = node;
             ppnode = &node->next;
-            if (!parse_markdown_list_table_block(r, tk, &node->child)) {
+            if (!parse_markdown_list_table_block(r, tk, node, &node->child)) {
                 return FALSE;
             }
             break;
@@ -1024,6 +1141,24 @@ static int parse_markdown_block(Markdown *r, MDTok *tk, MDNode **ppnode, int bq_
             break;
         case MD_COLON:
             break;
+        case MD_DIV_BLOCK:
+            node = MDNode_new(MD_DIV_BLOCK, r);
+            if (tk->val.size > 0) {
+                node->cstr = fs->str_dup_p(tk->val.p, tk->val.size, &r->mem);
+            } else {
+                node->cstr = NULL;
+            }
+            prev_node = node;
+            *ppnode = node;
+            ppnode = &node->next;
+            MDTok_next(tk);
+            if (!parse_markdown_block(r, tk, &node->child, tk->bq_level)) {
+                return FALSE;
+            }
+            break;
+        case MD_DIV_BLOCK_END:
+            MDTok_next(tk);
+            return TRUE;
         case MD_BLOCK_PLUGIN:
             node = MDNode_new(MD_BLOCK_PLUGIN, r);
             node->cstr = fs->str_dup_p(tk->val.p, tk->val.size, &r->mem);

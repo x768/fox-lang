@@ -44,12 +44,6 @@ typedef struct {
     int hours;
 } TimeZoneAbbrName;
 
-typedef struct {
-    RefHeader rh;
-    Date dt;
-    int32_t jd;  // 1970-01-01
-} RefDate;
-
 static RefNode *cls_date;
 static RefNode *cls_timedelta;
 
@@ -108,22 +102,29 @@ RefTimeZone *get_local_tz()
  */
 void adjust_timezone(RefDateTime *dt)
 {
-    int64_t ts = DateTime_to_Timestamp(&dt->d, &dt->t);
-    // TimeOffsetを推定
-    dt->off = TimeZone_offset_local(dt->tz, ts);
-    dt->ts = ts - dt->off->offset;
-    // タイムスタンプを戻して、もう一度TimeOffsetを計算
-    dt->off = TimeZone_offset_utc(dt->tz, dt->ts);
-    // もう一度計算
-    Timestamp_to_DateTime(&dt->d, &dt->t, dt->ts + dt->off->offset);
+    if (dt->tz != NULL) {
+        int64_t ts = DateTime_to_Timestamp(&dt->d, &dt->t);
+        // TimeOffsetを推定
+        dt->off = TimeZone_offset_local(dt->tz, ts);
+        dt->ts = ts - dt->off->offset;
+        // タイムスタンプを戻して、もう一度TimeOffsetを計算
+        dt->off = TimeZone_offset_utc(dt->tz, dt->ts);
+        // もう一度計算
+        Timestamp_to_DateTime(&dt->d, &dt->t, dt->ts + dt->off->offset);
+    } else {
+        dt->ts = DateTime_to_Timestamp(&dt->d, &dt->t);
+        Timestamp_to_DateTime(&dt->d, &dt->t, dt->ts);
+    }
 }
 /**
  * 指定したタイムスタンプとRefTimeZoneから、DateTimeを決定
  */
 void adjust_datetime(RefDateTime *dt)
 {
-    dt->off = TimeZone_offset_local(dt->tz, dt->ts);
-    Timestamp_to_DateTime(&dt->d, &dt->t, dt->ts + dt->off->offset);
+    if (dt->tz != NULL) {
+        dt->off = TimeZone_offset_local(dt->tz, dt->ts);
+        Timestamp_to_DateTime(&dt->d, &dt->t, dt->ts + dt->off->offset);
+    }
 }
 
 RefTimeZone *Value_to_tz(Value v, int argn)
@@ -192,10 +193,12 @@ static void DateTime_init(Date *dt, Time *tm)
     dt->year = 1;
     dt->month = 1;
     dt->day_of_month = 1;
-    tm->hour = 0;
-    tm->minute = 0;
-    tm->second = 0;
-    tm->millisec = 0;
+    if (tm != NULL) {
+        tm->hour = 0;
+        tm->minute = 0;
+        tm->second = 0;
+        tm->millisec = 0;
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -367,7 +370,12 @@ static int parse_iso_sub(Date *dt, Time *tm, const char *src_p, int src_size)
     }
     if (p < end && (*p == 'w' || *p == 'W')) {
         p++;
-        // TODO ISO週番号
+        // ISO週番号
+        if (!parse_digits_sub(&dt->isoweek, &p, end, 2)) {
+            return FALSE;
+        }
+        dt->isoweek_year = dt->year;
+        dt->year = INT32_MIN;
     } else {
         if (p < end && *p == '-') {
             p++;
@@ -385,6 +393,10 @@ static int parse_iso_sub(Date *dt, Time *tm, const char *src_p, int src_size)
 
     if (neg) {
         dt->year = -dt->year;
+    }
+
+    if (tm == NULL) {
+        return TRUE;
     }
 
     while (p < end && (isspace(*p) || *p == 'T')) {
@@ -646,7 +658,7 @@ static int word_parse_ymd(Str src, int *year, int *month, int *day)
     return p == end;
 }
 
-static int adjust_time_sub(RefDateTime *dt, int *dst, int num, int *type, int parse_type, int adjust_month)
+static int adjust_datetime_sub(RefDateTime *dt, int *dst, int num, int *type, int parse_type, int adjust_month)
 {
     switch (*type) {
     case PARSETYPE_NONE:
@@ -707,11 +719,12 @@ static int Str_eqi_list(Str s, ...)
     va_end(va);
     return FALSE;
 }
-static int word_parse_time(RefDateTime *dt, const char *src_p, int src_size, int parse_type)
+static int word_parse_datetime(RefDateTime *dt, const char *src_p, int src_size, int parse_type)
 {
     int i;
     int type = PARSETYPE_NONE;
     int num = 0;
+    int date_only = (dt->rh.type != fs->cls_datetime);
 
     for (i = 0; i < src_size; ) {
         int pos;
@@ -733,7 +746,7 @@ static int word_parse_time(RefDateTime *dt, const char *src_p, int src_size, int
                 // 1年のTimeDeltaは正確に決められない
                 return FALSE;
             }
-            if (!adjust_time_sub(dt, &dt->d.year, num, &type, parse_type, TRUE)) {
+            if (!adjust_datetime_sub(dt, &dt->d.year, num, &type, parse_type, TRUE)) {
                 return FALSE;
             }
         } else if (Str_eqi_list(s, "a", "aj", "jy", "julian-year", "annum", NULL)) {
@@ -741,7 +754,10 @@ static int word_parse_time(RefDateTime *dt, const char *src_p, int src_size, int
                 // ユリウス年はTimeDeltaのみ使用可能
                 return FALSE;
             }
-            if (!adjust_time_sub(dt, &dt->t.hour, num * 8766, &type, parse_type, FALSE)) {
+            if (date_only) {
+                return FALSE;
+            }
+            if (!adjust_datetime_sub(dt, &dt->t.hour, num * 8766, &type, parse_type, FALSE)) {
                 return FALSE;
             }
         } else if (Str_eqi_list(s, "mon", "month", "months", NULL)) {
@@ -749,7 +765,7 @@ static int word_parse_time(RefDateTime *dt, const char *src_p, int src_size, int
                 // 1ヶ月のTimeDeltaは正確に決められない
                 return FALSE;
             }
-            if (!adjust_time_sub(dt, &dt->d.month, num, &type, parse_type, TRUE)) {
+            if (!adjust_datetime_sub(dt, &dt->d.month, num, &type, parse_type, TRUE)) {
                 return FALSE;
             }
         } else if (Str_eqi_list(s, "w", "week", "weeks", NULL)) {
@@ -760,36 +776,56 @@ static int word_parse_time(RefDateTime *dt, const char *src_p, int src_size, int
                     DateTime_adjust(&dt->d, &dt->t);
                 }
                 break;
-            case PARSETYPE_NUM:
-                //Calendar_set_isoweek(&dt->cal, dt->cal.year, num);
+            case PARSETYPE_NUM: {
+                // isoweek
+                dt->d.isoweek_year = dt->d.year;
+                dt->d.isoweek = num;
+                dt->d.year = INT32_MIN;
+                DateTime_adjust(&dt->d, &dt->t);
                 break;
+            }
             default:
                 return FALSE;
             }
             type = PARSETYPE_NONE;
         } else if (Str_eqi_list(s, "d", "day", "days", NULL)) {
-            if (!adjust_time_sub(dt, &dt->d.day_of_month, num, &type, parse_type, FALSE)) {
+            if (!adjust_datetime_sub(dt, &dt->d.day_of_month, num, &type, parse_type, FALSE)) {
                 return FALSE;
             }
         } else if (Str_eqi_list(s, "h", "hour", "hours", NULL)) {
-            if (!adjust_time_sub(dt, &dt->t.hour, num, &type, parse_type, FALSE)) {
+            if (date_only) {
+                return FALSE;
+            }
+            if (!adjust_datetime_sub(dt, &dt->t.hour, num, &type, parse_type, FALSE)) {
                 return FALSE;
             }
         } else if (Str_eqi_list(s, "min", "minute", "minutes", NULL)) {
-            if (!adjust_time_sub(dt, &dt->t.minute, num, &type, parse_type, FALSE)) {
+            if (date_only) {
+                return FALSE;
+            }
+            if (!adjust_datetime_sub(dt, &dt->t.minute, num, &type, parse_type, FALSE)) {
                 return FALSE;
             }
         } else if (Str_eqi_list(s, "s", "sec", "second", "seconds", NULL)) {
-            if (!adjust_time_sub(dt, &dt->t.second, num, &type, parse_type, FALSE)) {
+            if (date_only) {
+                return FALSE;
+            }
+            if (!adjust_datetime_sub(dt, &dt->t.second, num, &type, parse_type, FALSE)) {
                 return FALSE;
             }
         } else if (Str_eqi_list(s, "ms", "msec", "millisecond", "milliseconds", NULL)) {
-            if (!adjust_time_sub(dt, &dt->t.millisec, num, &type, parse_type, FALSE)) {
+            if (date_only) {
+                return FALSE;
+            }
+            if (!adjust_datetime_sub(dt, &dt->t.millisec, num, &type, parse_type, FALSE)) {
                 return FALSE;
             }
         } else if (s.p[0] == '+' || s.p[0] == '-') {
             int n;
             if (type != PARSETYPE_NONE) {
+                return FALSE;
+            }
+            if (date_only) {
                 return FALSE;
             }
 
@@ -849,6 +885,9 @@ static int word_parse_time(RefDateTime *dt, const char *src_p, int src_size, int
                 dt->d.day_of_month = n3;
                 type = PARSETYPE_NONE;
             } else if (word_parse_hms(s, &n1, &n2, &n3)) {
+                if (date_only) {
+                    return FALSE;
+                }
                 dt->t.hour = n1;
                 dt->t.minute = n2;
                 dt->t.second = n3;
@@ -1256,7 +1295,7 @@ static int timestamp_add(Value *vret, Value *v, RefNode *node)
         dt.tz = fs->tz_utc;
         Timestamp_to_DateTime(&dt.d, &dt.t, tm1);
 
-        if (!word_parse_time(&dt, str->c, str->size, neg ? PARSE_NEGATIVE : PARSE_POSITIVE)) {
+        if (!word_parse_datetime(&dt, str->c, str->size, neg ? PARSE_NEGATIVE : PARSE_POSITIVE)) {
             throw_errorf(fs->mod_lang, "ParseError", "Invalid time format");
             return FALSE;
         }
@@ -1357,8 +1396,6 @@ static int timedelta_new(Value *vret, Value *v, RefNode *node)
     return TRUE;
 }
 
-static int word_parse_time(RefDateTime *dt, const char *src_p, int src_size, int parse_type);
-
 int timedelta_parse_string(double *ret, const char *src_p, int src_size)
 {
     RefDateTime dt;
@@ -1371,7 +1408,7 @@ int timedelta_parse_string(double *ret, const char *src_p, int src_size)
     DateTime_init(&dt.d, &dt.t);
     dt.d.day_of_month = 0;
     // TODO:timedelta専用にする
-    if (!word_parse_time(&dt, src_p, src_size, PARSE_DELTA)) {
+    if (!word_parse_datetime(&dt, src_p, src_size, PARSE_DELTA)) {
         return FALSE;
     }
 
@@ -1898,7 +1935,8 @@ static int datetime_marshal_read(Value *vret, Value *v, RefNode *node)
 {
     uint32_t uval;
     Value r = Value_ref(v[1])->v[INDEX_MARSHALDUMPER_SRC];
-    RefDateTime *dt = buf_new(fs->cls_datetime, sizeof(RefDateTime));
+    RefNode *type = FUNC_VP(node);
+    RefDateTime *dt = buf_new(type, sizeof(RefDateTime));
     *vret = vp_Value(dt);
 
     if (!stream_read_uint32(r, &uval)) {
@@ -1909,12 +1947,14 @@ static int datetime_marshal_read(Value *vret, Value *v, RefNode *node)
         return FALSE;
     }
     dt->ts |= uval;
-    dt->tz = timezone_marshal_read_sub(r);
-    if (dt->tz == NULL) {
-        return FALSE;
-    }
 
-    dt->off = TimeZone_offset_utc(dt->tz, dt->ts);
+    if (type == fs->cls_datetime) {
+        dt->tz = timezone_marshal_read_sub(r);
+        if (dt->tz == NULL) {
+            return FALSE;
+        }
+        dt->off = TimeZone_offset_utc(dt->tz, dt->ts);
+    }
     Timestamp_to_DateTime(&dt->d, &dt->t, dt->ts + dt->off->offset);
 
     return TRUE;
@@ -1933,11 +1973,13 @@ static int datetime_marshal_write(Value *vret, Value *v, RefNode *node)
         return FALSE;
     }
 
-    if (!stream_write_uint32(w, name_size)) {
-        return FALSE;
-    }
-    if (!stream_write_data(w, name, name_size)) {
-        return FALSE;
+    if (dt->rh.type == fs->cls_datetime) {
+        if (!stream_write_uint32(w, name_size)) {
+            return FALSE;
+        }
+        if (!stream_write_data(w, name, name_size)) {
+            return FALSE;
+        }
     }
     return TRUE;
 }
@@ -1966,7 +2008,7 @@ static int datetime_parse(Value *vret, Value *v, RefNode *node)
     }
 
     DateTime_init(&dt->d, &dt->t);
-    if (!word_parse_time(dt, src->c, src->size, PARSE_ABS)) {
+    if (!word_parse_datetime(dt, src->c, src->size, PARSE_ABS)) {
         throw_errorf(fs->mod_lang, "ValueError", "Invalid time format %Q", src);
         return FALSE;
     }
@@ -2060,11 +2102,12 @@ static int datetime_offset(Value *vret, Value *v, RefNode *node)
 }
 static int datetime_date(Value *vret, Value *v, RefNode *node)
 {
-    RefDateTime *dt = Value_vp(*v);
-    RefDate *d = buf_new(cls_date, sizeof(RefDate));
-    *vret = vp_Value(d);
-    d->dt = dt->d;
-    d->jd = Date_ymd_to_JulianDay(&d->dt);
+    RefDateTime *src = Value_vp(*v);
+    RefDateTime *dst = buf_new(cls_date, sizeof(RefDateTime));
+    *vret = vp_Value(dst);
+    dst->d = src->d;
+    dst->t = src->t;
+    dst->ts = src->ts;
     return TRUE;
 }
 static int datetime_tostr(Value *vret, Value *v, RefNode *node)
@@ -2112,14 +2155,14 @@ static int datetime_add(Value *vret, Value *v, RefNode *node)
     int neg = FUNC_INT(node);
     RefDateTime *dt1 = Value_vp(v[0]);
     RefNode *v1_type = Value_type(v[1]);
-    RefDateTime *dt2 = buf_new(fs->cls_datetime, sizeof(RefDateTime));
+    RefDateTime *dt2 = buf_new(dt1->rh.type, sizeof(RefDateTime));
     *vret = vp_Value(dt2);
 
     if (v1_type == fs->cls_str) {
         RefStr *fmt = Value_vp(v[1]);
         dt2->d = dt1->d;
         dt2->t = dt1->t;
-        if (!word_parse_time(dt2, fmt->c, fmt->size, neg ? PARSE_NEGATIVE : PARSE_POSITIVE)) {
+        if (!word_parse_datetime(dt2, fmt->c, fmt->size, neg ? PARSE_NEGATIVE : PARSE_POSITIVE)) {
             throw_errorf(fs->mod_lang, "ValueError", "Invalid time format %Q", fmt);
             return FALSE;
         }
@@ -2154,35 +2197,34 @@ static int datetime_add(Value *vret, Value *v, RefNode *node)
 static int date_new(Value *vret, Value *v, RefNode *node)
 {
     int is_isoweek = FUNC_INT(node);
-    RefDate *dt = buf_new(cls_date, sizeof(RefDate));
+    RefDateTime *dt = buf_new(cls_date, sizeof(RefDateTime));
     *vret = vp_Value(dt);
 
-    dt->dt.year = 1;
-    dt->dt.month = 1;
-    dt->dt.day_of_month = 1;
+    dt->d.year = 1;
+    dt->d.month = 1;
+    dt->d.day_of_month = 1;
 
     if (!validate_int32_range(v + 1, 3, 1)) {
         return FALSE;
     }
 
     if (is_isoweek) {
-        dt->dt.isoweek_year = Value_int32(v[1]);
-        dt->dt.isoweek = Value_int32(v[2]);
-        dt->dt.day_of_week = Value_int32(v[3]);
-        dt->jd = Date_week_to_JulianDay(&dt->dt);
+        dt->d.isoweek_year = Value_int32(v[1]);
+        dt->d.isoweek = Value_int32(v[2]);
+        dt->d.day_of_week = Value_int32(v[3]);
     } else {
-        dt->dt.year = Value_int32(v[1]);
-        dt->dt.month = Value_int32(v[2]);
-        dt->dt.day_of_month = Value_int32(v[3]);
-        dt->jd = Date_ymd_to_JulianDay(&dt->dt);
+        dt->d.year = Value_int32(v[1]);
+        dt->d.month = Value_int32(v[2]);
+        dt->d.day_of_month = Value_int32(v[3]);
     }
-    JulianDay_to_Date(&dt->dt, dt->jd);
+    dt->ts = DateTime_to_Timestamp(&dt->d, NULL);
+    Timestamp_to_DateTime(&dt->d, NULL, dt->ts);
 
     return TRUE;
 }
 static int date_today(Value *vret, Value *v, RefNode *node)
 {
-    RefDate *dt = buf_new(cls_date, sizeof(RefDate));
+    RefDateTime *dt = buf_new(cls_date, sizeof(RefDateTime));
     RefTimeZone *tz;
     int64_t tm;
     TimeOffset *off;
@@ -2198,39 +2240,30 @@ static int date_today(Value *vret, Value *v, RefNode *node)
     }
     tm = get_now_time();
     off = TimeZone_offset_utc(tz, tm);
-    dt->jd = (tm + off->offset) / MSECS_PER_DAY;
-    JulianDay_to_Date(&dt->dt, dt->jd);
+    dt->ts = (tm + off->offset) / MSECS_PER_DAY * MSECS_PER_DAY;
+    Timestamp_to_DateTime(&dt->d, NULL, dt->ts);
 
     return TRUE;
 }
-static int date_marshal_read(Value *vret, Value *v, RefNode *node)
+static int date_parse(Value *vret, Value *v, RefNode *node)
 {
-    uint32_t uval;
-    Value r = Value_ref(v[1])->v[INDEX_MARSHALDUMPER_SRC];
-    RefDate *dt = buf_new(fs->cls_datetime, sizeof(RefDate));
+    RefStr *src = Value_vp(v[1]);
+    RefDateTime *dt = buf_new(cls_date, sizeof(RefDateTime));
     *vret = vp_Value(dt);
 
-    if (!stream_read_uint32(r, &uval)) {
+    DateTime_init(&dt->d, &dt->t);
+    if (!word_parse_datetime(dt, src->c, src->size, PARSE_ABS)) {
+        throw_errorf(fs->mod_lang, "ValueError", "Invalid time format %Q", src);
         return FALSE;
     }
-    dt->jd = (int32_t)uval;
-    JulianDay_to_Date(&dt->dt, dt->jd);
+    dt->ts = DateTime_to_Timestamp(&dt->d, NULL);
+    Timestamp_to_DateTime(&dt->d, NULL, dt->ts);
 
-    return TRUE;
-}
-static int date_marshal_write(Value *vret, Value *v, RefNode *node)
-{
-    Value w = Value_ref(v[1])->v[INDEX_MARSHALDUMPER_SRC];
-    RefDate *dt = Value_vp(*v);
-
-    if (!stream_write_uint32(w, (uint32_t)dt->jd)) {
-        return FALSE;
-    }
     return TRUE;
 }
 static int date_tostr(Value *vret, Value *v, RefNode *node)
 {
-    RefDate *dt = Value_vp(*v);
+    RefDateTime *dt = Value_vp(*v);
     const LocaleData *loc = fv->loc_neutral;
     const char *fmt_p;
     int fmt_size;
@@ -2248,83 +2281,60 @@ static int date_tostr(Value *vret, Value *v, RefNode *node)
         fmt_size = -1;
     }
     StrBuf_init_refstr(&buf, 0);
-    build_datetime_string(&buf, fmt_p, fmt_size, &dt->dt, NULL, NULL, loc);
+    build_datetime_string(&buf, fmt_p, fmt_size, &dt->d, NULL, NULL, loc);
     *vret = StrBuf_str_Value(&buf, fs->cls_str);
 
     return TRUE;
 }
-static int date_hash(Value *vret, Value *v, RefNode *node)
+static int date_sub(Value *vret, Value *v, RefNode *node)
 {
-    RefDate *dt = Value_vp(*v);
-    int32_t hash = dt->jd & INT32_MAX;
-    *vret = int32_Value(hash);
-    return TRUE;
+    RefNode *v1_type = Value_type(v[1]);
+
+    if (v1_type == cls_date) {
+        // Date - Date
+        RefDateTime *dt1 = Value_vp(v[0]);
+        RefDateTime *dt2 = Value_vp(v[1]);
+        *vret = float_Value(cls_timedelta, (double)dt1->ts - (double)dt2->ts);
+        return TRUE;
+    } else if (v1_type == fs->cls_str || v1_type == cls_timedelta) {
+        return datetime_add(vret, v, node);
+    } else {
+        throw_errorf(fs->mod_lang, "TypeError", "TimeDelta, Date or Str required but %n", v1_type);
+        return FALSE;
+    }
 }
 static int date_eq(Value *vret, Value *v, RefNode *node)
 {
-    RefDate *d1 = Value_vp(*v);
-    RefDate *d2 = Value_vp(v[1]);
-    *vret = bool_Value(d1->jd == d2->jd);
+    RefDateTime *dt1 = Value_vp(v[0]);
+    RefDateTime *dt2 = Value_vp(v[1]);
+
+    *vret = bool_Value(dt1->ts == dt2->ts);
     return TRUE;
 }
 static int date_cmp(Value *vret, Value *v, RefNode *node)
 {
-    RefDate *d1 = Value_vp(*v);
-    RefDate *d2 = Value_vp(v[1]);
-    if (d1->jd < d2->jd) {
+    RefDateTime *dt1 = Value_vp(v[0]);
+    RefDateTime *dt2 = Value_vp(v[1]);
+
+    if (dt1->ts < dt2->ts) {
         *vret = int32_Value(-1);
-    } else if (d1->jd == d2->jd) {
-        *vret = int32_Value(0);
-    } else {
+    } else if (dt1->ts > dt2->ts) {
         *vret = int32_Value(1);
+    } else {
+        *vret = int32_Value(0);
     }
     return TRUE;
 }
 static int date_incdec(Value *vret, Value *v, RefNode *node)
 {
     int inc = FUNC_INT(node);
-    RefDate *d1 = Value_vp(*v);
-    RefDate *dt = buf_new(cls_date, sizeof(RefDate));
+    RefDateTime *d1 = Value_vp(*v);
+    RefDateTime *dt = buf_new(cls_date, sizeof(RefDateTime));
     *vret = vp_Value(dt);
 
-    *dt = *d1;
-    dt->jd += inc;
-    JulianDay_to_Date(&dt->dt, dt->jd);
-    return TRUE;
-}
-static int date_add(Value *vret, Value *v, RefNode *node)
-{
-/*
-    int neg = FUNC_INT(node);
-    RefDate *dt1 = Value_vp(v[0]);
-    RefNode *v1_type = Value_type(v[1]);
-    RefDate *dt2 = buf_new(fs->cls_datetime, sizeof(RefDate));
-    *vret = vp_Value(dt2);
-
-    if (v1_type == fs->cls_str) {
-        RefStr *fmt = Value_vp(v[1]);
-        dt2->dt = dt1->dt;
-        if (!word_parse_time(dt2, fmt->c, fmt->size, neg ? PARSE_NEGATIVE : PARSE_POSITIVE)) {
-            throw_errorf(fs->mod_lang, "ValueError", "Invalid time format %Q", fmt);
-            return FALSE;
-        }
-        dt2->tz = dt1->tz;
-        adjust_timezone(dt2);
-    } else if (v1_type == cls_timedelta) {
-        int64_t delta = VALUE_INT64(v[1]);
-        if (neg) {
-            dt2->tm = dt1->tm - delta;
-        } else {
-            dt2->tm = dt1->tm + delta;
-        }
-        dt2->tz = dt1->tz;
-        dt2->off = TimeZone_offset_local(dt2->tz, dt2->tm);
-        Timestamp_to_DateTime(&dt2->dt, dt2->tm + dt2->off->offset);
-    } else {
-        throw_error_select(THROW_ARGMENT_TYPE2__NODE_NODE_NODE_INT, fs->cls_str, cls_timedelta, v1_type, 1);
-        return FALSE;
-    }
-*/
+    dt->ts = d1->ts + inc * MSECS_PER_DAY;
+    Timestamp_to_DateTime(&dt->d, NULL, dt->ts);
+    
     return TRUE;
 }
 
@@ -2491,7 +2501,7 @@ static void define_time_class(RefNode *m)
     n = define_identifier(m, cls, "parse_format", NODE_NEW_N, 0);
     define_native_func_a(n, datetime_parse_format, 2, 3, NULL, fs->cls_str, fs->cls_str, NULL);
     n = define_identifier_p(m, cls, fs->str_marshal_read, NODE_NEW_N, 0);
-    define_native_func_a(n, datetime_marshal_read, 1, 1, NULL, fs->cls_marshaldumper);
+    define_native_func_a(n, datetime_marshal_read, 1, 1, fs->cls_datetime, fs->cls_marshaldumper);
 
     n = define_identifier_p(m, cls, fs->str_tostr, NODE_FUNC_N, 0);
     define_native_func_a(n, datetime_tostr, 0, 2, NULL, fs->cls_str, fs->cls_locale);
@@ -2553,19 +2563,21 @@ static void define_time_class(RefNode *m)
     define_native_func_a(n, date_new, 3, 3, (void*)TRUE, fs->cls_int, fs->cls_int, fs->cls_int);
     n = define_identifier(m, cls, "today", NODE_NEW_N, 0);
     define_native_func_a(n, date_today, 0, 1, NULL, NULL);
+    n = define_identifier(m, cls, "parse", NODE_NEW_N, 0);
+    define_native_func_a(n, date_parse, 1, 1, NULL, fs->cls_str);
     n = define_identifier_p(m, cls, fs->str_marshal_read, NODE_NEW_N, 0);
-    define_native_func_a(n, date_marshal_read, 1, 1, NULL, fs->cls_marshaldumper);
+    define_native_func_a(n, datetime_marshal_read, 1, 1, cls_date, fs->cls_marshaldumper);
 
     n = define_identifier_p(m, cls, fs->str_tostr, NODE_FUNC_N, 0);
     define_native_func_a(n, date_tostr, 0, 2, NULL, fs->cls_str, fs->cls_locale);
     n = define_identifier_p(m, cls, fs->str_hash, NODE_FUNC_N, NODEOPT_PROPERTY);
-    define_native_func_a(n, date_hash, 0, 0, NULL);
+    define_native_func_a(n, datetime_hash, 0, 0, NULL);
     n = define_identifier_p(m, cls, fs->str_marshal_write, NODE_FUNC_N, 0);
-    define_native_func_a(n, date_marshal_write, 1, 1, NULL, fs->cls_marshaldumper);
+    define_native_func_a(n, datetime_marshal_write, 1, 1, NULL, fs->cls_marshaldumper);
     n = define_identifier_p(m, cls, fs->symbol_stock[T_ADD], NODE_FUNC_N, 0);
-    define_native_func_a(n, date_add, 1, 1, (void*) FALSE, NULL);
+    define_native_func_a(n, datetime_add, 1, 1, (void*) FALSE, NULL);
     n = define_identifier_p(m, cls, fs->symbol_stock[T_SUB], NODE_FUNC_N, 0);
-    define_native_func_a(n, date_add, 1, 1, (void*) TRUE, NULL);
+    define_native_func_a(n, date_sub, 1, 1, (void*) TRUE, NULL);
 
     n = define_identifier_p(m, cls, fs->symbol_stock[T_EQ], NODE_FUNC_N, 0);
     define_native_func_a(n, date_eq, 1, 1, NULL, cls_date);

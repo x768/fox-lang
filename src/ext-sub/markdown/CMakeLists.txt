@@ -4,6 +4,7 @@ add_library(m_markdown SHARED
   ${SRC_COMMON}
   m_markdown.c
   md_parse.c
+  md_make.c
   hilight.c
 )
 set_target_properties(m_markdown

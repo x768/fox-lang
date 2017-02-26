@@ -1,0 +1,62 @@
+define comment_line
+define quot
+define dquot
+define keyword word icase
+define keyword2 word icase
+
+"--" = _ comment_line comment_line
+"\n" = comment_line _ _
+
+"'" = _ quot quot
+'\\' = quot quot quot
+"\\'" = quot quot quot
+"'" = quot quot _
+
+'"' = _ dquot dquot
+'\\' = dquot dquot dquot
+'\"' = dquot dquot dquot
+'"' = dquot dquot _
+
+"AND" = _ keyword _
+"AS" = _ keyword _
+"AVERAGE" = _ keyword2 _
+"ALTER" = _ keyword _
+"BEGIN" = _ keyword _
+"BY" = _ keyword _
+"COMMIT" = _ keyword _
+"COUNT" = _ keyword2 _
+"CREATE" = _ keyword _
+"DELETE" = _ keyword _
+"DROP" = _ keyword _
+"FROM" = _ keyword _
+"GROUP" = _ keyword _
+"IN" = _ keyword _
+"INNER" = _ keyword _
+"INSERT" = _ keyword _
+"INTO" = _ keyword _
+"LEFT" = _ keyword _
+"JOIN" = _ keyword _
+"KEY" = _ keyword _
+"NOT" = _ keyword _
+"NULL" = _ keyword _
+"ON" = _ keyword _
+"OR" = _ keyword _
+"ORDER" = _ keyword _
+"OUTER" = _ keyword _
+"PRIMARY" = _ keyword _
+"REPLACE" = _ keyword _
+"RIGHT" = _ keyword _
+"ROLLBACK" = _ keyword _
+"SAVE" = _ keyword _
+"SELECT" = _ keyword _
+"SET" = _ keyword _
+"SUM" = _ keyword2 _
+"TABLE" = _ keyword _
+"THEN" = _ keyword _
+"TRANCATE" = _ keyword _
+"TRANSACTION" = _ keyword _
+"UPDATE" = _ keyword _
+"USING" = _ keyword _
+"VALUES" = _ keyword _
+"WHEN" = _ keyword _
+"WHERE" = _ keyword _

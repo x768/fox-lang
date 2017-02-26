@@ -1,0 +1,59 @@
+word "0-9A-Za-z_%$@"
+define comment_line
+define quot
+define dquot
+define keyword word
+define keyword2 word
+
+"#" = _ comment_line comment_line
+"\n" = comment_line _ _
+
+"'" = _ quot quot
+'\\' = quot quot quot
+"\\'" = quot quot quot
+"'" = quot quot _
+
+'"' = _ dquot dquot
+'\\' = dquot dquot dquot
+'\"' = dquot dquot dquot
+'"' = dquot dquot _
+
+"BEGIN" = _ keyword2 _
+"END" = _ keyword2 _
+"INIT" = _ keyword2 _
+"CHECK" = _ keyword2 _
+
+"and" = _ keyword _
+"bless" = _ keyword _
+"cmd" = _ keyword _
+"continue" = _ keyword _
+"die" = _ keyword _
+"do" = _ keyword _
+"else" = _ keyword _
+"elsif" = _ keyword _
+"eval" = _ keyword _
+"eq" = _ keyword _
+"for" = _ keyword _
+"foreach" = _ keyword _
+"goto" = _ keyword _
+"ge" = _ keyword _
+"gt" = _ keyword _
+"if" = _ keyword _
+"last" = _ keyword _
+"le" = _ keyword _
+"local" = _ keyword _
+"lt" = _ keyword _
+"my" = _ keyword _
+"neq" = _ keyword _
+"new" = _ keyword _
+"next" = _ keyword _
+"or" = _ keyword _
+"our" = _ keyword _
+"redo" = _ keyword _
+"require" = _ keyword _
+"return" = _ keyword _
+"sub" = _ keyword _
+"unress" = _ keyword _
+"use" = _ keyword _
+"warn" = _ keyword _
+"while" = _ keyword _

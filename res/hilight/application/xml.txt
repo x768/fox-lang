@@ -1,0 +1,20 @@
+define comment
+define quot
+define dquot
+define xmltag
+
+"<" = _ xmltag xmltag
+">" = xmltag xmltag _
+
+"<!--" = _ comment comment
+"-->" = comment comment _
+
+"'" = xmltag quot quot
+'\\' = quot quot quot
+"\\'" = quot quot quot
+"'" = quot quot xmltag
+
+'"' = xmltag dquot dquot
+'\\' = dquot dquot dquot
+'\"' = dquot dquot dquot
+'"' = dquot dquot xmltag

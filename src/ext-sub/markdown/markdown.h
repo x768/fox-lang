@@ -16,6 +16,8 @@ enum {
     MD_HEADING_D,     // === or ---
     MD_PARAGRAPH,     // <p>child</p>
     MD_HORIZONTAL,    // <hr>
+    MD_DIV_BLOCK,     // <div class="...">
+    MD_DIV_BLOCK_END, // </div>
     MD_BLOCK_PLUGIN,  // %plugin
 
     // インライン要素
@@ -56,7 +58,14 @@ enum {
     MD_TABLE_HEADER,  // <th></th>
     MD_TABLE_CELL,    // <td></td>
 };
-
+enum {
+    TABLESEP_NONE,
+    TABLESEP_LINE,    // -----
+    TABLESEP_LEFT,    // :----
+    TABLESEP_CENTER,  // :---:
+    TABLESEP_RIGHT,   // ----:
+    TABLESEP_TH,      // *----
+};
 enum {
     INDEX_MARKDOWN_MD,
     INDEX_MARKDOWN_NUM,
@@ -178,5 +187,11 @@ int link_markdown(Ref *r);
 
 // hilight.c
 int parse_markdown_code_block(Markdown *r, MDTok *tk, MDNode **ppnode, RefStr *type);
+
+// md_make.c
+Ref *xmlelem_new(const char *name);
+int xml_from_markdown(Ref *root, Markdown *r, MDNode *node);
+int text_from_markdown(StrBuf *sb, Markdown *r, MDNode *node);
+
 
 #endif /* _MARKDOWN_H_ */

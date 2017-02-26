@@ -13,6 +13,7 @@
 "application/rdf+xml" = "rdf"
 "application/rss+xml" = "rss"
 "application/rtf" = "rtf"
+"application/sql" = "sql"
 "application/vnd.ms-excel" = "xls", "xlb", "xlt"
 "application/vnd.ms-powerpoint" = "ppt", "pps"
 "application/vnd.oasis.opendocument.chart" = "odc"

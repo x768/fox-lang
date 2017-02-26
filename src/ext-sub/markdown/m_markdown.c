@@ -43,6 +43,7 @@ void SimpleHash_add_node(SimpleHash **hash, Mem *mem, const char *name, MDNode *
     h->hash = ihash;
     h->name = fs->str_dup_p(name, -1, mem);
     h->node = node;
+    h->next = NULL;
     *pp = h;
 }
 static void MDNode_tostr_sub(StrBuf *sb, MDNode *node)
@@ -86,290 +87,8 @@ MDNode *MDNode_new(int type, Markdown *r)
     MDNode *n = fs->Mem_get(&r->mem, sizeof(MDNode));
     memset(n, 0, sizeof(MDNode));
     n->type = type;
-    n->indent = 0;
-    n->cstr = NULL;
-    n->href = NULL;
     return n;
 }
-
-static Ref *xmlelem_new(const char *name)
-{
-    RefArray *ra;
-    Ref *r = fs->ref_new(cls_xmlelem);
-    r->v[INDEX_ELEM_NAME] = vp_Value(fs->intern(name, -1));
-
-    ra = fs->refarray_new(0);
-    ra->rh.type = cls_nodelist;
-    r->v[INDEX_ELEM_CHILDREN] = vp_Value(ra);
-
-    return r;
-}
-static void xmlelem_add(Ref *r, Ref *elem)
-{
-    RefArray *ra = Value_vp(r->v[INDEX_ELEM_CHILDREN]);
-    Value *v = fs->refarray_push(ra);
-    *v = fs->Value_cp(vp_Value(elem));
-}
-
-static void xmlelem_add_attr(Ref *r, const char *ckey, const char *cval)
-{
-    RefMap *rm;
-    Value key;
-    HashValueEntry *ve;
-
-    if (Value_isref(r->v[INDEX_ELEM_ATTR])) {
-        rm = Value_vp(r->v[INDEX_ELEM_ATTR]);
-    } else {
-        rm = fs->refmap_new(0);
-        r->v[INDEX_ELEM_ATTR] = vp_Value(rm);
-    }
-    key = fs->cstr_Value(fs->cls_str, ckey, -1);
-    ve = fs->refmap_add(rm, key, TRUE, FALSE);
-    fs->unref(key);
-    fs->unref(ve->val);
-    ve->val = fs->cstr_Value(fs->cls_str, cval, -1);
-}
-
-//////////////////////////////////////////////////////////////////////////////////////////
-
-static int xml_convert_line(Ref *r, MDNode *node)
-{
-    for (; node != NULL; node = node->next) {
-        switch (node->type) {
-        case MD_TEXT:
-            if (node->href != NULL) {
-                Ref *span = xmlelem_new("span");
-                xmlelem_add(r, span);
-                xmlelem_add_attr(span, "class", node->href);
-                xmlelem_add(span, Value_vp(fs->cstr_Value(cls_xmltext, node->cstr, -1)));
-            } else {
-                xmlelem_add(r, Value_vp(fs->cstr_Value(cls_xmltext, node->cstr, -1)));
-            }
-            break;
-        case MD_LINK: {
-            Ref *child = xmlelem_new("a");
-            xmlelem_add(r, child);
-            if (node->href != NULL) {
-                xmlelem_add_attr(child, "href", node->href);
-            }
-            xmlelem_add(child, Value_vp(fs->cstr_Value(cls_xmltext, node->cstr, -1)));
-            break;
-        }
-        case MD_LINK_FOOTNOTE:
-            if (node->opt != 0xFFFF) {
-                Ref *sup = xmlelem_new("sup");
-                Ref *link = xmlelem_new("a");
-                char ctext[16];
-                char clink[16];
-                sprintf(ctext, "[%d]", node->opt);
-                sprintf(clink, "#note.%d", node->opt);
-                xmlelem_add_attr(link, "href", clink);
-                xmlelem_add(link, Value_vp(fs->cstr_Value(cls_xmltext, ctext, -1)));
-                xmlelem_add(r, sup);
-                xmlelem_add(sup, link);
-            } else {
-                Ref *sup = xmlelem_new("sup");
-                xmlelem_add(sup, Value_vp(fs->cstr_Value(cls_xmltext, "###", -1)));
-                xmlelem_add(r, sup);
-            }
-            break;
-        case MD_IMAGE: {
-            Ref *child = xmlelem_new("img");
-            xmlelem_add(r, child);
-            xmlelem_add_attr(child, "src", node->href);
-            xmlelem_add_attr(child, "alt", node->cstr);
-            break;
-        }
-        case MD_EM:
-        case MD_STRONG:
-        case MD_STRIKE: {
-            Ref *child;
-            switch (node->type) {
-            case MD_EM:
-                child = xmlelem_new("em");
-                break;
-            case MD_STRONG:
-                child = xmlelem_new("strong");
-                break;
-            case MD_STRIKE:
-                child = xmlelem_new("strike");
-                break;
-            default:
-                return FALSE;
-            }
-            xmlelem_add(r, child);
-            if (!xml_convert_line(child, node->child)) {
-                return FALSE;
-            }
-            break;
-        }
-        case MD_CODE_INLINE: {
-            Ref *code;
-            code = xmlelem_new("code");
-            xmlelem_add(r, code);
-            xmlelem_add(code, Value_vp(fs->cstr_Value(cls_xmltext, node->cstr, -1)));
-            break;
-        }
-        case MD_IGNORE:
-            if (!xml_convert_line(r, node->child)) {
-                return FALSE;
-            }
-            break;
-        default:
-            break;
-        }
-    }
-    return TRUE;
-}
-static int xml_convert_listitem(Ref *r, MDNode *node, int gen_id)
-{
-    Ref *prev_li = NULL;
-    int footnote_id = 1;
-
-    for (; node != NULL; node = node->next) {
-        switch (node->type) {
-        case MD_LIST_ITEM: {
-            Ref *li = xmlelem_new("li");
-            xmlelem_add(r, li);
-            if (gen_id) {
-                char cbuf[16];
-                sprintf(cbuf, "note.%d", footnote_id);
-                xmlelem_add_attr(li, "id", cbuf);
-                footnote_id++;
-            }
-            if (!xml_convert_line(li, node->child)) {
-                return FALSE;
-            }
-            prev_li = li;
-            break;
-        }
-        case MD_UNORDERD_LIST:
-        case MD_ORDERD_LIST:
-            if (prev_li != NULL) {
-                Ref *list = xmlelem_new(node->type == MD_UNORDERD_LIST ? "ul" : "ol");
-                xmlelem_add(prev_li, list);
-                if (!xml_convert_listitem(list, node->child, FALSE)) {
-                    return FALSE;
-                }
-            }
-            break;
-        }
-    }
-    return TRUE;
-}
-static int xml_from_markdown(Ref *root, Markdown *r, MDNode *node)
-{
-    for (; node != NULL; node = node->next) {
-        switch (node->type) {
-        case MD_HEADING: {
-            char tag[4];
-            int head = node->opt + r->heading_level - 1;
-            Ref *heading;
-            tag[0] = 'h';
-            tag[1] = (head <= 6 ? '0' + head : '6');
-            tag[2] = '\0';
-            heading = xmlelem_new(tag);
-            xmlelem_add(root, heading);
-            if (!xml_convert_line(heading, node->child)) {
-                return FALSE;
-            }
-            break;
-        }
-        case MD_HORIZONTAL: {
-            Ref *hr = xmlelem_new("hr");
-            xmlelem_add(root, hr);
-            break;
-        }
-        case MD_UNORDERD_LIST:
-        case MD_ORDERD_LIST: {
-            Ref *list = xmlelem_new(node->type == MD_UNORDERD_LIST ? "ul" : "ol");
-            xmlelem_add(root, list);
-            if (!xml_convert_listitem(list, node->child, FALSE)) {
-                return FALSE;
-            }
-            break;
-        }
-        case MD_FOOTNOTE_LIST: {
-            Ref *div = xmlelem_new("div");
-            Ref *list;
-            xmlelem_add_attr(div, "class", "footnote");
-            list = xmlelem_new("ol");
-            xmlelem_add(root, div);
-            xmlelem_add(div, list);
-            if (!xml_convert_listitem(list, node->child, TRUE)) {
-                return FALSE;
-            }
-            break;
-        }
-        case MD_PARAGRAPH: {
-            Ref *para = xmlelem_new("p");
-            xmlelem_add(root, para);
-            if (!xml_convert_line(para, node->child)) {
-                return FALSE;
-            }
-            break;
-        }
-        case MD_CODE: {
-            Ref *pre = xmlelem_new("pre");
-            Ref *code = xmlelem_new("code");
-            xmlelem_add(root, pre);
-            xmlelem_add(pre, code);
-            if (!xml_convert_line(code, node->child)) {
-                return FALSE;
-            }
-            break;
-        }
-        case MD_BLOCKQUOTE: {
-            Ref *blockquote = xmlelem_new("blockquote");
-            xmlelem_add(root, blockquote);
-            if (!xml_from_markdown(blockquote, r, node->child)) {
-                return FALSE;
-            }
-            break;
-        }
-        case MD_TABLE: {
-            MDNode *nrow;
-            Ref *table = xmlelem_new("table");
-            xmlelem_add(root, table);
-            for (nrow = node->child; nrow != NULL; nrow = nrow->next) {
-                MDNode *ncell;
-                Ref *row = xmlelem_new("tr");
-                xmlelem_add(table, row);
-                for (ncell = nrow->child; ncell != NULL; ncell = ncell->next) {
-                    Ref *cell = NULL;
-                    switch (ncell->type) {
-                    case MD_TABLE_HEADER:
-                        cell = xmlelem_new("th");
-                        break;
-                    case MD_TABLE_CELL:
-                        cell = xmlelem_new("td");
-                        break;
-                    }
-                    if (cell != NULL) {
-                        xmlelem_add(row, cell);
-                        if (ncell->opt > 1) {
-                            char str[16];
-                            sprintf(str, "%d", ncell->opt);
-                            xmlelem_add_attr(cell, "colspan", str);
-                        }
-                        if (!xml_convert_line(cell, ncell->child)) {
-                            return FALSE;
-                        }
-                    }
-                }
-            }
-        }
-        case MD_IGNORE:
-            xml_from_markdown(root, r, node->child);
-            break;
-        default:
-            break;
-        }
-    }
-    return TRUE;
-}
-
-//////////////////////////////////////////////////////////////////////////////////////////
 
 static int markdown_new(Value *vret, Value *v, RefNode *node)
 {
@@ -377,6 +96,7 @@ static int markdown_new(Value *vret, Value *v, RefNode *node)
     Ref *ref;
     Markdown *md;
     RefNode *type = fs->Value_type(*v);
+    Mem mem;
 
     // 継承可能なクラス
     if (type == fs->cls_fn) {
@@ -387,11 +107,12 @@ static int markdown_new(Value *vret, Value *v, RefNode *node)
         *vret = fs->Value_cp(*v);
     }
 
-    md = malloc(sizeof(Markdown));
+    fs->Mem_init(&mem, 1024);
+    md = fs->Mem_get(&mem, sizeof(Markdown));
     memset(md, 0, sizeof(Markdown));
     ref->v[INDEX_MARKDOWN_MD] = ptr_Value(md);
 
-    fs->Mem_init(&md->mem, 1024);
+    md->mem = mem;
     md->tabstop = 4;
     md->heading_level = 1;
     md->footnote_id = 1;
@@ -407,7 +128,6 @@ static int markdown_dispose(Value *vret, Value *v, RefNode *node)
     Ref *ref = Value_ref(*v);
     Markdown *r = Value_ptr(ref->v[INDEX_MARKDOWN_MD]);
     fs->Mem_close(&r->mem);
-    free(r);
     ref->v[INDEX_MARKDOWN_MD] = VALUE_NULL;
 
     return TRUE;
@@ -542,6 +262,21 @@ static int markdown_make_xml(Value *vret, Value *v, RefNode *node)
 
     return TRUE;
 }
+static int markdown_make_text(Value *vret, Value *v, RefNode *node)
+{
+    Ref *r = Value_vp(*v);
+    Markdown *md = Value_ptr(r->v[INDEX_MARKDOWN_MD]);
+    StrBuf sb;
+
+    fs->StrBuf_init_refstr(&sb, 256);
+    if (!text_from_markdown(&sb, md, md->root)) {
+        StrBuf_close(&sb);
+        return FALSE;
+    }
+    *vret = fs->StrBuf_str_Value(&sb, fs->cls_str);
+
+    return TRUE;
+}
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -557,6 +292,7 @@ static int md_escape(Value *vret, Value *v, RefNode *node)
         switch (ch) {
         case '[': case ']':
         case '(': case ')':
+        case '<': case '>':
         case '`': case '~': case '*':
         case '&': case '|': case ':':
         case '\\':
@@ -643,6 +379,8 @@ static void define_class(RefNode *m)
     fs->define_native_func_a(n, markdown_add_link, 2, 2, NULL, fs->cls_str, fs->cls_str);
     n = fs->define_identifier(m, cls, "make_xml", NODE_FUNC_N, 0);
     fs->define_native_func_a(n, markdown_make_xml, 1, 1, NULL, fs->cls_str);
+    n = fs->define_identifier(m, cls, "make_text", NODE_FUNC_N, 0);
+    fs->define_native_func_a(n, markdown_make_text, 0, 0, NULL);
 
     cls->u.c.n_memb = INDEX_MARKDOWN_NUM;
     fs->extends_method(cls, fs->cls_obj);

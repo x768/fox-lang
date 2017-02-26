@@ -176,7 +176,7 @@ typedef struct
 /////////////////////////////////////////////////////////////////////////////////////
 
 #define FOX_VERSION_MAJOR    0
-#define FOX_VERSION_MINOR    18
+#define FOX_VERSION_MINOR    19
 #define FOX_VERSION_REVISION 0
 
 #define int32_hash(v) (((v) * 31) & INT32_MAX)
@@ -515,6 +515,10 @@ void calc_splice_position(int *pstart, int *plen, int size, Value *v);
 int strclass_tostr(Value *vret, Value *v, RefNode *node);
 void define_lang_str_func(RefNode *m);
 void define_lang_str_class(RefNode *m);
+
+
+// m_test.c
+void define_test_driver(RefNode *m);
 
 
 // m_time.c

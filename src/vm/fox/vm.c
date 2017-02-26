@@ -197,7 +197,7 @@ void init_fox_vm(int running_mode)
     memset(fv, 0, sizeof(FoxVM));
 
     fs->revision = FOX_INTERFACE_REVISION;
-    fs->max_alloc = 32 * 1024 * 1024;  // 一時的
+    fs->max_alloc = 64 * 1024 * 1024;  // 一時的
     init_first_classes();
     g_intern_init();
 
@@ -272,6 +272,9 @@ void init_fox_vm(int running_mode)
     init_file_module_1();
     init_mime_module_1();
     init_marshal_module_1(mod_marshal);
+#ifndef NO_DEBUG
+    define_test_driver(fs->mod_lang);
+#endif
     init_so_func();
 }
 void init_fox_stack()
