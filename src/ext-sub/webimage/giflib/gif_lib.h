@@ -12,12 +12,13 @@ extern "C" {
 #endif /* __cplusplus */
 
 #define GIFLIB_MAJOR 5
-#define GIFLIB_MINOR 0
-#define GIFLIB_RELEASE 0
+#define GIFLIB_MINOR 1
+#define GIFLIB_RELEASE 4
 
 #define GIF_ERROR   0
 #define GIF_OK      1
 
+#include <stddef.h>
 #include <stdbool.h>
 
 #define GIF_STAMP "GIFVER"          /* First chars in file - GIF stamp.  */
@@ -125,8 +126,9 @@ typedef struct GraphicsControlBlock {
 GifFileType *EGifOpen(void *userPtr, OutputFunc writeFunc, int *Error);
 int EGifSpew(GifFileType * GifFile);
 const char *EGifGetGifVersion(GifFileType *GifFile); /* new in 5.x */
-int EGifCloseFile(GifFileType * GifFile);
+int EGifCloseFile(GifFileType *GifFile, int *ErrorCode);
 
+#define E_GIF_SUCCEEDED          0
 #define E_GIF_ERR_OPEN_FAILED    1    /* And EGif possible errors. */
 #define E_GIF_ERR_WRITE_FAILED   2
 #define E_GIF_ERR_HAS_SCRN_DSCR  3
@@ -149,6 +151,7 @@ int EGifPutImageDesc(GifFileType *GifFile,
                      const int GifWidth, const int GifHeight, 
 		     const bool GifInterlace,
                      const ColorMapObject *GifColorMap);
+void EGifSetGifVersion(GifFileType *GifFile, const bool gif89);
 int EGifPutLine(GifFileType *GifFile, GifPixelType *GifLine,
                 int GifLineLen);
 int EGifPutPixel(GifFileType *GifFile, const GifPixelType GifPixel);
@@ -172,8 +175,9 @@ int EGifPutCodeNext(GifFileType *GifFile,
 /* Main entry points */
 int DGifSlurp(GifFileType * GifFile);
 GifFileType *DGifOpen(void *userPtr, InputFunc readFunc, int *Error);    /* new one (TVT) */
-int DGifCloseFile(GifFileType * GifFile);
+int DGifCloseFile(GifFileType * GifFile, int *ErrorCode);
 
+#define D_GIF_SUCCEEDED          0
 #define D_GIF_ERR_OPEN_FAILED    101    /* And DGif possible errors. */
 #define D_GIF_ERR_READ_FAILED    102
 #define D_GIF_ERR_NOT_GIF_FILE   103
@@ -207,7 +211,7 @@ int DGifGetLZCodes(GifFileType *GifFile, int *GifCode);
 /******************************************************************************
  Error handling and reporting.
 ******************************************************************************/
-const char *GifErrorString(int ErrorCode);     /* new in 2012 - ESR */
+extern const char *GifErrorString(int ErrorCode);     /* new in 2012 - ESR */
 
 /*****************************************************************************
  Everything below this point is new after version 1.2, supporting `slurp
@@ -227,6 +231,7 @@ extern int GifBitSize(int n);
  Support for the in-core structures allocation (slurp mode).              
 ******************************************************************************/
 
+extern void GifApplyTranslation(SavedImage *Image, GifPixelType Translation[]);
 extern int GifAddExtensionBlock(int *ExtensionBlock_Count,
 				ExtensionBlock **ExtensionBlocks, 
 				int Function, 

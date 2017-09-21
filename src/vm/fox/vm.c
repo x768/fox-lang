@@ -61,6 +61,9 @@ void init_so_func(void)
     fs->int64_Value = int64_Value;
     fs->float_Value = float_Value;
     fs->cstr_Value = cstr_Value;
+#ifdef WIN32
+    fs->wstr_Value = wstr_Value;
+#endif
     fs->time_Value = time_Value;
     fs->printf_Value = printf_Value;
 

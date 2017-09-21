@@ -501,22 +501,12 @@ int StrBuf_add_v(StrBuf *s, Value v)
             StrBuf_add_r(s, nd->name);
             StrBuf_add_c(s, ')');
         } else if (type != fs->cls_null) {
-            RefNode *fn = Hash_get_p(&type->u.c.h, fs->str_tostr);
             Value vret;
             RefNode *ret_type;
 
-            if (fn == NULL) {
-                throw_error_select(THROW_NO_MEMBER_EXISTS__NODE_REFSTR, type, fs->str_tostr);
-                return FALSE;
-            }
-            if (fn->type != NODE_FUNC && fn->type != NODE_FUNC_N) {
-                throw_errorf(fs->mod_lang, "NameError", "to_str is not a member function");
-                return FALSE;
-            }
-
             Value_push("v", v);
-            if (!call_function(fn, 0)) {
-                return FALSE;
+            if (!call_member_func(fs->str_tostr, 0, TRUE)) {
+                return TRUE;
             }
 
             vret = fg->stk_top[-1];

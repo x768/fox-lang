@@ -1,5 +1,6 @@
-#include "fox.h"
-#include "compat.h"
+#define DEFINE_GLOBALS
+#include "m_text_util.h"
+#include "m_xml.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -19,11 +20,15 @@ typedef struct {
 } RefMapReplace;
 
 
-static const FoxStatic *fs;
-static FoxGlobal *fg;
-
-static RefNode *mod_util;
 static RefNode *cls_replacer;
+static RefNode *cls_hilighter;
+static RefNode *cls_hilight_iter;
+static RefNode *cls_elem;
+static RefNode *cls_text;
+
+static RefStr *str_span;
+static RefStr *str_class;
+static RefStr *str__;
 
 
 static char *init_mem_and_read_file(const char *path, Mem *mem)
@@ -102,16 +107,8 @@ static void read_replacer_sub(RefMapReplace *rp, char *src)
 
 static int replacer_new(Value *vret, Value *v, RefNode *node)
 {
-    const RefNode *v1_type;
+    const RefNode *v1_type = fs->Value_type(v[1]);
 
-    if (fg->stk_top <= v + 1) {
-        RefMapReplace *rp = fs->buf_new(cls_replacer, sizeof(RefMapReplace));
-        *vret = vp_Value(rp);
-        fs->Mem_init(&rp->mem, 1024);
-        return TRUE;
-    }
-
-    v1_type = fs->Value_type(v[1]);
     if (v1_type == fs->cls_str) {
         // ファイルから読む
         RefStr *path = Value_vp(v[1]);
@@ -222,42 +219,190 @@ static int replacer_replace(Value *vret, Value *v, RefNode *node)
 
     return TRUE;
 }
-static int replacer_add(Value *vret, Value *v, RefNode *node)
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
+static int str_isalnumu(const char *src)
 {
+    for (; *src != '\0'; src++) {
+        if (!isalnumu_fox(*src)) {
+            return FALSE;
+        }
+    }
+    return TRUE;
+}
+
+static int hilighter_new(Value *vret, Value *v, RefNode *node)
+{
+    RefNode *v1_type = fs->Value_type(v[1]);
+    RefStr *rs_type = NULL;
+
+    if (v1_type == fs->cls_mimetype) {
+        rs_type = Value_vp(v[1]);
+    } else if (v1_type == fs->cls_str) {
+        rs_type = Value_vp(v[1]);
+        if (str_isalnumu(rs_type->c)) {
+            char cbuf[16];
+            sprintf(cbuf, ".%.14s", rs_type->c);
+            // 拡張子->MimeType
+            rs_type = fs->mimetype_from_suffix(cbuf, -1);
+        }
+    } else {
+        fs->throw_error_select(THROW_ARGMENT_TYPE2__NODE_NODE_NODE_INT, fs->cls_mimetype, fs->cls_str, v1_type, 1);
+        return FALSE;
+    }
+
+    {
+        Hilight *h = fs->buf_new(cls_hilighter, sizeof(Hilight));
+        int result = FALSE;
+        fs->Mem_init(&h->mem, 1024);
+        if (!load_hilight(h, rs_type, &result)) {
+            return FALSE;
+        }
+        if (result) {
+            h->mimetype = fs->cstr_Value(fs->cls_mimetype, rs_type->c, rs_type->size);
+        } else {
+            h->mimetype = VALUE_NULL;
+        }
+        *vret = vp_Value(h);
+    }
+    return TRUE;
+}
+static int hilighter_get_mime(Value *vret, Value *v, RefNode *node)
+{
+    Hilight *h = Value_vp(v[0]);
+    *vret = fs->Value_cp(h->mimetype);
+    return TRUE;
+}
+static int hilighter_parse(Value *vret, Value *v, RefNode *node)
+{
+    Hilight *h = Value_vp(v[0]);
+    HilightIter *it = fs->buf_new(cls_hilight_iter, sizeof(HilightIter));
+    RefStr *src = Value_vp(v[1]);
+
+    it->h_val = fs->Value_cp(v[0]);
+    it->src_val = fs->Value_cp(v[1]);
+    it->h = h;
+    it->src_end = src->c + src->size;
+    it->ptr = src->c;
+    it->end = src->c;
+    it->word = NULL;
+    it->next_word = NULL;
+    it->state = fs->Hash_get(&h->state, "_", 1);
+    it->next_state = it->state;
+    it->state_next1 = it->state;
+    it->state_next2 = it->state;
+
+    *vret = vp_Value(it);
+    return TRUE;
+}
+static int hilighter_close(Value *vret, Value *v, RefNode *node)
+{
+    Hilight *h = Value_vp(v[0]);
+    fs->Mem_close(&h->mem);
+    return TRUE;
+}
+
+static Ref *xmlspan_new(RefStr *klass, const char *src, int src_len)
+{
+    RefArray *ra;
+    RefMap *rm;
+    HashValueEntry *em;
+    Ref *r = fs->ref_new(cls_elem);
+
+    ra = fs->refarray_new(0);
+    *fs->refarray_push(ra) = fs->cstr_Value(cls_text, src, src_len);
+
+    rm = fs->refmap_new(1);
+    em = fs->refmap_add(rm, vp_Value(str_class), TRUE, FALSE);
+    em->val = vp_Value(klass);
+
+    r->v[INDEX_ELEM_NAME] = vp_Value(str_span);
+    r->v[INDEX_ELEM_CHILDREN] = vp_Value(ra);
+    r->v[INDEX_ELEM_ATTR] = vp_Value(rm);
+
+    return r;
+}
+
+static int hilight_iter_next(Value *vret, Value *v, RefNode *node)
+{
+    HilightIter *it = Value_vp(v[0]);
+    const char *begin = NULL;
+    const char *end = NULL;
+
+    // 同じ色をまとめる
+    while (hilight_code_next(it)) {
+        if (begin == NULL) {
+            begin = it->ptr;
+        }
+        end = it->end;
+        if (it->state != it->state_next1) {
+            break;
+        }
+    }
+
+    if (begin == NULL) {
+        fs->throw_stopiter();
+        return FALSE;
+    }
+
+    if (it->state->name != str__) {
+        Ref *r = xmlspan_new(it->state->name, begin, (int)(end - begin));
+        *vret = vp_Value(r);
+    } else {
+        *vret = fs->cstr_Value(cls_text, begin, (int)(end - begin));
+    }
+    return TRUE;
+}
+static int hilight_iter_close(Value *vret, Value *v, RefNode *node)
+{
+    HilightIter *it = Value_vp(v[0]);
+    fs->unref(it->src_val);
+    fs->unref(it->h_val);
     return TRUE;
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
-static void define_func(RefNode *m)
-{
-/*
-    RefNode *n;
-    RefNode *root = &m->root;
-
-    n = fs->define_identifier(m, root, "convert_table", NODE_FUNC_N, 0);
-    fs->define_native_func_a(n, convert_kana, 2, 2, NULL, fs->cls_str, fs->cls_str);
-*/
-}
 static void define_class(RefNode *m)
 {
     RefNode *cls;
     RefNode *n;
 
     cls_replacer = fs->define_identifier(m, m, "Replacer", NODE_CLASS, 0);
+    cls_hilighter = fs->define_identifier(m, m, "Hilighter", NODE_CLASS, 0);
+    cls_hilight_iter = fs->define_identifier(m, m, "HilightIter", NODE_CLASS, 0);
 
 
     cls = cls_replacer;
     n = fs->define_identifier_p(m, cls, fs->str_new, NODE_NEW_N, 0);
-    fs->define_native_func_a(n, replacer_new, 0, 1, NULL, NULL);
+    fs->define_native_func_a(n, replacer_new, 1, 1, NULL, NULL);
 
     n = fs->define_identifier_p(m, cls, fs->str_dtor, NODE_FUNC_N, 0);
     fs->define_native_func_a(n, replacer_close, 0, 0, NULL);
     n = fs->define_identifier(m, cls, "replace", NODE_FUNC_N, 0);
     fs->define_native_func_a(n, replacer_replace, 1, 1, NULL, fs->cls_str);
-    n = fs->define_identifier(m, cls, "add", NODE_FUNC_N, 0);
-    fs->define_native_func_a(n, replacer_add, 1, 1, NULL, cls);
     fs->extends_method(cls, fs->cls_obj);
+
+
+    cls = cls_hilighter;
+    n = fs->define_identifier_p(m, cls, fs->str_new, NODE_NEW_N, 0);
+    fs->define_native_func_a(n, hilighter_new, 1, 1, NULL, NULL);
+
+    n = fs->define_identifier_p(m, cls, fs->str_dtor, NODE_FUNC_N, 0);
+    fs->define_native_func_a(n, hilighter_close, 0, 0, NULL);
+    n = fs->define_identifier(m, cls, "mimetype", NODE_FUNC_N, NODEOPT_PROPERTY);
+    fs->define_native_func_a(n, hilighter_get_mime, 0, 0, NULL);
+    n = fs->define_identifier(m, cls, "parse", NODE_FUNC_N, 0);
+    fs->define_native_func_a(n, hilighter_parse, 1, 1, NULL, fs->cls_str);
+    fs->extends_method(cls, fs->cls_obj);
+
+    cls = cls_hilight_iter;
+    n = fs->define_identifier_p(m, cls, fs->str_dtor, NODE_FUNC_N, 0);
+    fs->define_native_func_a(n, hilight_iter_close, 0, 0, NULL);
+    n = fs->define_identifier(m, cls, "next", NODE_FUNC_N, 0);
+    fs->define_native_func_a(n, hilight_iter_next, 0, 0, NULL);
+    fs->extends_method(cls, fs->cls_iterator);
 }
 
 void define_module(RefNode *m, const FoxStatic *a_fs, FoxGlobal *a_fg)
@@ -266,7 +411,16 @@ void define_module(RefNode *m, const FoxStatic *a_fs, FoxGlobal *a_fg)
     fg = a_fg;
     mod_util = m;
 
-    define_func(m);
+    {
+        RefNode *mod_xml = fs->get_module_by_name("marshal.xml", -1, TRUE, FALSE);
+        cls_elem = fs->Hash_get(&mod_xml->u.m.h, "XMLElem", -1);
+        cls_text = fs->Hash_get(&mod_xml->u.m.h, "XMLText", -1);
+    }
+    str_span = fs->intern("span", 4);
+    str_class = fs->intern("class", 5);
+    str__ = fs->intern("_", 1);
+
+
     define_class(m);
 }
 

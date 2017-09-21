@@ -1,5 +1,5 @@
-#ifndef _FOX_PARSE_H_
-#define _FOX_PARSE_H_
+#ifndef FOX_PARSE_H_INCLUDED
+#define FOX_PARSE_H_INCLUDED
 
 #include "fox_vm.h"
 #include "m_token.h"
@@ -167,4 +167,4 @@ void throw_error_vprintf(RefNode *err_m, const char *err_name, const char *fmt, 
 
 
 
-#endif /* _FOX_PARSE_H_ */
+#endif /* FOX_PARSE_H_INCLUDED */

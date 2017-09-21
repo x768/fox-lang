@@ -1477,7 +1477,7 @@ static int timedelta_div(Value *vret, Value *v, RefNode *node)
         }
         *vret = float_Value(cls_timedelta, d);
     } else if (v1_type == cls_timedelta) {
-        double r2 = Value_float(v[1]);
+        double r2 = Value_float2(v[1]);
         *vret = float_Value(fs->cls_float, r1 / r2);
     } else {
         throw_error_select(THROW_ARGMENT_TYPE2__NODE_NODE_NODE_INT, fs->cls_float, cls_timedelta, v1_type, 1);

@@ -290,7 +290,6 @@ int convert_bin_to_str_sub(StrBuf *dst_buf, const char *src_p, int src_size, Ref
     if (src_size < 0) {
         src_size = strlen(src_p);
     }
-
     if (cs == NULL || cs->utf8) {
         // なるべくそのまま
         if (invalid_utf8_pos(src_p, src_size) >= 0) {
@@ -308,6 +307,7 @@ int convert_bin_to_str_sub(StrBuf *dst_buf, const char *src_p, int src_size, Ref
         CodeCVT ic;
         int result = TRUE;
 
+        CodeCVTStatic_init();
         if (!codecvt->CodeCVT_open(&ic, cs, fs->cs_utf8, alt_b ? UTF8_ALTER_CHAR : NULL)) {
             return FALSE;
         }
@@ -541,6 +541,7 @@ void define_charset_class(RefNode *m)
     load_charset_info_file("data" SEP_S "charset-info.txt");
 
     fs->cs_utf8 = get_charset_from_name("UTF8", 4);
+    fs->cs_utf8->utf8 = TRUE;
 
     // Charset
     cls = fs->cls_charset;

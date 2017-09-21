@@ -933,6 +933,46 @@ ERROR_END:
     rm1->lock_count--;
     return FALSE;
 }
+int set_sub(Value *vret, Value *v, RefNode *node)
+{
+    RefMap *rm = Value_vp(*v);
+    RefMap *rm1 = Value_vp(v[1]);
+    int i;
+
+    RefMap *rm2 = refmap_new(rm->count);
+    *vret = vp_Value(rm2);
+    rm2->rh.type = fs->cls_set;
+
+    rm->lock_count++;
+    rm1->lock_count++;
+
+    for (i = 0; i < rm->entry_num; i++) {
+        HashValueEntry *ep = rm->entry[i];
+        for (; ep != NULL; ep = ep->next) {
+            Value key = ep->key;
+            HashValueEntry *ep2 = NULL;
+
+            // v1に同じ値がなければ追加
+            if (!refmap_get(&ep2, rm1, key)) {
+                goto ERROR_END;
+            }
+            if (ep2 == NULL) {
+                if (refmap_add(rm2, key, TRUE, FALSE) == NULL) {
+                    goto ERROR_END;
+                }
+            }
+        }
+    }
+
+    rm->lock_count--;
+    rm1->lock_count--;
+    return TRUE;
+
+ERROR_END:
+    rm->lock_count--;
+    rm1->lock_count--;
+    return FALSE;
+}
 
 ///////////////////////////////////////////////////////////////////////////////////////////
 
@@ -1063,6 +1103,8 @@ void define_lang_map_class(RefNode *m)
     define_native_func_a(n, set_or, 1, 1, NULL, fs->cls_set);
     n = define_identifier_p(m, cls, fs->symbol_stock[T_XOR], NODE_FUNC_N, 0);
     define_native_func_a(n, set_xor, 1, 1, NULL, fs->cls_set);
+    n = define_identifier_p(m, cls, fs->symbol_stock[T_SUB], NODE_FUNC_N, 0);
+    define_native_func_a(n, set_sub, 1, 1, NULL, fs->cls_set);
     n = define_identifier_p(m, cls, empty, NODE_FUNC_N, NODEOPT_PROPERTY);
     define_native_func_a(n, map_empty, 0, 0, NULL);
     n = define_identifier_p(m, cls, size, NODE_FUNC_N, NODEOPT_PROPERTY);

@@ -1,5 +1,5 @@
-#ifndef _M_NUMBER_H_
-#define _M_NUMBER_H_
+#ifndef M_NUMBER_H_INCLUDED
+#define M_NUMBER_H_INCLUDED
 
 #include "fox.h"
 
@@ -48,4 +48,4 @@ typedef struct {
 
 #define Value_float2(v)      (((RefFloat*)Value_vp(v))->d)
 
-#endif /* _M_NUMBER_H_ */
+#endif /* M_NUMBER_H_INCLUDED */

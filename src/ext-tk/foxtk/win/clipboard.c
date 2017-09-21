@@ -328,7 +328,7 @@ Value clipboard_get_text()
             return TRUE;
         }
         wbuf = (wchar_t*)GlobalLock(hGlobal);
-        v = utf16_str_Value(wbuf);
+        v = fs->wstr_Value(fs->cls_str, wbuf, -1);
 
         GlobalUnlock(hGlobal);
         CloseClipboard();
@@ -361,7 +361,7 @@ int clipboard_get_files(Value *v, int uri)
             Value *vf;
             DragQueryFileW(hDrop, i, wbuf, MAX_PATH);
             vf = fs->refarray_push(afile);
-            *vf = utf16_file_Value(wbuf);
+            *vf = fs->wstr_Value(fs->cls_file, wbuf, -1);
             if (uri) {
                 fs->Value_push("v", *vf);
                 if (!fs->call_function(fn_to_uri, 0)) {

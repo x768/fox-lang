@@ -6,21 +6,21 @@
 
 
 
-static WndHandle Value_widget_handle(Value v)
+static WndHandle Value_form_handle(Value v)
 {
     Ref *r = Value_ref(v);
-    return Value_handle(r->v[INDEX_WIDGET_HANDLE]);
+    return Value_handle(r->v[INDEX_FORM_HANDLE]);
 }
-static int check_already_closed(void *handle)
+static int validate_handle_alive(void *handle)
 {
     if (handle == NULL) {
-        fs->throw_errorf(mod_gui, "GuiError", "Widget already disposed");
+        fs->throw_errorf(mod_gui, "GuiError", "Already disposed");
         return FALSE;
     }
     return TRUE;
 }
 
-static int validate_string_array(RefArray *ra)
+static int is_string_array(RefArray *ra)
 {
     int i;
     for (i = 0; i < ra->size; i++) {
@@ -224,7 +224,7 @@ static int gui_alert(Value *vret, Value *v, RefNode *node)
         title = NULL;
     }
     if (fg->stk_top > v + 3) {
-        parent = Value_widget_handle(v[3]);
+        parent = Value_form_handle(v[3]);
     }
 
     if (type == fs->cls_str) {
@@ -261,18 +261,18 @@ static int gui_fileopen_dialog(Value *vret, Value *v, RefNode *node)
 
     if (type == FILEOPEN_DIR) {
         if (fg->stk_top > v + 2) {
-            parent = Value_widget_handle(v[2]);
+            parent = Value_form_handle(v[2]);
         }
     } else {
         if (fg->stk_top > v + 2) {
             ra = Value_vp(v[2]);
-            if (!validate_string_array(ra)) {
+            if (!is_string_array(ra)) {
                 fs->throw_errorf(fs->mod_lang, "TypeError", "Array of Str required (argument #2)");
                 return FALSE;
             }
         }
         if (fg->stk_top > v + 3) {
-            parent = Value_widget_handle(v[3]);
+            parent = Value_form_handle(v[3]);
         }
     }
 
@@ -359,34 +359,6 @@ static int exio_trash(Value *vret, Value *v, RefNode *node)
 
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-static int widget_is_destroyed(Value *vret, Value *v, RefNode *node)
-{
-    WndHandle window = Value_widget_handle(*v);
-    *vret = bool_Value(window == NULL);
-    return TRUE;
-}
-static int widget_get_visible(Value *vret, Value *v, RefNode *node)
-{
-    WndHandle window = Value_widget_handle(*v);
-
-    if (!check_already_closed(window)) {
-        return FALSE;
-    }
-    *vret = bool_Value(window_get_visible(window));
-    return TRUE;
-}
-static int widget_set_visible(Value *vret, Value *v, RefNode *node)
-{
-    WndHandle window = Value_widget_handle(*v);
-
-    if (!check_already_closed(window)) {
-        return FALSE;
-    }
-    window_set_visible(window, Value_bool(v[1]));
-
-    return TRUE;
-}
-
 static int widget_handler(Value *vret, Value *v, RefNode *node)
 {
     Ref *r = Value_ref(*v);
@@ -415,7 +387,7 @@ static int value_to_winhandle(WndHandle *pwh, Value v, int argc, RefNode *a_type
 
     if (fs->is_subclass(type, a_type)) {
         Ref *r = Value_ref(v);
-        *pwh = Value_handle(r->v[INDEX_WIDGET_HANDLE]);
+        *pwh = Value_handle(r->v[INDEX_FORM_HANDLE]);
     } else if (type == fs->cls_null) {
         *pwh = NULL;
     } else {
@@ -438,6 +410,7 @@ static int form_new_sub(Value *vret, Value *v, WndHandle parent, int *size)
         r = Value_vp(*v);
         *vret = fs->Value_cp(*v);
     }
+    r->v[INDEX_FORM_CHILDREN] = vp_Value(fs->refarray_new(0));
     create_form_window(r, parent, size);
 
     return TRUE;
@@ -470,7 +443,7 @@ static int form_fixed(Value *vret, Value *v, RefNode *node)
 }
 static int form_close(Value *vret, Value *v, RefNode *node)
 {
-    WndHandle window = Value_widget_handle(*v);
+    WndHandle window = Value_form_handle(*v);
     Ref *r = Value_ref(*v);
     if (window != NULL) {
         window_destroy(window);
@@ -478,11 +451,16 @@ static int form_close(Value *vret, Value *v, RefNode *node)
     widget_handler_destroy(r);
     return TRUE;
 }
-
+static int form_is_destroyed(Value *vret, Value *v, RefNode *node)
+{
+    WndHandle window = Value_form_handle(*v);
+    *vret = bool_Value(window == NULL);
+    return TRUE;
+}
 static int form_get_title(Value *vret, Value *v, RefNode *node)
 {
-    WndHandle window = Value_widget_handle(*v);
-    if (!check_already_closed(window)) {
+    WndHandle window = Value_form_handle(*v);
+    if (!validate_handle_alive(window)) {
         return FALSE;
     }
     window_get_title(vret, window);
@@ -491,22 +469,43 @@ static int form_get_title(Value *vret, Value *v, RefNode *node)
 }
 static int form_set_title(Value *vret, Value *v, RefNode *node)
 {
-    WndHandle window = Value_widget_handle(*v);
+    WndHandle window = Value_form_handle(*v);
     RefStr *rs = Value_vp(v[1]);
 
-    if (!check_already_closed(window)) {
+    if (!validate_handle_alive(window)) {
         return FALSE;
     }
     window_set_title(window, rs->c);
 
     return TRUE;
 }
+static int form_get_visible(Value *vret, Value *v, RefNode *node)
+{
+    WndHandle window = Value_form_handle(*v);
+
+    if (!validate_handle_alive(window)) {
+        return FALSE;
+    }
+    *vret = bool_Value(window_get_visible(window));
+    return TRUE;
+}
+static int form_set_visible(Value *vret, Value *v, RefNode *node)
+{
+    WndHandle window = Value_form_handle(*v);
+
+    if (!validate_handle_alive(window)) {
+        return FALSE;
+    }
+    window_set_visible(window, Value_bool(v[1]));
+
+    return TRUE;
+}
 static int form_set_icon(Value *vret, Value *v, RefNode *node)
 {
-    WndHandle window = Value_widget_handle(*v);
+    WndHandle window = Value_form_handle(*v);
     RefImage *img = Value_vp(v[1]);
 
-    if (!check_already_closed(window)) {
+    if (!validate_handle_alive(window)) {
         return FALSE;
     }
     if (img->data == NULL) {
@@ -523,8 +522,8 @@ static int form_set_icon(Value *vret, Value *v, RefNode *node)
 static int form_get_opacity(Value *vret, Value *v, RefNode *node)
 {
     Ref *r = Value_ref(*v);
-    WndHandle window = Value_handle(r->v[INDEX_WIDGET_HANDLE]);
-    if (!check_already_closed(window)) {
+    WndHandle window = Value_handle(r->v[INDEX_FORM_HANDLE]);
+    if (!validate_handle_alive(window)) {
         return FALSE;
     }
     *vret = fs->float_Value(fs->cls_float, window_get_opacity(r));
@@ -534,10 +533,10 @@ static int form_get_opacity(Value *vret, Value *v, RefNode *node)
 static int form_set_opacity(Value *vret, Value *v, RefNode *node)
 {
     Ref *r = Value_ref(*v);
-    WndHandle window = Value_handle(r->v[INDEX_WIDGET_HANDLE]);
+    WndHandle window = Value_handle(r->v[INDEX_FORM_HANDLE]);
     double opacity = fs->Value_float(v[1]);
 
-    if (!check_already_closed(window)) {
+    if (!validate_handle_alive(window)) {
         return FALSE;
     }
     if (opacity < 0.0) {
@@ -551,11 +550,11 @@ static int form_set_opacity(Value *vret, Value *v, RefNode *node)
 }
 static int form_set_client_size(Value *vret, Value *v, RefNode *node)
 {
-    WndHandle window = Value_widget_handle(*v);
+    WndHandle window = Value_form_handle(*v);
     int width = fs->Value_int64(v[1], NULL);
     int height = fs->Value_int64(v[2], NULL);
 
-    if (!check_already_closed(window)) {
+    if (!validate_handle_alive(window)) {
         return FALSE;
     }
     window_set_client_size(window, width, height);
@@ -564,11 +563,11 @@ static int form_set_client_size(Value *vret, Value *v, RefNode *node)
 }
 static int form_move(Value *vret, Value *v, RefNode *node)
 {
-    WndHandle window = Value_widget_handle(*v);
+    WndHandle window = Value_form_handle(*v);
     int x = fs->Value_int64(v[1], NULL);
     int y = fs->Value_int64(v[2], NULL);
 
-    if (!check_already_closed(window)) {
+    if (!validate_handle_alive(window)) {
         return FALSE;
     }
     window_move(window, x, y);
@@ -577,9 +576,9 @@ static int form_move(Value *vret, Value *v, RefNode *node)
 }
 static int form_move_center(Value *vret, Value *v, RefNode *node)
 {
-    WndHandle window = Value_widget_handle(*v);
+    WndHandle window = Value_form_handle(*v);
 
-    if (!check_already_closed(window)) {
+    if (!validate_handle_alive(window)) {
         return FALSE;
     }
     window_move_center(window);
@@ -589,10 +588,10 @@ static int form_move_center(Value *vret, Value *v, RefNode *node)
 
 static int form_keep_above(Value *vret, Value *v, RefNode *node)
 {
-    WndHandle window = Value_widget_handle(*v);
+    WndHandle window = Value_form_handle(*v);
     int above = Value_bool(v[1]);
 
-    if (!check_already_closed(window)) {
+    if (!validate_handle_alive(window)) {
         return FALSE;
     }
     window_set_keep_above(window, above);
@@ -602,14 +601,14 @@ static int form_keep_above(Value *vret, Value *v, RefNode *node)
 static int form_add_menu(Value *vret, Value *v, RefNode *node)
 {
     Ref *r = Value_ref(*v);
-    WndHandle window = Value_handle(r->v[INDEX_WIDGET_HANDLE]);
+    WndHandle window = Value_handle(r->v[INDEX_FORM_HANDLE]);
     Ref *r2 = Value_ref(v[2]);
     MenuHandle menu = Value_handle(r2->v[INDEX_MENU_HANDLE]);
     MenuHandle menubar = NULL;
     RefStr *text = Value_vp(v[1]);
     int init = FALSE;
 
-    if (!check_already_closed(window)) {
+    if (!validate_handle_alive(window)) {
         return FALSE;
     }
 
@@ -630,12 +629,12 @@ static int form_wait(Value *vret, Value *v, RefNode *node)
 {
     Ref *r = Value_ref(*v);
 
-    if (!check_already_closed(Value_handle(r->v[INDEX_WIDGET_HANDLE]))) {
+    if (!validate_handle_alive(Value_handle(r->v[INDEX_FORM_HANDLE]))) {
         return FALSE;
     }
 
     for (;;) {
-        if (Value_handle(r->v[INDEX_WIDGET_HANDLE]) == NULL) {
+        if (Value_handle(r->v[INDEX_FORM_HANDLE]) == NULL) {
             break;
         }
         if (!window_message_loop()) {
@@ -651,10 +650,10 @@ static int form_wait(Value *vret, Value *v, RefNode *node)
 static int form_handler_dropped(Value *vret, Value *v, RefNode *node)
 {
     Ref *r = Value_ref(*v);
-    WndHandle window = Value_handle(r->v[INDEX_WIDGET_HANDLE]);
+    WndHandle window = Value_handle(r->v[INDEX_FORM_HANDLE]);
     RefStr *name;
 
-    if (!check_already_closed(window)) {
+    if (!validate_handle_alive(window)) {
         return FALSE;
     }
     if (fg->stk_top > v + 1) {
@@ -671,31 +670,6 @@ static int form_handler_dropped(Value *vret, Value *v, RefNode *node)
         r->v[INDEX_FORM_DROP_HANDLE] = VALUE_TRUE;
     }
 
-    return TRUE;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////
-
-static int image_pane_new(Value *vret, Value *v, RefNode *node)
-{
-    RefNode *cls_image_pane = FUNC_VP(node);
-    WndHandle parent = Value_widget_handle(v[1]);
-
-    *vret = vp_Value(fs->ref_new(cls_image_pane));
-    create_image_pane_window(vret, parent);
-    return TRUE;
-}
-static int image_pane_set_image(Value *vret, Value *v, RefNode *node)
-{
-    WndHandle window = Value_widget_handle(*v);
-    RefImage *img = Value_vp(v[1]);
-
-    if (!check_already_closed(window)) {
-        return FALSE;
-    }
-    if (!image_pane_set_image_sub(window, img)) {
-        return FALSE;
-    }
     return TRUE;
 }
 
@@ -1085,22 +1059,14 @@ static void define_class(RefNode *m)
 
 
     cls = cls_widget;
-    n = fs->define_identifier(m, cls, "destroyed", NODE_FUNC_N, NODEOPT_PROPERTY);
-    fs->define_native_func_a(n, widget_is_destroyed, 0, 0, NULL);
     n = fs->define_identifier(m, cls, "_handler", NODE_FUNC_N, 0);
     fs->define_native_func_a(n, widget_handler, 0, 1, NULL, fs->cls_str);
     n = fs->define_identifier(m, cls, "_call_handler", NODE_FUNC_N, 0);
     fs->define_native_func_a(n, widget_call_handler, 1, 1, NULL, cls_event);
-    n = fs->define_identifier(m, cls, "visible", NODE_FUNC_N, NODEOPT_PROPERTY);
-    fs->define_native_func_a(n, widget_get_visible, 0, 0, NULL);
-    n = fs->define_identifier(m, cls, "visible=", NODE_FUNC_N, 0);
-    fs->define_native_func_a(n, widget_set_visible, 1, 1, NULL, fs->cls_bool);
-    n = fs->define_identifier(m, cls, "destroyed", NODE_FUNC_N, NODEOPT_PROPERTY);
-    fs->define_native_func_a(n, widget_is_destroyed, 0, 0, NULL);
 
-    n = fs->define_identifier(m, cls, "button_pressed", NODE_FUNC_N, NODEOPT_PROPERTY);
+    n = fs->define_identifier(m, cls, "mouse_pressed", NODE_FUNC_N, NODEOPT_PROPERTY);
     fs->define_native_func_a(n, widget_handler, 0, 0, NULL);
-    n = fs->define_identifier(m, cls, "button_released", NODE_FUNC_N, NODEOPT_PROPERTY);
+    n = fs->define_identifier(m, cls, "mouse_released", NODE_FUNC_N, NODEOPT_PROPERTY);
     fs->define_native_func_a(n, widget_handler, 0, 0, NULL);
     n = fs->define_identifier(m, cls, "wheel_scrolled", NODE_FUNC_N, NODEOPT_PROPERTY);
     fs->define_native_func_a(n, widget_handler, 0, 0, NULL);
@@ -1123,10 +1089,16 @@ static void define_class(RefNode *m)
 
     n = fs->define_identifier(m, cls, "close", NODE_FUNC_N, 0);
     fs->define_native_func_a(n, form_close, 0, 0, NULL);
+    n = fs->define_identifier(m, cls, "destroyed", NODE_FUNC_N, NODEOPT_PROPERTY);
+    fs->define_native_func_a(n, form_is_destroyed, 0, 0, NULL);
     n = fs->define_identifier(m, cls, "title", NODE_FUNC_N, NODEOPT_PROPERTY);
     fs->define_native_func_a(n, form_get_title, 0, 0, NULL);
     n = fs->define_identifier(m, cls, "title=", NODE_FUNC_N, 0);
     fs->define_native_func_a(n, form_set_title, 1, 1, NULL, fs->cls_str);
+    n = fs->define_identifier(m, cls, "visible", NODE_FUNC_N, NODEOPT_PROPERTY);
+    fs->define_native_func_a(n, form_get_visible, 0, 0, NULL);
+    n = fs->define_identifier(m, cls, "visible=", NODE_FUNC_N, 0);
+    fs->define_native_func_a(n, form_set_visible, 1, 1, NULL, fs->cls_bool);
     n = fs->define_identifier(m, cls, "icon=", NODE_FUNC_N, 0);
     fs->define_native_func_a(n, form_set_icon, 1, 1, NULL, NULL);
     fs->add_unresolved_args(m, mod_image, "Image", n, 0);
@@ -1151,20 +1123,15 @@ static void define_class(RefNode *m)
     fs->define_native_func_a(n, widget_handler, 0, 0, NULL);
     n = fs->define_identifier(m, cls, "dropped", NODE_FUNC_N, NODEOPT_PROPERTY);
     fs->define_native_func_a(n, form_handler_dropped, 0, 0, NULL);
+    n = fs->define_identifier(m, cls, "mouse_pressed", NODE_FUNC_N, NODEOPT_PROPERTY);
+    fs->define_native_func_a(n, widget_handler, 0, 0, NULL);
+    n = fs->define_identifier(m, cls, "mouse_released", NODE_FUNC_N, NODEOPT_PROPERTY);
+    fs->define_native_func_a(n, widget_handler, 0, 0, NULL);
+    n = fs->define_identifier(m, cls, "wheel_scrolled", NODE_FUNC_N, NODEOPT_PROPERTY);
+    fs->define_native_func_a(n, widget_handler, 0, 0, NULL);
 
     cls->u.c.n_memb = INDEX_FORM_NUM;
-    fs->extends_method(cls, cls_layout);
-
-
-    cls = fs->define_identifier(m, m, "ImagePane", NODE_CLASS, 0);
-    n = fs->define_identifier_p(m, cls, fs->str_new, NODE_NEW_N, 0);
-    fs->define_native_func_a(n, image_pane_new, 0, 1, cls, cls_layout);
-
-    n = fs->define_identifier(m, cls, "image=", NODE_FUNC_N, 0);
-    fs->define_native_func_a(n, image_pane_set_image, 1, 1, NULL, NULL);
-    fs->add_unresolved_args(m, mod_image, "Image", n, 0);
-    cls->u.c.n_memb = INDEX_FORM_NUM;
-    fs->extends_method(cls, cls_widget);
+    fs->extends_method(cls, fs->cls_obj);
 
 
     cls = cls_event;
@@ -1269,7 +1236,6 @@ static FoxtkStatic *newFoxtkStatic(void)
     f->invoke_event_handler = invoke_event_handler;
     f->widget_event_handler_sub = widget_event_handler_sub;
     f->widget_handler_destroy = widget_handler_destroy;
-    f->connect_widget_events = connect_widget_events;
 
     f->event_object_new = event_object_new;
     f->event_object_add = event_object_add;

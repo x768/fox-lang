@@ -43,25 +43,6 @@ char *get_toolkit_version()
     return p;
 }
 
-Value utf16_str_Value(const wchar_t *src)
-{
-    Value v;
-    int wlen = wcslen(src);
-    int clen = utf16_to_utf8(NULL, src, wlen);
-    char *buf = malloc(clen + 1);
-    utf16_to_utf8(buf, src, wlen);
-
-    v = fs->cstr_Value(NULL, buf, -1);
-    free(buf);
-    return v;
-}
-Value utf16_file_Value(const wchar_t *src)
-{
-    Value v = utf16_str_Value(src);
-    Value_ref_header(v)->type = fs->cls_file;
-    return v;
-}
-
 HBITMAP duplicate_bitmap(HBITMAP hSrcBmp)
 {
     BITMAP bitmap;

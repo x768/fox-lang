@@ -60,14 +60,14 @@ static char *read_hilight_file(RefStr *type)
     }
     return NULL;
 }
-static void add_hilight_state(Markdown *r, Hilight *h, RefStr *name, int word, int icase)
+static void add_hilight_state(Markdown *md, Hilight *h, RefStr *name, int word, int icase)
 {
-    State *state = fs->Mem_get(&r->mem, sizeof(State));
+    State *state = fs->Mem_get(&md->mem, sizeof(State));
     memset(state->left, 0, sizeof(state->left));
     state->name = name;
     state->word = word;
     state->icase = icase;
-    fs->Hash_add_p(&h->state, &r->mem, name, state);
+    fs->Hash_add_p(&h->state, &md->mem, name, state);
 }
 static int is_word_char(Hilight *h, int ch)
 {
@@ -151,7 +151,7 @@ static void parse_word_chars(Hilight *h, const char *p, const char *end)
         }
     }
 }
-static int load_hilight_sub(Hilight *h, Markdown *r, char *buf, RefStr *type)
+static int load_hilight_sub(Hilight *h, Markdown *md, char *buf, RefStr *type)
 {
     Tok tk;
 
@@ -174,7 +174,7 @@ static int load_hilight_sub(Hilight *h, Markdown *r, char *buf, RefStr *type)
             fs->throw_errorf(fs->mod_lang, "InternalError", "'%S' not found at line %d (%r)", tk.str_val, tk.v.line, type);
             return FALSE;
         }
-        result = load_hilight_sub(h, r, buf2, type2);
+        result = load_hilight_sub(h, md, buf2, type2);
         free(buf2);
         if (!result) {
             return FALSE;
@@ -182,7 +182,7 @@ static int load_hilight_sub(Hilight *h, Markdown *r, char *buf, RefStr *type)
 
         fs->Tok_simple_next(&tk);
     } else {
-        add_hilight_state(r, h, str__, FALSE, FALSE);
+        add_hilight_state(md, h, str__, FALSE, FALSE);
     }
     
     for (;;) {
@@ -207,7 +207,7 @@ static int load_hilight_sub(Hilight *h, Markdown *r, char *buf, RefStr *type)
                     }
                     fs->Tok_simple_next(&tk);
                 }
-                add_hilight_state(r, h, name, word, icase);
+                add_hilight_state(md, h, name, word, icase);
             } else if (str_eq(tk.str_val.p, tk.str_val.size, "word", 4)) {
                 fs->Tok_simple_next(&tk);
                 if (tk.v.type != TL_STR) {
@@ -223,7 +223,7 @@ static int load_hilight_sub(Hilight *h, Markdown *r, char *buf, RefStr *type)
             break;
         case TL_STR:
             if (tk.str_val.size > 0) {
-                Word *word = fs->Mem_get(&r->mem, sizeof(Word) + tk.str_val.size);
+                Word *word = fs->Mem_get(&md->mem, sizeof(Word) + tk.str_val.size);
                 State *state[3];
                 int i;
 
@@ -282,12 +282,12 @@ SYNTAX_ERROR:
 }
 // return FALSE: 読み込みエラー
 // ph == NULL:   ファイルが存在しない
-static int load_hilight(Hilight **ph, Markdown *r, RefStr *type)
+static int load_hilight(Hilight **ph, Markdown *md, RefStr *type)
 {
     char *buf;
     int result;
 
-    Hilight *h = fs->Hash_get_p(&r->hilight, type);
+    Hilight *h = fs->Hash_get_p(&md->hilight, type);
     if (h != NULL) {
         *ph = h;
         return TRUE;
@@ -300,30 +300,30 @@ static int load_hilight(Hilight **ph, Markdown *r, RefStr *type)
         return TRUE;
     }
 
-    h = fs->Mem_get(&r->mem, sizeof(Hilight));
-    fs->Hash_init(&h->state, &r->mem, 16);
+    h = fs->Mem_get(&md->mem, sizeof(Hilight));
+    fs->Hash_init(&h->state, &md->mem, 16);
 
     // 0-9A-Za-z_
     memcpy(h->word_char, "\0\0\0\0\0\0\xff\x03\xfe\xff\xff\x87\xfe\xff\xff\x07", 128 / 8);
 
-    result = load_hilight_sub(h, r, buf, type);
+    result = load_hilight_sub(h, md, buf, type);
     free(buf);
 
     if (result) {
-        fs->Hash_add_p(&r->hilight, &r->mem, type, h);
+        fs->Hash_add_p(&md->hilight, &md->mem, type, h);
         *ph = h;
     }
 
     return result;
 }
 
-static void hilight_add_word(CodeState *cs, Markdown *r, const char *str, const char *end, State *cur)
+static void hilight_add_word(CodeState *cs, Markdown *md, const char *str, const char *end, State *cur)
 {
     if (cur == cs->state) {
         cs->end = end;
     } else if (cur == NULL || str < end) {
-        MDNode *node = MDNode_new(MD_TEXT, r);
-        node->cstr = fs->str_dup_p(cs->ptr, cs->end - cs->ptr, &r->mem);
+        MDNode *node = MDNode_new(MD_TEXT, md);
+        node->cstr = fs->str_dup_p(cs->ptr, cs->end - cs->ptr, &md->mem);
         if (cs->state->name != str__) {
             node->href = cs->state->name->c;
         }
@@ -335,7 +335,7 @@ static void hilight_add_word(CodeState *cs, Markdown *r, const char *str, const 
         cs->end = end;
     }
 }
-static void hilight_code_main(MDNode **ppnode, Markdown *r, Hilight *h, const char *src, const char *src_end)
+static void hilight_code_main(MDNode **ppnode, Markdown *md, Hilight *h, const char *src, const char *src_end)
 {
     const char *ptr = src;
     const char *top = src;
@@ -364,8 +364,8 @@ static void hilight_code_main(MDNode **ppnode, Markdown *r, Hilight *h, const ch
                 }
             }
             if (streq_n(ptr, w->c, w->len, cur->icase)) {
-                hilight_add_word(&cs, r, top, ptr, cur);
-                hilight_add_word(&cs, r, ptr, ptr + w->len, w->self);
+                hilight_add_word(&cs, md, top, ptr, cur);
+                hilight_add_word(&cs, md, ptr, ptr + w->len, w->self);
                 ptr += w->len;
                 top = ptr;
                 cur = w->right;
@@ -380,12 +380,12 @@ static void hilight_code_main(MDNode **ppnode, Markdown *r, Hilight *h, const ch
     if (ptr > src_end) {
         ptr = src_end;
     }
-    hilight_add_word(&cs, r, top, ptr, cur);
-    hilight_add_word(&cs, r, NULL, NULL, NULL);
+    hilight_add_word(&cs, md, top, ptr, cur);
+    hilight_add_word(&cs, md, NULL, NULL, NULL);
 }
 
 // type: e.g. "text/css"
-int parse_markdown_code_block(Markdown *r, MDTok *tk, MDNode **ppnode, RefStr *type)
+int parse_markdown_code_block(Markdown *md, MDTok *tk, MDNode **ppnode, RefStr *type)
 {
     MDNode *node;
     Hilight *hilight;
@@ -394,15 +394,16 @@ int parse_markdown_code_block(Markdown *r, MDTok *tk, MDNode **ppnode, RefStr *t
         str__ = fs->intern("_", 1);
     }
 
-    if (!load_hilight(&hilight, r, type)) {
+    if (!load_hilight(&hilight, md, type)) {
         return FALSE;
     }
+
     if (hilight != NULL && tk->val.size > 0) {
-        hilight_code_main(ppnode, r, hilight, tk->val.p, tk->val.p + tk->val.size);
+        hilight_code_main(ppnode, md, hilight, tk->val.p, tk->val.p + tk->val.size);
     } else {
         // 色分けなし
-        node = MDNode_new(MD_TEXT, r);
-        node->cstr = fs->str_dup_p(tk->val.p, tk->val.size, &r->mem);
+        node = MDNode_new(MD_TEXT, md);
+        node->cstr = fs->str_dup_p(tk->val.p, tk->val.size, &md->mem);
         *ppnode = node;
     }
 

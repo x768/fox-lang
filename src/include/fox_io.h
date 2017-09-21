@@ -1,5 +1,5 @@
-#ifndef _FOX_IO_H_
-#define _FOX_IO_H_
+#ifndef FOX_IO_H_INCLUDED
+#define FOX_IO_H_INCLUDED
 
 #include "fox.h"
 #include "compat.h"
@@ -46,4 +46,4 @@ typedef struct {
     StrBuf buf;
 } RefBytesIO;
 
-#endif /* _FOX_IO_H_ */
+#endif /* FOX_IO_H_INCLUDED */

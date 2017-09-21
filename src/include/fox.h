@@ -1,5 +1,5 @@
-#ifndef _FOX_H_
-#define _FOX_H_
+#ifndef FOX_H_INCLUDED
+#define FOX_H_INCLUDED
 
 #include "compat.h"
 #include <stdint.h>
@@ -494,6 +494,9 @@ struct FoxStatic
     Value (*float_Value)(RefNode *klass, double dval);
     Value (*cstr_Value)(RefNode *klass, const char *p, int size);
     Value (*time_Value)(int64_t ts, RefTimeZone *tz);
+#ifdef WIN32
+    Value (*wstr_Value)(RefNode *klass, const wchar_t *p, int size);
+#endif
 
     Value (*printf_Value)(const char *fmt, ...);
 
@@ -687,4 +690,4 @@ uint32_t ptr_read_uint32(const char *p);
 void ptr_write_uint16(char *p, uint32_t val);
 void ptr_write_uint32(char *p, uint32_t val);
 
-#endif /* _FOX_H_ */
+#endif /* FOX_H_INCLUDED */

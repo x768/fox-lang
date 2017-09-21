@@ -1,5 +1,5 @@
-#ifndef _M_IMAGE_H_
-#define _M_IMAGE_H_
+#ifndef M_IMAGE_H_INCLUDED
+#define M_IMAGE_H_INCLUDED
 
 
 #include "fox.h"
@@ -62,4 +62,4 @@ typedef struct {
     void (*copy_image_line)(uint8_t *pd, RefImage *dst, const uint8_t *ps, const RefImage *src, int w, const CopyParam *cp, int alpha);
 } ImageStatic;
 
-#endif /* _M_IMAGE_H_ */
+#endif /* M_IMAGE_H_INCLUDED */

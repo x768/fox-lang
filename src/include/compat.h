@@ -1,5 +1,5 @@
-#ifndef _COMPAT_H_
-#define _COMPAT_H_
+#ifndef COMPAT_H_INCLUDED
+#define COMPAT_H_INCLUDED
 
 #ifdef WIN32
 #define _WIN32_WINNT 0x0501
@@ -98,4 +98,4 @@ typedef int FileHandle;
 int64_t get_file_size(FileHandle fh);
 
 
-#endif /* _COMPAT_H_ */
+#endif /* COMPAT_H_INCLUDED */

@@ -60,14 +60,3 @@ int window_message_loop()
 {
     return TRUE;
 }
-
-////////////////////////////////////////////////////////////////////////////////////////////////
-
-void create_image_pane_window(Value *v, WndHandle parent)
-{
-}
-int image_pane_set_image_sub(WndHandle window, RefImage *img)
-{
-    return TRUE;
-}
-

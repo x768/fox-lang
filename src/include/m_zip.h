@@ -1,5 +1,5 @@
-#ifndef _M_ZIP_H_
-#define _M_ZIP_H_
+#ifndef M_ZIP_H_INCLUDED
+#define M_ZIP_H_INCLUDED
 
 #include "fox.h"
 
@@ -17,4 +17,4 @@ typedef struct {
 } ZipStatic;
 
 
-#endif /* _M_ZIP_H_ */
+#endif /* M_ZIP_H_INCLUDED */

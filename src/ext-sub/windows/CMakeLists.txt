@@ -3,6 +3,7 @@ project(m_windows)
 add_library(m_windows SHARED
   ${SRC_COMMON}
   m_windows.c
+  winole.c
 )
 set_target_properties(m_windows
   PROPERTIES
@@ -15,6 +16,7 @@ set_target_properties(m_windows
   LINK_FLAGS_RELEASE "${LINK_FLAGS_RELEASE}"
 )
 target_link_libraries(m_windows
+  mpr
   ole32
   oleaut32
   uuid

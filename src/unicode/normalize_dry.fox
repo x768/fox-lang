@@ -1,0 +1,151 @@
+let f = fopen("data/UnicodeData.txt")
+
+let nc = List.sized(17)  // 正準分解
+let nk = List.sized(17)  // 互換分解
+let cc = List.sized(17)
+
+let exc = List.sized(17)  // 結合除外
+let nd = []
+
+
+def set_value(m:List, code:Int, val:Int)
+{
+	let plane = code / 0x10000
+	var mm = m[plane]
+
+	if !mm {
+		m[plane] = BytesIO.sized(0x20000, 0)
+		mm = m[plane]
+	}
+
+	let pt = (code % 0x10000) * 2
+	mm[pt] = val >> 8
+	mm[pt + 1] = val & 0xFF
+}
+def set_value1(m:List, code:Int, val:Int)
+{
+	let plane = code / 0x10000
+	var mm = m[plane]
+
+	if !mm {
+		m[plane] = BytesIO.sized(0x10000, 0)
+		mm = m[plane]
+	}
+	mm[code % 0x10000] = val
+}
+def get_value1(m:List, code:Int)
+{
+	let plane = code / 0x10000
+	let mm = m[plane]
+
+	if mm {
+		return mm[code % 0x10000]
+	}
+	return 0
+}
+
+// 結合除外表の読み込み
+def load_exclusive(m:List)
+{
+	let f = fopen("data/CompositionExclusions.txt")
+
+	if let line = f.next() {
+		if let ca = line.match(/([\d\.]+)\.txt$/) {
+			//writefile "../../unicode/version.txt", ca[1], Charset.UTF8
+		}
+	}
+	for line in f {
+		var plane = null
+		var begin = null
+		var end = null
+
+		if let t = line.match(/^([0-9A-F]+)/) {
+			// 値が1つ
+			let i = Int.parse(t[1], 16)
+			plane = i / 0x10000
+			begin = i % 0x10000
+			end = begin + 1
+		} elif let t = line.match(/^([0-9A-F]+)\.\.([0-9A-F]+)/) {
+			// 範囲指定
+			let i = Int.parse(t[1], 16)
+			let j = Int.parse(t[2], 16)
+			plane = i / 0x10000
+			begin = i % 0x10000
+			end = (j % 0x10000) + 1
+			if begin > end {
+				throw Error("Invalid range:${t[1]}..${t[2]}")
+			}
+		}
+		if plane {
+			var mm = m[plane]
+			if !mm {
+				m[plane] = BytesIO.sized(0x10000, 0)
+				mm = m[plane]
+			}
+			mm.fill 1, begin, end
+		}
+	}
+}
+
+load_exclusive(exc)
+
+let nz = NullIO() //FileIO("../../unicode/normalize", "w")
+var offset = 1
+nz.write b"\0\0\0\0"
+
+for line in f {
+	let a = line.split(";")
+	if a.size > 10 && !a[5].empty {
+		let code = Int.parse(a[0], 16)
+		var c = true
+		var s = a[5]  // 正規分解後
+		if let m = s.match(/^<.*?> (.*)$/) {
+			c = false
+			s = m[1]
+		}
+		if c {
+			set_value nc, code, offset
+		}
+		set_value nk, code, offset
+
+		s = s.split(" ").map_self(t => Int.parse(t, 16))
+
+		let cval = Int.parse(a[3])
+		if cval != 0 {
+			// 結合クラス
+			set_value1 cc, code, cval
+		}
+		// 正規分解・結合前の長さが2・結合クラス0・結合除外に含まれていない
+if code == 0x115BB { puts "${s[0]:x}, ${s[1]:x}" }
+		if c && s.size == 2 && get_value1(cc, s[0]) == 0 && get_value1(exc, code) == 0 {
+if code == 0x115BB {
+			nd.push [s[0], s[1], code]
+}
+		}
+
+		// BigEndian int32
+		nz.pack "I*x4", s
+		offset += s.size + 1
+	}
+}
+
+/*
+for p in nc.entries {
+	if p.value {
+		writefile "../unicode/nc${p.key:02d}", p.value
+	}
+}
+for p in nk.entries {
+	if p.value {
+		writefile "../unicode/nk${p.key:02d}", p.value
+	}
+}
+*/
+
+// 正規結合
+//nd.sort((a, b) => a[0] <=> b[0])
+var ndf = FileIO("composition", "w")
+for a in nd {
+	ndf.pack "I*", a
+}
+

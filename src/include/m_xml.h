@@ -1,5 +1,5 @@
-#ifndef _M_XML_H_
-#define _M_XML_H_
+#ifndef M_XML_H_INCLUDED
+#define M_XML_H_INCLUDED
 
 #include "fox.h"
 
@@ -20,4 +20,4 @@ typedef struct {
     int (*is_valid_elem_name)(const char *s_p, int s_size);
 } XMLStatic;
 
-#endif /* _M_XML_H_ */
+#endif /* M_XML_H_INCLUDED */

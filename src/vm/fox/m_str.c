@@ -469,7 +469,9 @@ static int sequence_find(Value *vret, Value *v, RefNode *node)
         throw_error_select(THROW_ARGMENT_TYPE2__NODE_NODE_NODE_INT, v0_type, fs->cls_regex, v1_type, 1);
         return FALSE;
     }
-    *vret = bool_Value(idx >= 0);
+    if (idx >= 0) {
+        *vret = int32_Value(idx);
+    }
 
     return TRUE;
 }

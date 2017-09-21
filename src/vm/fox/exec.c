@@ -793,22 +793,28 @@ NORMAL:
                     }
                 } else {
                     RefNode *r = Value_vp(v);
-                    if (r->type == NODE_CLASS) {
+                    switch (r->type) {
+                    case NODE_CLASS:
                         if (!call_member_func(fs->str_new, p->s, TRUE)) {
                             goto THROW;
                         }
-                    } else if (r->type == NODE_MODULE) {
+                        break;
+                    case NODE_MODULE:
                         if (!call_member_func(fs->str_toplevel, p->s, TRUE)) {
                             goto THROW;
                         }
-                    } else if (r->type == NODE_FUNC || r->type == NODE_FUNC_N) {
+                        break;
+                    case NODE_FUNC: case NODE_FUNC_N:
+                    case NODE_NEW:  case NODE_NEW_N:
                         if (!call_function(r, p->s)) {
                             goto THROW;
                         }
-                    } else {
+                        break;
+                    default:
                         if (!call_member_func(fs->symbol_stock[T_LP], p->s, TRUE)) {
                             goto THROW;
                         }
+                        break;
                     }
                 }
             } else {

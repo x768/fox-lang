@@ -1,7 +1,7 @@
 project(fox_cl)
 project(fox_cgi)
 project(fox_gui)
-project(fox_dbg)
+#project(fox_dbg)
 
 include_directories(../compat)
 include_directories(../fox)
@@ -22,11 +22,11 @@ add_executable(fox_gui
   ../compat/c_${TARGET_OS}_gui.${TARGET_EXT}
   main_gui.c
 )
-add_executable(fox_dbg
-  ../compat/c_${TARGET_OS}_cl.${TARGET_EXT}
-  main_cl.c
-  interactive.c
-)
+#add_executable(fox_dbg
+#  ../compat/c_${TARGET_OS}_cl.${TARGET_EXT}
+#  main_cl.c
+#  interactive.c
+#)
 
 if("${TARGET_OS}" STREQUAL "win")
   set(LINK_FLAGS_GUI "-mwindows")
@@ -65,15 +65,15 @@ set_target_properties(fox_gui
   LINK_FLAGS_DEBUG "${LINK_FLAGS_DEBUG}"
   LINK_FLAGS_RELEASE "${LINK_FLAGS_RELEASE}"
 )
-set_target_properties(fox_dbg
-  PROPERTIES
-  RUNTIME_OUTPUT_DIRECTORY ${DEST_DIR}
-  OUTPUT_NAME foxd
-  COMPILE_DEFINITIONS "DEBUGGER"
-  LINK_FLAGS "${LINK_FLAGS}"
-  LINK_FLAGS_DEBUG "${LINK_FLAGS_DEBUG}"
-  LINK_FLAGS_RELEASE "${LINK_FLAGS_RELEASE}"
-)
+#set_target_properties(fox_dbg
+#  PROPERTIES
+#  RUNTIME_OUTPUT_DIRECTORY ${DEST_DIR}
+#  OUTPUT_NAME foxd
+#  COMPILE_DEFINITIONS "DEBUGGER"
+#  LINK_FLAGS "${LINK_FLAGS}"
+#  LINK_FLAGS_DEBUG "${LINK_FLAGS_DEBUG}"
+#  LINK_FLAGS_RELEASE "${LINK_FLAGS_RELEASE}"
+#)
 
 
 if("${TARGET_OS}" STREQUAL "win")
@@ -86,10 +86,10 @@ if("${TARGET_OS}" STREQUAL "win")
   target_link_libraries(fox_gui
     foxrt
   )
-  target_link_libraries(fox_dbg
-    foxrtd
-    readline
-  )
+#  target_link_libraries(fox_dbg
+#    foxrtd
+#    readline
+#  )
   add_definitions(-DPCRE_STATIC)
 elseif("${TARGET_OS}" STREQUAL "osx")
   find_library(APPKIT_LIBRARY AppKit)
@@ -103,10 +103,10 @@ elseif("${TARGET_OS}" STREQUAL "osx")
     foxrt
     ${APPKIT_LIBRARY}
   )
-  target_link_libraries(fox_dbg
-    foxrtd
-    readline
-  )
+#  target_link_libraries(fox_dbg
+#    foxrtd
+#    readline
+#  )
 else()
   find_package(PkgConfig)
   pkg_check_modules(GTK3 REQUIRED gtk+-3.0)
@@ -122,8 +122,8 @@ else()
     foxrt
     ${GTK3_LIBRARIES}
   )
-  target_link_libraries(fox_dbg
-    foxrtd
-    readline
-  )
+#  target_link_libraries(fox_dbg
+#    foxrtd
+#    readline
+#  )
 endif()

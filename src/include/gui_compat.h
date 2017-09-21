@@ -1,5 +1,5 @@
-#ifndef _GUI_COMPAT_H_
-#define _GUI_COMPAT_H_
+#ifndef GUI_COMPAT_H_INCLUDED
+#define GUI_COMPAT_H_INCLUDED
 
 
 #define NOT_DEFINE_BOOL
@@ -21,4 +21,4 @@
 
 #endif
 
-#endif /* _GUI_COMPAT_H_ */
+#endif /* GUI_COMPAT_H_INCLUDED */

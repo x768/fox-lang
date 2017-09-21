@@ -1,5 +1,5 @@
-#ifndef _M_GUI_H_
-#define _M_GUI_H_
+#ifndef M_GUI_H_INCLUDED
+#define M_GUI_H_INCLUDED
 
 #include "m_image.h"
 
@@ -12,18 +12,18 @@ typedef void *GraphicsHandle;
  */
 enum {
     INDEX_WBASE_HANDLER,
-#ifdef WIN32
-    INDEX_WBASE_CALLBACK,
-#endif
     INDEX_WBASE_NUM,
 };
 /**
  * Widget系
  */
 enum {
-    INDEX_WIDGET_HANDLE = INDEX_WBASE_NUM,  // Windowsの場合はRefHWndの参照
-    INDEX_WIDGET_PARENT,
-    INDEX_WIDGET_GENERAL_USE,
+    INDEX_WIDGET_PARENT,  // 参照カウントは増やさない
+    INDEX_WIDGET_CALLBACK,
+    INDEX_WIDGET_X,
+    INDEX_WIDGET_Y,
+    INDEX_WIDGET_W,
+    INDEX_WIDGET_H,
     INDEX_WIDGET_NUM,
 };
 
@@ -42,6 +42,19 @@ typedef struct {
 
     GuiEntry *entry[GUI_ENTRY_NUM];
 } RefGuiHash;
+
+typedef struct {
+    int (*on_create)(Ref *r, WndHandle wh);
+    int (*on_destroy)(Ref *r, WndHandle wh);
+    int (*on_mousedown)(Ref *r, WndHandle wh, int x, int y, int button);
+    int (*on_mouseup)(Ref *r, WndHandle wh, int x, int y, int button);
+    int (*on_mousemove)(Ref *r, WndHandle wh, int x, int y);
+    int (*on_mousewheel)(Ref *r, WndHandle wh, int x, int y, int delta);
+    int (*on_gotfocus)(Ref *r, WndHandle wh);
+    int (*on_lostfocus)(Ref *r, WndHandle wh);
+    void (*on_resize)(Ref *r, WndHandle wh);
+    void (*on_paint)(Ref *r, WndHandle wh, void *ctx);
+} GuiCallback;
 
 typedef struct {
     void (*GuiHash_init)(RefGuiHash *h);
@@ -64,4 +77,4 @@ typedef struct {
 } FoxtkStatic;
 
 
-#endif /* _M_GUI_H_ */
+#endif /* M_GUI_H_INCLUDED */

@@ -1,5 +1,5 @@
-#ifndef _M_UNICODE_H_
-#define _M_UNICODE_H_
+#ifndef M_UNICODE_H_INCLUDED
+#define M_UNICODE_H_INCLUDED
 
 #include "fox.h"
 
@@ -53,4 +53,4 @@ typedef struct {
     int (*ch_get_category)(int code);
 } UnicodeStatic;
 
-#endif /* _M_UNICODE_H_ */
+#endif /* M_UNICODE_H_INCLUDED */

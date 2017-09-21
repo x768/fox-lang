@@ -212,7 +212,7 @@ RefStr *intern(const char *p, int size)
     pos = Mem_get(&fg->st_mem, sizeof(RefStrEntry) + size + 1);
     pos->next = *pp;
     pos->hash = h;
-    pos->s.rh.type = fs->cls_str,
+    pos->s.rh.type = fs->cls_str;
     pos->s.rh.nref = -1;
     pos->s.rh.n_memb = 0;
     pos->s.rh.weak_ref = NULL;
@@ -298,12 +298,10 @@ void PtrList_add_p(PtrList **pp, void *p, Mem *mem)
 PtrList *PtrList_push(PtrList **pp, int size, Mem *mem)
 {
     PtrList *pos = *pp;
-    int i = 0;
 
     while (pos != NULL) {
         pp = &pos->next;
         pos = *pp;
-        i++;
     }
     pos = Mem_get(mem, offsetof(PtrList, u) + size);
     pos->next = NULL;

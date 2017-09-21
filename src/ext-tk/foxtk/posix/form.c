@@ -25,7 +25,7 @@ static void signal_destroy(GObject *object, gpointer user_data)
     Ref *r = g_object_get_data(object, WINDOW_DATA_KEY);
 
     widget_handler_destroy(r);
-    r->v[INDEX_WIDGET_HANDLE] = VALUE_NULL;
+    r->v[INDEX_FORM_HANDLE] = VALUE_NULL;
 }
 static void signal_drag_data_received(
         GtkWidget *widget, GdkDragContext *context,
@@ -70,7 +70,22 @@ static void signal_drag_data_received(
 static int button_proc_sub(GtkWidget *widget, const char *type, int button, int x, int y, int dir)
 {
     Ref *sender_r = g_object_get_data(G_OBJECT(widget), WINDOW_DATA_KEY);
-    Value *eh = get_event_handler(sender_r, fs->intern(type, -1));
+    int i;
+    RefArray *ra = Value_vp(sender_r->v[INDEX_FORM_CHILDREN]);
+    Value *eh;
+
+    for (i = 0; i < ra->size; i++) {
+        Ref *child = Value_ref(ra->p[i]);
+        int left = Value_integral(child->v[INDEX_WIDGET_X]);
+        int top = Value_integral(child->v[INDEX_WIDGET_Y]);
+        int right = left + Value_integral(child->v[INDEX_WIDGET_W]);
+        int bottom = top + Value_integral(child->v[INDEX_WIDGET_H]);
+        if (x >= left && x < right && y >= top && y < bottom) {
+            sender_r = child;
+            break;
+        }
+    }
+    eh = get_event_handler(sender_r, fs->intern(type, -1));
 
     if (eh != NULL) {
         Value v_tmp;
@@ -110,12 +125,12 @@ static int button_proc_sub(GtkWidget *widget, const char *type, int button, int 
 }
 static gboolean signal_button_pressed(GtkWidget *widget, GdkEventButton *event, gpointer user_data)
 {
-    button_proc_sub(widget, "button_pressed", event->button, (int)event->x, (int)event->y, 0);
+    button_proc_sub(widget, "mouse_pressed", event->button, (int)event->x, (int)event->y, 0);
     return FALSE;
 }
 static gboolean signal_button_released(GtkWidget *widget, GdkEventButton *event, gpointer user_data)
 {
-    button_proc_sub(widget, "button_released", event->button, (int)event->x, (int)event->y, 0);
+    button_proc_sub(widget, "mouse_released", event->button, (int)event->x, (int)event->y, 0);
     return FALSE;
 }
 static gboolean signal_mousewheel(GtkWidget *widget, GdkEventScroll *event, gpointer user_data)
@@ -137,30 +152,41 @@ static gboolean signal_mousewheel(GtkWidget *widget, GdkEventScroll *event, gpoi
     button_proc_sub(widget, "wheel_scrolled", -1, (int)event->x, (int)event->y, dir);
     return FALSE;
 }
-
-/**
- * Widget共通のイベントハンドラを登録する
- */
-void connect_widget_events(WndHandle window)
+static gboolean signal_draw(GtkWidget *widget, cairo_t *cr, gpointer data)
 {
-    gtk_widget_add_events(window, GDK_BUTTON_PRESS_MASK | GDK_BUTTON_RELEASE_MASK | GDK_SCROLL_MASK);
-    g_signal_connect(G_OBJECT(window), "button-press-event", G_CALLBACK(signal_button_pressed), NULL);
-    g_signal_connect(G_OBJECT(window), "button-release-event", G_CALLBACK(signal_button_released), NULL);
-    g_signal_connect(G_OBJECT(window), "scroll-event", G_CALLBACK(signal_mousewheel), NULL);
+    Ref *sender_r = g_object_get_data(G_OBJECT(widget), WINDOW_DATA_KEY);
+    RefArray *ra = Value_vp(sender_r->v[INDEX_FORM_CHILDREN]);
+    int i;
+
+    for (i = 0; i < ra->size; i++) {
+        Ref *ref = Value_ref(ra->p[i]);
+        GuiCallback *gc = Value_ptr(ref->v[INDEX_WIDGET_CALLBACK]);
+        if (gc != NULL && gc->on_paint != NULL) {
+            gc->on_paint(ref, widget, cr);
+        }
+    }
+
+    return FALSE;
 }
+
 void create_form_window(Ref *r, WndHandle parent, int *size)
 {
     GtkWidget *window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
 
-    r->v[INDEX_WIDGET_HANDLE] = handle_Value(window);
+    r->v[INDEX_FORM_HANDLE] = handle_Value(window);
     g_object_set_data(G_OBJECT(window), WINDOW_DATA_KEY, r);
 
     if (parent != NULL) {
         gtk_window_set_transient_for(GTK_WINDOW(window), GTK_WINDOW(parent));
     }
+
+    gtk_widget_add_events(window, GDK_BUTTON_PRESS_MASK | GDK_BUTTON_RELEASE_MASK | GDK_SCROLL_MASK);
     g_signal_connect(G_OBJECT(window), "delete-event", G_CALLBACK(signal_close), NULL);
     g_signal_connect(G_OBJECT(window), "destroy", G_CALLBACK(signal_destroy), NULL);
-    connect_widget_events(window);
+    g_signal_connect(G_OBJECT(window), "button-press-event", G_CALLBACK(signal_button_pressed), NULL);
+    g_signal_connect(G_OBJECT(window), "button-release-event", G_CALLBACK(signal_button_released), NULL);
+    g_signal_connect(G_OBJECT(window), "scroll-event", G_CALLBACK(signal_mousewheel), NULL);
+    g_signal_connect(G_OBJECT(window), "draw", G_CALLBACK(signal_draw), NULL);
 
     if (size != NULL) {
         gtk_window_set_resizable(GTK_WINDOW(window), FALSE);
@@ -185,12 +211,12 @@ void window_set_drop_handler(WndHandle window)
 
 double window_get_opacity(Ref *r)
 {
-    WndHandle window = Value_handle(r->v[INDEX_WIDGET_HANDLE]);
+    WndHandle window = Value_handle(r->v[INDEX_FORM_HANDLE]);
     return gtk_widget_get_opacity(GTK_WIDGET(window));
 }
 void window_set_opacity(Ref *r, double opacity)
 {
-    WndHandle window = Value_handle(r->v[INDEX_WIDGET_HANDLE]);
+    WndHandle window = Value_handle(r->v[INDEX_FORM_HANDLE]);
     gtk_widget_set_opacity(GTK_WIDGET(window), opacity);
 }
 void window_get_title(Value *vret, WndHandle window)
@@ -204,12 +230,14 @@ void window_set_title(WndHandle window, const char *s)
 }
 void window_move(WndHandle window, int x, int y)
 {
+#if 0
     if (x < 0) {
         x += gdk_screen_width();
     }
     if (y < 0) {
         y += gdk_screen_height();
     }
+#endif
     gtk_window_move(GTK_WINDOW(window), x, y);
 }
 // TODO
@@ -252,45 +280,5 @@ int window_message_loop()
     if (gtk_main_iteration_do(TRUE)) {
     } else {
     }
-    return TRUE;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////
-
-static gboolean signal_mousewheel_void(GtkWidget *widget, GdkEventScroll *event, gpointer user_data)
-{
-    return TRUE;
-}
-void create_image_pane_window(Value *v, WndHandle parent)
-{
-    Ref *r = Value_ref(*v);
-    GtkWidget *scroll = gtk_scrolled_window_new(NULL, NULL);
-    GtkWidget *window = gtk_image_new();
-
-    g_object_set_data(G_OBJECT(window), WINDOW_DATA_KEY, r);
-    gtk_container_add(GTK_CONTAINER(scroll), window);
-
-    if (parent != NULL) {
-        gtk_container_add(GTK_CONTAINER(parent), scroll);
-    }
-    connect_widget_events(window);
-
-    // ホイールスクロールを抑止
-    gtk_widget_add_events(scroll, GDK_SCROLL_MASK);
-    g_signal_connect(G_OBJECT(scroll), "scroll-event", G_CALLBACK(signal_mousewheel_void), NULL);
-
-    r->v[INDEX_WIDGET_HANDLE] = handle_Value(window);
-
-    fs->addref(*v);
-}
-int image_pane_set_image_sub(WndHandle window, RefImage *img)
-{
-    GraphicsHandle handle = conv_image_to_graphics(img);
-
-    if (handle == NULL) {
-        return FALSE;
-    }
-    gtk_image_set_from_pixbuf(GTK_IMAGE(window), handle);
-    g_object_unref(handle);
     return TRUE;
 }

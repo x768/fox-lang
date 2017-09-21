@@ -87,14 +87,24 @@ int getifaddrs_sub(RefArray *ra)
     }
 
     for (p = ai; p != NULL; p = p->Next) {
-        Value *v;
-        Ref *r;
-        
-        v = fs->refarray_push(ra);
-        r = fs->ref_new(cls_ifaddr);
-        *v = vp_Value(r);
+        IP_ADAPTER_UNICAST_ADDRESS *ua;
 
-        r->v[INDEX_IFADDR_NAME] = fs->cstr_Value(NULL, p->AdapterName, -1);
+        Value name;
+        if (p->FriendlyName != NULL) {
+            name = fs->wstr_Value(NULL, p->FriendlyName, -1);
+        } else {
+            name = fs->cstr_Value(NULL, p->AdapterName, -1);
+        }
+        for (ua = p->FirstUnicastAddress; ua != NULL; ua = ua->Next) {
+            Value *v = fs->refarray_push(ra);
+            Ref *r = fs->ref_new(cls_ifaddr);
+            struct sockaddr *ifa = ua->Address.lpSockaddr;
+
+            r->v[INDEX_IFADDR_NAME] = fs->Value_cp(name);
+            r->v[INDEX_IFADDR_ADDR] = vp_Value(new_refsockaddr(ifa, FALSE));
+            *v = vp_Value(r);
+        }
+        fs->unref(name);
     }
     free(ai);
 

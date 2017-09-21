@@ -990,6 +990,9 @@ static void define_lang_class(RefNode *m)
     cls = define_identifier(m, m, "MemoryError", NODE_CLASS, 0);
     define_error_class(cls, fs->cls_error, m);
 
+    cls = define_identifier(m, m, "NotImplementedError", NODE_CLASS, 0);
+    define_error_class(cls, fs->cls_error, m);
+
 
     cls = define_identifier(m, m, "ArithmeticError", NODE_CLASS, 0);
     define_error_class(cls, fs->cls_error, m);

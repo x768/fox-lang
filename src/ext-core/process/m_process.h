@@ -1,5 +1,5 @@
-#ifndef M_PROCESS_H_
-#define M_PROCESS_H_
+#ifndef M_PROCESS_H_INCLUDED
+#define M_PROCESS_H_INCLUDED
 
 #include "fox_io.h"
 
@@ -50,4 +50,4 @@ void write_pipe(RefProcessHandle *ph, const char *data, int data_size);
 
 RefCharset *get_local_codepage(void);
 
-#endif /* M_PROCESS_H_ */
+#endif /* M_PROCESS_H_INCLUDED */

@@ -1,5 +1,5 @@
-#ifndef _FOX_MATH_H_
-#define _FOX_MATH_H_
+#ifndef FOX_MATH_H_INCLUDED
+#define FOX_MATH_H_INCLUDED
 
 #include "fox.h"
 #include "m_number.h"
@@ -31,4 +31,4 @@ extern RefNode *cls_matrix;
 #endif
 
 
-#endif /* _FOX_MATH_H_ */
+#endif /* FOX_MATH_H_INCLUDED */

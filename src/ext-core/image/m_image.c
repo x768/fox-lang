@@ -2311,7 +2311,7 @@ void define_module(RefNode *m, const FoxStatic *a_fs, FoxGlobal *a_fg)
     fs = a_fs;
     fg = a_fg;
     mod_image = m;
-    mod_math = fs->get_module_by_name("math", -1, TRUE, FALSE);
+    mod_math = fs->get_module_by_name("math", 4, TRUE, FALSE);
     cls_fileio = fs->Hash_get(&fs->mod_io->u.m.h, "FileIO", -1);
 
     m->u.m.ext = ImageStatic_new();

@@ -1,5 +1,5 @@
-#ifndef _FOX_VM_H_
-#define _FOX_VM_H_
+#ifndef FOX_VM_H_INCLUDED
+#define FOX_VM_H_INCLUDED
 
 #include "fox_io.h"
 #include "m_number.h"
@@ -156,7 +156,7 @@ typedef struct
 
     RefNode *startup;
     const char *err_dst;
-    
+
     PtrList *const_refs;
 
 #ifdef WIN32
@@ -176,7 +176,7 @@ typedef struct
 /////////////////////////////////////////////////////////////////////////////////////
 
 #define FOX_VERSION_MAJOR    0
-#define FOX_VERSION_MINOR    19
+#define FOX_VERSION_MINOR    20
 #define FOX_VERSION_REVISION 0
 
 #define int32_hash(v) (((v) * 31) & INT32_MAX)
@@ -189,7 +189,7 @@ typedef struct
 extern FoxStatic *fs;
 extern FoxGlobal *fg;
 extern FoxVM *fv;
-CodeCVTStatic *codecvt;
+extern CodeCVTStatic *codecvt;
 
 #ifdef DEFINE_GLOBALS
 #undef extern
@@ -280,6 +280,9 @@ Value int64_Value(int64_t i);
 Value float_Value(RefNode *klass, double dval);
 Value cstr_Value(RefNode *klass, const char *p, int size);
 Value frac_s_Value(const char *str);
+#ifdef WIN32
+Value wstr_Value(RefNode *klass, const wchar_t *wstr, int size);
+#endif
 
 Value printf_Value(const char *fmt, ...);
 
@@ -550,4 +553,4 @@ void fox_intaractive(RefNode *m);
 #endif
 
 
-#endif /* _FOX_VM_H_ */
+#endif /* FOX_VM_H_INCLUDED */

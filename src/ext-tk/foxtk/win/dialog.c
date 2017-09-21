@@ -105,7 +105,7 @@ static wchar_t *make_filter_string(RefArray *r)
 static void array_add_file(RefArray *r, const wchar_t *p)
 {
     Value *vf = fs->refarray_push(r);
-    *vf = utf16_file_Value(p);
+    *vf = fs->wstr_Value(fs->cls_file, p, -1);
 }
 static wchar_t *concat_filename(const wchar_t *dir, const wchar_t *file)
 {
@@ -210,7 +210,7 @@ int file_open_dialog(Value *vret, const char *title, RefArray *filter, WndHandle
                 }
             }
         } else {
-            *vret = utf16_file_Value(wbuf);
+            *vret = fs->wstr_Value(fs->cls_file, wbuf, -1);
         }
     }
 

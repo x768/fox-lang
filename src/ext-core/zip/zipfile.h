@@ -1,5 +1,5 @@
-#ifndef _ZIPFILE_H_
-#define _ZIPFILE_H_
+#ifndef ZIPFILE_H_INCLUDED
+#define ZIPFILE_H_INCLUDED
 
 #include "fox.h"
 #include "fox_io.h"
@@ -187,4 +187,4 @@ Hash *get_entry_map_static(const char *path, Mem *mem);
 int read_entry(char *buf, const ZipEntry *entry);
 
 
-#endif /* _ZIPFILE_H_ */
+#endif /* ZIPFILE_H_INCLUDED */

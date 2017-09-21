@@ -1,0 +1,69 @@
+var a = BytesIO.sized(256)
+
+// isalphau
+for c in ("A"[0])..("Z"[0] + 1) {
+	a[c] |= 1
+}
+for c in ("a"[0])..("z"[0] + 1) {
+	a[c] |= 1
+}
+a["_"[0]] |= 1
+
+// isalnumu
+for c in ("A"[0])..("Z"[0] + 1) {
+	a[c] |= 2
+}
+for c in ("a"[0])..("z"[0] + 1) {
+	a[c] |= 2
+}
+for c in ("0"[0])..("9"[0] + 1) {
+	a[c] |= 2
+}
+a["_"[0]] |= 2
+
+// isupper
+for c in ("A"[0])..("Z"[0] + 1) {
+	a[c] |= 4
+}
+
+// islower
+for c in ("a"[0])..("z"[0] + 1) {
+	a[c] |= 8
+}
+
+// isdigit
+for c in ("0"[0])..("9"[0] + 1) {
+	a[c] |= 16
+}
+
+// isxdigit
+for c in ("0"[0])..("9"[0] + 1) {
+	a[c] |= 32
+}
+for c in ("A"[0])..("F"[0] + 1) {
+	a[c] |= 32
+}
+for c in ("a"[0])..("f"[0] + 1) {
+	a[c] |= 32
+}
+
+// isspace
+for c in 0..(" "[0] + 1) {
+	a[c] |= 64
+}
+
+// islexspace
+a[" "[0]] |= 128
+a["\n"[0]] |= 128
+a["\t"[0]] |= 128
+
+
+for i in 0..16 {
+	print "\""
+	var n = i * 16
+	for j in 0..16 {
+		printf "\\x%{0:02x}", a[n + j]
+	}
+	print "\"\n"
+}
+

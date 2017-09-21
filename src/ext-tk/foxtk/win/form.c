@@ -5,7 +5,6 @@
 
 
 static const wchar_t * const FORM_CLASS = L"FoxGuiWindow";
-static const wchar_t * const IMAGE_PANE_CLASS = L"FoxImagePane";
 
 
 static int wndproc_drop_event(Ref *sender_r, HDROP hDrop)
@@ -27,7 +26,7 @@ static int wndproc_drop_event(Ref *sender_r, HDROP hDrop)
             Value *vf;
             DragQueryFileW(hDrop, i, wbuf, MAX_PATH);
             vf = fs->refarray_push(afile);
-            *vf = utf16_file_Value(wbuf);
+            *vf = fs->wstr_Value(fs->cls_file, wbuf, -1);
         }
         DragFinish(hDrop);
 
@@ -45,97 +44,24 @@ static int wndproc_drop_event(Ref *sender_r, HDROP hDrop)
     }
     return TRUE;
 }
-static LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
-{
-    switch (msg) {
-    case WM_CREATE:
-        return 0;
-    case WM_DESTROY: {
-        Ref *r = (Ref*)GetWindowLongPtr(hWnd, GWLP_USERDATA);
-        widget_handler_destroy(r);
-        fs->unref(r->v[INDEX_WIDGET_HANDLE]);
-        r->v[INDEX_WIDGET_HANDLE] = VALUE_NULL;
-        return 0;
-    }
-    case WM_CLOSE: {
-        Ref *sender_r = (Ref*)GetWindowLongPtr(hWnd, GWLP_USERDATA);
-        Value *eh = get_event_handler(sender_r, fs->intern("closed", -1));
-        int result = TRUE;
-
-        if (eh != NULL) {
-            Value evt = event_object_new(sender_r);
-            if (!invoke_event_handler(&result, *eh, evt)) {
-                //
-            }
-            fs->unref(evt);
-        }
-        if (fg->error != VALUE_NULL) {
-            PostQuitMessage(0);
-        }
-        if (!result) {
-            return 0;
-        }
-        break;
-    }
-    case WM_SIZE: {
-        if (!IsIconic(hWnd)){
-            RECT rc;
-            HWND hChild = GetDlgItem(hWnd, ID_CHILD_PANE);
-            GetClientRect(hWnd, &rc);
-            MoveWindow(hChild, 0, 0, rc.right, rc.bottom, TRUE);
-        }
-        break;
-    }
-    case WM_COMMAND: {
-        Ref *sender_r = get_menu_object(LOWORD(wParam));
-        if (sender_r != NULL) {
-            Value evt = event_object_new(sender_r);
-            invoke_event(evt, sender_r->v[INDEX_MENUITEM_FN]);
-            fs->unref(evt);
-        }
-        return 0;
-    }
-    case WM_DROPFILES:
-        wndproc_drop_event((Ref*)GetWindowLongPtr(hWnd, GWLP_USERDATA), (HDROP)wParam);
-        if (fg->error != VALUE_NULL) {
-            PostQuitMessage(0);
-        }
-        return 0;
-    }
-    return DefWindowProcW(hWnd, msg, wParam, lParam);
-}
-
-static int register_class(void)
-{
-    static int initialized = FALSE;
-
-    if (!initialized) {
-        WNDCLASSEXW wc;
-
-        wc.cbSize        = sizeof(wc);
-        wc.style         = 0;
-        wc.lpfnWndProc   = WndProc;
-        wc.cbClsExtra    = 0;
-        wc.cbWndExtra    = 0;
-        wc.hInstance     = GetModuleHandle(NULL);
-        wc.hIcon         = NULL;
-        wc.hIconSm       = NULL;
-        wc.hCursor       = LoadCursor(NULL, IDC_ARROW);
-        wc.hbrBackground = GetSysColorBrush(COLOR_3DFACE);
-        wc.lpszMenuName  = NULL;
-        wc.lpszClassName = FORM_CLASS;
-
-        if (RegisterClassExW(&wc) == 0) {
-            return FALSE;
-        }
-        initialized = TRUE;
-    }
-    return TRUE;
-}
-
 static int button_proc_sub(Ref *sender_r, const char *type, int button, int x, int y, int dir)
 {
-    Value *eh = get_event_handler(sender_r, fs->intern(type, -1));
+    int i;
+    RefArray *ra = Value_vp(sender_r->v[INDEX_FORM_CHILDREN]);
+    Value *eh;
+
+    for (i = 0; i < ra->size; i++) {
+        Ref *child = Value_ref(ra->p[i]);
+        int left = Value_integral(child->v[INDEX_WIDGET_X]);
+        int top = Value_integral(child->v[INDEX_WIDGET_Y]);
+        int right = left + Value_integral(child->v[INDEX_WIDGET_W]);
+        int bottom = top + Value_integral(child->v[INDEX_WIDGET_H]);
+        if (x >= left && x < right && y >= top && y < bottom) {
+            sender_r = child;
+            break;
+        }
+    }
+    eh = get_event_handler(sender_r, fs->intern(type, -1));
 
     if (eh != NULL) {
         const char *button_val = NULL;
@@ -174,28 +100,74 @@ static int button_proc_sub(Ref *sender_r, const char *type, int button, int x, i
     }
     return TRUE;
 }
-static LRESULT CALLBACK WndProcBase(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
+static LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
     Ref *r = (Ref*)GetWindowLongPtr(hWnd, GWLP_USERDATA);
 
     switch (msg) {
+    case WM_CREATE:
+        return 0;
+    case WM_DESTROY:
+        widget_handler_destroy(r);
+        fs->unref(r->v[INDEX_FORM_HANDLE]);
+        r->v[INDEX_FORM_HANDLE] = VALUE_NULL;
+        return 0;
+    case WM_CLOSE: {
+        Value *eh = get_event_handler(r, fs->intern("closed", -1));
+        int result = TRUE;
+
+        if (eh != NULL) {
+            Value evt = event_object_new(r);
+            if (!invoke_event_handler(&result, *eh, evt)) {
+                //
+            }
+            fs->unref(evt);
+        }
+        if (fg->error != VALUE_NULL) {
+            PostQuitMessage(0);
+        }
+        if (!result) {
+            return 0;
+        }
+        break;
+    }
+    case WM_SIZE:
+        if (!IsIconic(hWnd)) {
+        } else {
+        }
+        return 0;
+    case WM_COMMAND: {
+        Ref *sender_r = get_menu_object(LOWORD(wParam));
+        if (sender_r != NULL) {
+            Value evt = event_object_new(sender_r);
+            invoke_event(evt, sender_r->v[INDEX_MENUITEM_FN]);
+            fs->unref(evt);
+        }
+        return 0;
+    }
+    case WM_DROPFILES:
+        wndproc_drop_event(r, (HDROP)wParam);
+        if (fg->error != VALUE_NULL) {
+            PostQuitMessage(0);
+        }
+        return 0;
     case WM_LBUTTONDOWN:
-        button_proc_sub(r, "button_pressed", 1, (short)LOWORD(lParam), (short)HIWORD(lParam), 0);
+        button_proc_sub(r, "mouse_pressed", 1, (short)LOWORD(lParam), (short)HIWORD(lParam), 0);
         break;
     case WM_LBUTTONUP:
-        button_proc_sub(r, "button_released", 1, (short)LOWORD(lParam), (short)HIWORD(lParam), 0);
+        button_proc_sub(r, "mouse_released", 1, (short)LOWORD(lParam), (short)HIWORD(lParam), 0);
         break;
     case WM_RBUTTONDOWN:
-        button_proc_sub(r, "button_pressed", 3, (short)LOWORD(lParam), (short)HIWORD(lParam), 0);
+        button_proc_sub(r, "mouse_pressed", 3, (short)LOWORD(lParam), (short)HIWORD(lParam), 0);
         break;
     case WM_RBUTTONUP:
-        button_proc_sub(r, "button_released", 3, (short)LOWORD(lParam), (short)HIWORD(lParam), 0);
+        button_proc_sub(r, "mouse_released", 3, (short)LOWORD(lParam), (short)HIWORD(lParam), 0);
         break;
     case WM_MBUTTONDOWN:
-        button_proc_sub(r, "button_pressed", 2, (short)LOWORD(lParam), (short)HIWORD(lParam), 0);
+        button_proc_sub(r, "mouse_pressed", 2, (short)LOWORD(lParam), (short)HIWORD(lParam), 0);
         break;
     case WM_MBUTTONUP:
-        button_proc_sub(r, "button_released", 2, (short)LOWORD(lParam), (short)HIWORD(lParam), 0);
+        button_proc_sub(r, "mouse_released", 2, (short)LOWORD(lParam), (short)HIWORD(lParam), 0);
         break;
     case WM_MOUSEWHEEL: {
         POINT pt;
@@ -206,23 +178,54 @@ static LRESULT CALLBACK WndProcBase(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
         button_proc_sub(r, "wheel_scrolled", -1, pt.x, pt.y, dir);
         break;
     }
-    }
-    {
-        WNDPROC proc = Value_handle(r->v[INDEX_WBASE_CALLBACK]);
-        if (proc != NULL) {
-            return CallWindowProc(proc, hWnd, msg, wParam, lParam);
+    case WM_PAINT: {
+        PAINTSTRUCT ps;
+        HDC hDC = BeginPaint(hWnd, &ps);
+        int i;
+        RefArray *ra = Value_vp(r->v[INDEX_FORM_CHILDREN]);
+
+        for (i = 0; i < ra->size; i++) {
+            Ref *ref = Value_ref(ra->p[i]);
+            GuiCallback *gc = Value_ptr(ref->v[INDEX_WIDGET_CALLBACK]);
+            if (gc != NULL && gc->on_paint != NULL) {
+                gc->on_paint(ref, hWnd, hDC);
+            }
         }
+        EndPaint(hWnd, &ps);
+        break;
     }
-    return 0;
+    }
+    return DefWindowProcW(hWnd, msg, wParam, lParam);
 }
 
-/**
- * Widget共通のイベントハンドラを登録する
- */
-void connect_widget_events(WndHandle window)
+static int register_class(void)
 {
-    SetWindowLongPtr(window, GWLP_WNDPROC, (LONG_PTR)WndProcBase);
+    static int initialized = FALSE;
+
+    if (!initialized) {
+        WNDCLASSEXW wc;
+
+        wc.cbSize        = sizeof(wc);
+        wc.style         = 0;
+        wc.lpfnWndProc   = WndProc;
+        wc.cbClsExtra    = 0;
+        wc.cbWndExtra    = 0;
+        wc.hInstance     = GetModuleHandle(NULL);
+        wc.hIcon         = NULL;
+        wc.hIconSm       = NULL;
+        wc.hCursor       = LoadCursor(NULL, IDC_ARROW);
+        wc.hbrBackground = GetSysColorBrush(COLOR_3DFACE);
+        wc.lpszMenuName  = NULL;
+        wc.lpszClassName = FORM_CLASS;
+
+        if (RegisterClassExW(&wc) == 0) {
+            return FALSE;
+        }
+        initialized = TRUE;
+    }
+    return TRUE;
 }
+
 void create_form_window(Ref *r, WndHandle parent, int *size)
 {
     HWND window = NULL;
@@ -248,11 +251,9 @@ void create_form_window(Ref *r, WndHandle parent, int *size)
         NULL);
 
     r->v[INDEX_FORM_ALPHA] = int32_Value(255);
-    r->v[INDEX_WIDGET_HANDLE] = handle_Value(window);
+    r->v[INDEX_FORM_HANDLE] = handle_Value(window);
 
     SetWindowLongPtr(window, GWLP_USERDATA, (LONG_PTR)r);
-    r->v[INDEX_WBASE_CALLBACK] = handle_Value((void*)GetWindowLongPtr(window, GWLP_WNDPROC));
-    connect_widget_events(window);
 
     if (size != NULL) {
         RECT rc;
@@ -280,7 +281,7 @@ double window_get_opacity(Ref *r)
 }
 void window_set_opacity(Ref *r, double opacity)
 {
-    WndHandle window = Value_handle(r->v[INDEX_WIDGET_HANDLE]);
+    WndHandle window = Value_handle(r->v[INDEX_FORM_HANDLE]);
     int iop = (int)(opacity * 255.0);
     if (iop == 255) {
         if (Value_integral(r->v[INDEX_FORM_ALPHA]) < 255) {
@@ -299,7 +300,7 @@ void window_get_title(Value *vret, WndHandle window)
     int len = GetWindowTextLengthW(window);
     wchar_t *wbuf = malloc((len + 1) * sizeof(wchar_t));
     GetWindowTextW(window, wbuf, len + 1);
-    *vret = utf16_str_Value(wbuf);
+    *vret = fs->wstr_Value(fs->cls_str, wbuf, -1);
     free(wbuf);
 }
 void window_set_title(WndHandle window, const char *s)
@@ -345,377 +346,6 @@ void window_set_visible(WndHandle window, int show)
 void window_set_keep_above(WndHandle window, int above)
 {
     SetWindowPos(window, (above ? HWND_TOPMOST : HWND_NOTOPMOST), 0, 0, 0, 0, SWP_NOMOVE|SWP_NOSIZE);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////
-
-typedef struct {
-    GraphicsHandle g;
-    int x, y;
-    int width, height;
-} ImagePaneData;
-
-static void set_scrollbar(HWND hWnd, ImagePaneData *ipd, int code, int vert)
-{
-    RECT rc;
-    GetClientRect(hWnd, &rc);
-
-    switch (code){
-    case SB_LINEUP:
-        if (vert) {
-            if (ipd->y > 0) {
-                ipd->y--;
-            }
-        } else {
-            if (ipd->x > 0) {
-                ipd->x--;
-            }
-        }
-        return;
-    case SB_LINEDOWN:
-        if (vert) {
-            if (ipd->y < ipd->height - rc.bottom) {
-                ipd->y++;
-            }
-        } else {
-            if (ipd->x < ipd->width - rc.right) {
-                ipd->x++;
-            }
-        }
-        return;
-    case SB_PAGEUP:
-        if (vert) {
-            ipd->y -= rc.bottom;
-            if (ipd->y < 0) {
-                ipd->y = 0;
-            }
-        } else {
-            ipd->x -= rc.right;
-            if (ipd->x < 0) {
-                ipd->x = 0;
-            }
-        }
-        return;
-    case SB_PAGEDOWN:
-        if (vert) {
-            ipd->y += rc.bottom;
-            if (ipd->y > ipd->height - rc.bottom) {
-                ipd->y = ipd->height - rc.bottom;
-            }
-        } else {
-            ipd->x += rc.right;
-            if (ipd->x > ipd->width - rc.right) {
-                ipd->x = ipd->width - rc.right;
-            }
-        }
-        return;
-    case SB_TOP:
-        if (vert) {
-            ipd->y = 0;
-        } else {
-            ipd->x = 0;
-        }
-        break;
-    case SB_BOTTOM:
-        if (vert) {
-            ipd->y = ipd->height - rc.bottom;
-        } else {
-            ipd->x = ipd->width - rc.right;
-        }
-        break;
-    case SB_THUMBTRACK: {
-        SCROLLINFO si;
-        si.cbSize = sizeof(si);
-        si.fMask = SIF_TRACKPOS;
-        if (GetScrollInfo(hWnd, (vert ? SB_VERT : SB_HORZ), &si) == 0) {
-            return;
-        }
-        if (vert) {
-            ipd->y = si.nTrackPos;
-        } else {
-            ipd->x = si.nTrackPos;
-        }
-    } break;
-    default:
-        break;
-    }
-}
-static void update_scrollbar(HWND hWnd, ImagePaneData *ipd)
-{
-    SCROLLINFO sc;
-    memset(&sc, 0, sizeof(sc));
-    sc.cbSize = sizeof(SCROLLINFO);
-    sc.fMask = SIF_ALL;
-
-    if (ipd->g != NULL) {
-        RECT rc;
-        GetWindowRect(hWnd, &rc);
-        if (ipd->width <= rc.right - rc.left && ipd->height <= rc.bottom - rc.top) {
-            goto NO_SCROLL_BARS;
-        }
-
-        GetClientRect(hWnd, &rc);
-        if (ipd->width > rc.right) {
-            if (ipd->x > ipd->width - rc.right) {
-                ipd->x = ipd->width - rc.right;
-            }
-        } else {
-            ipd->x = 0;
-        }
-        if (ipd->height > rc.bottom) {
-            if (ipd->y > ipd->height - rc.bottom) {
-                ipd->y = ipd->height - rc.bottom;
-            }
-        } else {
-            ipd->y = 0;
-        }
-        sc.nMax = ipd->width;
-        sc.nPage = rc.right;
-        sc.nPos = ipd->x;
-        SetScrollInfo(hWnd, SB_HORZ, &sc, TRUE);
-
-        sc.nMax = ipd->height;
-        sc.nPage = rc.bottom;
-        sc.nPos = ipd->y;
-        SetScrollInfo(hWnd, SB_VERT, &sc, TRUE);
-    } else {
-        goto NO_SCROLL_BARS;
-    }
-    return;
-
-NO_SCROLL_BARS:
-    sc.nMax = 1;
-    sc.nPage = 2;
-    SetScrollInfo(hWnd, SB_HORZ, &sc, TRUE);
-    SetScrollInfo(hWnd, SB_VERT, &sc, TRUE);
-}
-static void draw_image_pane(HDC hDC, HDC hImgDC, const RECT *rc, ImagePaneData *ipd, HBRUSH hBrush)
-{
-    int x1, y1;
-    int x2, y2;
-    int width, height;
-
-    if (ipd->width < rc->right) {
-        x1 = (rc->right - ipd->width) / 2;
-    } else {
-        x1 = -ipd->x;
-    }
-    if (ipd->height < rc->bottom) {
-        y1 = (rc->bottom - ipd->height) / 2;
-    } else {
-        y1 = -ipd->y;
-    }
-    if (ipd->width > rc->right - x1) {
-        width = rc->right - x1;
-    } else {
-        width = ipd->width;
-    }
-    if (ipd->height > rc->bottom - y1) {
-        height = rc->bottom - y1;
-    } else {
-        height = ipd->height;
-    }
-    if (x1 < 0) {
-        x2 = -x1;
-        x1 = 0;
-    } else {
-        x2 = 0;
-    }
-    if (y1 < 0) {
-        y2 = -y1;
-        y1 = 0;
-    } else {
-        y2 = 0;
-    }
-
-    if (x1 > 0) {
-        RECT r;
-        r.left = 0;
-        r.right = x1;
-        r.top = 0;
-        r.bottom = rc->bottom;
-        FillRect(hDC, &r, hBrush);
-    }
-    if (width < rc->right) {
-        RECT r;
-        r.left = x1 + width;
-        r.right = rc->right;
-        r.top = 0;
-        r.bottom = rc->bottom;
-        FillRect(hDC, &r, hBrush);
-    }
-    if (y1 > 0) {
-        RECT r;
-        r.left = x1;
-        r.right = x1 + width;
-        r.top = 0;
-        r.bottom = y1;
-        FillRect(hDC, &r, hBrush);
-    }
-    if (height < rc->bottom) {
-        RECT r;
-        r.left = x1;
-        r.right = x1 + width;
-        r.top = y1 + height;
-        r.bottom = rc->bottom;
-        FillRect(hDC, &r, hBrush);
-    }
-    BitBlt(hDC, x1, y1, width, height, hImgDC, x2, y2, SRCCOPY);
-}
-static void ImagePanePaintProc(HWND hWnd, ImagePaneData *ipd)
-{
-    PAINTSTRUCT ps;
-    RECT rc;
-    HDC hDC = BeginPaint(hWnd, &ps);
-    HBRUSH hBrush = GetSysColorBrush(COLOR_3DFACE);
-
-    GetClientRect(hWnd, &rc);
-    if (ipd->g != NULL) {
-        HDC hImgDC = CreateCompatibleDC(hDC);
-        SelectObject(hImgDC, ipd->g);
-        draw_image_pane(hDC, hImgDC, &rc, ipd, hBrush);
-        DeleteDC(hImgDC);
-    } else {
-        FillRect(hDC, &rc, hBrush);
-    }
-    EndPaint(hWnd, &ps);
-}
-static LRESULT CALLBACK ImagePaneProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
-{
-    switch (msg) {
-    case WM_CREATE:
-        return 0;
-    case WM_DESTROY: {
-        Ref *r = (Ref*)GetWindowLongPtr(hWnd, GWLP_USERDATA);
-        if (r != NULL) {
-            ImagePaneData *ipd = Value_ptr(r->v[INDEX_WIDGET_GENERAL_USE]);
-            if (ipd->g != NULL) {
-                DeleteObject(ipd->g);
-                ipd->g = NULL;
-            }
-        }
-        break;
-    }
-    case WM_HSCROLL: {
-        Ref *r = (Ref*)GetWindowLongPtr(hWnd, GWLP_USERDATA);
-        if (r != NULL) {
-            ImagePaneData *ipd = Value_ptr(r->v[INDEX_WIDGET_GENERAL_USE]);
-            set_scrollbar(hWnd, ipd, LOWORD(wParam), FALSE);
-            update_scrollbar(hWnd, ipd);
-            InvalidateRect(hWnd, NULL, FALSE);
-        }
-        return 0;
-    }
-    case WM_VSCROLL: {
-        Ref *r = (Ref*)GetWindowLongPtr(hWnd, GWLP_USERDATA);
-        if (r != NULL) {
-            ImagePaneData *ipd = Value_ptr(r->v[INDEX_WIDGET_GENERAL_USE]);
-            set_scrollbar(hWnd, ipd, LOWORD(wParam), TRUE);
-            update_scrollbar(hWnd, ipd);
-            InvalidateRect(hWnd, NULL, FALSE);
-        }
-        return 0;
-    }
-    case WM_SIZE:
-        if (!IsIconic(hWnd)){
-            Ref *r = (Ref*)GetWindowLongPtr(hWnd, GWLP_USERDATA);
-            if (r != NULL) {
-                ImagePaneData *ipd = Value_ptr(r->v[INDEX_WIDGET_GENERAL_USE]);
-                update_scrollbar(hWnd, ipd);
-                InvalidateRect(hWnd, NULL, FALSE);
-            }
-            return 0;
-        }
-        break;
-    case WM_PAINT: {
-        Ref *r = (Ref*)GetWindowLongPtr(hWnd, GWLP_USERDATA);
-        if (r != NULL) {
-            ImagePaneData *ipd = Value_ptr(r->v[INDEX_WIDGET_GENERAL_USE]);
-            ImagePanePaintProc(hWnd, ipd);
-        }
-        return 0;
-    }
-    }
-    return DefWindowProcW(hWnd, msg, wParam, lParam);
-}
-
-static void init_image_pane_class()
-{
-    static int initialized = FALSE;
-
-    if (!initialized) {
-        WNDCLASSEXW wc;
-
-        wc.cbSize        = sizeof(wc);
-        wc.style         = 0;
-        wc.lpfnWndProc   = ImagePaneProc;
-        wc.cbClsExtra    = 0;
-        wc.cbWndExtra    = 0;
-        wc.hInstance     = GetModuleHandle(NULL);
-        wc.hIcon         = NULL;
-        wc.hIconSm       = NULL;
-        wc.hCursor       = LoadCursor(NULL, IDC_ARROW);
-        wc.hbrBackground = NULL;
-        wc.lpszMenuName  = NULL;
-        wc.lpszClassName = IMAGE_PANE_CLASS;
-        RegisterClassExW(&wc);
-
-        initialized = TRUE;
-    }
-}
-
-void create_image_pane_window(Value *v, WndHandle parent)
-{
-    Ref *r = Value_ref(*v);
-    HWND window = NULL;
-    ImagePaneData *ipd;
-    init_image_pane_class();
-
-    ipd = malloc(sizeof(ImagePaneData));
-    memset(ipd, 0, sizeof(ImagePaneData));
-    r->v[INDEX_WIDGET_GENERAL_USE] = ptr_Value(ipd);
-
-    window = CreateWindowExW(
-        0,
-        IMAGE_PANE_CLASS,
-        L"",
-        WS_CHILD|WS_CLIPSIBLINGS|WS_VISIBLE|WS_HSCROLL|WS_VSCROLL,
-        CW_USEDEFAULT,
-        CW_USEDEFAULT,
-        CW_USEDEFAULT,
-        CW_USEDEFAULT,
-        parent,
-        (HMENU)ID_CHILD_PANE,
-        GetModuleHandle(NULL),
-        NULL);
-
-    SetWindowLongPtr(window, GWLP_USERDATA, (LONG_PTR)r);
-    ShowWindow(window, SW_SHOW);
-
-    r->v[INDEX_WIDGET_HANDLE] = handle_Value(window);
-    fs->addref(*v);
-}
-int image_pane_set_image_sub(WndHandle window, RefImage *img)
-{
-    GraphicsHandle handle = conv_image_to_graphics(img);
-    if (handle == NULL) {
-        return FALSE;
-    }
-    {
-        Ref *r = (Ref*)GetWindowLongPtr(window, GWLP_USERDATA);
-        ImagePaneData *ipd = Value_ptr(r->v[INDEX_WIDGET_GENERAL_USE]);
-        if (ipd->g != NULL) {
-            DeleteObject(ipd->g);
-        }
-        ipd->g = handle;
-        ipd->x = 0;
-        ipd->y = 0;
-        ipd->width = img->width;
-        ipd->height = img->height;
-        update_scrollbar(window, ipd);
-    }
-    InvalidateRect(window, NULL, FALSE);
-    return TRUE;
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////
@@ -865,11 +495,15 @@ int window_set_icon(WndHandle window, Ref *r, RefImage *icon)
     free(buf);
     return TRUE;
 }
+
 int window_message_loop()
 {
     MSG msg;
 
-    MsgWaitForMultipleObjectsEx(0, NULL, INFINITE, QS_ALLEVENTS|QS_ALLINPUT|QS_ALLPOSTMESSAGE, MWMO_ALERTABLE);
+    if (MsgWaitForMultipleObjectsEx(0, NULL, INFINITE, QS_ALLEVENTS|QS_ALLINPUT|QS_ALLPOSTMESSAGE, 0) == 0xFFFFFFFF) {
+        fs->throw_errorf(fs->mod_lang, "InternalError", "MsgWaitForMultipleObjectsEx failed");
+        return FALSE;
+    }
     while (PeekMessageW(&msg, NULL, 0, 0, PM_REMOVE) != 0) {
         TranslateMessage(&msg);
         DispatchMessageW(&msg);

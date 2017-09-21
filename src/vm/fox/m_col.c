@@ -1173,6 +1173,35 @@ static int array_join(Value *vret, Value *v, RefNode *node)
     StrBuf buf;
     int i;
 
+    if (is_str) {
+        // 要素数0/1のとき最適化
+        if (ra->size == 0) {
+            *vret = vp_Value(fs->str_0);
+            return TRUE;
+        } else if (ra->size == 1) {
+            Value v1 = ra->p[0];
+            if (Value_type(v1) == fs->cls_str) {
+                *vret = Value_cp(v1);
+            } else {
+                RefNode *ret_type;
+
+                Value_push("v", v1);
+                if (!call_member_func(fs->str_tostr, 0, TRUE)) {
+                    return TRUE;
+                }
+                ret_type = Value_type(fg->stk_top[-1]);
+                // 戻り値チェック
+                if (ret_type != fs->cls_str) {
+                    throw_error_select(THROW_RETURN_TYPE__NODE_NODE, fs->cls_str, ret_type);
+                    return FALSE;
+                }
+                *vret = fg->stk_top[-1];
+                fg->stk_top--;
+            }
+            return TRUE;
+        }
+    }
+
     StrBuf_init(&buf, 0);
     for (i = 0; i < ra->size; i++) {
         if (i > 0) {
@@ -2090,32 +2119,104 @@ static int iterator_new(Value *vret, Value *v, RefNode *node)
 }
 static int iterator_to_list(Value *vret, Value *v, RefNode *node)
 {
-    int max_size = fs->max_alloc / sizeof(Value);
-    RefArray *ra = refarray_new(0);
-    *vret = vp_Value(ra);
+    if (Value_type(*v) == cls_listiter) {
+        // 配列の場合は複製を返したうえで、Iteratorを末尾まで進める
+        Ref *r = Value_vp(*v);
+        RefArray *src = Value_vp(r->v[INDEX_LISTITER_VAL]);
+        RefArray *dst = fs->refarray_new(src->size);
 
-    for (;;) {
-        Value *va;
-        
-        if (ra->size >= max_size) {
-            throw_error_select(THROW_MAX_ALLOC_OVER__INT, fs->max_alloc);
-            return FALSE;
+        int i = Value_integral(r->v[INDEX_LISTITER_IDX]);
+        if (i < 0) {
+            i = 0;
         }
 
-        Value_push("v", *v);
-        if (!call_member_func(fs->str_next, 0, TRUE)) {
-            if (Value_type(fg->error) == fs->cls_stopiter) {
-                // throw StopIteration
-                unref(fg->error);
-                fg->error = VALUE_NULL;
-                break;
-            } else {
+        for (; i < src->size; i++) {
+            dst->p[i] = Value_cp(src->p[i]);
+        }
+        *vret = vp_Value(dst);
+        r->v[INDEX_LISTITER_IDX] = int32_Value(i);
+    } else {
+        int max_size = fs->max_alloc / sizeof(Value);
+        RefArray *ra = refarray_new(0);
+        *vret = vp_Value(ra);
+
+        for (;;) {
+            Value *va;
+
+            if (ra->size >= max_size) {
+                throw_error_select(THROW_MAX_ALLOC_OVER__INT, fs->max_alloc);
+                return FALSE;
+            }
+
+            Value_push("v", *v);
+            if (!call_member_func(fs->str_next, 0, TRUE)) {
+                if (Value_type(fg->error) == fs->cls_stopiter) {
+                    // throw StopIteration
+                    unref(fg->error);
+                    fg->error = VALUE_NULL;
+                    break;
+                } else {
+                    return FALSE;
+                }
+            }
+            va = refarray_push(ra);
+            fg->stk_top--;
+            *va = *fg->stk_top;
+        }
+    }
+    return TRUE;
+}
+static int iterator_flatten_sub(RefArray *ra, Value v)
+{
+    if (Value_type(v) == fs->cls_list) {
+        int i;
+        RefArray *ra2 = Value_vp(v);
+
+        for (i = 0; i < ra2->size; i++) {
+            if (!iterator_flatten_sub(ra, ra2->p[i])) {
                 return FALSE;
             }
         }
-        va = refarray_push(ra);
-        fg->stk_top--;
-        *va = *fg->stk_top;
+    } else {
+        if (ra->size >= fs->max_alloc / sizeof(Value)) {
+            throw_error_select(THROW_MAX_ALLOC_OVER__INT, fs->max_alloc);
+            return FALSE;
+        }
+        *refarray_push(ra) = Value_cp(v);
+    }
+    return TRUE;
+}
+static int iterator_flatten(Value *vret, Value *v, RefNode *node)
+{
+    RefArray *ra = refarray_new(0);
+    *vret = vp_Value(ra);
+
+    if (Value_type(*v) == cls_listiter) {
+        int i;
+        Ref *r = Value_vp(*v);
+        RefArray *ra2 = Value_vp(r->v[INDEX_LISTITER_VAL]);
+
+        for (i = 0; i < ra2->size; i++) {
+            iterator_flatten_sub(ra, ra2->p[i]);
+        }
+    } else {
+        for (;;) {
+            Value_push("v", *v);
+            if (!call_member_func(fs->str_next, 0, TRUE)) {
+                if (Value_type(fg->error) == fs->cls_stopiter) {
+                    // throw StopIteration
+                    unref(fg->error);
+                    fg->error = VALUE_NULL;
+                    break;
+                } else {
+                    return FALSE;
+                }
+            }
+            if (!iterator_flatten_sub(ra, fg->stk_top[-1])) {
+                return FALSE;
+            }
+            Value_pop();
+        }
     }
     return TRUE;
 }
@@ -2612,6 +2713,7 @@ static int iterable_invoke(Value *vret, Value *v, RefNode *node)
     for (i = 1; i <= argc; i++) {
         Value_push("v", v[i]);
     }
+    // 自身と同名のmethodを呼び出す
     if (!call_member_func(node->name, argc, TRUE)) {
         return FALSE;
     }
@@ -2645,6 +2747,8 @@ void define_lang_col_class(RefNode *m)
 
     n = define_identifier(m, cls, "to_list", NODE_FUNC_N, 0);
     define_native_func_a(n, iterator_to_list, 0, 0, NULL);
+    n = define_identifier(m, cls, "flatten", NODE_FUNC_N, 0);
+    define_native_func_a(n, iterator_flatten, 0, 0, NULL);
     n = define_identifier(m, cls, "to_set", NODE_FUNC_N, 0);
     define_native_func_a(n, iterator_to_set, 0, 0, NULL);
     n = define_identifier(m, cls, "join", NODE_FUNC_N, 0);
@@ -2716,6 +2820,8 @@ void define_lang_col_class(RefNode *m)
     define_native_func_a(n, iterable_new, 0, 0, NULL);
 
     n = define_identifier(m, cls, "to_list", NODE_FUNC_N, 0);
+    define_native_func_a(n, iterable_invoke, 0, 0, NULL);
+    n = define_identifier(m, cls, "flatten", NODE_FUNC_N, 0);
     define_native_func_a(n, iterable_invoke, 0, 0, NULL);
     n = define_identifier(m, cls, "to_set", NODE_FUNC_N, 0);
     define_native_func_a(n, iterable_invoke, 0, 0, NULL);

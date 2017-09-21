@@ -222,7 +222,13 @@ static void OpBuf_grow(OpBuf *buf, int n)
 }
 static void OpBuf_add_str(OpBuf *buf, Tok *tk)
 {
-    OpBuf_add_op2(buf, OP_LITERAL, 0, cstr_Value(fs->cls_str, tk->str_val.p, tk->str_val.size));
+    Value v;
+    if (tk->v.type == TL_VAR || tk->v.type == TL_CLASS || tk->v.type == TL_CONST) {
+        v = vp_Value(intern(tk->str_val.p, tk->str_val.size));
+    } else {
+        v = cstr_Value(fs->cls_str, tk->str_val.p, tk->str_val.size);
+    }
+    OpBuf_add_op2(buf, OP_LITERAL, 0, v);
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -2577,7 +2583,9 @@ static int parse_break(OpBuf *buf, Block *bk, Tok *tk)
             }
             // 後でラベルを書き換える
             bk->break_p = OpBuf_add_op2(buf, OP_JMP, 0, (Value)bk->break_p);
-            Tok_next(tk);
+            if (tk->v.type == T_NL || tk->v.type == T_SEMICL) {
+                Tok_next(tk);
+            }
             break;
         }
         if (bk->parent == NULL) {
@@ -2605,7 +2613,9 @@ static int parse_continue(OpBuf *buf, Block *bk, Tok *tk)
                 OpBuf_add_op2(buf, OP_POP, pop_count, (Value)tk->v.line);
             }
             OpBuf_add_op2(buf, OP_JMP, 0, (Value)bk->continue_p);
-            Tok_next(tk);
+            if (tk->v.type == T_NL || tk->v.type == T_SEMICL) {
+                Tok_next(tk);
+            }
             break;
         }
         if (bk->parent == NULL) {

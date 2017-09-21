@@ -79,20 +79,27 @@ static CompoHash *compo_hash[COMPO_HASH_SIZE];
 
 /**
  * http://unicode.org/Public/UNIDATA/auxiliary/GraphemeBreakTest.html
+ * Unicode 9.0.0
  */
-static const uint16_t grapheme_break[] = {
-        0x0030,
-        0x0004,
-        0x0000,
-        0x0000,
-        0x0030,
-        0x0030,
-        0x06f0,
-        0x01b0,
-        0x0130,
-        0x01b0,
-        0x0130,
-        0x0830,
+static const uint32_t grapheme_break[] = {
+	0x00008050,
+	0x00000004,
+	0x00000000,
+	0x00000000,
+	0x00008050,
+	0x0003fff1,
+	0x00008050,
+	0x00008dd0,
+	0x00008350,
+	0x00008250,
+	0x00008350,
+	0x00008250,
+	0x00009050,
+	0x0000c050,
+	0x00008050,
+	0x00038050,
+	0x00008050,
+	0x0000c050,
 };
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

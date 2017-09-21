@@ -1373,7 +1373,11 @@ static int parse_html_sub(Value *v, RefArray *v_ra, HTMLDoc *html, XMLTok *tk, S
                     }
                 } else {
                     Value key = fs->cstr_Value(fs->cls_str, skey.p, skey.size);
-                    HashValueEntry *ve = fs->refmap_add(Value_vp(*vm), key, FALSE, FALSE);
+                    HashValueEntry *ve;
+                    if (*vm == VALUE_NULL) {
+                        *vm = vp_Value(fs->refmap_new(0));
+                    }
+                    ve = fs->refmap_add(Value_vp(*vm), key, FALSE, FALSE);
                     if (ve != NULL) {
                         ve->val = key;
                     } else {

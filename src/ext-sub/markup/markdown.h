@@ -1,7 +1,7 @@
-#ifndef _MARKDOWN_H_
-#define _MARKDOWN_H_
+#ifndef MARKDOWN_H_INCLUDED
+#define MARKDOWN_H_INCLUDED
 
-#include "fox.h"
+#include "markup.h"
 #include "m_xml.h"
 
 enum {
@@ -16,8 +16,6 @@ enum {
     MD_HEADING_D,     // === or ---
     MD_PARAGRAPH,     // <p>child</p>
     MD_HORIZONTAL,    // <hr>
-    MD_DIV_BLOCK,     // <div class="...">
-    MD_DIV_BLOCK_END, // </div>
     MD_BLOCK_PLUGIN,  // %plugin
 
     // インライン要素
@@ -89,7 +87,6 @@ enum {
     SIMPLE_HASH_MAX = 32,
 };
 
-
 typedef struct MDNode {
     struct MDNode *child;
     struct MDNode *next;
@@ -119,12 +116,10 @@ typedef struct SimpleHash
 } SimpleHash;
 
 typedef struct {
-    int enable_semantic;
-    int enable_tex;
-    int quiet_error;
     int tabstop;
     int heading_level;
     int footnote_id;
+    int link_done;
 
     Mem mem;
     SimpleHash *link_map[SIMPLE_HASH_MAX];
@@ -156,10 +151,6 @@ typedef struct {
 #define extern
 #endif
 
-extern const FoxStatic *fs;
-extern FoxGlobal *fg;
-
-extern RefNode *mod_markdown;
 extern RefNode *mod_xml;
 extern const XMLStatic *xst;
 
@@ -176,22 +167,22 @@ extern RefStr *str_block_plugin;
 #undef extern
 #endif
 
-// m_markdown.c
+// m_markup.c
 MDNode *SimpleHash_get_node(SimpleHash **hash, const char *name);
 void SimpleHash_add_node(SimpleHash **hash, Mem *mem, const char *name, MDNode *node);
-MDNode *MDNode_new(int type, Markdown *r);
+MDNode *MDNode_new(int type, Markdown *md);
 
 // md_parse.c
-int parse_markdown(Markdown *r, const char *p);
+int parse_markdown(Markdown *md, const char *p);
 int link_markdown(Ref *r);
 
 // hilight.c
-int parse_markdown_code_block(Markdown *r, MDTok *tk, MDNode **ppnode, RefStr *type);
+int parse_markdown_code_block(Markdown *md, MDTok *tk, MDNode **ppnode, RefStr *type);
 
 // md_make.c
 Ref *xmlelem_new(const char *name);
-int xml_from_markdown(Ref *root, Markdown *r, MDNode *node);
-int text_from_markdown(StrBuf *sb, Markdown *r, MDNode *node);
+int xml_from_markdown(Ref *root, Markdown *md, MDNode *node);
+int text_from_markdown(StrBuf *sb, Markdown *md, MDNode *node);
 
 
-#endif /* _MARKDOWN_H_ */
+#endif /* MARKDOWN_H_INCLUDED */

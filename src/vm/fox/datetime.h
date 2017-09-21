@@ -1,5 +1,5 @@
-#ifndef DATETIME_H_
-#define DATETIME_H_
+#ifndef DATETIME_H_INCLUDED
+#define DATETIME_H_INCLUDED
 
 #include "fox.h"
 #include <stdint.h>
@@ -42,4 +42,4 @@ int64_t Date_week_to_JulianDay(const Date *dt);
 void DateTime_adjust(Date *dt, Time *tm);
 void Date_adjust_month(Date *dt);
 
-#endif /* DATETIME_H_ */
+#endif /* DATETIME_H_INCLUDED */

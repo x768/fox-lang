@@ -327,6 +327,20 @@ Value cstr_Value(RefNode *klass, const char *p, int size)
     fv->heap_count++;
     return vp_Value(r);
 }
+
+#ifdef WIN32
+
+Value wstr_Value(RefNode *klass, const wchar_t *wstr, int size)
+{
+    int wlen = size < 0 ? wcslen(wstr) : size;
+    int len = utf16_to_utf8(NULL, wstr, wlen);
+    RefStr *rs = fs->refstr_new_n(klass, len);
+    utf16_to_utf8(rs->c, wstr, wlen);
+    return vp_Value(rs);
+}
+
+#endif
+
 Value Value_cp(Value v)
 {
     if (Value_isref(v)) {

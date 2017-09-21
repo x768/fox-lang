@@ -1,5 +1,5 @@
-#ifndef _MEDIA_H_
-#define _MEDIA_H_
+#ifndef MEDIA_H_INCLUDED
+#define MEDIA_H_INCLUDED
 
 #include "m_number.h"
 #include "m_media.h"
@@ -27,4 +27,4 @@ int Audio_set_size(RefAudio *snd, int size);
 int audio_load_wav(RefAudio *snd, Value r, int info_only);
 int audio_save_wav(RefAudio *snd, Value w);
 
-#endif /* _MEDIA_H_ */
+#endif /* MEDIA_H_INCLUDED */

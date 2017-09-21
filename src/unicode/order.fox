@@ -1,0 +1,27 @@
+let f = fopen("UnicodeData.txt")
+
+// 結合クラス
+let m = List.sized(17)
+
+for line in f {
+	let a = line.split(";")
+	let i = Int.parse(a[0], 16)
+
+	let val = Int.parse(a[3])
+	if val != 0 {
+		let plane = i / 0x10000
+		let pt = i % 0x10000
+		var mm = m[plane]
+		if !mm {
+			m[plane] = BytesIO.sized(0x10000, 0)
+			mm = m[plane]
+		}
+		mm[pt] = val
+	}
+}
+for p in m.entries {
+	if p.value {
+		writefile "../unicode/cc${p.key:02d}", p.value
+	}
+}
+

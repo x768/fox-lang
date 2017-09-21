@@ -552,7 +552,7 @@ static int load_gif_sub(RefImage *image, Value r, int info_only)
 
     if (gif->SWidth > MAX_IMAGE_SIZE || gif->SHeight > MAX_IMAGE_SIZE) {
         fs->throw_errorf(mod_image, "ImageError", "Image size too large (max:%d)", MAX_IMAGE_SIZE);
-        DGifCloseFile(gif);
+        DGifCloseFile(gif, NULL);
         return FALSE;
     }
     image->bands = BAND_P;
@@ -605,14 +605,12 @@ static int load_gif_sub(RefImage *image, Value r, int info_only)
             uint8_t *data;
 
             if (size_alloc > fs->max_alloc) {
-            fs->throw_error_select(THROW_MAX_ALLOC_OVER__INT, fs->max_alloc);
-                DGifCloseFile(gif);
-                return FALSE;
+                fs->throw_error_select(THROW_MAX_ALLOC_OVER__INT, fs->max_alloc);
+                goto ERROR_END;
             }
             if (id->Left < 0 || id->Left + id->Width > image->width || id->Top < 0 || id->Top + id->Height > image->height) {
                 fs->throw_errorf(mod_image, "ImageError", "Invalid GIF format");
-                DGifCloseFile(gif);
-                return FALSE;
+                goto ERROR_END;
             }
 
             data = malloc(size_alloc);
@@ -624,8 +622,12 @@ static int load_gif_sub(RefImage *image, Value r, int info_only)
         }
     }
 
-    DGifCloseFile(gif);
+    DGifCloseFile(gif, NULL);
     return TRUE;
+
+ERROR_END:
+    DGifCloseFile(gif, NULL);
+    return FALSE;
 }
 static int load_image_gif(Value *vret, Value *v, RefNode *node)
 {
@@ -1038,12 +1040,12 @@ static int save_gif_sub(RefImage *image, Value w)
         }
     }
 
-    EGifCloseFile(gif);
+    EGifCloseFile(gif, NULL);
     fox_image_free(img_p);
     return TRUE;
 
 ERROR_END:
-    EGifCloseFile(gif);
+    EGifCloseFile(gif, NULL);
     fox_image_free(img_p);
     return FALSE;
 }

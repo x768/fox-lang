@@ -1,5 +1,5 @@
-#ifndef _IMAGE_RAW_H_
-#define _IMAGE_RAW_H_
+#ifndef IMAGE_RAW_H_INCLUDED
+#define IMAGE_RAW_H_INCLUDED
 
 #include "fox.h"
 #include "m_image.h"
@@ -35,4 +35,4 @@ int load_image_pnm_sub(RefImage *image, Value r, int info_only);
 int save_image_pnm_sub(RefImage *image, Value w, int type, int threshold);
 
 
-#endif /* _IMAGE_RAW_H_ */
+#endif /* IMAGE_RAW_H_INCLUDED */

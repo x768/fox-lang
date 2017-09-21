@@ -3,6 +3,7 @@ project(m_text_util)
 add_library(m_text_util SHARED
   ${SRC_COMMON}
   m_text_util.c
+  hilight.c
 )
 set_target_properties(m_text_util
   PROPERTIES

@@ -1,0 +1,12 @@
+for line in fopen("data/grapheme-break-chart.txt") {
+	let bits = line.split("\t").map(s => s == "×" ? 1 : 0).skip(1).to_list()
+	var n = 0
+
+	for p in bits.entries {
+		if p.value != 0 {
+			n |= 1 << p.key
+		}
+	}
+	puts "\t0x${n.to_str('08x')},"
+}
+

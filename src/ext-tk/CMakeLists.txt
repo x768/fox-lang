@@ -7,5 +7,4 @@ set(DEST_DIR ../../../../import)
 
 add_subdirectory(foxtk)
 add_subdirectory(textedit)
-add_subdirectory(sdl2)
 

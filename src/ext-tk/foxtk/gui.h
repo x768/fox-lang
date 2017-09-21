@@ -1,10 +1,12 @@
-#ifndef _GUI_H_
-#define _GUI_H_
+#ifndef GUI_H_INCLUDED
+#define GUI_H_INCLUDED
 
 #include "m_gui.h"
 
 enum {
-    INDEX_FORM_MENU = INDEX_WIDGET_NUM,
+    INDEX_FORM_HANDLE = INDEX_WIDGET_NUM,
+    INDEX_FORM_MENU,
+    INDEX_FORM_CHILDREN,
     INDEX_FORM_DROP_HANDLE,
 #ifdef WIN32
     INDEX_FORM_NEW_ICON,
@@ -86,7 +88,7 @@ Value event_object_new(Ref *sender_r);
 void event_object_add(Value evt, const char *name, Value val);
 
 
-// m_gui_???.c
+// m_gui_sub.c
 void gui_initialize(void);
 void gui_dispose(void);
 char *get_toolkit_version(void);
@@ -101,7 +103,6 @@ int file_open_dialog(Value *vret, const char *title, RefArray *filter, WndHandle
 
 // form.c
 void create_form_window(Ref *r, WndHandle parent, int *size);
-
 void window_destroy(WndHandle window);
 void window_set_drop_handler(WndHandle window);
 int window_set_icon(WndHandle window, Ref *r, RefImage *icon);
@@ -117,10 +118,6 @@ int window_get_visible(WndHandle window);
 void window_set_visible(WndHandle window, int show);
 void window_set_keep_above(WndHandle window, int above);
 int window_message_loop(void);
-
-void connect_widget_events(WndHandle window);
-void create_image_pane_window(Value *v, WndHandle parent);
-int image_pane_set_image_sub(WndHandle window, RefImage *img);
 
 // monitor.c
 void native_timer_new(int millisec, Ref *r);
@@ -159,4 +156,4 @@ int uri_to_file_sub(Value *dst, Value src);
 int exio_trash_sub(Value vdst);
 
 
-#endif /* _GUI_H_ */
+#endif /* GUI_H_INCLUDED */

@@ -624,7 +624,7 @@ static int text_convert_html(StrBuf *buf, Str src, int quot, XMLOutputFormat *xo
 static int html_attr_no_value(Str name)
 {
     static const char *list[] = {
-        "checked", "disabled", "readonly", "multiple", "selected",
+        "checked", "disabled", "readonly", "multiple", "selected", "async", "defer",
     };
     int i;
 
@@ -1075,6 +1075,22 @@ ERROR_END:
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////
 
+static int xml_elem_new_add_value(RefArray *ra, Value e, int pos)
+{
+    RefNode *e_type = fs->Value_type(e);
+    if (e_type == cls_elem || e_type == cls_text || e_type == cls_comment) {
+        Value *pv = fs->refarray_push(ra);
+        *pv = fs->Value_cp(e);
+    } else if (e_type == fs->cls_str) {
+        Value *pv = fs->refarray_push(ra);
+        RefStr *src_s = Value_vp(e);
+        *pv = fs->cstr_Value(cls_text, src_s->c, src_s->size);
+    } else {
+        fs->throw_error_select(THROW_ARGMENT_TYPE2__NODE_NODE_NODE_INT, cls_node, fs->cls_str, e_type, pos + 1);
+        return FALSE;
+    }
+    return TRUE;
+}
 static int xml_elem_new(Value *vret, Value *v, RefNode *node)
 {
     RefArray *ra;
@@ -1084,7 +1100,7 @@ static int xml_elem_new(Value *vret, Value *v, RefNode *node)
     *vret = vp_Value(r);
 
     if (!is_valid_elem_name(rs_name->c, rs_name->size)) {
-        fs->throw_errorf(fs->mod_lang, "ValueError", "Invalid element name");
+        fs->throw_errorf(fs->mod_lang, "ValueError", "Invalid element name %Q", Str_new(rs_name->c, rs_name->size));
         return FALSE;
     }
 
@@ -1094,7 +1110,7 @@ static int xml_elem_new(Value *vret, Value *v, RefNode *node)
     ra->rh.type = cls_nodelist;
     r->v[INDEX_ELEM_CHILDREN] = vp_Value(ra);
 
-    if (fg->stk_top > v + 2 && fs->Value_type(v[2]) == fs->cls_map) {
+    if (v + 2 < fg->stk_top && fs->Value_type(v[2]) == fs->cls_map) {
         int i;
         Value pv = v[2];
         RefMap *map = Value_vp(pv);
@@ -1119,23 +1135,60 @@ static int xml_elem_new(Value *vret, Value *v, RefNode *node)
         pos = 3;
     }
     for (; v + pos < fg->stk_top; pos++) {
-        RefNode *v_type = fs->Value_type(v[pos]);
-        if (v_type == cls_elem || v_type == cls_text || v_type == cls_comment) {
+        Value e = v[pos];
+        RefNode *v_type = fs->Value_type(e);
+        if (v_type == fs->cls_str) {
             Value *pv = fs->refarray_push(ra);
-            *pv = fs->Value_cp(v[pos]);
-        } else if (v_type == fs->cls_str) {
-            Value tmp;
-            Value *pv;
-            RefStr *rs = Value_vp(v[pos]);
-            if (!parse_xml_from_str(&tmp, rs->c, rs->size)) {
+            RefStr *src_s = Value_vp(e);
+            *pv = fs->cstr_Value(cls_text, src_s->c, src_s->size);
+        } else if (v_type == cls_elem || v_type == cls_text || v_type == cls_comment) {
+            Value *pv = fs->refarray_push(ra);
+            *pv = fs->Value_cp(e);
+        } else if (v_type == fs->cls_list) {
+            RefArray *src_a = Value_vp(e);
+            int i;
+            for (i = 0; i < src_a->size; i++) {
+                if (!xml_elem_new_add_value(ra, src_a->p[i], pos)) {
+                    return FALSE;
+                }
+            }
+        } else {
+            Value iter = VALUE_NULL;
+
+            fs->Value_push("v", e);
+            if (!fs->call_member_func(fs->str_iterator, 0, FALSE)) {
                 return FALSE;
             }
-            pv = fs->refarray_push(ra);
-            // moveなので参照カウンタは変化しない
-            *pv = tmp;
-        } else {
-            fs->throw_error_select(THROW_ARGMENT_TYPE__NODE_NODE_INT, cls_node, v_type, pos + 1);
-            return FALSE;
+            iter = fg->stk_top[-1];
+            v_type = fs->Value_type(iter);
+            fg->stk_top--;
+
+            if (fs->is_subclass(v_type, fs->cls_iterator)) {
+                for (;;) {
+                    fs->Value_push("v", iter);
+                    if (!fs->call_member_func(fs->str_next, 0, TRUE)) {
+                        if (fs->Value_type(fg->error) == fs->cls_stopiter) {
+                            // throw StopIteration
+                            fs->unref(fg->error);
+                            fg->error = VALUE_NULL;
+                            fs->Value_pop();
+                            break;
+                        } else {
+                            fs->unref(iter);
+                            return FALSE;
+                        }
+                    }
+                    if (!xml_elem_new_add_value(ra, fg->stk_top[-1], pos)) {
+                        return FALSE;
+                    }
+                    fs->Value_pop();
+                }
+            } else {
+                fs->throw_error_select(THROW_ARGMENT_TYPE2__NODE_NODE_NODE_INT, cls_node, fs->cls_iterator, v_type, pos + 1);
+                fs->unref(iter);
+                return FALSE;
+            }
+            fs->unref(iter);
         }
     }
 
@@ -2117,7 +2170,7 @@ static void define_class(RefNode *m)
     fs->define_native_func_a(n, xml_node_list_eq, 1, 1, NULL, cls_nodelist);
     n = fs->define_identifier_p(m, cls, fs->symbol_stock[T_LET_B], NODE_FUNC_N, 0);
     fs->define_native_func_a(n, get_function_ptr(fs->cls_list, fs->symbol_stock[T_LET_B]), 2, 2, NULL, fs->cls_int, cls_node);
-    n = fs->define_identifier_p(m, cls, fs->str_iterator, NODE_FUNC_N, NODEOPT_PROPERTY);
+    n = fs->define_identifier_p(m, cls, fs->str_iterator, NODE_FUNC_N, 0);
     fs->define_native_func_a(n, get_function_ptr(fs->cls_list, fs->str_iterator), 0, 0, NULL);
     n = fs->define_identifier(m, cls, "attr", NODE_FUNC_N, 0);
     fs->define_native_func_a(n, xml_elem_attr, 1, 2, (void*) TRUE, fs->cls_str, NULL);

@@ -1,5 +1,5 @@
-#ifndef _FOX_OSX_H_
-#define _FOX_OSX_H_
+#ifndef FOX_MACOS_H_INCLUDED
+#define FOX_MACOS_H_INCLUDED
 
 #include "fox.h"
 
@@ -9,11 +9,11 @@
 #endif
 extern const FoxStatic *fs;
 extern FoxGlobal *fg;
-extern RefNode *mod_osx;
+extern RefNode *mod_macos;
 #ifdef DEFINE_GLOBALS
 #undef extern
 #endif
 
+int exec_apple_script(const char *src);
 
-
-#endif /* _FOX_OSX_H_ */
+#endif /* FOX_MACOS_H_INCLUDED */

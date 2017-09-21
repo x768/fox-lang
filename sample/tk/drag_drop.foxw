@@ -2,7 +2,7 @@ import foxtk
 
 class MyForm : Form
 {
-    new() {
+    this() {
         this.title = "Drag & Drop files into this window"
         this.dropped.push this.on_drop
         this.closed.push e => confirm("Exit anyway?", "test", this)

@@ -3,6 +3,7 @@ project(m_image_text)
 add_library(m_image_text SHARED
   ${SRC_COMMON}
   m_image_text.c
+  ft.c
 )
 set_target_properties(m_image_text
   PROPERTIES

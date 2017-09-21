@@ -1,4 +1,4 @@
-import markdown
+import markup
 import marshal.xml
 
 let src = <<<EOS

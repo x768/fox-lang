@@ -7,6 +7,7 @@ abstract class Base
 {
     this._new() {
         RESULT.push "Base._new"
+		RESULT.push typeof(this)
     }
     ~this() {
         RESULT.push "~Base"
@@ -18,6 +19,7 @@ class Derived : Base
     this() {
         super._new()
         RESULT.push "Derived.new"
+		RESULT.push typeof(this)
     }
     ~this() {
         RESULT.push "~Derived"
@@ -26,4 +28,4 @@ class Derived : Base
 
 Derived()
 
-assert_equal RESULT, ["Base._new", "Derived.new", "~Derived", "~Base"]
+assert_equal RESULT, ["Base._new", Base, "Derived.new", Derived, "~Derived", "~Base"]

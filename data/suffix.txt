@@ -3,7 +3,7 @@
 "application/font-woff" = "woff"
 "application/java-archive" = "jar"
 "application/java-vm" = "class"
-"application/javascript" = "js"
+"application/javascript" = "js", "mjs"
 "application/json" = "json"
 "application/m3g" = "m3g"
 "application/msword" = "doc", "dot"

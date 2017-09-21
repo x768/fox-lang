@@ -1,0 +1,63 @@
+def C = {
+	CR = 1,
+	LF = 2,
+	Control = 3,
+	Extend = 4,
+	Prepend = 5,
+	SpacingMark = 6,
+	L = 7,
+	V = 8,
+	T = 9,
+	LV = 10,
+	LVT = 11,
+	Regional_Indicator = 12,
+	E_Base = 13,
+	E_Modifier = 14,
+	ZWJ = 15,
+	Glue_After_Zwj = 16,
+	E_Base_GAZ = 17,
+}
+
+let f = fopen("data/GraphemeBreakProperty.txt")
+let m = List.sized(17)
+
+for line in f {
+	var plane = null
+	var begin = null
+	var end = null
+	var type = null
+
+	if let t = line.match(/^([0-9A-F]+)\s*;\s*(\w+)/) {
+		// 値が1つ
+		let i = Int.parse(t[1], 16)
+		plane = i / 0x10000
+		begin = i % 0x10000
+		end = begin + 1
+		type = C[t[2]]
+	} elif let t = line.match(/^([0-9A-F]+)\.\.([0-9A-F]+)\s*;\s*(\w+)/) {
+		// 範囲指定
+		let i = Int.parse(t[1], 16)
+		let j = Int.parse(t[2], 16)
+		plane = i / 0x10000
+		begin = i % 0x10000
+		end = (j % 0x10000) + 1
+		if begin > end {
+			throw Error("Invalid range:${t[1]}..${t[2]}")
+		}
+		type = C[t[3]]
+	}
+	if type {
+		var mm = m[plane]
+		if !mm {
+			m[plane] = BytesIO.sized(0x10000, 0)
+			mm = m[plane]
+		}
+		mm.fill type, begin, end
+	}
+}
+for p in m.entries {
+	if p.value {
+		writefile "../unicode/gr${p.key:02d}", p.value
+	}
+}
+

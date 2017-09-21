@@ -1,5 +1,5 @@
-#ifndef IMAGE_H_
-#define IMAGE_H_
+#ifndef IMAGE_H_INCLUDED
+#define IMAGE_H_INCLUDED
 
 #include "fox.h"
 #include "m_image.h"
@@ -48,4 +48,4 @@ uint8_t *get_convert_palette_table(uint32_t *dst, const uint32_t *src);
 void quantize_palette(RefImage *dst, const RefImage *src, int dither);
 
 
-#endif /* IMAGE_H_ */
+#endif /* IMAGE_H_INCLUDED */

@@ -1,5 +1,5 @@
-#ifndef _M_TOKEN_H_
-#define _M_TOKEN_H_
+#ifndef M_TOKEN_H_INCLUDED
+#define M_TOKEN_H_INCLUDED
 
 #include "fox.h"
 
@@ -133,4 +133,4 @@ struct Tok
 };
 
 
-#endif /* _M_TOKEN_H_ */
+#endif /* M_TOKEN_H_INCLUDED */

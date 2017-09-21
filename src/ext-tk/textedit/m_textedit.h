@@ -1,5 +1,5 @@
-#ifndef _M_EDITOR_H_
-#define _M_EDITOR_H_
+#ifndef M_EDITOR_H_INCLUDED
+#define M_EDITOR_H_INCLUDED
 
 #include "m_gui.h"
 #include <stdint.h>
@@ -100,6 +100,5 @@ extern RefNode *cls_textedit;
 #define extern
 #endif
 
-void create_editor_pane_window(Value *v, WndHandle parent);
 
-#endif /* _M_EDITOR_H_ */
+#endif /* M_EDITOR_H_INCLUDED */

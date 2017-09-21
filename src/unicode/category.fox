@@ -1,0 +1,75 @@
+def C = {
+	Cn = 0,
+	Cc = 1,
+	Cf = 2,
+	Co = 3,
+	Cs = 4,
+
+	Ll = 5,
+	Lm = 6,
+	Lo = 7,
+	Lt = 8,
+	Lu = 9,
+
+	Mc = 10,
+	Me = 11,
+	Mn = 12,
+
+	Nd = 13,
+	Nl = 14,
+	No = 15,
+
+	Pc = 15,
+	Pd = 16,
+	Pe = 17,
+	Pf = 18,
+	Pi = 19,
+	Po = 20,
+	Ps = 21,
+
+	Sc = 22,
+	Sk = 23,
+	Sm = 24,
+	So = 25,
+
+	Zl = 26,
+	Zp = 27,
+	Zs = 28,
+}
+
+let f = fopen("data/UnicodeData.txt")
+let m = List.sized(17)
+
+var range = null
+
+for line in f {
+	let a = line.split(";")
+	let i = Int.parse(a[0], 16)
+
+	if a[1].find(', First>') {
+		range = i
+		continue
+	}
+
+	let plane = i / 0x10000
+	let pt = i % 0x10000
+	var mm = m[plane]
+	if !mm {
+		m[plane] = BytesIO.sized(0x10000, 0)
+		mm = m[plane]
+	}
+	if range {
+		let pt2 = range % 0x10000
+		mm.fill C[a[2]], pt2, pt + 1
+		puts "${range:X},${i:X} : ${a[2]}"
+		range = null
+	} else {
+		mm[pt] = C[a[2]]
+	}
+}
+for p in m.entries {
+	if p.value {
+		writefile "../unicode/ct${p.key:02d}", p.value
+	}
+}
+

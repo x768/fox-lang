@@ -1,5 +1,5 @@
-#ifndef _M_NET_H_
-#define _M_NET_H_
+#ifndef M_NET_H_INCLUDED
+#define M_NET_H_INCLUDED
 
 #include "fox.h"
 #include "fox_io.h"
@@ -73,4 +73,4 @@ struct RefListener {
 };
 
 
-#endif /* _M_NET_H_ */
+#endif /* M_NET_H_INCLUDED */

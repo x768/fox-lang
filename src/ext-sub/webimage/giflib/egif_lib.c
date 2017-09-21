@@ -17,11 +17,10 @@ two modules will be linked.  Preserve this property!
 
 #ifdef _WIN32
 #include <io.h>
-#include <sys\stat.h>
 #else
 #include <sys/types.h>
-#include <sys/stat.h>
 #endif /* _WIN32 */
+#include <sys/stat.h>
 
 #include "gif_lib.h"
 #include "gif_lib_private.h"
@@ -72,6 +71,8 @@ EGifOpen(void *userData, OutputFunc writeFunc, int *Error)
         return NULL;
     }
 
+    memset(Private, '\0', sizeof(GifFilePrivateType));
+
     Private->HashTable = _InitHashTable();
     if (Private->HashTable == NULL) {
         free (GifFile);
@@ -89,6 +90,8 @@ EGifOpen(void *userData, OutputFunc writeFunc, int *Error)
     Private->Write = writeFunc;    /* User write routine (MRB) */
     GifFile->UserData = userData;    /* User write handle (MRB) */
 
+    Private->gif89 = false;	/* initially, write GIF87 */
+
     GifFile->Error = 0;
 
     return GifFile;
@@ -100,12 +103,15 @@ EGifOpen(void *userData, OutputFunc writeFunc, int *Error)
 const char *
 EGifGetGifVersion(GifFileType *GifFile)
 {
-	return GIF89_STAMP;
-#if 0
     GifFilePrivateType *Private = (GifFilePrivateType *) GifFile->Private;
     int i, j;
 
-    /* Bulletproofing - always write GIF89 if we need to */
+    /* 
+     * Bulletproofing - always write GIF89 if we need to.
+     * Note, we don't clear the gif89 flag here because
+     * users of the sequential API might have called EGifSetGifVersion()
+     * in order to set that flag.
+     */
     for (i = 0; i < GifFile->ImageCount; i++) {
         for (j = 0; j < GifFile->SavedImages[i].ExtensionBlockCount; j++) {
             int function =
@@ -132,7 +138,20 @@ EGifGetGifVersion(GifFileType *GifFile)
 	return GIF89_STAMP;
     else
 	return GIF87_STAMP;
-#endif
+}
+
+/******************************************************************************
+ Set the GIF version. In the extremely unlikely event that there is ever
+ another version, replace the bool argument with an enum in which the 
+ GIF87 value is 0 (numerically the same as bool false) and the GIF89 value
+ is 1 (numerically the same as bool true).  That way we'll even preserve
+ object-file compatibility!
+******************************************************************************/
+void EGifSetGifVersion(GifFileType *GifFile, const bool gif89)
+{
+    GifFilePrivateType *Private = (GifFilePrivateType *) GifFile->Private;
+
+    Private->gif89 = gif89;
 }
 
 /******************************************************************************
@@ -274,6 +293,10 @@ EGifPutImageDesc(GifFileType *GifFile,
     GifFile->Image.Height = Height;
     GifFile->Image.Interlace = Interlace;
     if (ColorMap) {
+	if (GifFile->Image.ColorMap != NULL) {
+	    GifFreeMapObject(GifFile->Image.ColorMap);
+	    GifFile->Image.ColorMap = NULL;
+	}
         GifFile->Image.ColorMap = GifMakeMapObject(ColorMap->ColorCount,
                                                 ColorMap->Colors);
         if (GifFile->Image.ColorMap == NULL) {
@@ -391,7 +414,7 @@ EGifPutPixel(GifFileType *GifFile, GifPixelType Pixel)
 int
 EGifPutComment(GifFileType *GifFile, const char *Comment)
 {
-    unsigned int length = strlen(Comment);
+    unsigned int length;
     char *buf;
 
     length = strlen(Comment);
@@ -645,7 +668,7 @@ EGifPutCodeNext(GifFileType *GifFile, const GifByteType *CodeBlock)
  This routine should be called last, to close the GIF file.
 ******************************************************************************/
 int
-EGifCloseFile(GifFileType *GifFile)
+EGifCloseFile(GifFileType *GifFile, int *ErrorCode)
 {
     GifByteType Buf;
     GifFilePrivateType *Private;
@@ -659,7 +682,9 @@ EGifCloseFile(GifFileType *GifFile)
 	return GIF_ERROR;
     if (!IS_WRITEABLE(Private)) {
         /* This file was NOT open for writing: */
-        GifFile->Error = E_GIF_ERR_NOT_WRITEABLE;
+	if (ErrorCode != NULL)
+	    *ErrorCode = E_GIF_ERR_NOT_WRITEABLE;
+	free(GifFile);
         return GIF_ERROR;
     }
 
@@ -680,22 +705,19 @@ EGifCloseFile(GifFileType *GifFile)
         if (Private->HashTable) {
             free((char *) Private->HashTable);
         }
-	    free((char *) Private);
+	free((char *) Private);
     }
 
     if (File && fclose(File) != 0) {
-        GifFile->Error = E_GIF_ERR_CLOSE_FAILED;
+	if (ErrorCode != NULL)
+	    *ErrorCode = E_GIF_ERR_CLOSE_FAILED;
+	free(GifFile);
         return GIF_ERROR;
     }
 
-    /* 
-     * Without the #ifndef, we get spurious warnings because Coverity mistakenly
-     * thinks the GIF structure is freed on an error return. 
-     */
-#ifndef __COVERITY__
     free(GifFile);
-#endif /* __COVERITY__ */
-
+    if (ErrorCode != NULL)
+	*ErrorCode = E_GIF_SUCCEEDED;
     return GIF_OK;
 }
 
@@ -1035,7 +1057,7 @@ EGifSpew(GifFileType *GifFileOut)
 			    GifFileOut->ExtensionBlockCount) == GIF_ERROR)
 	return (GIF_ERROR);
 
-    if (EGifCloseFile(GifFileOut) == GIF_ERROR)
+    if (EGifCloseFile(GifFileOut, NULL) == GIF_ERROR)
         return (GIF_ERROR);
 
     return (GIF_OK);

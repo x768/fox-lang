@@ -1,5 +1,10 @@
 #include "markdown.h"
 #include <stdio.h>
+#include <stdlib.h>
+
+
+
+static int text_convert_line(StrBuf *sb, MDNode *node);
 
 
 Ref *xmlelem_new(const char *name)
@@ -72,7 +77,31 @@ static Ref *xmlelem_image(const char *alt, char *p)
 
 //////////////////////////////////////////////////////////////////////////////////////////
 
-static int xml_convert_line(Ref *r, MDNode *node, int convert_br)
+static int xml_set_footnote_title(Ref *sup, Markdown *md, MDNode *node)
+{
+    int idx = node->opt;
+    MDNodeLink *foot;
+    
+    for (foot = md->footnote; foot != NULL; foot = foot->next) {
+        idx--;
+        if (idx <= 0) {
+            break;
+        }
+    }
+    if (foot != NULL) {
+        StrBuf sb;
+        fs->StrBuf_init(&sb, 64);
+        text_convert_line(&sb, foot->node);
+        fs->StrBuf_add_c(&sb, '\0');
+        xmlelem_add_attr(sup, "title", sb.p);
+        StrBuf_close(&sb);
+        return TRUE;
+    } else {
+        return FALSE;
+    }
+}
+
+static int xml_convert_line(Ref *r, Markdown *md, MDNode *node, int convert_br)
 {
     for (; node != NULL; node = node->next) {
         switch (node->type) {
@@ -123,6 +152,7 @@ static int xml_convert_line(Ref *r, MDNode *node, int convert_br)
                 sprintf(ctext, "[%d]", node->opt);
                 sprintf(clink, "#note.%d", node->opt);
                 xmlelem_add_attr(link, "href", clink);
+                xml_set_footnote_title(sup, md, node);
                 xmlelem_add(link, Value_vp(fs->cstr_Value(cls_xmltext, ctext, -1)));
                 xmlelem_add(r, sup);
                 xmlelem_add(sup, link);
@@ -155,7 +185,7 @@ static int xml_convert_line(Ref *r, MDNode *node, int convert_br)
                 return FALSE;
             }
             xmlelem_add(r, child);
-            if (!xml_convert_line(child, node->child, convert_br)) {
+            if (!xml_convert_line(child, md, node->child, convert_br)) {
                 return FALSE;
             }
             break;
@@ -168,7 +198,7 @@ static int xml_convert_line(Ref *r, MDNode *node, int convert_br)
             break;
         }
         case MD_IGNORE:
-            if (!xml_convert_line(r, node->child, convert_br)) {
+            if (!xml_convert_line(r, md, node->child, convert_br)) {
                 return FALSE;
             }
             break;
@@ -178,7 +208,7 @@ static int xml_convert_line(Ref *r, MDNode *node, int convert_br)
     }
     return TRUE;
 }
-static int xml_convert_listitem(Ref *r, MDNode *node, int gen_id)
+static int xml_convert_listitem(Ref *r, Markdown *md, MDNode *node, int gen_id)
 {
     Ref *prev_li = NULL;
     int footnote_id = 1;
@@ -194,7 +224,7 @@ static int xml_convert_listitem(Ref *r, MDNode *node, int gen_id)
                 xmlelem_add_attr(li, "id", cbuf);
                 footnote_id++;
             }
-            if (!xml_convert_line(li, node->child, TRUE)) {
+            if (!xml_convert_line(li, md, node->child, TRUE)) {
                 return FALSE;
             }
             prev_li = li;
@@ -205,7 +235,7 @@ static int xml_convert_listitem(Ref *r, MDNode *node, int gen_id)
             if (prev_li != NULL) {
                 Ref *list = xmlelem_new(node->type == MD_UNORDERD_LIST ? "ul" : "ol");
                 xmlelem_add(prev_li, list);
-                if (!xml_convert_listitem(list, node->child, FALSE)) {
+                if (!xml_convert_listitem(list, md, node->child, FALSE)) {
                     return FALSE;
                 }
             }
@@ -214,20 +244,20 @@ static int xml_convert_listitem(Ref *r, MDNode *node, int gen_id)
     }
     return TRUE;
 }
-int xml_from_markdown(Ref *root, Markdown *r, MDNode *node)
+int xml_from_markdown(Ref *root, Markdown *md, MDNode *node)
 {
     for (; node != NULL; node = node->next) {
         switch (node->type) {
         case MD_HEADING: {
             char tag[4];
-            int head = node->opt + r->heading_level - 1;
+            int head = node->opt + md->heading_level - 1;
             Ref *heading;
             tag[0] = 'h';
             tag[1] = (head <= 6 ? '0' + head : '6');
             tag[2] = '\0';
             heading = xmlelem_new(tag);
             xmlelem_add(root, heading);
-            if (!xml_convert_line(heading, node->child, TRUE)) {
+            if (!xml_convert_line(heading, md, node->child, TRUE)) {
                 return FALSE;
             }
             break;
@@ -241,7 +271,7 @@ int xml_from_markdown(Ref *root, Markdown *r, MDNode *node)
         case MD_ORDERD_LIST: {
             Ref *list = xmlelem_new(node->type == MD_UNORDERD_LIST ? "ul" : "ol");
             xmlelem_add(root, list);
-            if (!xml_convert_listitem(list, node->child, FALSE)) {
+            if (!xml_convert_listitem(list, md, node->child, FALSE)) {
                 return FALSE;
             }
             break;
@@ -253,7 +283,7 @@ int xml_from_markdown(Ref *root, Markdown *r, MDNode *node)
             list = xmlelem_new("ol");
             xmlelem_add(root, div);
             xmlelem_add(div, list);
-            if (!xml_convert_listitem(list, node->child, TRUE)) {
+            if (!xml_convert_listitem(list, md, node->child, TRUE)) {
                 return FALSE;
             }
             break;
@@ -261,7 +291,7 @@ int xml_from_markdown(Ref *root, Markdown *r, MDNode *node)
         case MD_PARAGRAPH: {
             Ref *para = xmlelem_new("p");
             xmlelem_add(root, para);
-            if (!xml_convert_line(para, node->child, TRUE)) {
+            if (!xml_convert_line(para, md, node->child, TRUE)) {
                 return FALSE;
             }
             break;
@@ -271,7 +301,7 @@ int xml_from_markdown(Ref *root, Markdown *r, MDNode *node)
             Ref *code = xmlelem_new("code");
             xmlelem_add(root, pre);
             xmlelem_add(pre, code);
-            if (!xml_convert_line(code, node->child, FALSE)) {
+            if (!xml_convert_line(code, md, node->child, FALSE)) {
                 return FALSE;
             }
             break;
@@ -279,7 +309,7 @@ int xml_from_markdown(Ref *root, Markdown *r, MDNode *node)
         case MD_BLOCKQUOTE: {
             Ref *blockquote = xmlelem_new("blockquote");
             xmlelem_add(root, blockquote);
-            if (!xml_from_markdown(blockquote, r, node->child)) {
+            if (!xml_from_markdown(blockquote, md, node->child)) {
                 return FALSE;
             }
             break;
@@ -326,7 +356,7 @@ int xml_from_markdown(Ref *root, Markdown *r, MDNode *node)
                             sprintf(str, "%d", ncell->opt);
                             xmlelem_add_attr(cell, "colspan", str);
                         }
-                        if (!xml_convert_line(cell, ncell->child, TRUE)) {
+                        if (!xml_convert_line(cell, md, ncell->child, TRUE)) {
                             return FALSE;
                         }
                         if (*col_type != TABLESEP_NONE) {
@@ -337,19 +367,8 @@ int xml_from_markdown(Ref *root, Markdown *r, MDNode *node)
             }
             break;
         }
-        case MD_DIV_BLOCK: {
-            Ref *div = xmlelem_new("div");
-            if (node->cstr != NULL) {
-                xmlelem_add_attr(div, "class", node->cstr);
-            }
-            xmlelem_add(root, div);
-            if (!xml_from_markdown(div, r, node->child)) {
-                return FALSE;
-            }
-            break;
-        }
         case MD_IGNORE:
-            xml_from_markdown(root, r, node->child);
+            xml_from_markdown(root, md, node->child);
             break;
         default:
             break;
@@ -461,7 +480,6 @@ int text_from_markdown(StrBuf *sb, Markdown *r, MDNode *node)
             }
             break;
         }
-        case MD_DIV_BLOCK:
         case MD_IGNORE:
             text_from_markdown(sb, r, node->child);
             break;

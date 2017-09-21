@@ -1,5 +1,5 @@
-#ifndef _BIGINT_H_
-#define _BIGINT_H_
+#ifndef BIGINT_H_INCLUDED
+#define BIGINT_H_INCLUDED
 
 #include "fox.h"
 
@@ -50,4 +50,4 @@ void BigInt_divmod_sd(BigInt *bi, int dv, uint16_t *mod);
 int BigInt_pow(BigInt *a, uint32_t n);
 int BigInt_gcd(BigInt *ret, const BigInt *a, const BigInt *b);
 
-#endif /* _BIGINT_H_ */
+#endif /* BIGINT_H_INCLUDED */

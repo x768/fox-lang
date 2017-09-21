@@ -809,7 +809,7 @@ static void Tok_parse_binhex(TokValue *v, Tok *tk)
 static void Tok_parse_regex(TokValue *v, Tok *tk, char term)
 {
     char *pattern = tk->p;
-    const char *end;
+    char *end;
     int options = 0;
     int trim_space = FALSE;
 
@@ -1040,6 +1040,7 @@ static void Tok_fetch(TokValue *v, Tok *tk)
                 Tok_parse_double_str(v, tk, TRUE, nest & ~CURLY_MASK);
             }
             tk->prev_id = FALSE;
+            v->line = tk->head_line;
             return;
         }
     }
@@ -1532,7 +1533,7 @@ void Tok_next(Tok *tk)
         break;
     case TL_REGEX:
         tk->str_val.p = tk->v.p;
-        tk->str_val.size = tk->v.u.end - tk->v.p;
+        tk->str_val.size = strlen(tk->v.p);
         tk->int_val = tk->v.u.flag;
         break;
     case TL_INT: {

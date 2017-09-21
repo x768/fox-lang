@@ -1,5 +1,5 @@
-#ifndef _M_CODECVT_H_
-#define _M_CODECVT_H_
+#ifndef M_CODECVT_H_INCLUDED
+#define M_CODECVT_H_INCLUDED
 
 #include "fox.h"
 
@@ -31,4 +31,4 @@ typedef struct {
     Value (*cstr_Value_conv)(const char *p, int size, RefCharset *cs);
 } CodeCVTStatic;
 
-#endif /* _M_CODECVT_H_ */
+#endif /* M_CODECVT_H_INCLUDED */

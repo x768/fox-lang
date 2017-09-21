@@ -1,5 +1,5 @@
-#ifndef _M_MEDIA_H_
-#define _M_MEDIA_H_
+#ifndef M_MEDIA_H_INCLUDED
+#define M_MEDIA_H_INCLUDED
 
 #include "fox.h"
 
@@ -17,4 +17,4 @@ typedef struct {
     } u;
 } RefAudio;
 
-#endif /* _M_MEDIA_H_ */
+#endif /* M_MEDIA_H_INCLUDED */

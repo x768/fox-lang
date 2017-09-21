@@ -47,6 +47,7 @@ define typename word
 "register" = _ keyword _
 "restrict" = _ keyword _
 "return" = _ keyword _
+"sizeof" = _ keyword _
 "static" = _ keyword _
 "struct" = _ keyword _
 "switch" = _ keyword _

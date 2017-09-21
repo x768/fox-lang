@@ -47,17 +47,15 @@ static const aaparameters_t aaparams[] = { /* set params by weight */
 static subraster_t *rastflags(const char **expression, int size, const subraster_t *basesp,
                               int flag, int value, int arg3)
 {
-    char valuearg[1024] = "NOVALUE";    /* value from expression, if needed */
-    int argvalue = NOVALUE;     /* atoi(valuearg) */
+    char valuearg[1024] = "NOVALUE";
+    int argvalue = NOVALUE;
     int isdelta = 0;            /* true if + or - precedes valuearg */
     int valuelen = 0;           /* strlen(valuearg) */
     static int displaystylelevel = -99; /* \displaystyle set at recurlevel */
-/* -------------------------------------------------------------------------
-set flag or value
--------------------------------------------------------------------------- */
+
     switch (flag) {
     default:
-        break;                  /* unrecognized flag */
+        break;
     case ISFONTFAM:
         if (isthischar((*(*expression)), WHITEMATH)) {   /* \rm followed by white */
             (*expression)++;    /* skip leading ~ after \rm */
@@ -91,14 +89,11 @@ set flag or value
 //  case ISGAMMA:               /* set gamma correction */
 //  case ISPBMPGM:              /* set pbmpgm output flag and ptype */
         if (value != NOVALUE) { /* passed a fixed value to be set */
-            argvalue = value;   /* set given fixed int value */
-            /* not used --dblvalue = (double) value; */
-        } /* or maybe interpreted as double */
-        else {                  /* get value from expression */
-            *expression =
-                texsubexpr(*expression, valuearg, 1023, "{", "}", 0, 0);
-            if (*valuearg != '\0') {    /* guard against empty string */
-                if (!isalpha(*valuearg)) {      /* and against alpha string args */
+            argvalue = value;
+        } else {
+            *expression = texsubexpr(*expression, valuearg, 1023, "{", "}", 0, 0);
+            if (*valuearg != '\0') {
+                if (!isalpha(*valuearg)) {
                     if (!isthischar(*valuearg, "?")) {  /*leading ? is query for value */
                         isdelta = isthischar(*valuearg, "+-");  /* leading + or - */
                         if (memcmp(valuearg, "--", 2) == 0) {   /* leading -- signals... */
@@ -108,8 +103,8 @@ set flag or value
                         switch (flag) { /* convert to double or int */
                         default:
                             argvalue = atoi(valuearg);
-                            break;      /* convert to int */
-                        }       /* or to double */
+                            break;
+                        }
                     }
                 }
             }
