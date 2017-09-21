@@ -28,22 +28,17 @@ It works on Windows, MacOSX and Linux.
 
 ## Getting started
 
-### Windows
-
 Following versions are available.
 
-- fox-win32.zip (for 32bit Windows® or connect to 32bit OLE/ActiveX)
-- fox-win64.zip (for 64bit Windows®, RECOMMENDED)
+### Windows (64bit)
 
-https://x768.sakura.ne.jp/fox-lang/
+https://x768.sakura.ne.jp/fox-lang/fox-win64.zip
 
 Just unzip it and add %PATH% to fox.exe directory.
 
 ### MacOSX
 
-fox-osx.dmg is available.
-
-https://x768.sakura.ne.jp/fox-lang/
+https://x768.sakura.ne.jp/fox-lang/fox-osx.dmg
 
 ### Linux (GTK+3)
 

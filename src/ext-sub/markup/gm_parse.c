@@ -277,7 +277,7 @@ GenML *GenML_new(RefMap *rm)
                 value = Value_vp(e->val);
                 if (value->size == 0) {
                     fs->throw_errorf(fs->mod_lang, "ValueError", "Cannot define empty value");
-                    return FALSE;
+                    return NULL;
                 }
 
                 if (str_eq(name->c, name->size, "_comment", 8)) {
