@@ -145,7 +145,7 @@ static void Tok_parse_hex_digit(TokValue *v, Tok *tk)
 
     // \h+(\.\h+)?([Pp][\+\-]\d+)?
     for (;;) {
-        int ch = *tk->p;
+        int ch = *tk->p & 0xFF;
         if (isxdigit(ch)) {
             *dst++ = ch;
             tk->p++;
@@ -352,7 +352,7 @@ static void Tok_parse_single_str(TokValue *v, Tok *tk, int term, int type)
     v->p = tk->p;
 
     for (;;) {
-        char ch = *tk->p;
+        int ch = *tk->p & 0xFF;
 
         switch (ch) {
         case '\0':
@@ -379,7 +379,8 @@ static void Tok_parse_single_str(TokValue *v, Tok *tk, int term, int type)
                 tk->p++;
                 if (*tk->p == term && term != ')' && term != ']' && term != '}') {
                     // 'abc''def'
-                    ch = *tk->p++;
+                    ch = *tk->p & 0xFF;
+                    tk->p++;
                 } else {
                     goto BREAK;
                 }
@@ -401,13 +402,122 @@ BREAK:
         }
     }
 }
+static int Tok_backslash_sequence(Tok *tk, int is_unicode)
+{
+    int ch = *tk->p & 0xFF;
+    tk->p++;
+
+    /*
+     * \0           NUL
+     * \b           bell
+     * \f           formfeed (hex 0C)
+     * \n           linefeed (hex 0A)
+     * \r           carriage return (hex 0D)
+     * \t           tab (hex 09)
+     * \xhh         character with hex code hh (< 0x80)
+     * \x{HHH..}    character with hex code (UCS4)
+     * \uHHHH       character with hex code (UCS2)
+     * \uHHHH\uHHHH character with hex code (UCS4)
+     */
+    switch (ch) {
+    case '\0':
+        throw_errorf(fs->mod_lang, "TokenError", "Unterminated string");
+        return -1;
+    case '0':
+        return '\0';
+    case 'b':
+        return '\b';
+    case 'f':
+        return '\f';
+    case 'n':
+        return '\n';
+    case 'r':
+        return '\r';
+    case 't':
+        return '\t';
+    case 'u':
+        if (is_unicode) {
+            int ch2 = parse_hex((const char**)&tk->p, NULL, 4);
+            if (ch2 < 0) {
+                throw_errorf(fs->mod_lang, "TokenError", "Illigal string hexformat");
+                return -1;
+            }
+            if (ch2 < SURROGATE_U_BEGIN) {
+                return ch2;
+            } else if (ch2 < SURROGATE_L_BEGIN) {
+                // 上位サロゲート
+                int ch3;
+                if (*tk->p != '\\' || tk->p[1] != 'u') {
+                    throw_errorf(fs->mod_lang, "TokenError", "Missing Low Surrogate");
+                    return -1;
+                }
+                tk->p += 2;
+                ch3 = parse_hex((const char**)&tk->p, NULL, 4);
+                if (ch3 < SURROGATE_L_BEGIN || ch3 >= SURROGATE_END) {
+                    throw_errorf(fs->mod_lang, "TokenError", "Invalid Low Surrogate");
+                    return -1;
+                }
+                return ((ch2 - SURROGATE_U_BEGIN) * 0x400 + 0x10000) | (ch3 - SURROGATE_L_BEGIN);
+            } else if (ch2 < SURROGATE_END) {
+                // 下位サロゲート
+                throw_errorf(fs->mod_lang, "TokenError", "Illigal codepoint (Surrogate) %U", ch2);
+                return -1;
+            } else {
+                return ch2;
+            }
+        } else {
+            throw_errorf(fs->mod_lang, "TokenError", "Unknown backslash sequence");
+            return -1;
+        }
+    case 'x':
+        ch = *tk->p & 0xFF;
+        if (is_unicode && ch == '{') {
+            int ch2;
+
+            tk->p++;
+            ch2 = parse_hex((const char**)&tk->p, NULL, -1);
+            if (ch2 < 0) {
+                throw_errorf(fs->mod_lang, "TokenError", "Illigal string hexformat");
+                return -1;
+            }
+            if (*tk->p != '}') {
+                throw_errorf(fs->mod_lang, "TokenError", "Illigal string hexformat");
+                return -1;
+            }
+            tk->p++;
+            return ch2;
+        } else {
+            int ch2 = parse_hex((const char**)&tk->p, NULL, 2);
+
+            if (ch2 < 0) {
+                throw_errorf(fs->mod_lang, "TokenError", "Illigal string hexformat");
+                return -1;
+            }
+            if (is_unicode && ch2 >= 0x80) {
+                throw_errorf(fs->mod_lang, "TokenError", "Illigal hexadecimal value");
+                return -1;
+            }
+            return ch2;
+        }
+    default:
+        if (ch <= ' ') {
+            throw_errorf(fs->mod_lang, "TokenError", "Illigal character %c", ch);
+            return -1;
+        }
+        if ((ch & 0x80) != 0 || isalnum(ch)) {
+            throw_errorf(fs->mod_lang, "TokenError", "Unknown backslash sequence");
+            return -1;
+        }
+        return ch;
+    }
+}
 static void Tok_parse_double_str(TokValue *v, Tok *tk, int cat, int term)
 {
     char *dst = tk->p;
     v->p = tk->p;
 
     for (;;) {
-        char ch = *tk->p;
+        int ch = *tk->p & 0xFF;
 
         switch (ch) {
         case '\0':
@@ -427,7 +537,7 @@ static void Tok_parse_double_str(TokValue *v, Tok *tk, int cat, int term)
             if (tk->simple_mode) {
                 *dst++ = ch;
             } else {
-                ch = *tk->p;
+                ch = *tk->p & 0xFF;
                 if (ch == '{') {
                     // "${val}"
                     tk->p_nest_n++;
@@ -464,147 +574,23 @@ static void Tok_parse_double_str(TokValue *v, Tok *tk, int cat, int term)
             break;
         case '\\':
             tk->p++;
-            ch = *tk->p;
-            tk->p++;
-
-            /*
-             * \0        NUL
-             * \b        bell
-             * \f        formfeed (hex 0C)
-             * \n        linefeed (hex 0A)
-             * \r        carriage return (hex 0D)
-             * \t        tab (hex 09)
-             * \xhh      character with hex code hh (< 0x80)
-             * \x{hhh..} character with hex code (UCS4)
-             * \uhhhh    character with hex code (UCS2)
-             */
-            switch (ch) {
-            case '\0':
-                throw_errorf(fs->mod_lang, "TokenError", "Unterminated string");
-                v->type = T_ERR;
-                return;
-            case '0':
-                *dst++ = '\0';
-                break;
-            case 'b':
-                *dst++ = '\b';
-                break;
-            case 'f':
-                *dst++ = '\f';
-                break;
-            case 'n':
-                *dst++ = '\n';
-                break;
-            case 'r':
-                *dst++ = '\r';
-                break;
-            case 't':
-                *dst++ = '\t';
-                break;
-            case 'u': {
-                int ch2 = parse_hex((const char**)&tk->p, NULL, 4);
-                if (ch2 < 0) {
-                    throw_errorf(fs->mod_lang, "TokenError", "Illigal string hexformat");
+            if (*tk->p == '\n') {
+                // ignore
+                tk->p++;
+                tk->head_line++;
+            } else {
+                int ch2 = Tok_backslash_sequence(tk, TRUE);
+                if (ch2 == -1) {
                     v->type = T_ERR;
                     return;
-                }
-                if (ch2 < 0x80) {
+                } else if (ch2 < 0x80) {
                     *dst++ = ch2;
-                } else if (ch2 < 0x800) {
-                    *dst++ = 0xC0 | (ch2 >> 6);
-                    *dst++ = 0x80 | (ch2 & 0x3F);
-                } else if (ch2 < SURROGATE_U_BEGIN) {
-                    *dst++ = 0xE0 | (ch2 >> 12);
-                    *dst++ = 0x80 | ((ch2 >> 6) & 0x3F);
-                    *dst++ = 0x80 | (ch2 & 0x3F);
-                } else if (ch2 < SURROGATE_L_BEGIN) {
-                    // 上位サロゲート
-                    int ch3;
-                    if (*tk->p != '\\' || tk->p[1] != 'u') {
-                        throw_errorf(fs->mod_lang, "TokenError", "Missing Low Surrogate");
-                        v->type = T_ERR;
-                        return;
-                    }
-                    tk->p += 2;
-                    ch3 = parse_hex((const char**)&tk->p, NULL, 4);
-                    if (ch3 < SURROGATE_L_BEGIN || ch3 >= SURROGATE_END) {
-                        throw_errorf(fs->mod_lang, "TokenError", "Invalid Low Surrogate");
-                        v->type = T_ERR;
-                        return;
-                    }
-                    ch2 = (ch2 - SURROGATE_U_BEGIN) * 0x400 + 0x10000;
-                    ch3 = ch2 | (ch3 - SURROGATE_L_BEGIN);
-
-                    *dst++ = 0xF0 | (ch3 >> 18);
-                    *dst++ = 0x80 | ((ch3 >> 12) & 0x3F);
-                    *dst++ = 0x80 | ((ch3 >> 6) & 0x3F);
-                    *dst++ = 0x80 | (ch3 & 0x3F);
-                } else if (ch2 < SURROGATE_END) {
-                    // 下位サロゲート
-                    throw_errorf(fs->mod_lang, "TokenError", "Illigal codepoint (Surrogate) %U", ch2);
-                    v->type = T_ERR;
-                    return;
                 } else {
-                    *dst++ = 0xE0 | (ch2 >> 12);
-                    *dst++ = 0x80 | ((ch2 >> 6) & 0x3F);
-                    *dst++ = 0x80 | (ch2 & 0x3F);
-                }
-                break;
-            }
-            case 'x':
-                ch = *tk->p;
-                if (ch == '{') {
-                    int ch2;
-
-                    tk->p++;
-                    ch2 = parse_hex((const char**)&tk->p, NULL, -1);
-                    if (ch2 < 0) {
-                        throw_errorf(fs->mod_lang, "TokenError", "Illigal string hexformat");
-                        v->type = T_ERR;
-                        return;
-                    }
-                    if (*tk->p != '}') {
-                        throw_errorf(fs->mod_lang, "TokenError", "Illigal string hexformat");
-                        v->type = T_ERR;
-                        return;
-                    }
-
                     if (!str_add_codepoint(&dst, ch2, "TokenError")) {
                         v->type = T_ERR;
                         return;
                     }
-                    tk->p++;
-                } else {
-                    int ch2 = parse_hex((const char**)&tk->p, NULL, 2);
-
-                    if (ch2 < 0) {
-                        throw_errorf(fs->mod_lang, "TokenError", "Illigal string hexformat");
-                        v->type = T_ERR;
-                        return;
-                    }
-                    if (ch2 >= 0x80) {
-                        throw_errorf(fs->mod_lang, "TokenError", "Illigal hexadecimal value");
-                        v->type = T_ERR;
-                        return;
-                    }
-                    *dst++ = ch2;
                 }
-                break;
-            case '\r':
-                throw_errorf(fs->mod_lang, "TokenError", "Illigal character '\\r'");
-                v->type = T_ERR;
-                return;
-            case '\n': // ignore
-                tk->head_line++;
-                break;
-            default:
-                if (isalnum(ch)) {
-                    throw_errorf(fs->mod_lang, "TokenError", "Unknown backslash sequence");
-                    v->type = T_ERR;
-                    return;
-                }
-                *dst++ = ch;
-                break;
             }
             break;
         case '\r':
@@ -636,13 +622,79 @@ FINALLY:
     }
     return;
 }
+static void Tok_parse_char(TokValue *v, Tok *tk)
+{
+    int ch = *tk->p & 0xFF;
+    int32_t val = -1;
+
+    switch (ch) {
+    case '\0':
+        throw_errorf(fs->mod_lang, "TokenError", "Unterminated string");
+        v->type = T_ERR;
+        return;
+    case '\\':
+        tk->p++;
+        val = Tok_backslash_sequence(tk, TRUE);
+        if (val == -1) {
+            v->type = T_ERR;
+            return;
+        } else if (val >= 0x80) {
+        }
+        break;
+    default:
+        if (ch < ' ' || ch == '\'') {
+            throw_errorf(fs->mod_lang, "TokenError", "Illigal character %c", ch);
+            v->type = T_ERR;
+            return;
+        }
+        // UTF-8をコードポイントにする
+        if ((ch & 0x80) == 0) {
+            val = ch;
+            tk->p++;
+        } else {
+            const char *p = tk->p;
+            while (*p != '\0' && *p != '\'') {
+                p++;
+            }
+            if (invalid_utf8_pos(tk->p, (int)(p - tk->p)) >= 0) {
+                throw_errorf(fs->mod_lang, "TokenError", "Invalid UTF-8 sequence");
+                v->type = T_ERR;
+                return;
+            }
+            val = utf8_codepoint_at(tk->p);
+            utf8_next((const char**)&tk->p, p);
+        }
+        break;
+    }
+    if (*tk->p != '\'') {
+        throw_errorf(fs->mod_lang, "TokenError", "Unterminated string");
+        v->type = T_ERR;
+        return;
+    }
+    tk->p++;
+    if (val < 0) {
+        throw_errorf(fs->mod_lang, "TokenError", "Illigal string hexformat");
+        v->type = T_ERR;
+        return;
+    }
+    if (val >= SURROGATE_U_BEGIN && val < SURROGATE_END) {
+        throw_errorf(fs->mod_lang, "TokenError", "Invalid codepoint (Surrogate) %U", ch);
+        return;
+    }
+    if (val >= CODEPOINT_END) {
+        throw_errorf(fs->mod_lang, "TokenError", "Invalid codepoint (> 0x10FFFF)");
+        return;
+    }
+    tk->int_val = val;
+    v->type = TL_CHAR;
+}
 static void Tok_parse_double_bin(TokValue *v, Tok *tk, int term)
 {
     char *dst = tk->p;
     v->p = tk->p;
 
     for (;;) {
-        char ch = *tk->p;
+        int ch = *tk->p & 0xFF;
 
         switch (ch) {
         case '\0':
@@ -659,65 +711,18 @@ static void Tok_parse_double_bin(TokValue *v, Tok *tk, int term)
             return;
         case '\\':
             tk->p++;
-            ch = *tk->p;
-            tk->p++;
-
-            /*
-             * \0        NUL
-             * \b        bell (hex 1B)
-             * \f        formfeed (hex 0C)
-             * \n        linefeed (hex 0A)
-             * \r        carriage return (hex 0D)
-             * \t        tab (hex 09)
-             * \xhh      character with hex code hh
-             */
-            switch (ch) {
-            case '0':
-                *dst++ = '\0';
-                break;
-            case 'b':
-                *dst++ = '\b';
-                break;
-            case 'f':
-                *dst++ = '\f';
-                break;
-            case 'n':
-                *dst++ = '\n';
-                break;
-            case 'r':
-                *dst++ = '\r';
-                break;
-            case 't':
-                *dst++ = '\t';
-                break;
-            case '\r':
-                throw_errorf(fs->mod_lang, "TokenError", "Illigal character '\\r'");
-                v->type = T_ERR;
-                return;
-            case '\n':
-                break;
-            case '\0':
-                throw_errorf(fs->mod_lang, "TokenError", "Unterminated string");
-                v->type = T_ERR;
-                return;
-            case 'x': {
-                int ch2 = parse_hex((const char**)&tk->p, NULL, 2);
-                if (ch2 < 0) {
-                    throw_errorf(fs->mod_lang, "TokenError", "Illigal string hexformat");
+            if (*tk->p == '\n') {
+                // ignore
+                tk->p++;
+                tk->head_line++;
+            } else {
+                int ch2 = Tok_backslash_sequence(tk, FALSE);
+                if (ch2 == -1) {
                     v->type = T_ERR;
                     return;
+                } else {
+                    *dst++ = ch2;
                 }
-                *dst++ = ch2;
-                break;
-            }
-            default:
-                if (isalnum(ch)) {
-                    throw_errorf(fs->mod_lang, "TokenError", "Unknown backslash sequence");
-                    v->type = T_ERR;
-                    return;
-                }
-                *dst++ = ch;
-                break;
             }
             break;
         case '\r':
@@ -748,13 +753,13 @@ static void Tok_parse_binhex(TokValue *v, Tok *tk)
     v->p = tk->p;
 
     for (;;) {
-        char ch = *tk->p;
+        int ch = *tk->p & 0xFF;
 
         if (islexspace_fox(ch)) {
             tk->p++;
         } else if (isxdigit(ch)) {
             char ch2;
-            ch = *tk->p;
+            ch = *tk->p & 0xFF;
 
             if (!isxdigit(ch)) {
                 throw_errorf(fs->mod_lang, "TokenError", "Illigal string hexformat");
@@ -764,7 +769,7 @@ static void Tok_parse_binhex(TokValue *v, Tok *tk)
             ch2 = char2hex(ch);
 
             tk->p++;
-            ch = *tk->p;
+            ch = *tk->p & 0xFF;
             if (isxdigit(ch)) {
                 ch2 <<= 4;
                 ch2 |= char2hex(ch);
@@ -1485,6 +1490,11 @@ START:
             // x"00 1F 09 11"
             tk->p += 2;
             Tok_parse_binhex(v, tk);
+            tk->prev_id = TRUE;
+        } else if (ch == 'c' && ch2 == '\'') {
+            // c'A'
+            tk->p += 2;
+            Tok_parse_char(v, tk);
             tk->prev_id = TRUE;
         } else if (isdigit_fox(ch)) {
             Tok_parse_digit(v, tk);

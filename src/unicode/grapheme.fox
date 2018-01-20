@@ -57,7 +57,7 @@ for line in f {
 }
 for p in m.entries {
 	if p.value {
-		writefile "../unicode/gr${p.key:02d}", p.value
+		writefile "../../fox/unicode/gr${p.key:02d}", p.value
 	}
 }
 

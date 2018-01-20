@@ -1,0 +1,12 @@
+locale = "zh_Hant"
+message = <<<EOS
+用法: fox [選項...] 源碼名稱 [參数...]
+選項
+  -e srccode: 即刻執行"srccode"
+  -c srccode: 驗證文法錯誤
+  -v: 顯示版本信息
+  -DNAME=value: 設置環境變量
+  --help: 顯示此幫助信息
+  --version: 顯示模塊版本和設置信息
+
+EOS

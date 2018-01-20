@@ -144,11 +144,21 @@ int string_format_sub(Value *v, Str src, const char *fmt_p, int fmt_size, int ut
                     alt_utf8_string(&buf, src.p, src.size);
                     utf8 = TRUE;
                 }
+            } else if (str_eq(fm.p, fm.size, "src", -1)) {
+                if (utf8) {
+                    StrBuf_add_c(&buf, '"');
+                    add_backslashes_sub(&buf, src.p, src.size, ADD_BACKSLASH_UCS4);
+                } else {
+                    StrBuf_add(&buf, "b\"", 2);
+                    add_backslashes_bin(&buf, src.p, src.size);
+                }
+                StrBuf_add_c(&buf, '"');
+                found = TRUE;
+                utf8 = TRUE;
             }
             break;
         case 'j':
             if (str_eq(fm.p, fm.size, "js", -1)) {
-                found = TRUE;
                 if (utf8) {
                     add_backslashes_sub(&buf, src.p, src.size, ADD_BACKSLASH_UCS2);
                 } else {
@@ -157,21 +167,37 @@ int string_format_sub(Value *v, Str src, const char *fmt_p, int fmt_size, int ut
                     StrBuf_close(&tmp);
                     return FALSE;
                 }
+                found = TRUE;
+                utf8 = TRUE;
             }
             break;
-        case 'u':   // urlencode
+        case 'q':
+            if (str_eq(fm.p, fm.size, "quot", -1)) {
+                if (utf8) {
+                    add_backslashes_sub(&buf, src.p, src.size, ADD_BACKSLASH_UCS4);
+                } else {
+                    add_backslashes_bin(&buf, src.p, src.size);
+                }
+                found = TRUE;
+                utf8 = TRUE;
+            }
+            break;
+        case 'u':
             if (str_eq(fm.p, fm.size, "url", -1)) {
+                // urlencode (' ' => '%20')
                 urlencode_sub(&buf, src.p, src.size, FALSE);
                 found = TRUE;
                 utf8 = TRUE;
             } else if (str_eq(fm.p, fm.size, "url+", -1)) {
+                // urlencode (' ' => '+')
                 urlencode_sub(&buf, src.p, src.size, TRUE);
                 found = TRUE;
                 utf8 = TRUE;
             }
             break;
-        case 'x':   // html escape
-            if (fm.size == 1) {
+        case 'x':
+            if (str_eq(fm.p, fm.size, "xml", -1)) {
+                // html escape
                 convert_html_entity(&buf, src.p, src.size, FALSE);
                 found = TRUE;
             }
@@ -231,8 +257,7 @@ static int sequence_from_iterator(Value *vret, Value v, int is_str)
 
     for (;;) {
         RefNode *type;
-        int64_t val;
-        int err;
+        int val;
 
         Value_push("v", fg->stk_top[-1]);
         if (!call_member_func(fs->str_next, 0, TRUE)) {
@@ -245,13 +270,13 @@ static int sequence_from_iterator(Value *vret, Value v, int is_str)
             }
         }
         type = Value_type(fg->stk_top[-1]);
-        if (type != fs->cls_int) {
-            throw_errorf(fs->mod_lang, "TypeError", "Int required but %n", type);
+        if (type != fs->cls_int && type != fs->cls_char) {
+            throw_errorf(fs->mod_lang, "TypeError", "Int or Char required but %n", type);
             goto ERROR_END;
         }
-        val = Value_int64(fg->stk_top[-1], &err);
+        val = Value_int32(fg->stk_top[-1]);
         Value_pop();
-        if (err || val < 0 || (is_str && val > 0x10FFFF) || (!is_str && val > 255)) {
+        if (val < 0 || (is_str && val > 0x10FFFF) || (!is_str && val > 255)) {
             throw_errorf(fs->mod_lang, "ValueError", "Number out of range (0 - %s)", is_str ? "0x10FFFF" : "255");
             goto ERROR_END;
         }
@@ -913,7 +938,7 @@ static int sequence_split(Value *vret, Value *v, RefNode *node)
     return TRUE;
 }
 /**
- * 大文字小文字を変換します。
+ * 大文字小文字を変換
  */
 static int sequence_caseconv(Value *vret, Value *v, RefNode *node)
 {
@@ -1088,12 +1113,13 @@ static int seqiter_next(Value *vret, Value *v, RefNode *node)
         ret = utf8_codepoint_at(p);
         utf8_next(&p, &s->c[s->size]);
         i = p - s->c;
+        *vret = integral_Value(fs->cls_char, ret);
     } else {
         ret = s->c[i];
         i++;
+        *vret = int32_Value(ret);
     }
     r->v[INDEX_SEQITER_CUR] = int32_Value(i);
-    *vret = int32_Value(ret);
 
     return TRUE;
 }
@@ -1105,19 +1131,10 @@ static int seqiter_next(Value *vret, Value *v, RefNode *node)
  */
 static int string_new(Value *vret, Value *v, RefNode *node)
 {
-    if (fg->stk_top > v + 2) {
-        RefNode *type = Value_type(v[1]);
-        if (type != fs->cls_bytes) {
-            throw_error_select(THROW_ARGMENT_TYPE__NODE_NODE_INT, fs->cls_bytes, type, 1);
-            return FALSE;
-        }
-        if (!convert_bin_to_str(vret, NULL, 1)) {
-            return FALSE;
-        }
-    } else if (fg->stk_top > v + 1) {
+    if (fg->stk_top > v + 1) {
         Value v1 = v[1];
-
         RefNode *type = Value_type(v1);
+
         if (type == fs->cls_str) {
             // そのまま使う
             *vret = v1;
@@ -1155,7 +1172,7 @@ static int string_new_seq(Value *vret, Value *v, RefNode *node)
             RefArray *ra = Value_vp(*v1);
             v1 = ra->p;
             top = v1 + ra->size;
-        } else if (v1_type != fs->cls_int) {
+        } else if (v1_type != fs->cls_int && v1_type != fs->cls_char) {
             if (!sequence_from_iterator(vret, *v1, TRUE)) {
                 return FALSE;
             }
@@ -1168,8 +1185,8 @@ static int string_new_seq(Value *vret, Value *v, RefNode *node)
         int32_t ch;
         RefNode *type = Value_type(*v1);
 
-        if (type != fs->cls_int) {
-            throw_error_select(THROW_ARGMENT_TYPE__NODE_NODE_INT, fs->cls_int, type, v1 - fg->stk_base + 1);
+        if (type != fs->cls_int && type != fs->cls_char) {
+            throw_error_select(THROW_ARGMENT_TYPE2__NODE_NODE_NODE_INT, fs->cls_int, fs->cls_char, type, v1 - fg->stk_base + 1);
             return FALSE;
         }
         ch = Value_int64(*v1, NULL);
@@ -1236,7 +1253,7 @@ static int string_index(Value *vret, Value *v, RefNode *node)
 
     if (idx >= 0 && idx < src->size) {
         int code = utf8_codepoint_at(&src->c[idx]);
-        *vret = int32_Value(code);
+        *vret = integral_Value(fs->cls_char, code);
     } else {
         throw_error_select(THROW_INVALID_INDEX__VAL_INT, v1, src->size);
         return FALSE;
@@ -1316,9 +1333,8 @@ static int string_substr(Value *vret, Value *v, RefNode *node)
 }
 static int string_tobytes(Value *vret, Value *v, RefNode *node)
 {
-    if (!convert_str_to_bin(vret, NULL, 0)) {
-        return FALSE;
-    }
+    RefStr *src = Value_vp(*v);
+    *vret = cstr_Value(fs->cls_bytes, src->c, src->size);
     return TRUE;
 }
 
@@ -1438,14 +1454,21 @@ static int bytes_tostr(Value *vret, Value *v, RefNode *node)
         }
     } else {
         RefStr *rs = Value_vp(*v);
-        StrBuf buf;
-
-        StrBuf_init_refstr(&buf, rs->size);
-        StrBuf_add(&buf, "b\"", 2);
-        add_backslashes_bin(&buf, rs->c, rs->size);
-        StrBuf_add_c(&buf, '"');
-
-        *vret = StrBuf_str_Value(&buf, fs->cls_str);
+        *vret = cstr_Value(NULL, rs->c, rs->size);
+    }
+    return TRUE;
+}
+static int bytes_utf8str(Value *vret, Value *v, RefNode *node)
+{
+    RefStr *src = Value_vp(*v);
+    if (fg->stk_top > v + 1 && Value_bool(v[1])) {
+        *vret = cstr_Value(NULL, src->c, src->size);
+    } else {
+        if (invalid_utf8_pos(src->c, src->size) >= 0) {
+            throw_error_select(THROW_INVALID_UTF8);
+            return FALSE;
+        }
+        *vret = cstr_Value(fs->cls_str, src->c, src->size);
     }
     return TRUE;
 }
@@ -2120,6 +2143,8 @@ void define_lang_str_class(RefNode *m)
 
     n = define_identifier_p(m, cls, fs->str_tostr, NODE_FUNC_N, 0);
     define_native_func_a(n, bytes_tostr, 0, 2, NULL, fs->cls_str, fs->cls_locale);
+    n = define_identifier(m, cls, "utf8str", NODE_FUNC_N, 0);
+    define_native_func_a(n, bytes_utf8str, 0, 1, NULL, fs->cls_bool);
 
     n = define_identifier_p(m, cls, fs->symbol_stock[T_LB], NODE_FUNC_N, 0);
     define_native_func_a(n, bytes_index, 1, 1, NULL, fs->cls_int);
@@ -2134,7 +2159,7 @@ void define_lang_str_class(RefNode *m)
     // Str
     cls = fs->cls_str;
     n = define_identifier_p(m, cls, fs->str_new, NODE_NEW_N, 0);
-    define_native_func_a(n, string_new, 0, 3, NULL, NULL, fs->cls_charset, fs->cls_bool);
+    define_native_func_a(n, string_new, 0, 1, NULL, NULL);
     n = define_identifier(m, cls, "chr", NODE_NEW_N, 0);
     define_native_func_a(n, string_new_seq, 0, -1, NULL);
     n = define_identifier_p(m, cls, fs->str_marshal_read, NODE_NEW_N, 0);
@@ -2155,7 +2180,7 @@ void define_lang_str_class(RefNode *m)
     n = define_identifier(m, cls, "sub", NODE_FUNC_N, 0);
     define_native_func_a(n, string_substr, 1, 2, NULL, fs->cls_int, fs->cls_int);
     n = define_identifier(m, cls, "to_bytes", NODE_FUNC_N, 0);
-    define_native_func_a(n, string_tobytes, 1, 2, NULL, fs->cls_charset, fs->cls_bool);
+    define_native_func_a(n, string_tobytes, 0, 0, NULL);
     extends_method(cls, fs->cls_sequence);
 
     // SequenceIter
@@ -2218,5 +2243,3 @@ void define_lang_str_class(RefNode *m)
     cls = define_identifier(m, m, "RegexError", NODE_CLASS, 0);
     define_error_class(cls, fs->cls_error, m);
 }
-
-

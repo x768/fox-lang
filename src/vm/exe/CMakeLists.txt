@@ -7,7 +7,7 @@ include_directories(../compat)
 include_directories(../fox)
 
 
-set(DEST_DIR ../../../../bin)
+set(DEST_DIR ../../../../fox/bin)
 file(GLOB LIST_SRC ../fox/*.c)
 
 add_executable(fox_cl

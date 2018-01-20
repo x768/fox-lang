@@ -1,0 +1,88 @@
+for f in glob("*.txt") {
+	let w = FileIO("../../charset/${f.basename}", "w");
+
+	puts f.basename, "..."
+
+	var position = null
+	let strtable = []
+	var type = 0
+	var pos = 0
+	var str_total_size = 0
+
+	for line in fopen(f) {
+		let a = line.split(':')
+		if a.size < 2 {
+			continue
+		}
+		let key = a[0]
+		let val = a[1]
+		var begin = 0
+		var end = 0
+
+		if key == "type" {
+			var size = 0
+			switch val {
+			case "256"
+				type = 1
+				size = 256
+			case "96-96"
+				type = 2
+				size = 96 * 96
+			case "96-192"
+				type = 3
+				size = 96 * 192
+			default
+				throw Error("Unknown type: $key")
+			}
+			position = List.sized(size)
+			continue
+		} elif let m = key.match(/^(\w+)-(\w+)$/) {
+			begin = Int.parse(m[1], 16)
+			end = Int.parse(m[2], 16) + 1
+		} else {
+			begin = Int.parse(key, 16)
+			if type == 2 {
+				begin = (begin >> 8) * 96 + (begin & 0xFF)
+			} elif type == 3 {
+				begin = (begin >> 8) * 192 + (begin & 0xFF)
+			}
+		}
+
+		if end > 0 {
+			var code = Int.parse(val, 16)
+			for i in begin..end {
+				let b = Str.chr(code).to_bytes(Charset.UTF8)
+				if position[i] {
+					throw Error("${i:04X} already defined")
+				}
+				position[i] = pos
+				strtable.push b
+				pos += b.size + 1
+				str_total_size += b.size + 1
+				code++
+			}
+		} else {
+			let code = val.split(',').map(s => Int.parse(s, 16))
+			let b = Str.chr(code).to_bytes(Charset.UTF8)
+			position[begin] = pos
+			strtable.push b
+			pos += b.size + 1
+			str_total_size += b.size
+		}
+	}
+	w.pack "I", type
+
+	for p in position {
+		if p {
+			w.pack "I", p
+		} else {
+			w.pack "I", -1
+		}
+	}
+
+	w.pack "I", str_total_size
+
+	for s in strtable {
+		w.pack "z", s
+	}
+}

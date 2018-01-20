@@ -58,6 +58,9 @@ void init_stream_ref(Ref *r, int mode)
 
     // -1の場合はwriteしたとき例外を出す
     r->v[INDEX_WRITE_MAX] = int32_Value((mode & STREAM_WRITE) != 0 ? 0 : -1);
+
+    // デフォルトでバッファリングする
+    r->v[INDEX_WRITE_BUFFERING] = bool_Value(TRUE);
 }
 
 static int stream_open(Value *vret, Value *v, RefNode *node)
@@ -703,6 +706,11 @@ int stream_write_data(Value v, const char *s_p, int s_size)
             }
         }
     }
+    if (!Value_bool(r->v[INDEX_WRITE_BUFFERING])) {
+        if (!stream_flush_sub(v)) {
+            return FALSE;
+        }
+    }
 
     return TRUE;
 }
@@ -791,12 +799,13 @@ static int stream_write_stream_sub(Value v, Value v1, int64_t last)
 static int stream_write(Value *vret, Value *v, RefNode *node)
 {
     RefStr *rs = Value_vp(v[1]);
+
     if (!stream_write_data(*v, rs->c, rs->size)) {
         return FALSE;
     }
     return TRUE;
 }
-static int stream_write_s(Value *vret, Value *v, RefNode *node)
+static int stream_write_stream(Value *vret, Value *v, RefNode *node)
 {
     Value v1 = v[1];
     RefNode *v1_type = Value_type(v1);
@@ -1511,6 +1520,27 @@ static int stream_flush(Value *vret, Value *v, RefNode *node)
     }
     return TRUE;
 }
+int stream_get_write_memio(Value v, Value *pmb, int *pmax)
+{
+    Ref *r = Value_ref(v);
+    Value *vmb = &r->v[INDEX_WRITE_MEMIO];
+    int max = Value_integral(r->v[INDEX_WRITE_MAX]);
+
+    if (max == -1) {
+        throw_error_select(THROW_NOT_OPENED_FOR_WRITE);
+        return FALSE;
+    }
+    if (*vmb == VALUE_NULL) {
+        RefBytesIO *mb = bytesio_new_sub(NULL, BUFFER_SIZE);
+        *vmb = vp_Value(mb);
+        max = BUFFER_SIZE;
+        r->v[INDEX_WRITE_MAX] = int32_Value(max);
+    }
+    *pmb = *vmb;
+    *pmax = max;
+
+    return TRUE;
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -1798,7 +1828,7 @@ static int bytesio_write(Value *vret, Value *v, RefNode *node)
 
     return TRUE;
 }
-static int bytesio_write_s(Value *vret, Value *v, RefNode *node)
+static int bytesio_write_stream(Value *vret, Value *v, RefNode *node)
 {
     RefBytesIO *mb = Value_vp(*v);
     Value v1 = v[1];
@@ -2173,8 +2203,8 @@ static void define_io_class(RefNode *m)
     define_native_func_a(n, stream_fetch, 1, 1, NULL, fs->cls_int);
     n = define_identifier_p(m, cls, fs->str_write, NODE_FUNC_N, 0);
     define_native_func_a(n, stream_write, 1, 1, NULL, fs->cls_bytes);
-    n = define_identifier(m, cls, "write_s", NODE_FUNC_N, 0);
-    define_native_func_a(n, stream_write_s, 1, 2, NULL, fs->cls_streamio, fs->cls_int);
+    n = define_identifier(m, cls, "write_stream", NODE_FUNC_N, 0);
+    define_native_func_a(n, stream_write_stream, 1, 2, NULL, fs->cls_streamio, fs->cls_int);
     n = define_identifier(m, cls, "pos", NODE_FUNC_N, NODEOPT_PROPERTY);
     define_native_func_a(n, stream_pos, 0, 0, NULL);
     n = define_identifier(m, cls, "pos=", NODE_FUNC_N, 0);
@@ -2264,8 +2294,8 @@ static void define_io_class(RefNode *m)
     define_native_func_a(n, bytesio_gets, 0, 0, NULL);
     n = define_identifier_p(m, cls, fs->str_write, NODE_FUNC_N, 0);
     define_native_func_a(n, bytesio_write, 1, 1, NULL, fs->cls_bytes);
-    n = define_identifier(m, cls, "write_s", NODE_FUNC_N, 0);
-    define_native_func_a(n, bytesio_write_s, 1, 2, NULL, fs->cls_streamio, fs->cls_int);
+    n = define_identifier(m, cls, "write_stream", NODE_FUNC_N, 0);
+    define_native_func_a(n, bytesio_write_stream, 1, 2, NULL, fs->cls_streamio, fs->cls_int);
     n = define_identifier(m, cls, "pack", NODE_FUNC_N, 0);
     define_native_func_a(n, bytesio_pack, 1, -1, NULL, fs->cls_str);
     n = define_identifier(m, cls, "flush", NODE_FUNC_N, 0);
@@ -2300,6 +2330,7 @@ void init_io_module_stubs()
     fs->cls_bytesio = define_identifier(m, m, "BytesIO", NODE_CLASS, 0);
 
     fs->cls_textio = define_identifier(m, m, "TextIO", NODE_CLASS, NODEOPT_ABSTRACT);
+    fs->cls_utf8io = define_identifier(m, m, "Utf8IO", NODE_CLASS, 0);
     fv->cls_strio = define_identifier(m, m, "StrIO", NODE_CLASS, 0);
 
     fs->mod_io = m;

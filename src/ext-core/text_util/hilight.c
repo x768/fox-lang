@@ -12,10 +12,22 @@ static char *read_hilight_file(RefStr *type)
     // TODO:見つからない場合はMimeType.parentをたどる
     for (res_path = fs->resource_path; res_path != NULL; res_path = res_path->next) {
         char *fname = fs->str_printf("%s" SEP_S "hilight" SEP_S "%s.txt", res_path->u.c, type->c);
-        char *buf = fs->read_from_file(NULL, fname, NULL);
-        free(fname);
-        if (buf != NULL) {
-            return buf;
+#ifdef WIN32
+        {
+            char *p;
+            for (p = fname; *p != '\0'; p++) {
+                if (*p == '/') {
+                    *p = '\\';
+                }
+            }
+        }
+#endif
+        {
+            char *buf = fs->read_from_file(NULL, fname, NULL);
+            free(fname);
+            if (buf != NULL) {
+                return buf;
+            }
         }
     }
     return NULL;
@@ -144,7 +156,7 @@ static int load_hilight_sub(Hilight *h, char *buf, RefStr *type)
     } else {
         add_hilight_state(h, fs->intern("_", 1), FALSE, FALSE);
     }
-    
+
     for (;;) {
         switch (tk.v.type) {
         case TL_VAR:
@@ -240,22 +252,23 @@ SYNTAX_ERROR:
     fs->throw_errorf(fs->mod_lang, "InternalError", "Syntax error at line %d (%r)", tk.v.line, type);
     return FALSE;
 }
-int load_hilight(Hilight *h, RefStr *type, int *result)
+int load_hilight(Hilight *h, RefStr *type)
 {
     char *buf = read_hilight_file(type);
+    int ret;
+
     if (buf == NULL) {
-        *result = FALSE;
-        return TRUE;
+        fs->throw_errorf(fs->mod_lang, "ValueError", "Hilight type '%r' not found", type);
+        return FALSE;
     }
     fs->Hash_init(&h->state, &h->mem, 16);
 
     // 0-9A-Za-z_
     memcpy(h->word_char, "\0\0\0\0\0\0\xff\x03\xfe\xff\xff\x87\xfe\xff\xff\x07", 128 / 8);
-
-    *result = load_hilight_sub(h, buf, type);
+    ret = load_hilight_sub(h, buf, type);
     free(buf);
 
-    return TRUE;
+    return ret;
 }
 
 /////////////////////////////////////////////////////////////////////////////////////

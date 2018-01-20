@@ -52,7 +52,7 @@ def load_exclusive(m:List)
 	if let line = f.next() {
 		if let ca = line.match(/([\d\.]+)\.txt$/) {
 			puts ca[1]
-			writefile "../unicode/version.txt", ca[1], Charset.UTF8
+			writefile "../../fox/unicode/version.txt", ca[1], Charset.UTF8
 		}
 	}
 	for line in f {
@@ -90,7 +90,7 @@ def load_exclusive(m:List)
 
 load_exclusive(exc)
 
-let nz = FileIO("../unicode/normalize", "w")
+let nz = FileIO("../../fox/unicode/normalize", "w")
 var offset = 1
 nz.write b"\0\0\0\0"
 
@@ -129,18 +129,18 @@ for line in f {
 
 for p in nc.entries {
 	if p.value {
-		writefile "../unicode/nc${p.key:02d}", p.value
+		writefile "../../fox/unicode/nc${p.key:02d}", p.value
 	}
 }
 for p in nk.entries {
 	if p.value {
-		writefile "../unicode/nk${p.key:02d}", p.value
+		writefile "../../fox/unicode/nk${p.key:02d}", p.value
 	}
 }
 
 // 正規結合
 nd.sort((a, b) => a[0] <=> b[0])
-var ndf = FileIO("../unicode/composition", "w")
+var ndf = FileIO("../../fox/unicode/composition", "w")
 for a in nd {
 	ndf.pack "I*", a
 }

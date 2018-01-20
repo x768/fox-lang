@@ -190,10 +190,30 @@ static int pipeio_close(Value *vret, Value *v, RefNode *node)
     return TRUE;
 }
 
-// TextIO(PipeIO(...), "ローカルCP")
+#ifdef WIN32
+static RefNode *get_codepageio_new()
+{
+    static RefNode *fn_codepageio;
+
+    if (fn_codepageio == NULL) {
+        RefNode *mod_windows = fs->get_module_by_name("windows", 7, TRUE, TRUE);
+        if (mod_windows != NULL) {
+            RefNode *cls_codepageio = fs->Hash_get(&mod_windows->u.c.h, "CodePageIO", -1);
+            fn_codepageio = fs->Hash_get_p(&cls_codepageio->u.c.h, fs->str_new);
+        }
+    }
+    return fn_codepageio;
+}
+#endif
+
+// Utf8IO(PipeIO(...))
 static int process_popen(Value *vret, Value *v, RefNode *node)
 {
-    RefNode *fn_textio_new = fs->Hash_get_p(&fs->cls_textio->u.c.h, fs->str_new);
+#ifdef WIN32
+    RefNode *fn_codepageio_new = get_codepageio_new();
+#else
+    RefNode *fn_utf8io_new = fs->Hash_get_p(&fs->cls_utf8io->u.c.h, fs->str_new);
+#endif
     RefNode *fn_pipeio_new = fs->Hash_get_p(&cls_pipeio->u.c.h, fs->str_new);
 
     if (!fs->call_function(fn_pipeio_new, 3)) {
@@ -203,10 +223,16 @@ static int process_popen(Value *vret, Value *v, RefNode *node)
     fg->stk_top[0] = fg->stk_top[-1];
     fg->stk_top[-1] = VALUE_NULL;
     fg->stk_top++;
-    fs->Value_push("rb", get_local_codepage(), TRUE);
-    if (!fs->call_function(fn_textio_new, 3)) {
+#ifdef WIN32
+    *fg->stk_top++ = int32_Value(0);
+    if (!fs->call_function(fn_codepageio_new, 2)) {
         return FALSE;
     }
+#else
+    if (!fs->call_function(fn_utf8io_new, 1)) {
+        return FALSE;
+    }
+#endif
     *vret = fg->stk_top[-1];
     fg->stk_top--;
 

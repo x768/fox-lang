@@ -339,7 +339,7 @@ void add_backslashes_sub(StrBuf *buf, const char *src_p, int src_size, int mode)
                 if (c < ' ') {
                     char c_buf[8];
                     if (mode == ADD_BACKSLASH_UCS4) {
-                        sprintf(c_buf, "\\u%02x", c);
+                        sprintf(c_buf, "\\x%02x", c);
                         StrBuf_add(buf, c_buf, 4);
                     } else {
                         sprintf(c_buf, "\\u%04x", c);
@@ -417,7 +417,7 @@ void add_backslashes_sub(StrBuf *buf, const char *src_p, int src_size, int mode)
                 if (code >= ' ' && code < 0x7F) {
                     StrBuf_add_c(buf, c);
                 } else if (code < 0x10000) {  // BMP
-                    char c_buf[8];
+                    char c_buf[10];
                     sprintf(c_buf, "\\u%04x", code);
                     StrBuf_add(buf, c_buf, 6);
                 } else {  // サロゲート

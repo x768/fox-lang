@@ -21,7 +21,7 @@ for line in f {
 }
 for p in m.entries {
 	if p.value {
-		writefile "../unicode/cc${p.key:02d}", p.value
+		writefile "../../fox/unicode/cc${p.key:02d}", p.value
 	}
 }
 

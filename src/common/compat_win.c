@@ -29,11 +29,7 @@ int utf8_to_utf16(wchar_t *dst_p, const char *src, int len)
                 *dst++ = ((c & 0x1F) << 6) | (p[1] & 0x3F);
                 p += 2;
             } else if ((c & 0xF0) == 0xE0 && p + 2 < end) {
-                int code = ((c & 0x0F) << 12) | ((p[1] & 0x3F) << 6) | (p[2] & 0x3F);
-                if (code >= SURROGATE_L_BEGIN && code < SURROGATE_END) {
-                    code = 0xFFFD;
-                }
-                *dst++ = code;
+                *dst++ = ((c & 0x0F) << 12) | ((p[1] & 0x3F) << 6) | (p[2] & 0x3F);
                 p += 3;
             } else if ((c & 0xF8) == 0xF0 && p + 3 < end) {
                 int code = ((c & 0x07) << 18) | ((p[1] & 0x3F) << 12)  | ((p[2] & 0x3F) << 6) | (p[3] & 0x3F);
@@ -232,6 +228,10 @@ FileHandle open_fox(const char *fname, int mode, int dummy)
         dwCreationDisposition = OPEN_EXISTING;
         break;
     case O_CREAT|O_WRONLY|O_TRUNC:
+        dwDesiredAccess = GENERIC_WRITE;
+        dwShareMode = 0;
+        dwCreationDisposition = CREATE_ALWAYS;
+        break;
     case O_CREAT|O_WRONLY|O_APPEND:
         dwDesiredAccess = GENERIC_WRITE;
         dwShareMode = 0;
@@ -242,10 +242,6 @@ FileHandle open_fox(const char *fname, int mode, int dummy)
     }
     wtmp = filename_to_utf16(fname, NULL);
     fd = (FileHandle)CreateFileW(wtmp, dwDesiredAccess, dwShareMode, NULL, dwCreationDisposition, FILE_ATTRIBUTE_NORMAL, NULL);
-
-    if (fd != -1 && mode == (O_CREAT|O_WRONLY|O_APPEND)) {
-        SetFilePointer((HANDLE)fd, 0, NULL, FILE_END);
-    }
     free(wtmp);
 
     return fd;

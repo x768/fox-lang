@@ -367,7 +367,7 @@ static int parse_args(ArgumentInfo *ai, int argc, const char **argv)
                     }
                 }
                 srcfile = str_printf("%r" SEP_S "script" SEP_S "%s.fox", fs->fox_home, p + 2);
-            } else {
+            } else if (p[1] != '\0' && p[2] == '\0') {
                 switch (p[1]) {
                 case 'D': {
                     const char *pkey = p + 2;
@@ -380,7 +380,8 @@ static int parse_args(ArgumentInfo *ai, int argc, const char **argv)
                         char *val = str_dup_p(pval + 1, -1, &fg->st_mem);
                         Hash_add_p(&fs->envs, &fg->st_mem, key, val);
                     } else {
-                        throw_errorf(fs->mod_lang, "ArgumentError", "Unknown option %q", p);
+                        RefStr *key = intern(pkey, -1);
+                        Hash_add_p(&fs->envs, &fg->st_mem, key, (void*)"1");
                         return FALSE;
                     }
                     break;
@@ -421,6 +422,9 @@ static int parse_args(ArgumentInfo *ai, int argc, const char **argv)
                     throw_errorf(fs->mod_lang, "ArgumentError", "Unknown option %q", p);
                     return FALSE;
                 }
+            } else {
+                throw_errorf(fs->mod_lang, "ArgumentError", "Unknown option %q", p);
+                return FALSE;
             }
         } else {
             // ファイル名を取得

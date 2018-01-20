@@ -10,6 +10,10 @@ enum {
     INDEX_IFADDR_ADDR,
     INDEX_IFADDR_NUM,
 };
+enum {
+    INDEX_SOCKIO_IPADDR = INDEX_FILEIO_NUM,
+    INDEX_SOCKIO_NUM,
+};
 
 typedef struct RefSockAddr RefSockAddr;
 typedef struct RefListener RefListener;
@@ -68,6 +72,7 @@ struct RefSockAddr {
 struct RefListener {
     RefHeader rh;
     FileHandle sock;
+    int port;
     int len;
     struct sockaddr addr[0];
 };

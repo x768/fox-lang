@@ -149,6 +149,7 @@ void init_so_func(void)
     fs->stream_seek_sub = stream_seek;
     fs->stream_flush_sub = stream_flush_sub;
     fs->stream_gets_sub = stream_gets_sub;
+    fs->stream_get_write_memio = stream_get_write_memio;
 
     fs->get_local_tz = get_local_tz;
     fs->adjust_timezone = adjust_timezone;
@@ -275,7 +276,7 @@ void init_fox_vm(int running_mode)
     init_file_module_1();
     init_mime_module_1();
     init_marshal_module_1(mod_marshal);
-#ifndef NO_DEBUG
+#if 0
     define_test_driver(fs->mod_lang);
 #endif
     init_so_func();

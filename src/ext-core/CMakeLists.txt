@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.0)
 include(../common.cmake)
 include(../library.cmake)
 
-set(DEST_DIR ../../../../import)
+set(DEST_DIR ../../../../fox/import)
 
 add_subdirectory(crypt)
 add_subdirectory(image)

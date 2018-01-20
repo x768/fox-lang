@@ -5,6 +5,7 @@ include_directories(./)
 add_library(m_foxtk SHARED
   ${SRC_COMMON}
   m_gui.c
+  widget.c
   ${TARGET_OS}/m_gui_sub.${TARGET_EXT}
   ${TARGET_OS}/clipboard.${TARGET_EXT}
   ${TARGET_OS}/dialog.${TARGET_EXT}

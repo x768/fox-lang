@@ -1,0 +1,12 @@
+locale = "!"
+message = <<<EOS
+Usage: fox [options...] source-file-name [arguments...]
+Options
+  -e srccode: Execute "srccode" immediately.
+  -c srccode: Validate syntax only.
+  -v: Show version information.
+  -DNAME=value: Set environment variable.
+  --help: Show help.
+  --version: Show modules version and settings.
+
+EOS

@@ -356,6 +356,12 @@ static int socket_empty(Value *vret, Value *v, RefNode *node)
 
     return TRUE;
 }
+static int socket_ipaddr(Value *vret, Value *v, RefNode *node)
+{
+    Ref *r = Value_ref(*v);
+    *vret = fs->Value_cp(r->v[INDEX_SOCKIO_IPADDR]);
+    return TRUE;
+}
 
 ///////////////////////////////////////////////////////////////////////////////////////////
 
@@ -363,7 +369,6 @@ static int listener_new(Value *vret, Value *v, RefNode *node)
 {
     const char *error_at = NULL;
     RefSockAddr *rsa = Value_vp(v[1]);
-    int addr_nbytes = sockaddr_bytes_count(rsa->addr);
     int ssock_size = (rsa->addr->sa_family == AF_INET) ? sizeof(struct sockaddr_in) : sizeof(struct sockaddr_in6);
 
     int port = fs->Value_int64(v[2], NULL);
@@ -372,13 +377,13 @@ static int listener_new(Value *vret, Value *v, RefNode *node)
     switch (rsa->addr->sa_family) {
     case AF_INET: {
         struct sockaddr_in *in4 = (struct sockaddr_in*)ls->addr;
-        memcpy(in4, sockaddr_bytes(rsa->addr), addr_nbytes);
+        memcpy(in4, rsa->addr, sizeof(struct sockaddr_in));
         in4->sin_port = htons(port);
         break;
     }
     case AF_INET6: {
         struct sockaddr_in6 *in6 = (struct sockaddr_in6*)ls->addr;
-        memcpy(in6, sockaddr_bytes(rsa->addr), addr_nbytes);
+        memcpy(in6, rsa->addr, sizeof(struct sockaddr_in6));
         in6->sin6_port = htons(port);
         break;
     }
@@ -387,6 +392,7 @@ static int listener_new(Value *vret, Value *v, RefNode *node)
         return FALSE;
     }
 
+    ls->port = port;
     ls->sock = socket(rsa->addr->sa_family, SOCK_STREAM, 0);
     if (ls->sock == -1) {
         error_at = "socket";
@@ -402,15 +408,11 @@ static int listener_new(Value *vret, Value *v, RefNode *node)
     }
 
     *vret = vp_Value(ls);
+    return TRUE;
 
 FINALLY:
-    if (error_at != NULL) {
-        fprintf(stderr, "%d, EINVAL=%d\n", errno, EINVAL);
-        fs->throw_errorf(fs->mod_io, "SocketError", "Failed (%s)", error_at);
-        return FALSE;
-    }
-
-    return TRUE;
+    fs->throw_errorf(fs->mod_io, "SocketError", "Failed (%s)", error_at);
+    return FALSE;
 }
 static int listener_close(Value *vret, Value *v, RefNode *node)
 {
@@ -426,8 +428,6 @@ static int listener_close(Value *vret, Value *v, RefNode *node)
 static int listener_accept(Value *vret, Value *v, RefNode *node)
 {
     RefListener *ls = Value_vp(*v);
-    socklen_t sa_len;
-    struct sockaddr *sa;
     FileHandle sock;
 
     if (ls->sock == -1) {
@@ -435,8 +435,20 @@ static int listener_accept(Value *vret, Value *v, RefNode *node)
         return FALSE;
     }
 
-    sa = malloc(sizeof(struct sockaddr_in6));
-    sock = accept(ls->sock, sa, &sa_len);
+    switch (ls->addr->sa_family) {
+    case AF_INET:
+        break;
+    case AF_INET6:
+        break;
+    default:
+        break;
+    }
+    {
+        struct sockaddr *sa = malloc(sizeof(struct sockaddr_in6));
+        socklen_t sa_len;
+        sock = accept(ls->sock, sa, &sa_len);
+        free(sa);
+    }
 
     if (sock != -1) {
         Ref *sock_r = fs->ref_new(cls_socketio);
@@ -448,6 +460,12 @@ static int listener_accept(Value *vret, Value *v, RefNode *node)
         *vret = vp_Value(sock_r);
     }
 
+    return TRUE;
+}
+static int listener_port(Value *vret, Value *v, RefNode *node)
+{
+    RefListener *ls = Value_vp(*v);
+    *vret = int32_Value(ls->port);
     return TRUE;
 }
 
@@ -579,16 +597,16 @@ static int ipaddr_const_any(Value *vret, Value *v, RefNode *node)
         rsa = fs->buf_new(cls_ipaddr, sizeof(RefSockAddr) + sizeof(struct sockaddr_in));
         rsa->len = sizeof(struct sockaddr_in);
         {
-            struct sockaddr_in *addr_in = (struct sockaddr_in*)rsa->addr;
-            addr_in->sin_family = AF_INET;
+            struct sockaddr_in *in4 = (struct sockaddr_in*)rsa->addr;
+            in4->sin_family = AF_INET;
         }
         break;
     case AF_INET6:
         rsa = fs->buf_new(cls_ipaddr, sizeof(RefSockAddr) + sizeof(struct sockaddr_in6));
         rsa->len = sizeof(struct sockaddr_in6);
         {
-            struct sockaddr_in6 *addr_in6 = (struct sockaddr_in6*)rsa->addr;
-            addr_in6->sin6_family = AF_INET6;
+            struct sockaddr_in6 *in6 = (struct sockaddr_in6*)rsa->addr;
+            in6->sin6_family = AF_INET6;
         }
         break;
     default:
@@ -867,8 +885,10 @@ static void define_class(RefNode *m)
     fs->define_native_func_a(n, socket_read, 2, 2, NULL, fs->cls_bytesio, fs->cls_int);
     n = fs->define_identifier(m, cls, "_write", NODE_FUNC_N, 0);
     fs->define_native_func_a(n, socket_write, 1, 1, NULL, fs->cls_bytesio);
+    n = fs->define_identifier(m, cls, "ipaddr", NODE_FUNC_N, NODEOPT_PROPERTY);
+    fs->define_native_func_a(n, socket_ipaddr, 0, 0, NULL);
 
-    cls->u.c.n_memb = INDEX_FILEIO_NUM;
+    cls->u.c.n_memb = INDEX_SOCKIO_NUM;
     fs->extends_method(cls, fs->cls_streamio);
 
 
@@ -883,6 +903,8 @@ static void define_class(RefNode *m)
     fs->define_native_func_a(n, listener_close, 0, 0, NULL);
     n = fs->define_identifier(m, cls, "accept", NODE_FUNC_N, 0);
     fs->define_native_func_a(n, listener_accept, 0, 0, NULL);
+    n = fs->define_identifier(m, cls, "port", NODE_FUNC_N, NODEOPT_PROPERTY);
+    fs->define_native_func_a(n, listener_port, 0, 0, NULL);
     fs->extends_method(cls, fs->cls_obj);
 
 

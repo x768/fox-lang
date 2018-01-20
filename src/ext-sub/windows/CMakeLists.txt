@@ -4,6 +4,7 @@ add_library(m_windows SHARED
   ${SRC_COMMON}
   m_windows.c
   winole.c
+  codepageio.c
 )
 set_target_properties(m_windows
   PROPERTIES

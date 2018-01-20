@@ -3,8 +3,8 @@ import foxtk
 def callback(e)
 {
     puts e.action, ":", e.file
-    STDIO.flush()
 }
 
+STDIO.buffering = false
 let m = DirMonitor("monitor", callback)
 m.wait()

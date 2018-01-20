@@ -1,4 +1,5 @@
 import util.assert
+import text.codecvt
 
 let path = ENV.has_key("TEST_BATCH") ? "charset" : "."
 

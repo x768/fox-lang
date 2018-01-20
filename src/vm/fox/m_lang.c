@@ -1050,6 +1050,7 @@ void init_lang_module_stubs()
     fs->cls_sequence = define_identifier(m, m, "Sequence", NODE_CLASS, NODEOPT_ABSTRACT);
     fs->cls_bytes = define_identifier(m, m, "Bytes", NODE_CLASS, NODEOPT_STRCLASS);
     fs->cls_regex = define_identifier(m, m, "Regex", NODE_CLASS, 0);
+    fs->cls_char = define_identifier(m, m, "Char", NODE_CLASS, NODEOPT_INTEGRAL);
     fs->cls_list = define_identifier(m, m, "List", NODE_CLASS, 0);
     fs->cls_map = define_identifier(m, m, "Map", NODE_CLASS, 0);
     fs->cls_set = define_identifier(m, m, "Set", NODE_CLASS, 0);

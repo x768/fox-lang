@@ -1,0 +1,12 @@
+locale = "ja"
+message = <<<EOS
+使用方法: fox [オプション...] ソースファイル名 [引数...]
+オプション
+  -e srccode: "srccode"をfoxスクリプトとして実行
+  -c srccode: 文法チェックのみ行う
+  -v: バージョン情報を表示
+  -DNAME=value: 環境変数を設定
+  --help: ヘルプを表示
+  --version: モジュールのバージョン情報と設定情報を表示
+
+EOS

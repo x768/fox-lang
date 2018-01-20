@@ -1,8 +1,6 @@
 #include "fox_vm.h"
 
 
-#ifndef NO_DEBUG
-
 #if 0
 
 typedef struct HashEntry2
@@ -44,6 +42,12 @@ static void Hash2_grow(Hash2 *hash, Mem *mem)
     for (i = 0; i < n; i++){
         HashEntry2 *he2 = &hash->entry[i];
         uint32_t idx = HASH_INDEX(he2->key, hash);
+        while (e[idx].key != NULL) {
+            idx++;
+            if (idx > hash->entry_num) {
+                idx = 0;
+            }
+        }
         e[idx] = *he2;
     }
     if (mem == NULL) {
@@ -51,29 +55,29 @@ static void Hash2_grow(Hash2 *hash, Mem *mem)
     }
     hash->entry = e;
 }
-void Hash2_add_p(Hash2 *hash, Mem *mem, RefStr *key, void *ptr)
+int Hash2_add_p(Hash2 *hash, Mem *mem, RefStr *key, void *ptr)
 {
-    HashEntry2 *pos, *p;
+    HashEntry2 *p;
 
-    if (hash->count * 2 > hash->entry_num * 3) {
+    if (hash->count + hash->count / 2 > hash->entry_num) {
         Hash2_grow(hash, mem);
     }
 
-    pos = &hash->entry[HASH_INDEX(key, hash)];
-    p = pos;
+    p = &hash->entry[HASH_INDEX(key, hash)];
 
-    for (;;) {
-        if (p->key == NULL) {
-            break;
+    while (p->key != NULL) {
+        if (p->key == key) {
+            return FALSE;
         }
         p++;
         if (p >= hash->entry + hash->entry_num) {
             p = hash->entry;
         }
     }
-    pos->key = key;
-    pos->p = ptr;
+    p->key = key;
+    p->p = ptr;
     hash->count++;
+    return TRUE;
 }
 void *Hash2_get_p(const Hash2 *hash, RefStr *key)
 {
@@ -96,38 +100,52 @@ void *Hash2_get_p(const Hash2 *hash, RefStr *key)
  */
 HashEntry2 *Hash2_get_add_entry(Hash2 *hash, Mem *mem, RefStr *key)
 {
-    HashEntry **pp = &hash->entry[HASH_INDEX(key, hash)];
-    HashEntry *pos = *pp;
+    HashEntry2 *p;
 
-    while (pos != NULL) {
-        if (key == pos->key) {
-            return pos;
+    if (hash->count + hash->count / 2 > hash->entry_num) {
+        Hash2_grow(hash, mem);
+    }
+
+    p = &hash->entry[HASH_INDEX(key, hash)];
+
+    while (p->key != NULL) {
+        if (p->key == key) {
+            return p;
         }
-        pp = &pos->next;
-        pos = *pp;
+        p++;
+        if (p >= hash->entry + hash->entry_num) {
+            p = hash->entry;
+        }
     }
-
-    pos = Mem_get(mem, sizeof(*pos));
-    pos->next = NULL;
-    pos->key = key;
-    pos->p = NULL;
-    *pp = pos;
-
     hash->count++;
-    if (hash->count > hash->entry_num) {
-        Hash_grow(hash, mem);
-    }
-
-    return pos;
+    return p;
 }
-
-
-#endif
 
 
 
 static int lang_testfunc(Value *vret, Value *v, RefNode *node)
 {
+    Mem mem;
+    Hash2 h;
+    int i;
+    char tmp[16];
+
+    Mem_init(&mem, 1024);
+    Hash2_init(&h, &mem, 16);
+
+    for (i = 0; i < 100; i++) {
+        sprintf(tmp, "%d", i);
+        RefStr *p = intern(tmp, -1);
+        Hash2_add_p(&h, &mem, p, p);
+    }
+    for (i = 0; i < 100; i++) {
+        sprintf(tmp, "%d", i);
+        RefStr *p = Hash2_get_p(&h, intern(tmp, -1));
+        fprintf(stderr, "%s:%s\n", tmp, p ? p->c : NULL);
+    }
+    fprintf(stderr, "size=%d, alloc_size=%d\n", h.count, h.entry_num);
+
+    Mem_close(&mem);
     return TRUE;
 }
 
@@ -136,7 +154,7 @@ void define_test_driver(RefNode *m)
     RefNode *n;
 
     n = define_identifier(m, m, "testfunc", NODE_FUNC_N, 0);
-    define_native_func_a(n, lang_testfunc, 1, 1, NULL, NULL);
+    define_native_func_a(n, lang_testfunc, 0, 0, NULL);
 }
 
 #endif

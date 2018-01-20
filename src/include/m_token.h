@@ -37,6 +37,7 @@ enum {
     TL_FRAC,
     TL_STR,
     TL_BYTES,
+    TL_CHAR,
     TL_REGEX,
     TL_CLASS,
     TL_VAR,

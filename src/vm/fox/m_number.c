@@ -872,6 +872,21 @@ static int integer_tofrac(Value *vret, Value *v, RefNode *node)
 
     return TRUE;
 }
+static int integer_tochar(Value *vret, Value *v, RefNode *node)
+{
+    int code = -1;
+
+    if (Value_isint(*v)) {
+        code = Value_integral(*v);
+    }
+    if (code < 0 || code >= CODEPOINT_END || (code >= SURROGATE_U_BEGIN && code < SURROGATE_END)) {
+        throw_errorf(fs->mod_lang, "ValueError", "Character range error (U+0000 - U+10FFFF)");
+        return FALSE;
+    }
+    *vret = integral_Value(fs->cls_char, code);
+
+    return TRUE;
+}
 static int integer_empty(Value *vret, Value *v, RefNode *node)
 {
     if (Value_isint(*v)) {
@@ -2747,6 +2762,162 @@ ERROR_END:
     return FALSE;
 }
 
+/////////////////////////////////////////////////////////////////////////////////////////////////////
+
+static int char_new(Value *vret, Value *v, RefNode *node)
+{
+    int32_t n = 0;
+
+    if (v + 1 < fg->stk_top) {
+        Value v1 = v[1];
+        RefNode *v1_type = Value_type(v1);
+        if (v1_type == fs->cls_int) {
+            if (Value_isref(v1)) {
+                n = -1;
+            }
+            n = Value_integral(v1);
+            if (n < 0 || n >= CODEPOINT_END || (n >= SURROGATE_U_BEGIN && n < SURROGATE_END)) {
+                throw_errorf(fs->mod_lang, "ValueError", "Character range error (U+0000 - U+10FFFF)");
+                return FALSE;
+            }
+        } else if (v1_type == fs->cls_char) {
+            n = Value_integral(v1);
+        } else if (v1_type == fs->cls_str) {
+            RefStr *rs = Value_vp(v1);
+            const char *p = rs->c;
+            const char *end = p + rs->size;
+            utf8_next(&p, end);
+            if (rs->size == 0 || p != end) {
+                throw_errorf(fs->mod_lang, "ValueError", "Argument string length is not 1");
+                return FALSE;
+            }
+            n = utf8_codepoint_at(rs->c);
+        }
+    }
+
+    *vret = integral_Value(fs->cls_char, n);
+    return TRUE;
+}
+static int char_tostr(Value *vret, Value *v, RefNode *node)
+{
+    int code = Value_integral(*v);
+
+    if (fg->stk_top > v + 1) {
+        RefStr *fmt = Value_vp(v[1]);
+        char tmp[8];
+        if (str_eq(fmt->c, fmt->size, "u", 1)) {
+            sprintf(tmp, "U+%04X", code);
+            *vret = cstr_Value(fs->cls_str, tmp, -1);
+            return TRUE;
+        } else if (str_eq(fmt->c, fmt->size, "x", 1)) {
+            sprintf(tmp, "\\x{%X}", code);
+            *vret = cstr_Value(fs->cls_str, tmp, -1);
+            return TRUE;
+        } else if (str_eq(fmt->c, fmt->size, "xml", 3)) {
+            if (code >= ' ' && code < 0x80) {
+                switch (code) {
+                case '<':
+                    strcpy(tmp, "&lt;");
+                    break;
+                case '>':
+                    strcpy(tmp, "&gt;");
+                    break;
+                case '&':
+                    strcpy(tmp, "&amp;");
+                    break;
+                case '"':
+                    strcpy(tmp, "&quot;");
+                    break;
+                default:
+                    tmp[0] = code;
+                    tmp[1] = '\0';
+                    break;
+                }
+            } else {
+                sprintf(tmp, "&#%d;", code);
+            }
+            *vret = cstr_Value(fs->cls_str, tmp, -1);
+            return TRUE;
+        } else if (fmt->size > 0) {
+            throw_errorf(fs->mod_lang, "FormatError", "Unknown format %Q", Str_new(fmt->c, fmt->size));
+            return FALSE;
+        }
+    }
+    {
+        char tmp[8];
+        char *ptmp = tmp;
+        if (!str_add_codepoint(&ptmp, code, NULL)) {
+            return FALSE;
+        }
+        *vret = cstr_Value(fs->cls_str, tmp, ptmp - tmp);
+    }
+    return TRUE;
+}
+static int char_marshal_read(Value *vret, Value *v, RefNode *node)
+{
+    Value r = Value_ref(v[1])->v[INDEX_MARSHALDUMPER_SRC];
+    uint32_t n;
+
+    if (!stream_read_uint32(r, &n)) {
+        return FALSE;
+    }
+    if (n >= CODEPOINT_END || (n >= SURROGATE_U_BEGIN && n < SURROGATE_END)) {
+        throw_errorf(fs->mod_lang, "ValueError", "Character range error (U+0000 - U+10FFFF)");
+        return FALSE;
+    }
+    *vret = integral_Value(fs->cls_char, n);
+
+    return TRUE;
+}
+static int char_marshal_write(Value *vret, Value *v, RefNode *node)
+{
+    Value w = Value_ref(v[1])->v[INDEX_MARSHALDUMPER_SRC];
+    int32_t ival = Value_integral(*v);
+    if (!stream_write_uint32(w, ival)) {
+        return FALSE;
+    }
+    return TRUE;
+}
+static int char_addsub(Value *vret, Value *v, RefNode *node)
+{
+    int32_t v0 = Value_integral(*v);
+    int32_t n = -1;
+
+    if (FUNC_INT(node)) {
+        Value v1 = v[1];
+        if (Value_isintegral(v1)) {
+            int32_t n1 = Value_integral(v1);
+            RefNode *v1_type = Value_type(v1);
+            if (v1_type == fs->cls_int) {
+                n = v0 - n1;
+            } else if (v1_type == fs->cls_char) {
+                *vret = integral_Value(fs->cls_int, v0 - n1);
+                return TRUE;
+            } else {
+                throw_error_select(THROW_ARGMENT_TYPE2__NODE_NODE_NODE_INT, fs->cls_int, fs->cls_char, v1_type, 1);
+                return TRUE;
+            }
+        }
+    } else {
+        if (Value_isint(v[1])) {
+            int32_t v1 = Value_integral(v[1]);
+            n = v0 + v1;
+        }
+    }
+    if (n < 0 || n >= CODEPOINT_END || (n >= SURROGATE_U_BEGIN && n < SURROGATE_END)) {
+        throw_errorf(fs->mod_lang, "ValueError", "Character range error (U+0000 - U+10FFFF)");
+        return FALSE;
+    }
+    *vret = integral_Value(fs->cls_char, n);
+    return TRUE;
+}
+static int char_toint(Value *vret, Value *v, RefNode *node)
+{
+    int32_t n = Value_integral(*v);
+    *vret = int32_Value(n);
+    return TRUE;
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 
 void define_lang_number_func(RefNode *m)
@@ -2843,6 +3014,8 @@ void define_lang_number_class(RefNode *m)
     define_native_func_a(n, integer_tofloat, 0, 0, NULL);
     n = define_identifier_p(m, cls, tofrac, NODE_FUNC_N, 0);
     define_native_func_a(n, integer_tofrac, 0, 0, NULL);
+    n = define_identifier(m, cls, "to_char", NODE_FUNC_N, 0);
+    define_native_func_a(n, integer_tochar, 0, 0, NULL);
     extends_method(cls, fs->cls_number);
 
     // Frac
@@ -2947,4 +3120,33 @@ void define_lang_number_class(RefNode *m)
     n->u.k.val = float_Value(fs->cls_float, DBL_EPSILON);
 
     extends_method(cls, fs->cls_number);
+
+    // Char
+    cls = fs->cls_char;
+    n = define_identifier_p(m, cls, fs->str_new, NODE_NEW_N, 0);
+    define_native_func_a(n, char_new, 0, 1, NULL, NULL);
+    n = define_identifier_p(m, cls, fs->str_marshal_read, NODE_NEW_N, 0);
+    define_native_func_a(n, char_marshal_read, 1, 1, NULL, fs->cls_marshaldumper);
+
+    n = define_identifier_p(m, cls, empty, NODE_FUNC_N, NODEOPT_PROPERTY);
+    define_native_func_a(n, integer_empty, 0, 0, NULL);
+    n = define_identifier_p(m, cls, fs->str_tostr, NODE_FUNC_N, 0);
+    define_native_func_a(n, char_tostr, 0, 2, NULL, fs->cls_str, fs->cls_locale);
+    n = define_identifier_p(m, cls, fs->str_hash, NODE_FUNC_N, NODEOPT_PROPERTY);
+    define_native_func_a(n, integer_hash, 0, 0, NULL);
+
+    n = define_identifier_p(m, cls, fs->str_marshal_write, NODE_FUNC_N, 0);
+    define_native_func_a(n, char_marshal_write, 1, 1, NULL, fs->cls_marshaldumper);
+    n = define_identifier_p(m, cls, fs->symbol_stock[T_EQ], NODE_FUNC_N, 0);
+    define_native_func_a(n, integer_eq, 1, 1, NULL, fs->cls_char);
+    n = define_identifier_p(m, cls, fs->symbol_stock[T_CMP], NODE_FUNC_N, 0);
+    define_native_func_a(n, integer_cmp, 1, 1, NULL, fs->cls_char);
+    n = define_identifier_p(m, cls, fs->symbol_stock[T_ADD], NODE_FUNC_N, 0);
+    define_native_func_a(n, char_addsub, 1, 1, (void*)FALSE, fs->cls_int);
+    n = define_identifier_p(m, cls, fs->symbol_stock[T_SUB], NODE_FUNC_N, 0);
+    define_native_func_a(n, char_addsub, 1, 1, (void*)TRUE, NULL);
+    n = define_identifier_p(m, cls, toint, NODE_FUNC_N, 0);
+    define_native_func_a(n, char_toint, 0, 0, NULL);
+
+    extends_method(cls, fs->cls_obj);
 }

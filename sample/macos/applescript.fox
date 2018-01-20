@@ -1,0 +1,10 @@
+import macos
+
+let src = <<<EOS
+tell application "iTunes"
+  play
+end tell
+EOS
+
+let as = AppleScript(src)
+as.exec()

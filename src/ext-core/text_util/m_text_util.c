@@ -254,16 +254,11 @@ static int hilighter_new(Value *vret, Value *v, RefNode *node)
 
     {
         Hilight *h = fs->buf_new(cls_hilighter, sizeof(Hilight));
-        int result = FALSE;
         fs->Mem_init(&h->mem, 1024);
-        if (!load_hilight(h, rs_type, &result)) {
+        if (!load_hilight(h, rs_type)) {
             return FALSE;
         }
-        if (result) {
-            h->mimetype = fs->cstr_Value(fs->cls_mimetype, rs_type->c, rs_type->size);
-        } else {
-            h->mimetype = VALUE_NULL;
-        }
+        h->mimetype = fs->cstr_Value(fs->cls_mimetype, rs_type->c, rs_type->size);
         *vret = vp_Value(h);
     }
     return TRUE;
@@ -278,6 +273,7 @@ static int hilighter_parse(Value *vret, Value *v, RefNode *node)
 {
     Hilight *h = Value_vp(v[0]);
     HilightIter *it = fs->buf_new(cls_hilight_iter, sizeof(HilightIter));
+
     RefStr *src = Value_vp(v[1]);
 
     it->h_val = fs->Value_cp(v[0]);

@@ -166,6 +166,15 @@ static int inspect_sub(StrBuf *buf, Value v, Hash *hash, Mem *mem)
         if (!StrBuf_add_c(buf, '"')) {
             return FALSE;
         }
+    } else if (type == fs->cls_bytes) {
+        RefStr *rs = Value_vp(v);
+        if (!StrBuf_add(buf, "b\"", 2)) {
+            return FALSE;
+        }
+        add_backslashes_bin(buf, rs->c, rs->size);
+        if (!StrBuf_add_c(buf, '"')) {
+            return FALSE;
+        }
     } else if (type == fs->cls_null) {
         if (!StrBuf_add(buf, "null", 4)) {
             return FALSE;
@@ -1254,11 +1263,11 @@ int value_cmp_invoke(Value v1, Value v2, Value fn)
             } else {
                 return VALUE_CMP_EQ;
             }
-        }
-
-        Value_push("vv", v1, v2);
-        if (!call_member_func(fs->symbol_stock[T_CMP], 1, TRUE)) {
-            return VALUE_CMP_ERROR;
+        } else {
+            Value_push("vv", v1, v2);
+            if (!call_member_func(fs->symbol_stock[T_CMP], 1, TRUE)) {
+                return VALUE_CMP_ERROR;
+            }
         }
     }
 
@@ -2255,6 +2264,50 @@ static int iterator_to_set(Value *vret, Value *v, RefNode *node)
 
     return TRUE;
 }
+static int iterator_to_map(Value *vret, Value *v, RefNode *node)
+{
+    int max_size = fs->max_alloc / sizeof(Value);
+    int count = 0;
+
+    RefMap *rm = refmap_new(0);
+    *vret = vp_Value(rm);
+
+    for (;;) {
+        count++;
+        if (count >= max_size) {
+            throw_error_select(THROW_MAX_ALLOC_OVER__INT, fs->max_alloc);
+            return FALSE;
+        }
+        Value_push("v", *v);
+        if (!call_member_func(fs->str_next, 0, TRUE)) {
+            if (Value_type(fg->error) == fs->cls_stopiter) {
+                // throw StopIteration
+                unref(fg->error);
+                fg->error = VALUE_NULL;
+                break;
+            } else {
+                return FALSE;
+            }
+        }
+        {
+            RefNode *ret_type = Value_type(fg->stk_top[-1]);
+            if (ret_type == fv->cls_entry) {
+                Ref *re = Value_ref(fg->stk_top[-1]);
+                HashValueEntry *e = refmap_add(rm, re->v[INDEX_ENTRY_KEY], TRUE, FALSE);
+                if (e == NULL) {
+                    return FALSE;
+                }
+                e->val = Value_cp(re->v[INDEX_ENTRY_VAL]);
+            } else {
+                fs->throw_errorf(fs->mod_lang, "TypeError", "Entry required but %n", ret_type);
+                return FALSE;
+            }
+        }
+        Value_pop();
+    }
+
+    return TRUE;
+}
 static int iterator_join(Value *vret, Value *v, RefNode *node)
 {
     RefStr *sep = Value_vp(v[1]);
@@ -2751,6 +2804,8 @@ void define_lang_col_class(RefNode *m)
     define_native_func_a(n, iterator_flatten, 0, 0, NULL);
     n = define_identifier(m, cls, "to_set", NODE_FUNC_N, 0);
     define_native_func_a(n, iterator_to_set, 0, 0, NULL);
+    n = define_identifier(m, cls, "to_map", NODE_FUNC_N, 0);
+    define_native_func_a(n, iterator_to_map, 0, 0, NULL);
     n = define_identifier(m, cls, "join", NODE_FUNC_N, 0);
     define_native_func_a(n, iterator_join, 1, 1, NULL, fs->cls_sequence);
     n = define_identifier(m, cls, "count", NODE_FUNC_N, 0);
@@ -2824,6 +2879,8 @@ void define_lang_col_class(RefNode *m)
     n = define_identifier(m, cls, "flatten", NODE_FUNC_N, 0);
     define_native_func_a(n, iterable_invoke, 0, 0, NULL);
     n = define_identifier(m, cls, "to_set", NODE_FUNC_N, 0);
+    define_native_func_a(n, iterable_invoke, 0, 0, NULL);
+    n = define_identifier(m, cls, "to_map", NODE_FUNC_N, 0);
     define_native_func_a(n, iterable_invoke, 0, 0, NULL);
     n = define_identifier(m, cls, "join", NODE_FUNC_N, 0);
     define_native_func_a(n, iterable_invoke, 1, 1, NULL, fs->cls_sequence);

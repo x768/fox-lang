@@ -1,0 +1,15 @@
+import util.assert
+
+
+assert_equal Char(), c'\0'
+assert_equal Char(65), c'A'
+assert_equal 65.to_char(), c'A'
+assert_equal c'A'.to_int(), 65
+assert_equal c'A'.to_str(), "A"
+assert_equal c'A'.to_str('u'), "U+0041"
+assert_equal "A"[0], c'A'
+
+assert_equal c'A' + 1, c'B'
+assert_equal c'B' - 1, c'A'
+assert_equal c'B' - c'A', 1
+

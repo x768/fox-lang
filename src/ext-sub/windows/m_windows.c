@@ -1,7 +1,7 @@
 #define DEFINE_GLOBALS
 
 #include "fox_windows.h"
-
+#include "fox_io.h"
 
 enum {
     INDEX_REGITER_PARENT,
@@ -694,6 +694,14 @@ static int netresource_tostr(Value *vret, Value *v, RefNode *node)
     *vret = fs->printf_Value("NetResource(%v)", r->v[INDEX_NETRESOURCE_REMOTENAME]);
     return TRUE;
 }
+static int output_debug_string(Value *vret, Value *v, RefNode *node)
+{
+    RefStr *rs = Value_vp(v[1]);
+    wchar_t *wstr = cstr_to_utf16(rs->c, rs->size);
+    OutputDebugStringW(wstr);
+    free(wstr);
+    return TRUE;
+}
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -754,6 +762,8 @@ static void define_const(RefNode *m)
     DEFINE_INT(MB_ICONQUESTION);
     DEFINE_INT(MB_ICONINFORMATION);
 
+    DEFINE_INT(CP_ACP);
+    DEFINE_INT(CP_UTF8);
 #undef DEFINE_INT
 }
 
@@ -772,6 +782,14 @@ static void define_func(RefNode *m)
 
     n = fs->define_identifier(m, m, "get_netresources", NODE_FUNC_N, 0);
     fs->define_native_func_a(n, get_netresources, 0, 0, NULL);
+
+    n = fs->define_identifier(m, m, "debug_log", NODE_FUNC_N, 0);
+    fs->define_native_func_a(n, output_debug_string, 1, 1, NULL, fs->cls_str);
+
+    n = fs->define_identifier(m, m, "cpio_tobytes", NODE_FUNC_N, 0);
+    fs->define_native_func_a(n, cpio_tobytes, 2, 2, NULL, fs->cls_str, fs->cls_int);
+    n = fs->define_identifier(m, m, "cpio_tostr", NODE_FUNC_N, 0);
+    fs->define_native_func_a(n, cpio_tostr, 2, 2, NULL, fs->cls_bytes, fs->cls_int);
 }
 
 static void define_class(RefNode *m)
@@ -780,6 +798,7 @@ static void define_class(RefNode *m)
     RefNode *n;
     RefNode *cls_regiter;
     RefNode *cls_oleenum;
+    RefNode *cls_codepageio;
 
     cls_oleobject = fs->define_identifier(m, m, "OLEObject", NODE_CLASS, 0);
     cls_oleenum = fs->define_identifier(m, m, "OLEEnumerator", NODE_CLASS, 0);
@@ -787,6 +806,7 @@ static void define_class(RefNode *m)
     cls_regiter = fs->define_identifier(m, m, "RegKeyIterator", NODE_CLASS, 0);
     cls_winfile = fs->define_identifier(m, m, "WinFile", NODE_CLASS, 0);
     cls_netresource = fs->define_identifier(m, m, "NetResource", NODE_CLASS, 0);
+    cls_codepageio = fs->define_identifier(m, m, "CodePageIO", NODE_CLASS, 0);
 
     cls = cls_oleobject;
     n = fs->define_identifier_p(m, cls, fs->str_new, NODE_NEW_N, 0);
@@ -912,6 +932,25 @@ static void define_class(RefNode *m)
     fs->define_native_func_a(n, netresource_get_shared_disks, 0, 0, NULL);
     cls->u.c.n_memb = INDEX_NETRESOURCE_NUM;
     fs->extends_method(cls, fs->cls_obj);
+
+
+    cls = cls_codepageio;
+    n = fs->define_identifier_p(m, cls, fs->str_new, NODE_NEW_N, 0);
+    fs->define_native_func_a(n, codepageio_new, 2, 2, cls_codepageio, fs->cls_streamio, fs->cls_int);
+
+    n = fs->define_identifier(m, cls, "gets", NODE_FUNC_N, 0);
+    fs->define_native_func_a(n, codepageio_gets, 0, 0, (void*)TEXTIO_M_GETS);
+    n = fs->define_identifier(m, cls, "getln", NODE_FUNC_N, 0);
+    fs->define_native_func_a(n, codepageio_gets, 0, 0, (void*)TEXTIO_M_GETLN);
+    n = fs->define_identifier(m, cls, "next", NODE_FUNC_N, 0);
+    fs->define_native_func_a(n, codepageio_gets, 0, 0, (void*)TEXTIO_M_NEXT);
+    n = fs->define_identifier(m, cls, "_write", NODE_FUNC_N, 0);
+    fs->define_native_func_a(n, codepageio_write, 0, -1, NULL);
+    n = fs->define_identifier(m, cls, "codepage", NODE_FUNC_N, NODEOPT_PROPERTY);
+    fs->define_native_func_a(n, codepageio_codepage, 0, 0, NULL);
+
+    cls->u.c.n_memb = INDEX_CODEPAGEIO_NUM;
+    fs->extends_method(cls, fs->cls_textio);
 
 
     cls = fs->define_identifier(m, m, "OLEError", NODE_CLASS, 0);

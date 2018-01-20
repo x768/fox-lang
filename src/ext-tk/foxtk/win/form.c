@@ -500,7 +500,7 @@ int window_message_loop()
 {
     MSG msg;
 
-    if (MsgWaitForMultipleObjectsEx(0, NULL, INFINITE, QS_ALLEVENTS|QS_ALLINPUT|QS_ALLPOSTMESSAGE, 0) == 0xFFFFFFFF) {
+    if (MsgWaitForMultipleObjectsEx(0, NULL, INFINITE, QS_ALLEVENTS|QS_ALLINPUT|QS_ALLPOSTMESSAGE, MWMO_ALERTABLE) == 0xFFFFFFFF) {
         fs->throw_errorf(fs->mod_lang, "InternalError", "MsgWaitForMultipleObjectsEx failed");
         return FALSE;
     }

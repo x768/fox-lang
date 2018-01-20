@@ -66,14 +66,6 @@ enum {
     INDEX_LOCALE_NUM,
 };
 
-// class TextIO
-enum {
-    INDEX_TEXTIO_STREAM,
-    INDEX_TEXTIO_TEXTIO,
-    INDEX_TEXTIO_NEWLINE,
-    INDEX_TEXTIO_NUM,
-};
-
 // class Entry
 enum {
     INDEX_ENTRY_KEY,
@@ -142,7 +134,6 @@ typedef struct
     RefNode *func_map_new;
     RefNode *func_range_new;
 
-    RefHeader *ref_textio_utf8;
     RefNode *refnode_sequence_hash;
     LocaleData *loc_neutral;
 
@@ -176,11 +167,10 @@ typedef struct
 /////////////////////////////////////////////////////////////////////////////////////
 
 #define FOX_VERSION_MAJOR    0
-#define FOX_VERSION_MINOR    20
+#define FOX_VERSION_MINOR    21
 #define FOX_VERSION_REVISION 0
 
 #define int32_hash(v) (((v) * 31) & INT32_MAX)
-#define Value_bytesio(val) ((RefBytesIO*)(uintptr_t)(Value_ref((val))->v[INDEX_TEXTIO_STREAM]))
 
 #ifdef DEFINE_GLOBALS
 #define extern
@@ -439,6 +429,7 @@ int stream_flush_sub(Value v);
 int stream_gets_sub(StrBuf *sb, Value v, int sep);
 int stream_gets_limit(Value v, char *p, int *psize);
 int stream_seek(Value v, int64_t offset);
+int stream_get_write_memio(Value v, Value *pmb, int *pmax);
 
 void init_io_module_stubs(void);
 void init_io_module_1(void);

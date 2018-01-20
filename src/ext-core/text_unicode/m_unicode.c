@@ -462,7 +462,7 @@ static int breakiter_next(Value *vret, Value *v, RefNode *node)
         src_begin = src_end;
         fs->utf8_next(&p, end);
         src_end = p - src->c;
-        
+
         ret = (src_begin < src_end);
         break;
     }
@@ -529,15 +529,9 @@ static int unicode_category(Value *vret, Value *v, RefNode *node)
             // 分離子
             "Zl" "Zp" "Zs";
 
-    RefStr *src = Value_vp(v[1]);
-
-    if (src->size > 0) {
-        int type = ch_get_category(fs->utf8_codepoint_at(src->c));
-        *vret = fs->cstr_Value(fs->cls_str, &type_name[type * 2], 2);
-    } else {
-        fs->throw_errorf(fs->mod_lang, "ValueError", "string length == 0");
-        return FALSE;
-    }
+    int code = Value_integral(v[1]);
+    int type = ch_get_category(code);
+    *vret = fs->cstr_Value(fs->cls_str, &type_name[type * 2], 2);
     return TRUE;
 }
 
@@ -897,7 +891,7 @@ static void define_func(RefNode *m)
     fs->define_native_func_a(n, breaks_split, 2, 3, (void*) TRUE, fs->cls_str, fs->cls_str, fs->cls_locale);
 
     n = fs->define_identifier(m, m, "char_category", NODE_FUNC_N, 0);
-    fs->define_native_func_a(n, unicode_category, 1, 1, NULL, fs->cls_str);
+    fs->define_native_func_a(n, unicode_category, 1, 1, NULL, fs->cls_char);
 
     n = fs->define_identifier(m, m, "normalize", NODE_FUNC_N, 0);
     fs->define_native_func_a(n, unicode_normalize, 2, 2, NULL, fs->cls_str, fs->cls_str);
@@ -943,7 +937,7 @@ void define_module(RefNode *m, const FoxStatic *a_fs, FoxGlobal *a_fg)
 const char *module_version(const FoxStatic *a_fs)
 {
     static char *buf = NULL;
-    
+
     if (a_fs->revision != FOX_INTERFACE_REVISION) {
         return NULL;
     }

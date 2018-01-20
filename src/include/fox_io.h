@@ -23,6 +23,16 @@ enum {
     INDEX_FILEIO_HANDLE = INDEX_STREAM_NUM,
     INDEX_FILEIO_NUM,
 };
+// class TextIO
+enum {
+    INDEX_TEXTIO_STREAM,
+    INDEX_TEXTIO_NUM,
+};
+// class Utf8IO
+enum {
+    INDEX_UTF8IO_TRANS = INDEX_TEXTIO_NUM,
+    INDEX_UTF8IO_NUM,
+};
 
 enum {
     STREAM_READ = 1,

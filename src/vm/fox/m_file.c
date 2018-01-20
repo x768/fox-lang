@@ -944,10 +944,10 @@ static int file_fopen(Value *vret, Value *v, RefNode *node)
         unref(tmp);
         return FALSE;
     }
-    ref = ref_new(fs->cls_textio);
+    ref = ref_new(fs->cls_utf8io);
     *vret = vp_Value(ref);
     ref->v[INDEX_TEXTIO_STREAM] = tmp;
-    ref->v[INDEX_TEXTIO_TEXTIO] = vp_Value(fv->ref_textio_utf8);
+    ref->v[INDEX_UTF8IO_TRANS] = VALUE_FALSE;
 
     return TRUE;
 }

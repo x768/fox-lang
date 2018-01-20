@@ -72,7 +72,7 @@ extern RefNode *mod_util;
 #undef extern
 #endif
 
-int load_hilight(Hilight *h, RefStr *type, int *result);
+int load_hilight(Hilight *h, RefStr *type);
 int hilight_code_next(HilightIter *it);
 
 

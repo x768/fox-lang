@@ -32,7 +32,7 @@ static const char *token_name[] = {
 
     "=", ")", "{", "}", "]", "(", "[", ",", ";", ".X", ".?X", "a=>",
 
-    "(Pragma)", "(Int)", "(Int)", "(Float)", "(Rational)", "(Str)", "(Bytes)", "(Regex)", "(Class)", "(var)", "(const)",
+    "(Pragma)", "(Int)", "(Int)", "(Float)", "(Rational)", "(Str)", "(Bytes)", "(Char)", "(Regex)", "(Class)", "(var)", "(const)",
     "(Str)", "(Str)", "(Str)", "(Str)",
 
     "abstract", "break", "case", "catch", "class", "continue", "def", "default", "else", "elif", "false",
@@ -760,11 +760,10 @@ static int parse_elem(OpBuf *buf, Block *bk, Tok *tk)
         OpBuf_add_op1(buf, OP_GET_LOCAL, 0);
         Tok_next(tk);
         break;
-    case TL_INT: {
+    case TL_INT:
         OpBuf_add_op2(buf, OP_LITERAL, 0, int32_Value(tk->int_val));
         Tok_next(tk);
         break;
-    }
     case TL_BIGINT: {
         RefInt *mp = buf_new(fs->cls_int, sizeof(RefInt));
         Value v = vp_Value(mp);
@@ -820,6 +819,10 @@ static int parse_elem(OpBuf *buf, Block *bk, Tok *tk)
         Tok_next(tk);
         break;
     }
+    case TL_CHAR:
+        OpBuf_add_op2(buf, OP_LITERAL, 0, integral_Value(fs->cls_char, tk->int_val));
+        Tok_next(tk);
+        break;
     case TT_TRUE:
         OpBuf_add_op2(buf, OP_LITERAL, 0, VALUE_TRUE);
         Tok_next(tk);
@@ -3204,6 +3207,13 @@ static int parse_class_statement(RefNode *module, Tok *tk, int abst)
                 name = Tok_intern(tk);
             } else {
                 name = fs->str_new;
+            }
+            if (abst) {
+                if (name->c[0] != '_') {
+                    throw_errorf(fs->mod_lang, "SyntaxError", "Abstract class allowed no public constructors");
+                    add_stack_trace(tk->module, NULL, tk->v.line);
+                    return FALSE;
+                }
             }
             nd = Node_define_tk(klass, tk, name, NODE_NEW);
             if (nd == NULL) {

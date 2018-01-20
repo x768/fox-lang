@@ -338,6 +338,7 @@ struct RefNode {
             int n_integral;
             int n_offset;
             int n_memb;
+            void *ext;
         } c;
         struct {     // Module
             Hash h;
@@ -429,6 +430,7 @@ struct FoxStatic
     RefNode *cls_str;
     RefNode *cls_bytes;
     RefNode *cls_regex;
+    RefNode *cls_char;
     RefNode *cls_range;
     RefNode *cls_list;
     RefNode *cls_map;
@@ -454,6 +456,7 @@ struct FoxStatic
     RefNode *cls_streamio;
     RefNode *cls_bytesio;
     RefNode *cls_textio;
+    RefNode *cls_utf8io;
 
     RefNode *cls_locale;
     RefNode *cls_resource;
@@ -579,6 +582,7 @@ struct FoxStatic
     int (*stream_seek_sub)(Value v, int64_t pos);
     int (*stream_flush_sub)(Value v);
     int (*stream_gets_sub)(StrBuf *sb, Value v, int sep);
+    int (*stream_get_write_memio)(Value v, Value *pmb, int *pmax);
 
     int (*get_loader_function)(RefNode **fn, const char *type_p, int type_size, const char *prefix, Hash *hash);
     int (*load_aliases_file)(Hash *ret, const char *filename);
@@ -614,7 +618,7 @@ struct FoxGlobal
     Value *stk_top;
 
     Value v_cio;
-    Value v_ctextio;
+    Value v_utf8_cio;
 
     Hash mod_root;
     Mem st_mem;   // 永続的

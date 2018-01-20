@@ -1017,7 +1017,7 @@ void BigInt_rsh(BigInt *bi, uint32_t sh)
 static void BigInt_inv(BigInt *a)
 {
     int i;
-    
+
     for (i = 0; i < a->size; i++) {
         a->d[i] = ~a->d[i];
     }
