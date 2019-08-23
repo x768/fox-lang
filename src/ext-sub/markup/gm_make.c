@@ -70,6 +70,9 @@ int make_genml_elem(Value *vret, Value cvt, GenML *gm, GenMLNode *node)
         *vret = vp_Value(ra);
         break;
     }
+    case GMLTYPE_NONE:
+        *vret = VALUE_NULL;
+        break;
     default:
         fs->fatal_errorf("GenML:make_genml_cmd unknown node type (%d)", node->type);
         return FALSE;

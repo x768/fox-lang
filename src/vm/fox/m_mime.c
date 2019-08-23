@@ -495,7 +495,7 @@ static int mimereader_new(Value *vret, Value *v, RefNode *node)
 
     *vret = vp_Value(r);
 
-    if (!value_to_streamio(src, v[1], FALSE, 0)) {
+    if (!value_to_streamio(src, v[1], FALSE, 0, TRUE)) {
         return FALSE;
     }
 
@@ -634,7 +634,7 @@ static int mimerandomreader_new(Value *vret, Value *v, RefNode *node)
 
     *vret = vp_Value(rm);
     rm->rh.type = cls_mimerandomreader;
-    if (!value_to_streamio(&reader, v[1], FALSE, 0)) {
+    if (!value_to_streamio(&reader, v[1], FALSE, 0, TRUE)) {
         return FALSE;
     }
     if (fg->stk_top > v + 4) {

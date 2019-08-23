@@ -388,7 +388,7 @@ static int zip_randomreader_new(Value *vret, Value *v, RefNode *node)
         tz = fs->get_local_tz();
     }
 
-    if (!fs->value_to_streamio(&reader, v1, FALSE, 0)) {
+    if (!fs->value_to_streamio(&reader, v1, FALSE, 0, FALSE)) {
         return FALSE;
     }
     if (!get_reader_file_size(&file_size, reader)) {
@@ -548,7 +548,7 @@ static int zipreader_new(Value *vret, Value *v, RefNode *node)
         tz = NULL;
     }
 
-    if (!fs->value_to_streamio(&reader, v[1], FALSE, 0)) {
+    if (!fs->value_to_streamio(&reader, v[1], FALSE, 0, FALSE)) {
         return FALSE;
     }
     r->v[INDEX_ZIPREADER_READER] = reader;
@@ -603,7 +603,7 @@ static int zipwriter_new(Value *vret, Value *v, RefNode *node)
     Ref *r = fs->ref_new(cls_zipwriter);
     *vret = vp_Value(r);
 
-    if (!fs->value_to_streamio(&writer, v[1], TRUE, 0)) {
+    if (!fs->value_to_streamio(&writer, v[1], TRUE, 0, FALSE)) {
         return FALSE;
     }
 

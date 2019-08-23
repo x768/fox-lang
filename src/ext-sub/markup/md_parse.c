@@ -1033,16 +1033,8 @@ static int parse_markdown_block(Markdown *r, MDTok *tk, MDNode **ppnode, int bq_
             MDTok_next_code(tk);
 
             {
-                RefStr *type = NULL;
-                if (node->cstr != NULL) {
-                    char cbuf[16];
-                    sprintf(cbuf, ".%.14s", node->cstr);
-                    // 拡張子->MimeType
-                    type = fs->mimetype_from_suffix(cbuf, -1);
-                }
-                if (!parse_markdown_code_block(r, tk, &node->child, type)) {
-                    return FALSE;
-                }
+                node->child = MDNode_new(MD_TEXT, r);
+                node->child->cstr = fs->str_dup_p(tk->val.p, tk->val.size, &r->mem);
             }
             MDTok_next(tk);
             break;

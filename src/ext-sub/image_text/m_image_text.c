@@ -160,7 +160,7 @@ static int ftfont_new(Value *vret, Value *v, RefNode *node)
 
     ft_initialize();
 
-    if (!fs->value_to_streamio(&r->v[FONT_INDEX_SRC], v[1], FALSE, 0)) {
+    if (!fs->value_to_streamio(&r->v[FONT_INDEX_SRC], v[1], FALSE, 0, FALSE)) {
         return FALSE;
     }
 

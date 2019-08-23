@@ -200,22 +200,27 @@ static int strio_gets(Value *vret, Value *v, RefNode *node)
     Ref *ref = Value_ref(*v);
     RefBytesIO *mb = Value_vp(ref->v[INDEX_TEXTIO_STREAM]);
     int gets_type = FUNC_INT(node);
+    const char *mbuf = mb->buf.p + mb->cur;
     int sz = mb->buf.size - mb->cur;
     int i;
 
     // sepの次まで読む
     for (i = 0; i < sz; i++) {
-        if (mb->buf.p[mb->cur + i] == '\n') {
+        if (mbuf[i] == '\n') {
             i++;
             break;
         }
     }
     if (i > 0) {
-        if (gets_type != TEXTIO_M_GETS) {
-            // 末尾の改行を取り除く
-            *vret = cstr_Value(fs->cls_str, mb->buf.p + mb->cur, i - i);
+        if (gets_type == TEXTIO_M_GETS) {
+            *vret = cstr_Value(fs->cls_str, mbuf, i);
         } else {
-            *vret = cstr_Value(fs->cls_str, mb->buf.p + mb->cur, i);
+            // 末尾の改行を取り除く
+            if (mbuf[i - 1] == '\n') {
+                *vret = cstr_Value(fs->cls_str, mbuf, i - 1);
+            } else {
+                *vret = cstr_Value(fs->cls_str, mbuf, i);
+            }
         }
     } else {
         if (gets_type == TEXTIO_M_NEXT) {

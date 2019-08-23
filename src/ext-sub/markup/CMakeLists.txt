@@ -7,7 +7,6 @@ add_library(m_markup SHARED
   md_make.c
   gm_parse.c
   gm_make.c
-  hilight.c
 )
 set_target_properties(m_markup
   PROPERTIES

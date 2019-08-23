@@ -717,6 +717,12 @@ static int lang_prop(Value *vret, Value *v, RefNode *node)
 #endif
     refmap_add_str(rm, "path_separator", vp_Value(intern(SEP_S, -1)));
 
+#ifdef DEBUGGER
+    refmap_add_str(rm, "debugger", VALUE_TRUE);
+#else
+    refmap_add_str(rm, "debugger", VALUE_FALSE);
+#endif
+
     switch (fs->running_mode) {
     case RUNNING_MODE_CL:
         refmap_add_str(rm, "mode", vp_Value(intern("CL", -1)));

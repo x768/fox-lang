@@ -1094,11 +1094,25 @@ static int resource_getstr(Value *vret, Value *v, RefNode *node)
     if (ps != NULL) {
         *vret = cstr_Value(fs->cls_str, ps->p, ps->size);
         return TRUE;
+    } else if (fg->stk_top > v + 2) {
+        *vret = Value_cp(v[2]);
+        return TRUE;
     } else {
         throw_errorf(fs->mod_lang, "IndexError", "Resource key %r not found", key);
         return FALSE;
     }
 
+    return TRUE;
+}
+/**
+ * 文字列をそのまま返す
+ */
+static int resource_has_key(Value *vret, Value *v, RefNode *node)
+{
+    RefResource *res = Value_vp(*v);
+    RefStr *key = Value_vp(v[1]);
+    Str *ps = Hash_get(&res->h, key->c, key->size);
+    *vret = bool_Value(ps != NULL);
     return TRUE;
 }
 
@@ -1304,6 +1318,10 @@ static void define_locale_class(RefNode *m)
     define_native_func_a(n, resource_getstr, 1, 1, NULL, fs->cls_str);
     n = define_identifier_p(m, cls, fs->symbol_stock[T_LB], NODE_FUNC_N, 0);
     define_native_func_a(n, resource_getstr, 1, 1, NULL, fs->cls_str);
+    n = define_identifier(m, cls, "has_key", NODE_FUNC_N, 0);
+    define_native_func_a(n, resource_has_key, 1, 1, NULL, fs->cls_str);
+    n = define_identifier(m, cls, "get", NODE_FUNC_N, 0);
+    define_native_func_a(n, resource_getstr, 2, 2, NULL, fs->cls_str, fs->cls_str);
     n = define_identifier(m, cls, "locale", NODE_FUNC_N, NODEOPT_PROPERTY);
     define_native_func_a(n, resource_locale, 0, 0, NULL);
 

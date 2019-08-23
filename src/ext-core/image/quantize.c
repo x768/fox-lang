@@ -171,7 +171,7 @@ static void median_cut(uint32_t *dist, QuantColor *qc, int *max_qc, int mode)
         double max_var = 1.0;
         QuantColor *q_div = NULL;
         QuantColor *q_idx;
-        int axis;
+        int axis = 0;
 
         for (i = 0; i < n_qc; i++) {
             QuantColor *q = &qc[i];

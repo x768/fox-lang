@@ -35,6 +35,7 @@ typedef struct {
 typedef struct {
     RefHeader rh;
 
+    int is_complex;
     int size;
     double d[0];
 } RefVector;
@@ -42,6 +43,7 @@ typedef struct {
 typedef struct {
     RefHeader rh;
 
+    int is_complex;
     int rows, cols;
     double d[0];
 } RefMatrix;

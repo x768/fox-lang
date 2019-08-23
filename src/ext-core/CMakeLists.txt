@@ -5,7 +5,6 @@ include(../library.cmake)
 
 set(DEST_DIR ../../../../fox/import)
 
-add_subdirectory(crypt)
 add_subdirectory(image)
 add_subdirectory(math)
 add_subdirectory(media)

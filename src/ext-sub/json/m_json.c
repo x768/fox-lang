@@ -3,6 +3,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <errno.h>
+#include <math.h>
 
 
 static const FoxStatic *fs;
@@ -391,7 +392,15 @@ static int json_encode_sub(StrBuf *buf, Value v, Mem *mem, Hash *hash, int mode,
         if (!fs->StrBuf_add_c(buf, '"')) {
             return FALSE;
         }
-    } else if (type == fs->cls_int || type == fs->cls_float) {
+    } else if (type == fs->cls_int) {
+        if (!fs->StrBuf_printf(buf, "%v", v)) {
+            return FALSE;
+        }
+    } else if (type == fs->cls_float) {
+        if (isinf(Value_float2(v))) {
+            fs->throw_errorf(mod_json, "JSONError", "Infinity is not allowed");
+            return FALSE;
+        }
         if (!fs->StrBuf_printf(buf, "%v", v)) {
             return FALSE;
         }

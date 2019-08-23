@@ -248,16 +248,3 @@ void pipeio_close_sub(RefProcessHandle *ph)
         ph->fd_err = -1;
     }
 }
-
-RefCharset *get_local_codepage()
-{
-    char buf[32];
-    RefCharset *cs;
-
-    sprintf(buf, "CP%d", GetACP());
-    cs = fs->get_charset_from_name(buf, -1);
-    if (cs == NULL) {
-        cs = fs->cs_utf8;
-    }
-    return cs;
-}

@@ -1131,7 +1131,7 @@ static int image_load(Value *vret, Value *v, RefNode *node)
     Value reader;
     RefStr *type = NULL;
 
-    if (!fs->value_to_streamio(&reader, v[1], FALSE, 0)) {
+    if (!fs->value_to_streamio(&reader, v[1], FALSE, 0, FALSE)) {
         return FALSE;
     }
     if (fg->stk_top > v + 2) {
@@ -1198,7 +1198,7 @@ static int image_save(Value *vret, Value *v, RefNode *node)
         param = v[3];
     }
 
-    if (!fs->value_to_streamio(&writer, v1, TRUE, 0)) {
+    if (!fs->value_to_streamio(&writer, v1, TRUE, 0, FALSE)) {
         return FALSE;
     }
 

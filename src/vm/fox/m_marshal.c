@@ -49,7 +49,7 @@ static int marshal_load(Value *vret, Value *v, RefNode *node)
 {
     Value reader;
 
-    if (!value_to_streamio(&reader, v[1], FALSE, 0)) {
+    if (!value_to_streamio(&reader, v[1], FALSE, 0, FALSE)) {
         return FALSE;
     }
     if (!validate_fox_object(reader)) {
@@ -72,7 +72,7 @@ static int marshal_save(Value *vret, Value *v, RefNode *node)
 {
     Value writer;
 
-    if (!value_to_streamio(&writer, v[1], TRUE, 0)) {
+    if (!value_to_streamio(&writer, v[1], TRUE, 0, FALSE)) {
         return FALSE;
     }
     stream_write_data(writer, FOX_OBJECT_MAGIC, FOX_OBJECT_MAGIC_SIZE);

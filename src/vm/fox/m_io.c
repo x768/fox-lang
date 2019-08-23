@@ -21,7 +21,7 @@ static RefStr *str__close;
 
 
 
-int value_to_streamio(Value *stream, Value v, int writemode, int argn)
+int value_to_streamio(Value *stream, Value v, int writemode, int argn, int accept_textio)
 {
     RefNode *v_type = Value_type(v);
     if (v_type == fs->cls_str || v_type == fs->cls_file) {
@@ -39,8 +39,15 @@ int value_to_streamio(Value *stream, Value v, int writemode, int argn)
     } else if (is_subclass(v_type, fs->cls_streamio)) {
         // foxのstreamから読み込む
         *stream = Value_cp(v);
+    } else if (accept_textio && is_subclass(v_type, fs->cls_textio)) {
+        Ref *ref = Value_ref(v);
+        *stream = Value_cp(ref->v[INDEX_TEXTIO_STREAM]);
     } else {
-        throw_errorf(fs->mod_lang, "TypeError", "Str, File or StreamIO required but %n (argument #%d)", v_type, argn + 1);
+        if (accept_textio) {
+            throw_errorf(fs->mod_lang, "TypeError", "Str, File, StreamIO or TextIO required but %n (argument #%d)", v_type, argn + 1);
+        } else {
+            throw_errorf(fs->mod_lang, "TypeError", "Str, File or StreamIO required but %n (argument #%d)", v_type, argn + 1);
+        }
         return FALSE;
     }
     return TRUE;
@@ -532,6 +539,14 @@ int stream_gets_sub(StrBuf *sb, Value v, int sep)
     r->v[INDEX_READ_CUR] = int32_Value(cur);
     r->v[INDEX_READ_MAX] = int32_Value(max);
 
+    return TRUE;
+}
+/**
+ * 16bit文字 sep_u,sep_l が出現するか最後まで読む
+ * sb : 文字 sep_u,sep_l を含んだ1行を追加して返す or NULL
+ */
+int stream_gets_sub16(StrBuf *sb, Value v, int sep_u, int sep_l)
+{
     return TRUE;
 }
 static int stream_read(Value *vret, Value *v, RefNode *node)

@@ -88,6 +88,17 @@ enum {
     VALUE_CMP_ERROR,
 };
 
+enum {
+    ROUND_ERR,
+    ROUND_DOWN,
+    ROUND_UP,
+    ROUND_FLOOR,
+    ROUND_CEILING,
+    ROUND_HALF_DOWN,
+    ROUND_HALF_UP,
+    ROUND_HALF_EVEN,
+};
+
 /////////////////////////////////////////////////////////////////////////////////////
 
 typedef void (*FoxModuleDefine)(RefNode *m, const FoxStatic *fs, FoxGlobal *fg);
@@ -167,7 +178,7 @@ typedef struct
 /////////////////////////////////////////////////////////////////////////////////////
 
 #define FOX_VERSION_MAJOR    0
-#define FOX_VERSION_MINOR    21
+#define FOX_VERSION_MINOR    22
 #define FOX_VERSION_REVISION 0
 
 #define int32_hash(v) (((v) * 31) & INT32_MAX)
@@ -407,7 +418,7 @@ void init_file_module_1(void);
 
 // m_io.c
 char *file_value_to_path(Str *ret, Value v, int argn);
-int value_to_streamio(Value *stream, Value v, int writemode, int argn);
+int value_to_streamio(Value *stream, Value v, int writemode, int argn, int accept_textio);
 
 RefBytesIO *bytesio_new_sub(const char *src, int size);
 int bytesio_gets_sub(Str *result, Value v);
@@ -427,6 +438,7 @@ int stream_write_uint32(Value w, uint32_t val);
 
 int stream_flush_sub(Value v);
 int stream_gets_sub(StrBuf *sb, Value v, int sep);
+int stream_gets_sub16(StrBuf *sb, Value v, int sep_u, int sep_l);
 int stream_gets_limit(Value v, char *p, int *psize);
 int stream_seek(Value v, int64_t offset);
 int stream_get_write_memio(Value v, Value *pmb, int *pmax);
@@ -496,6 +508,14 @@ char *frac_tostr_sub(int sign, BigInt *mi, BigInt *rem, int width_f);
 void define_lang_number_func(RefNode *m);
 void define_lang_number_class(RefNode *m);
 
+// m_number_str.c
+int parse_round_mode(RefStr *rs);
+int integer_tostr(Value *vret, Value *v, RefNode *node);
+int frac_tostr(Value *vret, Value *v, RefNode *node);
+int float_tostr(Value *vret, Value *v, RefNode *node);
+int char_tostr(Value *vret, Value *v, RefNode *node);
+int base58encode(Value *vret, Value *v, RefNode *node);
+int base58decode(Value *vret, Value *v, RefNode *node);
 
 // m_str.c
 int string_format_sub(Value *v, Str src, const char *fmt_p, int fmt_size, int utf8);

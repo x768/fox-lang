@@ -560,7 +560,7 @@ struct FoxStatic
     void (*fatal_errorf)(const char *msg, ...);
     void (*throw_stopiter)(void);
     char *(*file_value_to_path)(Str *ret, Value v, int argn);
-    int (*value_to_streamio)(Value *stream, Value v, int writemode, int argn);
+    int (*value_to_streamio)(Value *stream, Value v, int writemode, int argn, int accept_textio);
     void (*get_random)(void *buf, int len);
     void (*fix_bigint)(Value *v, BigInt *bi);
 
@@ -582,6 +582,7 @@ struct FoxStatic
     int (*stream_seek_sub)(Value v, int64_t pos);
     int (*stream_flush_sub)(Value v);
     int (*stream_gets_sub)(StrBuf *sb, Value v, int sep);
+    int (*stream_gets_sub16)(StrBuf *sb, Value v, int sep_u, int sep_l);
     int (*stream_get_write_memio)(Value v, Value *pmb, int *pmax);
 
     int (*get_loader_function)(RefNode **fn, const char *type_p, int type_size, const char *prefix, Hash *hash);

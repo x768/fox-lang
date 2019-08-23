@@ -149,6 +149,7 @@ void init_so_func(void)
     fs->stream_seek_sub = stream_seek;
     fs->stream_flush_sub = stream_flush_sub;
     fs->stream_gets_sub = stream_gets_sub;
+    fs->stream_gets_sub16 = stream_gets_sub16;
     fs->stream_get_write_memio = stream_get_write_memio;
 
     fs->get_local_tz = get_local_tz;

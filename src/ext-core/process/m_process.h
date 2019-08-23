@@ -39,7 +39,6 @@ extern FoxGlobal *fg;
 #undef extern
 #endif
 
-
 int process_new_sub(RefProcessHandle *ph, int create_pipe, const char *path, char **argv, int flags);
 int process_wait_sub(RefProcessHandle *ph);
 int is_process_terminated(RefProcessHandle *ph);
@@ -47,7 +46,5 @@ void process_close_sub(RefProcessHandle *ph);
 void pipeio_close_sub(RefProcessHandle *ph);
 int read_pipe(RefProcessHandle *ph, char *data, int data_size);
 void write_pipe(RefProcessHandle *ph, const char *data, int data_size);
-
-RefCharset *get_local_codepage(void);
 
 #endif /* M_PROCESS_H_INCLUDED */

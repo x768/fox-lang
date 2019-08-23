@@ -176,9 +176,6 @@ MDNode *MDNode_new(int type, Markdown *md);
 int parse_markdown(Markdown *md, const char *p);
 int link_markdown(Ref *r);
 
-// hilight.c
-int parse_markdown_code_block(Markdown *md, MDTok *tk, MDNode **ppnode, RefStr *type);
-
 // md_make.c
 Ref *xmlelem_new(const char *name);
 int xml_from_markdown(Ref *root, Markdown *md, MDNode *node);

@@ -1,0 +1,15 @@
+import util.assert
+
+let s = StrIO()
+
+s.print "hello"
+s.puts ", world"
+
+assert_equal s.data, "hello, world\n"
+assert_equal s.size, 13
+
+s.printf "size=%0", s.size
+
+assert_equal s.getln(), "hello, world"
+assert_equal s.getln(), "size=13"
+

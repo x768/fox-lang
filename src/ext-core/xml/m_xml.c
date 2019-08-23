@@ -1023,7 +1023,7 @@ static int xml_node_save(Value *vret, Value *v, RefNode *node)
     Value writer;
 
     writer = VALUE_NULL;
-    if (!fs->value_to_streamio(&writer, v[1], TRUE, 0)) {
+    if (!fs->value_to_streamio(&writer, v[1], TRUE, 0, TRUE)) {
         return FALSE;
     }
 
@@ -1091,49 +1091,10 @@ static int xml_elem_new_add_value(RefArray *ra, Value e, int pos)
     }
     return TRUE;
 }
-static int xml_elem_new(Value *vret, Value *v, RefNode *node)
+static int xml_elem_refarray(RefArray *ra, Value *v, Value *vtop, int pos)
 {
-    RefArray *ra;
-    int pos = 2;
-    RefStr *rs_name = Value_vp(v[1]);
-    Ref *r = fs->ref_new(cls_elem);
-    *vret = vp_Value(r);
-
-    if (!is_valid_elem_name(rs_name->c, rs_name->size)) {
-        fs->throw_errorf(fs->mod_lang, "ValueError", "Invalid element name %Q", Str_new(rs_name->c, rs_name->size));
-        return FALSE;
-    }
-
-    r->v[INDEX_ELEM_NAME] = fs->Value_cp(v[1]);
-
-    ra = fs->refarray_new(0);
     ra->rh.type = cls_nodelist;
-    r->v[INDEX_ELEM_CHILDREN] = vp_Value(ra);
 
-    if (v + 2 < fg->stk_top && fs->Value_type(v[2]) == fs->cls_map) {
-        int i;
-        Value pv = v[2];
-        RefMap *map = Value_vp(pv);
-        RefMap *rm_dst = fs->refmap_new(0);
-        r->v[INDEX_ELEM_ATTR] = vp_Value(rm_dst);
-
-        for (i = 0; i < map->entry_num; i++) {
-            HashValueEntry *ep;
-            for (ep = map->entry[i]; ep != NULL; ep = ep->next) {
-                HashValueEntry *ve;
-                if (fs->Value_type(ep->key) != fs->cls_str || fs->Value_type(ep->val) != fs->cls_str) {
-                    fs->throw_errorf(fs->mod_lang, "TypeError", "Argument #2 must be map of {str:str, str:str ...}");
-                    return FALSE;
-                }
-                ve = fs->refmap_add(rm_dst, ep->key, TRUE, FALSE);
-                if (ve == NULL) {
-                    return FALSE;
-                }
-                ve->val = fs->Value_cp(ep->val);
-            }
-        }
-        pos = 3;
-    }
     for (; v + pos < fg->stk_top; pos++) {
         Value e = v[pos];
         RefNode *v_type = fs->Value_type(e);
@@ -1191,8 +1152,51 @@ static int xml_elem_new(Value *vret, Value *v, RefNode *node)
             fs->unref(iter);
         }
     }
-
     return TRUE;
+}
+static int xml_elem_new(Value *vret, Value *v, RefNode *node)
+{
+    RefArray *ra;
+    int pos = 2;
+    RefStr *rs_name = Value_vp(v[1]);
+    Ref *r = fs->ref_new(cls_elem);
+    *vret = vp_Value(r);
+
+    if (!is_valid_elem_name(rs_name->c, rs_name->size)) {
+        fs->throw_errorf(fs->mod_lang, "ValueError", "Invalid element name %Q", Str_new(rs_name->c, rs_name->size));
+        return FALSE;
+    }
+
+    r->v[INDEX_ELEM_NAME] = fs->Value_cp(v[1]);
+
+    ra = fs->refarray_new(0);
+    r->v[INDEX_ELEM_CHILDREN] = vp_Value(ra);
+
+    if (v + 2 < fg->stk_top && fs->Value_type(v[2]) == fs->cls_map) {
+        int i;
+        Value pv = v[2];
+        RefMap *map = Value_vp(pv);
+        RefMap *rm_dst = fs->refmap_new(0);
+        r->v[INDEX_ELEM_ATTR] = vp_Value(rm_dst);
+
+        for (i = 0; i < map->entry_num; i++) {
+            HashValueEntry *ep;
+            for (ep = map->entry[i]; ep != NULL; ep = ep->next) {
+                HashValueEntry *ve;
+                if (fs->Value_type(ep->key) != fs->cls_str || fs->Value_type(ep->val) != fs->cls_str) {
+                    fs->throw_errorf(fs->mod_lang, "TypeError", "Argument #2 must be map of {str:str, str:str ...}");
+                    return FALSE;
+                }
+                ve = fs->refmap_add(rm_dst, ep->key, TRUE, FALSE);
+                if (ve == NULL) {
+                    return FALSE;
+                }
+                ve->val = fs->Value_cp(ep->val);
+            }
+        }
+        pos = 3;
+    }
+    return xml_elem_refarray(ra, v, fg->stk_top, pos);
 }
 static int xml_elem_parse(Value *vret, Value *v, RefNode *node)
 {
@@ -1573,7 +1577,7 @@ static int xml_elem_attr(Value *vret, Value *v, RefNode *node)
 /**
  * xmlのテキスト部分を抽出
  */
-static int node_text_xml(StrBuf *buf, Value v)
+static int node_text_xml(StrBuf *buf, Value v, int wrap)
 {
     RefNode *type = fs->Value_type(v);
 
@@ -1584,10 +1588,18 @@ static int node_text_xml(StrBuf *buf, Value v)
     } else if (type == cls_elem) {
         Ref *r = Value_ref(v);
         RefArray *ra = Value_vp(r->v[INDEX_ELEM_CHILDREN]);
+        RefStr *tagname = Value_vp(r->v[INDEX_ELEM_NAME]);
         int i;
         for (i = 0; i < ra->size; i++) {
-            if (!node_text_xml(buf, ra->p[i])) {
+            if (!node_text_xml(buf, ra->p[i], wrap)) {
                 return FALSE;
+            }
+        }
+        if (wrap) {
+            if (get_tag_type_icase(tagname->c, tagname->size) == TTYPE_BLOCK) {
+                if (!fs->StrBuf_add_c(buf, '\n')) {
+                    return FALSE;
+                }
             }
         }
     }
@@ -1596,19 +1608,20 @@ static int node_text_xml(StrBuf *buf, Value v)
 static int xml_node_text(Value *vret, Value *v, RefNode *node)
 {
     StrBuf buf;
+    int wrap = FUNC_INT(node);
 
     fs->StrBuf_init_refstr(&buf, 0);
     if (fs->Value_type(*v) == cls_nodelist) {
         RefArray *ra = Value_vp(*v);
         int i;
         for (i = 0; i < ra->size; i++) {
-            if (!node_text_xml(&buf, ra->p[i])) {
+            if (!node_text_xml(&buf, ra->p[i], wrap)) {
                 StrBuf_close(&buf);
                 return FALSE;
             }
         }
     } else {
-        if (!node_text_xml(&buf, *v)) {
+        if (!node_text_xml(&buf, *v, wrap)) {
             StrBuf_close(&buf);
             return FALSE;
         }
@@ -1699,6 +1712,15 @@ static int xml_comment_new(Value *vret, Value *v, RefNode *node)
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////
 
+static int xml_node_list_new(Value *vret, Value *v, RefNode *node)
+{
+    RefArray *ra = fs->refarray_new(0);
+    if (!xml_elem_refarray(ra, v, fg->stk_top, 1)) {
+        return FALSE;
+    }
+    *vret = vp_Value(ra);
+    return TRUE;
+}
 static int xml_node_list_css(Value *vret, Value *v, RefNode *node)
 {
     RefArray *ra = Value_vp(*v);
@@ -2014,7 +2036,7 @@ static int xml_document_save(Value *vret, Value *v, RefNode *node)
     Value writer;
 
     writer = VALUE_NULL;
-    if (!fs->value_to_streamio(&writer, v[1], TRUE, 0)) {
+    if (!fs->value_to_streamio(&writer, v[1], TRUE, 0, TRUE)) {
         return FALSE;
     }
 
@@ -2141,15 +2163,19 @@ static void define_class(RefNode *m)
     fs->extends_method(cls, fs->cls_obj);
 
 
-    // XMLRefNodeList
+    // XMLNodeList
     cls = cls_nodelist;
+    n = fs->define_identifier_p(m, cls, fs->str_new, NODE_NEW_N, 0);
+    fs->define_native_func_a(n, xml_node_list_new, 1, 1, NULL, fs->cls_list);
     n = fs->define_identifier_p(m, cls, fs->str_dtor, NODE_FUNC_N, 0);
     fs->define_native_func_a(n, get_function_ptr(fs->cls_list, fs->str_dtor), 0, 0, NULL);
 
     n = fs->define_identifier_p(m, cls, fs->str_tostr, NODE_FUNC_N, 0);
     fs->define_native_func_a(n, xml_node_tostr, 0, 2, (void*)FALSE, fs->cls_str, fs->cls_locale);
     n = fs->define_identifier(m, cls, "as_text", NODE_FUNC_N, NODEOPT_PROPERTY);
-    fs->define_native_func_a(n, xml_node_text, 0, 0, NULL);
+    fs->define_native_func_a(n, xml_node_text, 0, 0, (void*)FALSE);
+    n = fs->define_identifier(m, cls, "as_text_wrap", NODE_FUNC_N, NODEOPT_PROPERTY);
+    fs->define_native_func_a(n, xml_node_text, 0, 0, (void*)TRUE);
     n = fs->define_identifier(m, cls, "as_xml", NODE_FUNC_N, NODEOPT_PROPERTY);
     fs->define_native_func_a(n, xml_node_tostr, 0, 0, (void*)FALSE);
     n = fs->define_identifier(m, cls, "as_html", NODE_FUNC_N, NODEOPT_PROPERTY);
@@ -2187,7 +2213,9 @@ static void define_class(RefNode *m)
     n = fs->define_identifier_p(m, cls, fs->str_tostr, NODE_FUNC_N, 0);
     fs->define_native_func_a(n, xml_node_tostr, 0, 2, (void*)FALSE, fs->cls_str, fs->cls_locale);
     n = fs->define_identifier(m, cls, "as_text", NODE_FUNC_N, NODEOPT_PROPERTY);
-    fs->define_native_func_a(n, xml_node_text, 0, 0, NULL);
+    fs->define_native_func_a(n, xml_node_text, 0, 0, (void*)FALSE);
+    n = fs->define_identifier(m, cls, "as_text_wrap", NODE_FUNC_N, NODEOPT_PROPERTY);
+    fs->define_native_func_a(n, xml_node_text, 0, 0, (void*)TRUE);
     n = fs->define_identifier(m, cls, "as_xml", NODE_FUNC_N, NODEOPT_PROPERTY);
     fs->define_native_func_a(n, xml_node_tostr, 0, 0, (void*)FALSE);
     n = fs->define_identifier(m, cls, "as_html", NODE_FUNC_N, NODEOPT_PROPERTY);

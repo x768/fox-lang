@@ -26,6 +26,7 @@ enum {
     GET_MINUTE,
     GET_SECOND,
     GET_MILLISEC,
+    GET_ERR,
 };
 enum {
     PARSE_ABS,
@@ -1349,6 +1350,122 @@ static int timestamp_rfc2822(Value *vret, Value *v, RefNode *node)
 
     return TRUE;
 }
+static int parse_time_resolution(RefStr *rs)
+{
+    if (rs->size == 1) {
+        switch (rs->c[0]) {
+        case 'y':
+            return GET_YEAR;
+        case 'M':
+            return GET_MONTH;
+        case 'w':
+            return GET_DAY_OF_WEEK;
+        case 'd':
+            return GET_DAY_OF_MONTH;
+        case 'h':
+            return GET_HOUR;
+        case 'm':
+            return GET_MINUTE;
+        case 's':
+            return GET_SECOND;
+        case 'f':
+            return GET_MILLISEC;
+        }
+    } if (str_eqi(rs->c, rs->size, "year", 4)) {
+        return GET_YEAR;
+    } else if (str_eqi(rs->c, rs->size, "month", 5)) {
+        return GET_MONTH;
+    } else if (str_eqi(rs->c, rs->size, "week", 4)) {
+        return GET_DAY_OF_WEEK;
+    } else if (str_eqi(rs->c, rs->size, "day", 3)) {
+        return GET_DAY_OF_MONTH;
+    } else if (str_eqi(rs->c, rs->size, "hour", 4)) {
+        return GET_HOUR;
+    } else if (str_eqi(rs->c, rs->size, "minute", 6)) {
+        return GET_MINUTE;
+    } else if (str_eqi(rs->c, rs->size, "second", 6)) {
+        return GET_SECOND;
+    } else if (str_eqi(rs->c, rs->size, "ms", 6)) {
+        return GET_MILLISEC;
+    }
+    return GET_ERR;
+}
+static int timestamp_round(Value *vret, Value *v, RefNode *node)
+{
+    RefInt64 *src = Value_vp(*v);
+    RefInt64 *dst;
+    int round_mode = parse_round_mode(Value_vp(v[1]));
+    int64_t resol = 0;
+    int64_t src_i = src->u.i;
+    int sign = 1;
+
+    if (src_i < 0) {
+        src_i = -src_i;
+        sign = -1;
+    }
+
+    if (round_mode == ROUND_ERR || round_mode == ROUND_FLOOR || round_mode == ROUND_CEILING || round_mode == ROUND_HALF_EVEN) {
+        throw_errorf(fs->mod_lang, "ValueError", "Unknown round mode %v", v[1]);
+        return FALSE;
+    }
+    switch (parse_time_resolution(Value_vp(v[2]))) {
+    case GET_DAY_OF_MONTH:
+        resol = MSECS_PER_DAY;
+        break;
+    case GET_HOUR:
+        resol = MSECS_PER_HOUR;
+        break;
+    case GET_MINUTE:
+        resol = MSECS_PER_MINUTE;
+        break;
+    case GET_SECOND:
+        resol = MSECS_PER_SECOND;
+        break;
+    case GET_MILLISEC:
+        resol = 1;
+        break;
+    default:
+        throw_errorf(fs->mod_lang, "ValueError", "Unknown mode %v", v[2]);
+        return FALSE;
+    }
+    if (sign < 0) {
+        switch (round_mode) {
+        case ROUND_DOWN:
+            round_mode = ROUND_UP;
+            break;
+        case ROUND_UP:
+            round_mode = ROUND_DOWN;
+            break;
+        case ROUND_HALF_DOWN:
+            round_mode = ROUND_HALF_UP;
+            break;
+        case ROUND_HALF_UP:
+            round_mode = ROUND_HALF_DOWN;
+            break;
+        }
+    }
+    if (resol > 1) {
+        switch (round_mode) {
+        case ROUND_DOWN:
+            src_i = src_i / resol * resol;
+            break;
+        case ROUND_UP:
+            src_i = (src_i + resol - 1) / resol * resol;
+            break;
+        case ROUND_HALF_DOWN:
+            src_i = (src_i + resol / 2 - 1) / resol * resol;
+            break;
+        case ROUND_HALF_UP:
+            src_i = (src_i + resol / 2) / resol * resol;
+            break;
+        }
+    }
+    dst = buf_new(fs->cls_timestamp, sizeof(RefInt64));
+    dst->u.i = src_i * sign;
+    *vret = vp_Value(dst);
+
+    return TRUE;
+}
 static int timestamp_tostr(Value *vret, Value *v, RefNode *node)
 {
     if (fg->stk_top > v + 1) {
@@ -1404,6 +1521,7 @@ int timedelta_parse_string(double *ret, const char *src_p, int src_size)
     if (src_size < 0) {
         src_size = strlen(src_p);
     }
+    dt.rh.type = cls_timedelta;
 
     DateTime_init(&dt.d, &dt.t);
     dt.d.day_of_month = 0;
@@ -1543,6 +1661,38 @@ static int format_get_leading_chars(const char *s_p, int s_size, int *pi, int ch
     *pi = i;
     return i - init;
 }
+static void print_leading_zero(StrBuf *sb, int width, int64_t val)
+{
+    char cbuf[24];
+    char *dst;
+    char *p;
+
+    p = cbuf;
+    while (val > 0) {
+        *p++ = '0' + (val % 10);
+        val /= 10;
+    }
+    *p = '\0';
+    if (width > (int)(p - cbuf)) {
+        int leading_zero = width - (p - cbuf);
+        int i;
+
+        StrBuf_alloc(sb, sb->size + width);
+        dst = sb->p + sb->size - width;
+        for (i = 0; i < leading_zero; i++) {
+            *dst++ = '0';
+        }
+        dst = sb->p + sb->size - 1;
+    } else {
+        StrBuf_alloc(sb, sb->size + (p - cbuf));
+        dst = sb->p + sb->size - 1;
+    }
+
+    p = cbuf;
+    while (*p != '\0') {
+        *dst-- = *p++;
+    }
+}
 static void timedelta_tostr_sub(StrBuf *sbuf, const char *fmt_p, int fmt_size, int64_t diff_src)
 {
     enum {
@@ -1553,7 +1703,6 @@ static void timedelta_tostr_sub(StrBuf *sbuf, const char *fmt_p, int fmt_size, i
     int sign = 1;
     int width;
     int64_t diff;
-    char cbuf[48];
     int i = 0;
 
     if (fmt_size < 0) {
@@ -1585,60 +1734,52 @@ static void timedelta_tostr_sub(StrBuf *sbuf, const char *fmt_p, int fmt_size, i
             StrBuf_add_c(sbuf, sign < 0 ? '-' : ' ');
             i++;
             break;
+        case 'D':
         case 'd':
             width = format_get_leading_chars(fmt_p, fmt_size, &i, 'd', MAX_DIGIT);
-            sprintf(cbuf, "%0*d", width, day);
-            StrBuf_add(sbuf, cbuf, -1);
+            print_leading_zero(sbuf, width, day);
             break;
         case 'h':
             width = format_get_leading_chars(fmt_p, fmt_size, &i, 'h', 2);
-            sprintf(cbuf, "%0*d", width, hour);
-            StrBuf_add(sbuf, cbuf, -1);
+            print_leading_zero(sbuf, width, hour);
             break;
         case 'm':
             width = format_get_leading_chars(fmt_p, fmt_size, &i, 'm', 2);
-            sprintf(cbuf, "%0*d", width, minute);
-            StrBuf_add(sbuf, cbuf, -1);
+            print_leading_zero(sbuf, width, minute);
             break;
         case 's':
             width = format_get_leading_chars(fmt_p, fmt_size, &i, 's', 2);
-            sprintf(cbuf, "%0*d", width, second);
-            StrBuf_add(sbuf, cbuf, -1);
+            print_leading_zero(sbuf, width, second);
             break;
         case 't':
             width = format_get_leading_chars(fmt_p, fmt_size, &i, 't', 3);
             switch (width) {
             case 1:
-                sprintf(cbuf, "%d", millisec / 100);
+                print_leading_zero(sbuf, 1, millisec / 100);
                 break;
             case 2:
-                sprintf(cbuf, "%02d", millisec / 10);
+                print_leading_zero(sbuf, 2, millisec / 10);
                 break;
             case 3:
-                sprintf(cbuf, "%03d", millisec);
+                print_leading_zero(sbuf, 3, millisec);
                 break;
             }
-            StrBuf_add(sbuf, cbuf, -1);
             break;
         case 'H':
             width = format_get_leading_chars(fmt_p, fmt_size, &i, 'H', MAX_DIGIT);
-            sprintf(cbuf, "%0*" FMT_INT64_PREFIX "d", width, diff_src / 3600000LL);
-            StrBuf_add(sbuf, cbuf, -1);
+            print_leading_zero(sbuf, width, diff_src / 3600000LL);
             break;
         case 'M':
             width = format_get_leading_chars(fmt_p, fmt_size, &i, 'M', MAX_DIGIT);
-            sprintf(cbuf, "%0*" FMT_INT64_PREFIX "d", width, diff_src / 60000LL);
-            StrBuf_add(sbuf, cbuf, -1);
+            print_leading_zero(sbuf, width, diff_src / 60000LL);
             break;
         case 'S':
             width = format_get_leading_chars(fmt_p, fmt_size, &i, 'S', MAX_DIGIT);
-            sprintf(cbuf, "%0*" FMT_INT64_PREFIX "d", width, diff_src / 1000LL);
-            StrBuf_add(sbuf, cbuf, -1);
+            print_leading_zero(sbuf, width, diff_src / 1000LL);
             break;
         case 'T':
             width = format_get_leading_chars(fmt_p, fmt_size, &i, 'T', MAX_DIGIT);
-            sprintf(cbuf, "%0*" FMT_INT64_PREFIX "d", width, (long long int)diff_src);
-            StrBuf_add(sbuf, cbuf, -1);
+            print_leading_zero(sbuf, width, diff_src);
             break;
         case '\'': // '任意の文字列'
             i++;
@@ -1690,6 +1831,79 @@ static int timedelta_tostr(Value *vret, Value *v, RefNode *node)
         timedelta_tostr_sub(&buf, "'TimeDelta'(+d, hh:mm:ss.ttt)", -1, diff);
     }
     *vret = StrBuf_str_Value(&buf, fs->cls_str);
+
+    return TRUE;
+}
+static int timedelta_round(Value *vret, Value *v, RefNode *node)
+{
+    double src = Value_float2(*v);
+    int round_mode = parse_round_mode(Value_vp(v[1]));
+    double resol = 0.0;
+    double src_d = src;
+    int sign = 1;
+
+    if (src_d < 0.0) {
+        src_d = -src_d;
+        sign = -1;
+    }
+
+    if (round_mode == ROUND_ERR || round_mode == ROUND_FLOOR || round_mode == ROUND_CEILING) {
+        throw_errorf(fs->mod_lang, "ValueError", "Unknown round mode %v", v[1]);
+        return FALSE;
+    }
+    if (round_mode == ROUND_HALF_DOWN || round_mode == ROUND_HALF_EVEN) {
+        round_mode = ROUND_HALF_UP;
+    }
+    switch (parse_time_resolution(Value_vp(v[2]))) {
+    case GET_DAY_OF_MONTH:
+        resol = MSECS_PER_DAY;
+        break;
+    case GET_HOUR:
+        resol = MSECS_PER_HOUR;
+        break;
+    case GET_MINUTE:
+        resol = MSECS_PER_MINUTE;
+        break;
+    case GET_SECOND:
+        resol = MSECS_PER_SECOND;
+        break;
+    case GET_MILLISEC:
+        resol = 1;
+        break;
+    default:
+        throw_errorf(fs->mod_lang, "ValueError", "Unknown mode %v", v[2]);
+        return FALSE;
+    }
+    if (sign < 0) {
+        switch (round_mode) {
+        case ROUND_DOWN:
+            round_mode = ROUND_UP;
+            break;
+        case ROUND_UP:
+            round_mode = ROUND_DOWN;
+            break;
+        case ROUND_HALF_DOWN:
+            round_mode = ROUND_HALF_UP;
+            break;
+        case ROUND_HALF_UP:
+            round_mode = ROUND_HALF_DOWN;
+            break;
+        }
+    }
+    if (resol > 0.0) {
+        switch (round_mode) {
+        case ROUND_DOWN:
+            src_d = floor(src_d / resol) * resol;
+            break;
+        case ROUND_UP:
+            src_d = ceil(src_d / resol) * resol;
+            break;
+        case ROUND_HALF_UP:
+            src_d = floor((src_d + resol / 2) / resol) * resol;
+            break;
+        }
+    }
+    *vret = float_Value(cls_timedelta, src_d * sign);
 
     return TRUE;
 }
@@ -2413,6 +2627,8 @@ static void define_time_class(RefNode *m)
     define_native_func_a(n, timestamp_iso8601, 0, 0, (void*)"%04d-%02d-%02dT%02d:%02d:%02dZ");
     n = define_identifier(m, cls, "httpdate", NODE_FUNC_N, NODEOPT_PROPERTY);
     define_native_func_a(n, timestamp_rfc2822, 0, 0, NULL);
+    n = define_identifier(m, cls, "round", NODE_FUNC_N, 0);
+    define_native_func_a(n, timestamp_round, 2, 2, NULL, fs->cls_str, fs->cls_str);
     extends_method(cls, fs->cls_obj);
 
     // TimeDelta
@@ -2464,6 +2680,8 @@ static void define_time_class(RefNode *m)
     define_native_func_a(n, timedelta_get_float, 0, 0, (void*) GET_SECOND);
     n = define_identifier(m, cls, "milliseconds_float", NODE_FUNC_N, NODEOPT_PROPERTY);
     define_native_func_a(n, timedelta_get_float, 0, 0, (void*) GET_MILLISEC);
+    n = define_identifier(m, cls, "round", NODE_FUNC_N, 0);
+    define_native_func_a(n, timedelta_round, 2, 2, NULL, fs->cls_str, fs->cls_str);
     extends_method(cls, fs->cls_obj);
 
     // TimeZone

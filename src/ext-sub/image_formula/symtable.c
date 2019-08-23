@@ -133,7 +133,7 @@ static subraster_t *rastflags(const char **expression, int size, const subraster
             else {              /* embed font size in expression */
                 sprintf(valuearg, "%d", fontsize);      /* convert size */
                 valuelen = strlen(valuearg);    /* ought to be 1 */
-                if (*expression != '\0') {      /* ill-formed expression */
+                if (*expression != NULL) {      /* ill-formed expression */
                     *expression = (*expression - valuelen);     /*back up buff */
                     // XXX:
                     memcpy((char *) (*expression), valuearg, valuelen);

@@ -161,8 +161,3 @@ void pipeio_close_sub(RefProcessHandle *ph)
 {
     process_close_sub(ph);
 }
-
-RefCharset *get_local_codepage()
-{
-    return fs->cs_utf8;
-}

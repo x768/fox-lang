@@ -8,16 +8,6 @@
 #include <limits.h>
 
 
-enum {
-    ROUND_DOWN,
-    ROUND_UP,
-    ROUND_FLOOR,
-    ROUND_CEILING,
-    ROUND_HALF_DOWN,
-    ROUND_HALF_UP,
-    ROUND_HALF_EVEN,
-};
-
 typedef struct {
     const char *name;
     double (*real)(double);
@@ -378,113 +368,6 @@ static int math_gcd(Value *vret, Value *v, RefNode *node)
 ERROR_END:
     fs->throw_errorf(fs->mod_lang, "ValueError", "Parameters must be positive value");
     return FALSE;
-}
-static int math_round(Value *vret, Value *v, RefNode *node)
-{
-    int type = FUNC_INT(node);
-    Value v1 = v[1];
-    RefFrac *md = Value_vp(v1);
-    RefFrac *mp;   // result
-    BigInt mul, rem;
-
-    int sign = md->bi[0].sign;
-    int64_t pred = 0;
-    if (fg->stk_top > v + 2) {
-        pred = fs->Value_int64(v[2], NULL);
-        if (pred < -32768 || pred > 32767) {
-            fs->throw_errorf(fs->mod_lang, "ValueError", "Illigal parameter #2 (-32768 - 32767)");
-            return FALSE;
-        }
-    }
-
-    mp = fs->buf_new(fs->cls_frac, sizeof(RefFrac));
-    *vret = vp_Value(mp);
-    fs->BigInt_init(&mp->bi[0]);
-    fs->BigInt_init(&mp->bi[1]);
-
-    fs->BigInt_copy(&mp->bi[0], &md->bi[0]);
-    fs->BigInt_copy(&mp->bi[1], &md->bi[1]);
-    if (type == ROUND_FLOOR) {
-        if (sign < 0) {
-            type = ROUND_UP;
-        } else {
-            type = ROUND_DOWN;
-        }
-    } else if (type == ROUND_CEILING) {
-        if (sign < 0) {
-            type = ROUND_DOWN;
-        } else {
-            type = ROUND_UP;
-        }
-    }
-
-    fs->BigInt_init(&mul);
-    if (pred < 0) {
-        fs->int64_BigInt(&mul, 10);
-        fs->BigInt_pow(&mul, -pred);
-        fs->BigInt_mul(&mp->bi[1], &mp->bi[1], &mul);
-    } else if (pred > 0) {
-        fs->int64_BigInt(&mul, 10);
-        fs->BigInt_pow(&mul, pred);
-        fs->BigInt_mul(&mp->bi[0], &mp->bi[0], &mul);
-    }
-
-    fs->BigInt_init(&rem);
-    fs->BigInt_divmod(&mp->bi[0], &rem, &mp->bi[0], &mp->bi[1]);
-    if (rem.sign < 0) {
-        rem.sign = -rem.sign;
-    }
-
-    switch (type) {
-    case ROUND_DOWN:
-        break;
-    case ROUND_UP:
-        if (rem.sign != 0) {
-            fs->BigInt_add_d(&mp->bi[0], mp->bi[0].sign);
-        }
-        break;
-    case ROUND_HALF_DOWN:
-        fs->BigInt_lsh(&rem, 1);  // rem *= 2
-        if (fs->BigInt_cmp(&rem, &mp->bi[1]) > 0) {
-            fs->BigInt_add_d(&mp->bi[0], mp->bi[0].sign);
-        }
-        break;
-    case ROUND_HALF_UP:
-        fs->BigInt_lsh(&rem, 1);  // rem *= 2
-        if (fs->BigInt_cmp(&rem, &mp->bi[1]) >= 0) {
-            fs->BigInt_add_d(&mp->bi[0], mp->bi[0].sign);
-        }
-        break;
-    case ROUND_HALF_EVEN: {
-        int cmp;
-        fs->BigInt_lsh(&rem, 1);  // rem *= 2
-        cmp = fs->BigInt_cmp(&rem, &mp->bi[1]);
-        if (cmp == 0) {
-            if (mp->bi[0].size > 0 && (mp->bi[0].d[0] & 1) != 0) {
-                cmp = 1;
-            }
-        }
-        if (cmp > 0) {
-            fs->BigInt_add_d(&mp->bi[0], mp->bi[0].sign);
-        }
-        break;
-    }
-    }
-    if (pred < 0) {
-        fs->BigInt_mul(&mp->bi[0], &mp->bi[0], &mul);
-        fs->int64_BigInt(&mp->bi[1], 1);
-    } else if (pred > 0) {
-        fs->BigInt_copy(&mp->bi[1], &mul);
-    } else {
-        fs->int64_BigInt(&mp->bi[1], 1);
-    }
-    fs->BigInt_close(&mul);
-    fs->BigInt_close(&rem);
-
-    fs->BigRat_fix(mp->bi);
-    mp->bi[0].sign = sign;
-
-    return TRUE;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////
@@ -1088,27 +971,6 @@ static void define_func(RefNode *m)
 
     n = fs->define_identifier(m, m, "gcd", NODE_FUNC_N, 0);
     fs->define_native_func_a(n, math_gcd, 2, 2, NULL, fs->cls_int, fs->cls_int);
-
-    n = fs->define_identifier(m, m, "round_down", NODE_FUNC_N, 0);
-    fs->define_native_func_a(n, math_round, 1, 2, (void*) ROUND_DOWN, fs->cls_frac, fs->cls_int);
-
-    n = fs->define_identifier(m, m, "round_up", NODE_FUNC_N, 0);
-    fs->define_native_func_a(n, math_round, 1, 2, (void*) ROUND_UP, fs->cls_frac, fs->cls_int);
-
-    n = fs->define_identifier(m, m, "round_floor", NODE_FUNC_N, 0);
-    fs->define_native_func_a(n, math_round, 1, 2, (void*) ROUND_FLOOR, fs->cls_frac, fs->cls_int);
-
-    n = fs->define_identifier(m, m, "round_ceiling", NODE_FUNC_N, 0);
-    fs->define_native_func_a(n, math_round, 1, 2, (void*) ROUND_CEILING, fs->cls_frac, fs->cls_int);
-
-    n = fs->define_identifier(m, m, "round_half_down", NODE_FUNC_N, 0);
-    fs->define_native_func_a(n, math_round, 1, 2, (void*) ROUND_HALF_DOWN, fs->cls_frac, fs->cls_int);
-
-    n = fs->define_identifier(m, m, "round_half_up", NODE_FUNC_N, 0);
-    fs->define_native_func_a(n, math_round, 1, 2, (void*) ROUND_HALF_UP, fs->cls_frac, fs->cls_int);
-
-    n = fs->define_identifier(m, m, "round_half_even", NODE_FUNC_N, 0);
-    fs->define_native_func_a(n, math_round, 1, 2, (void*) ROUND_HALF_EVEN, fs->cls_frac, fs->cls_int);
 }
 static void define_class(RefNode *m)
 {

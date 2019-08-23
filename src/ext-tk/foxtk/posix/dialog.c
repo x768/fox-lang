@@ -109,7 +109,7 @@ int file_open_dialog(Value *vret, const char *title, RefArray *filter, WndHandle
 {
     int ret = FALSE;
     GtkWidget *dialog;
-    int type_id;
+    int type_id = 0;
     const char *btn_id = "document-open";
 
     switch (type) {

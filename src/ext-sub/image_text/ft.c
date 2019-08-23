@@ -187,26 +187,11 @@ int get_char_positions(StrBuf *offsets, const uint32_t *indexes, FT_Face *a_face
 
     for (i = 0; a_face[i] != NULL; i++) {
         FT_Face f = a_face[i];
-        int size = face_size;
-        if (f->available_sizes != NULL) {
-            int j;
-            int min_diff = 65536;
-            for (j = 0; j < f->num_fixed_sizes; j++) {
-                long size_diff = face_size - f->available_sizes[j].size;
-                if (size_diff < 0) {
-                    size_diff = -size_diff;
-                }
-                if (min_diff > size_diff) {
-                    min_diff = size_diff;
-                    size = f->available_sizes[j].size;
-                }
-            }
-        }
-        FT_Error ret = FT_Set_Char_Size(f, 0, size, 0, 0);
-        if (ret != 0) {
-            fs->throw_errorf(mod_ft, "FontError", "%s", ft_err_to_string(ret));
-            return FALSE;
-        }
+        FT_Size_RequestRec req = {0};
+
+        req.type = FT_SIZE_REQUEST_TYPE_NOMINAL;
+        req.height = face_size;
+        FT_Request_Size(f, &req);
     }
 
     for (i = 0; indexes[i] != 0; i++) {

@@ -146,7 +146,7 @@ static int audio_load(Value *vret, Value *v, RefNode *node)
     RefAudio *snd;
     Value reader;
 
-    if (!fs->value_to_streamio(&reader, v[1], FALSE, 0)) {
+    if (!fs->value_to_streamio(&reader, v[1], FALSE, 0, FALSE)) {
         return FALSE;
     }
     snd = fs->buf_new(cls_audio, sizeof(RefAudio));
@@ -176,7 +176,7 @@ static int audio_save(Value *vret, Value *v, RefNode *node)
         return FALSE;
     }
 
-    if (!fs->value_to_streamio(&writer, v[1], TRUE, 0)) {
+    if (!fs->value_to_streamio(&writer, v[1], TRUE, 0, FALSE)) {
         return FALSE;
     }
 
@@ -618,7 +618,7 @@ static int mediareader_new(Value *vret, Value *v, RefNode *node)
     Value reader;
     RefStr *type = NULL;
 
-    if (!fs->value_to_streamio(&reader, v[1], FALSE, 0)) {
+    if (!fs->value_to_streamio(&reader, v[1], FALSE, 0, FALSE)) {
         return FALSE;
     }
     if (fg->stk_top > v + 2) {
