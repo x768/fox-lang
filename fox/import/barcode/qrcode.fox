@@ -119,8 +119,8 @@ def _b_bio_and_bio_b(b1:Bytes, bi1:BytesIO, bi2:BytesIO, b2:Bytes)
     var s2 = BytesIO()
 
     s1.write b1
-    s1.write_s bi1
-    s2.write_s bi2
+    s1.write_stream bi1
+    s2.write_stream bi2
     s2.write b2
 
     bi1.pos = 0
@@ -145,8 +145,8 @@ def _b_bio_or_bio_b(b1:Bytes, bi1:BytesIO, bi2:BytesIO, b2:Bytes)
     var s2 = BytesIO()
 
     s1.write b1
-    s1.write_s bi1
-    s2.write_s bi2
+    s1.write_stream bi1
+    s2.write_stream bi2
     s2.write b2
 
     bi1.pos = 0
@@ -274,7 +274,7 @@ class QRCodeError : BarcodeError
 {
     this(s)
     {
-        super(s)
+        super._new(s)
     }
 }
 class _StrlenAcc
@@ -447,7 +447,7 @@ class QRCode
                 let f = tmp[0]
                 _bytesio_xor_bytes tmp, f != 0 ? rs_cal_tbl[f] : b""
             }
-            code_words.write_s tmp
+            code_words.write_stream tmp
         }
     }
     def _make_matrix(code_words:BytesIO, qrv:_QRVFile, frame_data:List, max_modules_1side:Int, max_codewords:Int, byte_num:Int)
@@ -536,7 +536,7 @@ class QRCode
                 k--
             }
             hor.push 170
-            hor.write_s ver
+            hor.write_stream ver
             ver.pos = 0
 
             //                                                  +     |                                        +
@@ -595,7 +595,7 @@ class QRCode
 
         var data_string = source
         if typeof(source) == Str {
-            data_string = data_string.to_bytes(Charset("US-ASCII"))
+            data_string = data_string.to_bytes()
         }
         if data_string.size == 0 {
             throw ValueError("data_string.size is 0")

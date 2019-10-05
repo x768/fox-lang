@@ -143,7 +143,7 @@ RefTimeZone *Value_to_tz(Value v, int argn)
         } else {
             tz = load_timezone(name->c, name->size);
             if (tz == NULL) {
-                throw_errorf(fs->mod_lang, "ValueError", "RefTimeZone %q not found", name->c);
+                throw_errorf(fs->mod_lang, "ValueError", "TimeZone %q not found", name->c);
                 return NULL;
             }
         }

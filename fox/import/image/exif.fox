@@ -157,7 +157,7 @@ def _read_value(data:StreamIO, type:Int, num:Int, int16:Str, int32:Str)
 
 class ExifReaderError : Error
 {
-    new(s)
+    this(s)
     {
         super(s)
     }
@@ -168,7 +168,7 @@ class ExifTag
     var m_tag
     var m_value
 
-    new(tag:Int, value) {
+    this(tag:Int, value) {
         m_tag = tag
         m_value = value
     }
@@ -196,7 +196,7 @@ class ExifReader : Iterable
     var m_tags
     var m_tags_map
 
-    new(src) {
+    this(src) {
         super._new()
 
         let type = typeof(src)
@@ -213,8 +213,17 @@ class ExifReader : Iterable
             throw ExifReaderError("No JPEG file")
         }
         m_data.peek("x4")
-        if m_data.peek("b6") != b"Exif\0\0" {
-            throw ExifReaderError("No exif data")
+        {
+            var tag = m_data.peek("b4")
+            if tag == b"JFIF" {
+                m_data.peek("x14")
+                tag = m_data.peek("b4")
+            }
+            if tag == b"Exif" {
+                m_data.peek("x2")
+            } else {
+                throw ExifReaderError("No exif data")
+            }
         }
 
         let endian = m_data.peek("b4")
@@ -318,7 +327,7 @@ class ExifIterator : Iterator
     var m_int16
     var m_int32
 
-    new(data:StreamIO, tags:List, int16:Str, int32:Str) {
+    this(data:StreamIO, tags:List, int16:Str, int32:Str) {
         super._new()
 
         m_index = 0
