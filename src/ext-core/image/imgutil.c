@@ -999,7 +999,7 @@ void copy_image_resized_sub(RefImage *dst, const RefImage *src, int32_t *dst_rec
                             const uint8_t *ps = src->data + (sy + yy) * src->pitch + sx * sc;
                             sum += (double)ps[x];
                         }
-                        if (pt2 > 0.0) {
+                        if (pt2 > (1.0 / 1024.0) && yy < src->height) {
                             const uint8_t *ps = src->data + (sy + yy) * src->pitch + sx * sc;
                             sum += (double)ps[x] * pt2;
                         }

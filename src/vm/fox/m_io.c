@@ -2154,8 +2154,8 @@ static int nullio_new(Value *vret, Value *v, RefNode *node)
 
 static int nullio_write(Value *vret, Value *v, RefNode *node)
 {
-    RefBytesIO *mb = Value_vp(v[1]);
-    *vret = int32_Value(mb->buf.size);
+    RefStr *rs = Value_vp(v[1]);
+    *vret = int32_Value(rs->size);
     return TRUE;
 }
 
@@ -2246,13 +2246,9 @@ static void define_io_class(RefNode *m)
     fv->cls_nullio = cls;
     n = define_identifier_p(m, cls, fs->str_new, NODE_NEW_N, 0);
     define_native_func_a(n, nullio_new, 0, 0, NULL);
-    n = define_identifier_p(m, cls, fs->str_marshal_read, NODE_NEW_N, 0);
-    define_native_func_a(n, nullio_new, 1, 1, NULL, fs->cls_marshaldumper);
 
     n = define_identifier(m, cls, "empty", NODE_FUNC_N, NODEOPT_PROPERTY);
     define_native_func_a(n, native_return_bool, 0, 0, (void*)TRUE);
-    n = define_identifier_p(m, cls, fs->str_marshal_write, NODE_FUNC_N, 0);
-    define_native_func_a(n, native_return_null, 1, 1, NULL, fs->cls_marshaldumper);
     n = define_identifier_p(m, cls, str__read, NODE_FUNC_N, 0);
     define_native_func_a(n, native_return_null, 2, 2, NULL, fs->cls_bytesio, fs->cls_int);
     n = define_identifier_p(m, cls, str__write, NODE_FUNC_N, 0);

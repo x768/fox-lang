@@ -251,6 +251,15 @@ static int strio_write(Value *vret, Value *v, RefNode *node)
     return TRUE;
 }
 
+////////////////////////////////////////////////////////////////////////////////
+
+static int nulltextio_new(Value *vret, Value *v, RefNode *node)
+{
+    Ref *r = ref_new(FUNC_VP(node));
+    *vret = vp_Value(r);
+    return TRUE;
+}
+
 //////////////////////////////////////////////////////////////////////////////////////////
 
 static int textio_print(Value *vret, Value *v, RefNode *node)
@@ -609,7 +618,7 @@ static void define_io_text_class(RefNode *m)
     n = define_identifier(m, cls, "translit", NODE_FUNC_N, NODEOPT_PROPERTY);
     define_native_func_a(n, utf8io_translit, 0, 0, NULL);
 
-    cls->u.c.n_memb = INDEX_TEXTIO_NUM;
+    cls->u.c.n_memb = INDEX_UTF8IO_NUM;
     extends_method(cls, fs->cls_textio);
 
 
@@ -644,6 +653,25 @@ static void define_io_text_class(RefNode *m)
     define_native_func_a(n, strio_write, 0, -1, NULL);
     n = define_identifier(m, cls, "flush", NODE_FUNC_N, 0);
     define_native_func_a(n, native_return_null, 0, 0, NULL); // 何もしない
+    extends_method(cls, fs->cls_textio);
+
+
+    // NullTextIO(R,W) なにもしない
+    cls = define_identifier(m, m, "NullTextIO", NODE_CLASS, 0);
+    n = define_identifier_p(m, cls, fs->str_new, NODE_NEW_N, 0);
+    define_native_func_a(n, nulltextio_new, 0, 0, NULL);
+
+    n = define_identifier(m, cls, "empty", NODE_FUNC_N, NODEOPT_PROPERTY);
+    define_native_func_a(n, native_return_bool, 0, 0, (void*)TRUE);
+
+    n = define_identifier(m, cls, "print", NODE_FUNC_N, 0);
+    define_native_func_a(n, native_return_null, 0, -1, NULL);
+    n = define_identifier(m, cls, "puts", NODE_FUNC_N, 0);
+    define_native_func_a(n, native_return_null, 0, -1, NULL);
+    n = define_identifier(m, cls, "printf", NODE_FUNC_N, 0);
+    define_native_func_a(n, native_return_null, 1, -1, NULL, NULL);
+    n = define_identifier(m, cls, "flush", NODE_FUNC_N, 0);
+    define_native_func_a(n, native_return_null, 0, 0, NULL);
     extends_method(cls, fs->cls_textio);
 }
 
