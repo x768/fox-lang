@@ -1,0 +1,34 @@
+word "0-9A-Za-z_?!$@"
+define comment_line
+define quot
+define dquot
+define bquot quot
+define keyword word
+
+"#" = _ comment_line comment_line
+"\n" = comment_line _ _
+
+"'" = _ quot quot
+"'" = quot quot _
+
+'"' = _ dquot dquot
+'\\' = dquot dquot dquot
+'\"' = dquot dquot dquot
+'"' = dquot dquot _
+
+'`' = _ bquot bquot
+'\\' = bquot bquot bquot
+'\`' = bquot bquot bquot
+'`' = bquot bquot _
+
+"cd" = _ keyword _
+"declare" = _ keyword _
+"echo" = _ keyword _
+"else" = _ keyword _
+"eval" = _ keyword _
+"exit" = _ keyword _
+"fi" = _ keyword _
+"for" = _ keyword _
+"if" = _ keyword _
+"then" = _ keyword _
+"while" = _ keyword _

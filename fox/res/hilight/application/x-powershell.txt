@@ -1,0 +1,29 @@
+word "0-9A-Za-z_?!$@"
+define comment_line
+define quot
+define dquot
+define keyword word
+define typename
+
+"#" = _ comment_line comment_line
+"\n" = comment_line _ _
+
+"'" = _ quot quot
+"'" = quot quot _
+
+'"' = _ dquot dquot
+'\\' = dquot dquot dquot
+'\"' = dquot dquot dquot
+'"' = dquot dquot _
+
+"[" = _ typename typename
+"]" = typename typename _
+
+"cd" = _ keyword _
+"echo" = _ keyword _
+"else" = _ keyword _
+"for" = _ keyword _
+"if" = _ keyword _
+"oh" = _ keyword _
+"start" = _ keyword _
+"while" = _ keyword _

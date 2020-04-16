@@ -1,0 +1,77 @@
+word "0-9A-Za-z_$"
+define comment
+define comment_line
+define line_command
+define quot
+define dquot
+define keyword word
+define typename word
+
+"/*" = _ comment comment
+"*/" = comment comment _
+"//" = _ comment_line comment_line
+"\n" = comment_line _ _
+
+"#" = _ line_command line_command
+" " = line_command _ _
+"\n" = line_command _ _
+
+"'" = _ quot quot
+"b'" = _ quot quot
+'\\' = quot quot quot
+"\\'" = quot quot quot
+"'" = quot quot _
+
+'"' = _ dquot dquot
+'b"' = _ dquot dquot
+'\\' = dquot dquot dquot
+'\"' = dquot dquot dquot
+'"' = dquot dquot _
+
+"as" = _ keyword _
+"break" = _ keyword _
+"const" = _ keyword _
+"continue" = _ keyword _
+"crate" = _ keyword _
+"else" = _ keyword _
+"enum" = _ keyword _
+"extern" = _ keyword _
+"false" = _ keyword _
+"fn" = _ keyword _
+"for" = _ keyword _
+"if" = _ keyword _
+"impl" = _ keyword _
+"in" = _ keyword _
+"let" = _ keyword _
+"loop" = _ keyword _
+"match" = _ keyword _
+"mod" = _ keyword _
+"muve" = _ keyword _
+"mut" = _ keyword _
+"pub" = _ keyword _
+"ref" = _ keyword _
+"return" = _ keyword _
+"self" = _ keyword _
+"static" = _ keyword _
+"struct" = _ keyword _
+"super" = _ keyword _
+"trait" = _ keyword _
+"true" = _ keyword _
+"type" = _ keyword _
+"unsafe" = _ keyword _
+"use" = _ keyword _
+"where" = _ keyword _
+"while" = _ keyword _
+
+"Self" = _ typename _
+"f32" = _ typename _
+"f64" = _ typename _
+"i16" = _ typename _
+"i32" = _ typename _
+"i64" = _ typename _
+"i8" = _ typename _
+"u16" = _ typename _
+"u32" = _ typename _
+"u64" = _ typename _
+"u8" = _ typename _
+
