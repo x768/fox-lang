@@ -798,7 +798,7 @@ static void define_lang_const(RefNode *m)
 static void define_lang_class(RefNode *m)
 {
     RefNode *n;
-    RefNode *cls, *cls2;
+    RefNode *cls;
     RefStr *empty = intern("empty", -1);
 
     // Object
@@ -921,6 +921,11 @@ static void define_lang_class(RefNode *m)
     // GC対象外とするため、0を設定
     cls->u.c.n_memb = 0;
     extends_method(cls, fs->cls_obj);
+}
+static void define_lang_error_class(RefNode *m)
+{
+    RefNode *n;
+    RefNode *cls, *cls2;
 
     // Error
     cls = fs->cls_error;
@@ -1078,6 +1083,7 @@ void init_lang_module_1()
     RefNode *m = fs->mod_lang;
 
     define_lang_func(m);
+    define_lang_error_class(m);
     define_charset_class(m);
     define_lang_str_func(m);
     define_lang_class(m);

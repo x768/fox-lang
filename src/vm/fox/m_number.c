@@ -121,6 +121,8 @@ static int integer_new(Value *vret, Value *v, RefNode *node)
             // Null -> 0
             // true -> 1, false -> 0
             *vret = int32_Value(Value_bool(v1) ? 1 : 0);
+        } else if (type == fs->cls_char) {
+            *vret = int32_Value(Value_integral(v1));
         } else {
             // 未知の型
             *vret = int32_Value(0);
