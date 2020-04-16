@@ -2,12 +2,20 @@
 
 \- Reinvent the PHP -
 
+## Important notice
+
+For windows users, please set "Configure the line ending conversions" as false (Checkout as-is commit as-is).
+
+```
+git config --global core.autocrlf false
+```
+
+fox language do not accept CRLF line ending.
+
 ## What's this
 
 fox language is a dynamic and strong typed programming language.
 It works on Windows, MacOSX and Linux.
-
-## Features
 
 ### Language spec
 
