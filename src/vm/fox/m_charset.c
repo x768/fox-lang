@@ -45,11 +45,9 @@ static void load_charset_alias_file(const char *filename)
             cs->rh.nref = -1;
             cs->rh.n_memb = 0;
             cs->rh.weak_ref = NULL;
-            cs->utf8 = FALSE;
-            cs->ascii = TRUE;
+            cs->type = FCHARSET_NONE;
             cs->name = name_r;
             cs->iana = name_r;
-            cs->ic_name = name_r;
 
             for (;;) {
                 if (tk.v.type != TL_STR) {
@@ -87,9 +85,14 @@ ERROR_END:
 }
 static void load_charset_info_file(const char *filename)
 {
+    enum {
+        MAX_CHARSET_FILES = 16,
+    };
+    
     Tok tk;
     char *path = path_normalize(NULL, fs->fox_home, filename, -1, NULL);
     char *buf = read_from_file(NULL, path, NULL);
+    Str def_path;
 
     if (buf == NULL) {
         fatal_errorf("Cannot load file %q", path);
@@ -97,6 +100,8 @@ static void load_charset_info_file(const char *filename)
 
     Tok_simple_init(&tk, buf);
     Tok_simple_next(&tk);
+
+    path_normalize(&def_path, fs->fox_home, "charset" SEP_S, -1, &fg->st_mem);
 
     for (;;) {
     LINE_BEGIN:
@@ -127,22 +132,78 @@ static void load_charset_info_file(const char *filename)
                         goto ERROR_END;
                     }
                     cs->iana = intern(tk.str_val.p, tk.str_val.size);
-                } else if (str_eq(key.p, key.size, "iconv", -1)) {
-                    if (tk.v.type != TL_STR) {
-                        goto ERROR_END;
-                    }
-                    cs->ic_name = intern(tk.str_val.p, tk.str_val.size);
-                } else if (str_eq(key.p, key.size, "ascii_compat", -1)) {
+                } else if (str_eq(key.p, key.size, "type", -1)) {
                     if (tk.v.type == TL_VAR) {
-                        if (str_eq(tk.str_val.p, tk.str_val.size, "true", -1)) {
-                            cs->ascii = TRUE;
-                        } else if (str_eq(tk.str_val.p, tk.str_val.size, "false", -1)) {
-                            cs->ascii = FALSE;
+                        if (str_eq(tk.str_val.p, tk.str_val.size, "ascii", -1)) {
+                            cs->type = FCHARSET_ASCII;
+                        } else if (str_eq(tk.str_val.p, tk.str_val.size, "utf8", -1)) {
+                            cs->type = FCHARSET_UTF8;
+                        } else if (str_eq(tk.str_val.p, tk.str_val.size, "utf8loose", -1)) {
+                            cs->type = FCHARSET_UTF8_LOOSE;
+                        } else if (str_eq(tk.str_val.p, tk.str_val.size, "cesu8", -1)) {
+                            cs->type = FCHARSET_CESU8;
+                        } else if (str_eq(tk.str_val.p, tk.str_val.size, "singlebyte", -1)) {
+                            cs->type = FCHARSET_SINGLE_BYTE;
+                        } else if (str_eq(tk.str_val.p, tk.str_val.size, "euc", -1)) {
+                            cs->type = FCHARSET_EUC;
+                        } else if (str_eq(tk.str_val.p, tk.str_val.size, "shiftjis", -1)) {
+                            cs->type = FCHARSET_SHIFTJIS;
+                        } else if (str_eq(tk.str_val.p, tk.str_val.size, "big5", -1)) {
+                            cs->type = FCHARSET_BIG5;
+                        } else if (str_eq(tk.str_val.p, tk.str_val.size, "gb18030", -1)) {
+                            cs->type = FCHARSET_GB18030;
+                        } else if (str_eq(tk.str_val.p, tk.str_val.size, "iso2022", -1)) {
+                            cs->type = FCHARSET_ISO_2022;
+                        } else if (str_eq(tk.str_val.p, tk.str_val.size, "utf16le", -1)) {
+                            cs->type = FCHARSET_UTF16LE;
+                        } else if (str_eq(tk.str_val.p, tk.str_val.size, "utf16be", -1)) {
+                            cs->type = FCHARSET_UTF16BE;
+                        } else if (str_eq(tk.str_val.p, tk.str_val.size, "utf32le", -1)) {
+                            cs->type = FCHARSET_UTF32LE;
+                        } else if (str_eq(tk.str_val.p, tk.str_val.size, "utf32be", -1)) {
+                            cs->type = FCHARSET_UTF32BE;
                         } else {
                             goto ERROR_END;
                         }
                     } else {
                         goto ERROR_END;
+                    }
+                } else if (str_eq(key.p, key.size, "files", -1)) {
+                    const char *list[MAX_CHARSET_FILES];
+                    int num = 0;
+
+                    if (tk.v.type != T_LB && tk.v.type != T_LB_C) {
+                        goto ERROR_END;
+                    }
+                    Tok_simple_next(&tk);
+                    while (tk.v.type != T_RB) {
+                        if (num >= MAX_CHARSET_FILES - 1) {
+                            fatal_errorf("Too many files at line %d (%s)", tk.v.line, path);
+                        }
+                        if (tk.v.type != TL_STR) {
+                            goto ERROR_END;
+                        }
+                        {
+                            char *p = Mem_get(&fg->st_mem, def_path.size + tk.str_val.size + 1);
+                            memcpy(p, def_path.p, def_path.size);
+                            memcpy(p + def_path.size, tk.str_val.p, tk.str_val.size);
+                            p[def_path.size + tk.str_val.size] = '\0';
+                            list[num++] = p;
+                        }
+
+                        Tok_simple_next(&tk);
+                        if (tk.v.type == T_RB) {
+                            break;
+                        }
+                        if (tk.v.type != T_COMMA) {
+                            goto ERROR_END;
+                        }
+                        Tok_simple_next(&tk);
+                    }
+                    if (num > 0) {
+                        list[num++] = NULL;
+                        cs->files = Mem_get(&fg->st_mem, num * sizeof(const char*));
+                        memcpy(cs->files, list, num * sizeof(const char*));
                     }
                 } else {
                     fatal_errorf("Unknown key %Q at line %d (%s)", key, tk.v.line, path);
@@ -152,6 +213,12 @@ static void load_charset_info_file(const char *filename)
                     break;
                 }
                 Tok_simple_next(&tk);
+            }
+            if (cs->type >= FCHARSET_SINGLE_BYTE && cs->type < FCHARSET_UTF16LE) {
+                if (cs->files == NULL) {
+//                    fatal_errorf("'files' required at line %d (%s)", tk.v.line, path);
+                    cs->type = FCHARSET_NONE;
+                }
             }
             break;
         }
@@ -205,7 +272,7 @@ int convert_str_to_bin_sub(StrBuf *dst_buf, const char *src_p, int src_size, Ref
         src_size = strlen(src_p);
     }
 
-    if (cs == NULL || cs->utf8) {
+    if (cs == NULL || cs->type == FCHARSET_UTF8 || cs->type == FCHARSET_UTF8_LOOSE) {
         // そのまま
         if (!StrBuf_add(dst_buf, src_p, src_size)) {
             return FALSE;
@@ -213,20 +280,20 @@ int convert_str_to_bin_sub(StrBuf *dst_buf, const char *src_p, int src_size, Ref
         return TRUE;
     } else {
         // UTF-8 -> 任意の文字コード変換
-        CodeCVT ic;
-        int result = TRUE;
+        FConv cv;
+        FCharset *fc;
 
         CodeCVTStatic_init();
-        if (!codecvt->CodeCVT_open(&ic, fs->cs_utf8, cs, alt_s)) {
+        fc = codecvt->RefCharset_get_fcharset(cs, TRUE);
+        if (fc == NULL) {
+            return FALSE;
+        }
+        codecvt->FConv_init(&cv, fc, FALSE, alt_s);
+        if (!codecvt->FConv_conv_strbuf(&cv, dst_buf, src_p, src_size, TRUE)) {
             return FALSE;
         }
 
-        if (!codecvt->CodeCVT_conv(&ic, dst_buf, src_p, src_size, TRUE, TRUE)) {
-            result = FALSE;
-        }
-        codecvt->CodeCVT_close(&ic);
-
-        return result;
+        return TRUE;
     }
 }
 
@@ -290,7 +357,7 @@ int convert_bin_to_str_sub(StrBuf *dst_buf, const char *src_p, int src_size, Ref
     if (src_size < 0) {
         src_size = strlen(src_p);
     }
-    if (cs == NULL || cs->utf8) {
+    if (cs == NULL || cs->type == FCHARSET_UTF8 || cs->type == FCHARSET_UTF8_LOOSE) {
         // なるべくそのまま
         if (invalid_utf8_pos(src_p, src_size) >= 0) {
             if (alt_b) {
@@ -304,19 +371,20 @@ int convert_bin_to_str_sub(StrBuf *dst_buf, const char *src_p, int src_size, Ref
         }
         return TRUE;
     } else {
-        CodeCVT ic;
-        int result = TRUE;
+        FConv cv;
+        FCharset *fc;
 
         CodeCVTStatic_init();
-        if (!codecvt->CodeCVT_open(&ic, cs, fs->cs_utf8, alt_b ? UTF8_ALTER_CHAR : NULL)) {
+        fc = codecvt->RefCharset_get_fcharset(cs, TRUE);
+        if (fc == NULL) {
             return FALSE;
         }
-        if (!codecvt->CodeCVT_conv(&ic, dst_buf, src_p, src_size, FALSE, TRUE)) {
-            result = FALSE;
+        codecvt->FConv_init(&cv, fc, TRUE, alt_b ? UTF8_ALTER_CHAR : NULL);
+        if (!codecvt->FConv_conv_strbuf(&cv, dst_buf, src_p, src_size, TRUE)) {
+            return FALSE;
         }
-        codecvt->CodeCVT_close(&ic);
 
-        return result;
+        return TRUE;
     }
 }
 
@@ -445,6 +513,12 @@ static int charset_tostr(Value *vret, Value *v, RefNode *node)
     *vret = printf_Value("Charset(%r)", name);
     return TRUE;
 }
+static int charset_supported(Value *vret, Value *v, RefNode *node)
+{
+    RefCharset *cs = Value_vp(*v);
+    *vret = bool_Value(cs->type != FCHARSET_NONE);
+    return TRUE;
+}
 static int charset_name(Value *vret, Value *v, RefNode *node)
 {
     RefCharset *cs = Value_vp(*v);
@@ -464,7 +538,7 @@ static int charset_is_valid_encoding(Value *vret, Value *v, RefNode *node)
     int str = FUNC_INT(node);
     RefCharset *cs = Value_vp(*v);
     const RefStr *rs = Value_vp(v[1]);
-    int result;
+    int result = FALSE;
 
     if (cs == fs->cs_utf8) {
         if (str) {
@@ -473,55 +547,36 @@ static int charset_is_valid_encoding(Value *vret, Value *v, RefNode *node)
             result = (invalid_utf8_pos(rs->c, rs->size) < 0);
         }
     } else {
-        CodeCVT ic;
-        RefCharset *cs_from;
-        RefCharset *cs_to;
+        FConv cv;
+        FCharset *fc;
 
-        if (str) {
-            cs_from = fs->cs_utf8;
-            cs_to = cs;
-        } else {
-            cs_from = cs;
-            cs_to = fs->cs_utf8;
-        }
         CodeCVTStatic_init();
+        fc = codecvt->RefCharset_get_fcharset(cs, TRUE);
+        if (fc == NULL) {
+            return FALSE;
+        }
+        codecvt->FConv_init(&cv, fc, FALSE, NULL);
+        codecvt->FConv_set_src(&cv, rs->c, rs->size, TRUE);
 
         // エラーがないかどうか調べるだけ
-        if (codecvt->CodeCVT_open(&ic, cs_from, cs_to, NULL)) {
+        {
             char *tmp_buf = malloc(BUFFER_SIZE);
-            result = TRUE;
-
-            ic.inbuf = rs->c;
-            ic.inbytesleft = rs->size;
-            ic.outbuf = tmp_buf;
-            ic.outbytesleft = BUFFER_SIZE;
-
+            codecvt->FConv_set_dst(&cv, tmp_buf, BUFFER_SIZE);
             for (;;) {
-                switch (codecvt->CodeCVT_next(&ic)) {
-                case CODECVT_OK:
-                    if (ic.inbuf != NULL) {
-                        ic.inbuf = NULL;
-                    } else {
-                        goto BREAK;
-                    }
+                codecvt->FConv_next(&cv, FALSE);
+                switch (cv.status) {
+                case FCONV_OK:
+                    result = TRUE;
+                    goto BREAK;
+                case FCONV_OUTPUT_REQUIRED:
+                    codecvt->FConv_set_dst(&cv, tmp_buf, BUFFER_SIZE);
                     break;
-                case CODECVT_OUTBUF:
-                    ic.outbuf = tmp_buf;
-                    ic.outbytesleft = BUFFER_SIZE;
-                    break;
-                case CODECVT_INVALID:
-                    result = FALSE;
+                case FCONV_ERROR:
                     goto BREAK;
                 }
             }
         BREAK:
             free(tmp_buf);
-            if (ic.inbytesleft > 0) {
-                result = FALSE;
-            }
-            codecvt->CodeCVT_close(&ic);
-        } else {
-            return FALSE;
         }
     }
     *vret = bool_Value(result);
@@ -541,7 +596,7 @@ void define_charset_class(RefNode *m)
     load_charset_info_file("data" SEP_S "charset-info.txt");
 
     fs->cs_utf8 = get_charset_from_name("UTF8", 4);
-    fs->cs_utf8->utf8 = TRUE;
+    fs->cs_utf8->type = FCHARSET_UTF8;
 
     // Charset
     cls = fs->cls_charset;
@@ -556,6 +611,8 @@ void define_charset_class(RefNode *m)
     define_native_func_a(n, object_eq, 1, 1, NULL, fs->cls_charset);
     n = define_identifier_p(m, cls, fs->str_marshal_write, NODE_FUNC_N, 0);
     define_native_func_a(n, charset_marshal_write, 1, 1, NULL, fs->cls_marshaldumper);
+    n = define_identifier(m, cls, "supported", NODE_FUNC_N, NODEOPT_PROPERTY);
+    define_native_func_a(n, charset_supported, 0, 0, NULL);
     n = define_identifier(m, cls, "name", NODE_FUNC_N, NODEOPT_PROPERTY);
     define_native_func_a(n, charset_name, 0, 0, NULL);
     n = define_identifier(m, cls, "iana", NODE_FUNC_N, NODEOPT_PROPERTY);

@@ -1,9 +1,8 @@
-#include "m_codecvt.h"
 #include "fox_io.h"
+#include "fconv.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
-#include <iconv.h>
 #include <errno.h>
 
 
@@ -23,232 +22,53 @@ enum {
 typedef struct {
     RefCharset *cs;
     int trans;
-
-    CodeCVT in;
-    CodeCVT out;
+    FConv in;
+    FConv out;
 } FConvIO;
 
 
-static const FoxStatic *fs;
-static FoxGlobal *fg;
+const FoxStatic *fs;
+FoxGlobal *fg;
 
 static RefNode *mod_codecvt;
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////
 
-static void RefStr_copy(char *dst, RefStr *src, int max)
+static FCharset *RefCharset_get_fcharset(RefCharset *rc, int throw_error)
 {
-    int size = src->size;
-    if (size > max - 1) {
-        size = max - 1;
+    if (rc->cs == NULL) {
+        rc->cs = FCharset_new(rc);
     }
-    memcpy(dst, src->c, size);
-    dst[size] = '\0';
+    if (rc->cs == NULL && throw_error) {
+        fs->throw_errorf(fs->mod_lang, "NotSupportedError", "Converting %s is not supported", rc->name->c);
+    }
+    return rc->cs;
 }
-static int CodeCVT_open(CodeCVT *ic, RefCharset *from, RefCharset *to, const char *trans)
-{
-    enum {
-        MAX_LEN = 32,
-    };
-    char c_src[MAX_LEN];
-    char c_dst[MAX_LEN];
-
-    ic->cs_from = from;
-    ic->cs_to = to;
-    ic->trans = trans;
-
-    RefStr_copy(c_src, from->ic_name, MAX_LEN);
-    RefStr_copy(c_dst, to->ic_name, MAX_LEN);
-
-    ic->ic = iconv_open(c_dst, c_src);
-
-    if (ic->ic == (iconv_t)-1) {
-        fs->throw_errorf(fs->mod_lang, "InternalError", "iconv_open fault");
-        return FALSE;
-    }
-    return TRUE;
-}
-static void CodeCVT_close(CodeCVT *ic)
-{
-    if (ic->ic != (iconv_t)-1) {
-        iconv_close(ic->ic);
-        ic->ic = (iconv_t)-1;
-    }
-}
-
-static int CodeCVT_next(CodeCVT *ic)
-{
-    errno = 0;
-    if (iconv(ic->ic, (char**)&ic->inbuf, &ic->inbytesleft, &ic->outbuf, &ic->outbytesleft) == (size_t)-1) {
-        switch (errno) {
-        case EINVAL:
-            return CODECVT_OK;
-        case E2BIG:
-            return CODECVT_OUTBUF;
-        case EILSEQ:
-            return CODECVT_INVALID;
-        }
-    }
-    return CODECVT_OK;
-}
-
-static int make_alt_string(char *dst, const char *alt, int ch)
-{
-    enum {
-        SURROGATE_NONE = 0,
-        SURROGATE_DONE = -1,
-    };
-    const char *p = alt;
-    const char *top = dst;
-    int lo_sur = SURROGATE_NONE;  // Low Surrogate
-
-    for (;;) {
-        switch (*p) {
-        case '\0':
-            if (lo_sur > 0) {
-                p = alt;
-                ch = lo_sur;
-                lo_sur = SURROGATE_DONE;
-            } else {
-                return dst - top;
-            }
-            break;
-        case 'd':
-            sprintf(dst, "%d", ch);
-            dst += strlen(dst);
-            p++;
-            break;
-        case 'x':
-            sprintf(dst, "%02X", ch);
-            dst += strlen(dst);
-            p++;
-            break;
-        case 'u':
-            if (lo_sur == SURROGATE_NONE) {
-                if (ch > 0x10000) {
-                    ch -= 0x10000;
-                    lo_sur = ch % 0x400 + 0xDC00;
-                    ch = ch / 0x400 + 0xD800;
-                }
-            }
-            sprintf(dst, "%04X", ch);
-            dst += strlen(dst);
-            p++;
-            break;
-        case 'U':
-            sprintf(dst, "%04X", ch);
-            dst += strlen(dst);
-            p++;
-            break;
-        default:
-            *dst++ = *p;
-            p++;
-            break;
-        }
-    }
-}
-static int CodeCVT_conv(CodeCVT *ic, StrBuf *dst, const char *src_p, int src_size, int from_uni, int raise_error)
-{
-    char *tmp_buf = malloc(BUFFER_SIZE);
-    char alt[ALT_MAX_LEN];
-    int alt_size;
-
-    ic->inbuf = src_p;
-    ic->inbytesleft = src_size;
-    ic->outbuf = tmp_buf;
-    ic->outbytesleft = BUFFER_SIZE;
-
-    for (;;) {
-        switch (CodeCVT_next(ic)) {
-        case CODECVT_OK:
-            if (ic->inbuf != NULL) {
-                ic->inbuf = NULL;
-            } else {
-                goto BREAK;
-            }
-            break;
-        case CODECVT_OUTBUF:
-            if (!fs->StrBuf_add(dst, tmp_buf, BUFFER_SIZE - ic->outbytesleft)) {
-                return FALSE;
-            }
-            ic->outbuf = tmp_buf;
-            ic->outbytesleft = BUFFER_SIZE;
-            break;
-        case CODECVT_INVALID:
-            if (ic->trans != NULL) {
-                const char *psrc;
-                char *pdst;
-
-                if (from_uni) {
-                    alt_size = make_alt_string(alt, ic->trans, fs->utf8_codepoint_at(ic->inbuf));
-                } else {
-                    alt_size = make_alt_string(alt, ic->trans, *ic->inbuf);
-                }
-                if (ic->outbytesleft < alt_size) {
-                    if (!fs->StrBuf_add(dst, tmp_buf, BUFFER_SIZE - ic->outbytesleft)) {
-                        return FALSE;
-                    }
-                    ic->outbuf = tmp_buf;
-                    ic->outbytesleft = BUFFER_SIZE;
-                }
-                psrc = ic->inbuf;
-                pdst = ic->outbuf;
-
-                memcpy(pdst, alt, alt_size);
-                ic->outbuf += alt_size;
-                ic->outbytesleft -= alt_size;
-
-                if (from_uni) {
-                    fs->utf8_next(&psrc, psrc + ic->inbytesleft);
-                } else {
-                    psrc++;
-                }
-
-                ic->inbytesleft -= psrc - ic->inbuf;
-                ic->inbuf = psrc;
-            } else {
-                if (raise_error) {
-                    if (from_uni) {
-                        int ch = fs->utf8_codepoint_at(ic->inbuf);
-                        fs->throw_errorf(fs->mod_lang, "CharsetError", "Cannot convert to %r (%U)", ic->cs_to->name, ch);
-                    } else {
-                        fs->throw_errorf(fs->mod_lang, "CharsetError", "Invalid byte sequence detected (%r)", ic->cs_from->name);
-                    }
-                }
-                free(tmp_buf);
-                return FALSE;
-            }
-            break;
-        }
-    }
-BREAK:
-    if (!fs->StrBuf_add(dst, tmp_buf, BUFFER_SIZE - ic->outbytesleft)) {
-        return FALSE;
-    }
-    free(tmp_buf);
-    return TRUE;
-}
-
-//////////////////////////////////////////////////////////////////////////////////////////
 
 static int convio_new(Value *vret, Value *v, RefNode *node)
 {
     RefNode *cls_convio = FUNC_VP(node);
     FConvIO *cio;
+    FCharset *fc;
     Ref *r = fs->ref_new(cls_convio);
     *vret = vp_Value(r);
 
     r->v[INDEX_TEXTIO_STREAM] = fs->Value_cp(v[1]);
     cio = (FConvIO*)malloc(sizeof(FConvIO));
     r->v[INDEX_CONVIO_FCONV] = ptr_Value(cio);
-    cio->in.ic = (void*)-1;
-    cio->out.ic = (void*)-1;
+
     cio->cs = Value_vp(v[2]);
-    cio->trans = TRUE;
+    fc = RefCharset_get_fcharset(cio->cs, TRUE);
+    if (fc == NULL) {
+        return FALSE;
+    }
 
     if (fg->stk_top > v + 3 && Value_bool(v[3])) {
         cio->trans = TRUE;
     }
+
+    FConv_init(&cio->in, fc, TRUE, cio->trans ? UTF8_ALTER_CHAR : NULL);
+    FConv_init(&cio->out, fc, TRUE, cio->trans ? "?" : NULL);
 
     return TRUE;
 }
@@ -258,8 +78,6 @@ static int convio_close(Value *vret, Value *v, RefNode *node)
     FConvIO *cio = Value_ptr(r->v[INDEX_CONVIO_FCONV]);
 
     if (cio != NULL) {
-        CodeCVT_close(&cio->in);
-        CodeCVT_close(&cio->out);
         free(cio);
         r->v[INDEX_CONVIO_FCONV] = VALUE_NULL;
     }
@@ -295,14 +113,9 @@ static int convio_gets(Value *vret, Value *v, RefNode *node)
                 }
             }
         }
-        if (cio->in.ic == (void*)-1) {
-            if (!CodeCVT_open(&cio->in, cio->cs, fs->cs_utf8, cio->trans ? UTF8_ALTER_CHAR : NULL)) {
-                ret = FALSE;
-                goto FINALLY;
-            }
-        }
         fs->StrBuf_init(&buf2, buf.size);
-        if (!CodeCVT_conv(&cio->in, &buf2, buf.p, buf.size, FALSE, TRUE)) {
+        FConv_conv_strbuf(&cio->in, &buf2, buf.p, buf.size, TRUE);
+        if (cio->in.status != FCONV_OK) {
             StrBuf_close(&buf2);
             ret = FALSE;
             goto FINALLY;
@@ -326,15 +139,9 @@ static int convio_write(Value *vret, Value *v, RefNode *node)
     Value stream = ref_textio->v[INDEX_TEXTIO_STREAM];
     FConvIO *cio = Value_ptr(ref_textio->v[INDEX_CONVIO_FCONV]);
     RefBytesIO *mb;
-    CodeCVT *ic = &cio->out;
     Value *vp;
     int max;
 
-    if (cio->out.ic == (void*)-1) {
-        if (!CodeCVT_open(&cio->out, fs->cs_utf8, cio->cs, cio->trans ? "?" : NULL)) {
-            return FALSE;
-        }
-    }
     {
         Value vmb;
         if (fs->stream_get_write_memio(stream, &vmb, &max)) {
@@ -348,51 +155,26 @@ static int convio_write(Value *vret, Value *v, RefNode *node)
         if (fs->Value_type(*vp) == fs->cls_str) {
             RefStr *rs = Value_vp(*vp);
 
-            ic->inbuf = rs->c;
-            ic->inbytesleft = rs->size;
-            ic->outbuf = mb->buf.p + mb->buf.size;
-            ic->outbytesleft = max - mb->buf.size;
+            FConv_set_src(&cio->out, rs->c, rs->size, TRUE);
+            FConv_set_dst(&cio->out, mb->buf.p + mb->buf.size, max - mb->buf.size);
 
             for (;;) {
-                switch (CodeCVT_next(ic)) {
-                case CODECVT_OK:
-                    mb->buf.size = ic->outbuf - mb->buf.p;
+                if (!FConv_next(&cio->out, TRUE)) {
+                    return FALSE;
+                }
+                switch (cio->out.status) {
+                case FCONV_OK:
+                    mb->buf.size = cio->out.dst - mb->buf.p;
                     goto BREAK;
-                case CODECVT_OUTBUF:
-                    mb->buf.size = ic->outbuf - mb->buf.p;
+                case FCONV_OUTPUT_REQUIRED:
+                    mb->buf.size = cio->out.dst - mb->buf.p;
                     if (!fs->stream_flush_sub(stream)) {
                         return FALSE;
                     }
-                    ic->outbuf = mb->buf.p;
-                    ic->outbytesleft = max;
+                    FConv_set_dst(&cio->out, mb->buf.p, max);
                     break;
-                case CODECVT_INVALID:
-                    if (cio->trans) {
-                        const char *ptr;
-                        if (ic->outbytesleft == 0) {
-                            mb->buf.size = ic->outbuf - mb->buf.p;
-                            if (!fs->stream_flush_sub(stream)) {
-                                return FALSE;
-                            }
-                            ic->outbuf = mb->buf.p;
-                            ic->outbytesleft = max;
-                        }
-                        ptr = ic->inbuf;
-
-                        *ic->outbuf++ = '?';
-                        ic->outbytesleft--;
-
-                        // 1文字進める
-                        fs->utf8_next(&ptr, ptr + ic->inbytesleft);
-                        ic->inbytesleft -= ptr - ic->inbuf;
-                        ic->inbuf = ptr;
-                    } else {
-                        RefCharset *cs = cio->cs;
-                        fs->throw_errorf(fs->mod_lang, "CharsetError", "Cannot convert %U to %S",
-                                         fs->utf8_codepoint_at(ic->inbuf), cs->name);
-                        return FALSE;
-                    }
-                    break;
+                case FCONV_ERROR:
+                    return FALSE;
                 }
             }
         BREAK: // for
@@ -436,14 +218,15 @@ int conv_tostr(Value *vret, Value *v, RefNode *node)
  * 文字コードをUTF-8に変換してセットする
  * 変換できない文字は置き換え
  */
-static Value cstr_Value_conv(const char *p, int size, RefCharset *cs)
+static Value cstr_Value_conv(const char *p, int size, RefCharset *rc)
 {
-    CodeCVT ic;
-    if (CodeCVT_open(&ic, cs, fs->cs_utf8, UTF8_ALTER_CHAR)) {
+    FCharset *cs = RefCharset_get_fcharset(rc, FALSE);
+    if (cs != NULL) {
+        FConv fc;
         StrBuf buf;
         fs->StrBuf_init_refstr(&buf, 0);
-        CodeCVT_conv(&ic, &buf, p, size, FALSE, TRUE);
-        CodeCVT_close(&ic);
+        FConv_init(&fc, cs, TRUE, UTF8_ALTER_CHAR);
+        FConv_conv_strbuf(&fc, &buf, p, size, FALSE);
         return fs->StrBuf_str_Value(&buf, fs->cls_str);
     }
     return VALUE_NULL;
@@ -496,10 +279,13 @@ static CodeCVTStatic *CodeCVTStatic_new(void)
 {
     CodeCVTStatic *f = fs->Mem_get(&fg->st_mem, sizeof(CodeCVTStatic));
 
-    f->CodeCVT_open = CodeCVT_open;
-    f->CodeCVT_close = CodeCVT_close;
-    f->CodeCVT_next = CodeCVT_next;
-    f->CodeCVT_conv = CodeCVT_conv;
+    f->RefCharset_get_fcharset = RefCharset_get_fcharset;
+
+    f->FConv_init = FConv_init;
+    f->FConv_conv_strbuf = FConv_conv_strbuf;
+    f->FConv_next = FConv_next;
+    f->FConv_set_src = FConv_set_src;
+    f->FConv_set_dst = FConv_set_dst;
 
     f->cstr_Value_conv = cstr_Value_conv;
 

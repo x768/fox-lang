@@ -212,6 +212,8 @@ typedef struct TimeOffset TimeOffset;
 typedef uint64_t Value;
 typedef struct Tok Tok;
 
+typedef struct FCharset FCharset;
+
 typedef int (*NativeFunc)(Value *vret, Value *v, RefNode *node);
 
 
@@ -270,9 +272,9 @@ typedef struct {
 
     RefStr *name;    // 文字コード名
     RefStr *iana;    // IANA登録名
-    RefStr *ic_name; // iconvで使う名前
-    int utf8;        // UTF-8ならTRUE
-    int ascii;       // G1がUS-ASCIIと互換性があればTRUE
+    FCharset *cs;
+    int type;
+    const char **files;
 } RefCharset;
 
 typedef struct {
@@ -628,7 +630,7 @@ struct FoxGlobal
 
 ////////////////////////////////////////////////////////////////////////////////
 
-#define FOX_INTERFACE_REVISION 1
+#define FOX_INTERFACE_REVISION 2
 
 
 extern const char *fox_ctype_flags;

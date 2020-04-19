@@ -483,14 +483,16 @@ static int zip_randomreader_index(Value *vret, Value *v, RefNode *node)
         fs->StrBuf_init(&sb, 0);
         // 文字コードを変換
         if (cdir->cs != fs->cs_utf8) {
-            CodeCVT ic;
+            FConv cv;
+            FCharset *fc;
             CodeCVTStatic_init();
-            if (codecvt->CodeCVT_open(&ic, fs->cs_utf8, cdir->cs, "?")) {
-                if (codecvt->CodeCVT_conv(&ic, &sb, name->c, name->size, TRUE, FALSE)) {
-                    local_str = TRUE;
-                }
-                codecvt->CodeCVT_close(&ic);
+            fc = codecvt->RefCharset_get_fcharset(cdir->cs, TRUE);
+            if (fc == NULL) {
+                return FALSE;
             }
+            codecvt->FConv_init(&cv, fc, FALSE, "?");
+            codecvt->FConv_conv_strbuf(&cv, &sb, name->c, name->size, FALSE);
+            local_str = TRUE;
         }
         for (i = 0; i < cdir->cdir_size; i++) {
             CentralDir *cd = &cdir->cdir[i];

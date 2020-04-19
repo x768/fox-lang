@@ -1,5 +1,5 @@
 #include "fconv.h"
-#include "util.h"
+#include "m_codecvt.h"
 #include <stdint.h>
 #include <stdarg.h>
 #include <stdlib.h>
@@ -12,6 +12,11 @@ enum {
     CODESET_256,
     CODESET_96_96,
     CODESET_96_192,
+};
+
+enum {
+    USER_DEFINED_BEGIN = 0xE000,
+    USER_DEFINED_END = 0xF900,
 };
 
 typedef union {
@@ -40,7 +45,7 @@ typedef struct {
 } FEscape;
 
 struct FCharset {
-    Mem mem;
+    RefCharset *rc;
     int type;
     FFromU8Table *f;
     FToU8Table **t;
@@ -48,10 +53,6 @@ struct FCharset {
     FEscape *esc;
 };
 
-static uint32_t ptr_read_uint32(const char *p)
-{
-    return ((uint8_t)p[0] << 24) | ((uint8_t)p[1] << 16) | ((uint8_t)p[2] << 8) | ((uint8_t)p[3]);
-}
 static int32_t fread_int32(FileHandle fh)
 {
     char buf[4];
@@ -109,6 +110,7 @@ static FToU8Table *load_U8Table(const char *fname, Mem *mem)
         close_fox(fh);
         return table;
     } else {
+        fs->fatal_errorf("Cannot read file %q", fname);
         return NULL;
     }
 }
@@ -148,7 +150,7 @@ static void appendU8Table(FFromU8Table *from, FToU8Table *to, Mem *mem)
         if (str != NULL) {
             int c = *str & 0xFF;
             FFromU8 *u8 = from->next[c];
-            int32_t code;
+            int32_t code = 0;
             if (u8 == NULL) {
                 u8 = (FFromU8*)fs->Mem_get(mem, sizeof(FFromU8));
                 memset(u8, 0, sizeof(FFromU8));
@@ -209,28 +211,25 @@ static FFromU8 *findFromU8(FFromU8Table *from, const char **psrc)
 
 /////////////////////////////////////////////////////////////////////////
 
-FCharset *FCharset_new(int type, int num, ...)
+FCharset *FCharset_new(RefCharset *rc)
 {
     Mem mem;
     FCharset *cs;
 
     fs->Mem_init(&mem, 1024);
-    cs = (FCharset*)fs->Mem_get(&mem, sizeof(FCharset));
-    cs->mem = mem;
-    cs->type = type;
+    cs = (FCharset*)fs->Mem_get(&fg->st_mem, sizeof(FCharset));
+    cs->rc = rc;
+    cs->type = rc->type;
 
-    if (num > 0 && type >= FCHARSET_SINGLE_BYTE) {
-        va_list va;
+    if (rc->type >= FCHARSET_SINGLE_BYTE && rc->files != NULL) {
         int i;
-        int num_t;
+        int num_t = 1;
 
-        switch (type) {
+        switch (rc->type) {
         case FCHARSET_SINGLE_BYTE:
             num_t = 2;
             break;
         case FCHARSET_EUC:
-            num_t = 4;
-            break;
         case FCHARSET_SHIFTJIS:
             num_t = 4;
             break;
@@ -241,27 +240,16 @@ FCharset *FCharset_new(int type, int num, ...)
         memset(cs->f, 0, sizeof(FFromU8Table));
         memset(cs->t, 0, sizeof(FToU8Table) * num_t);
 
-        if (num > num_t) {
-            num = num_t;
+        for (i = 0; i < num_t && rc->files[i] != NULL; i++) {
+            const char *file = rc->files[i];
+            cs->t[i] = load_U8Table(file, &mem);
+            appendU8Table(cs->f, cs->t[i], &mem);
         }
-        va_start(va, num);
-        for (i = 0; i < num; i++) {
-            const char *tbl = va_arg(va, const char*);
-            if (tbl != NULL && tbl[0] != '\0') {
-                cs->t[i] = load_U8Table(tbl, &mem);
-                appendU8Table(cs->f, cs->t[i], &mem);
-            }
-        }
-        va_end(va);
     } else {
         cs->f = NULL;
         cs->t = NULL;
     }
     return cs;
-}
-void FCharset_close(FCharset *cv)
-{
-    fs->Mem_close(&cv->mem);
 }
 
 // 不正なUTF-8を入力した場合の動作は未定義
@@ -548,7 +536,7 @@ int FCharset_to_utf8(FCharset *cs, const char **psrc, const char *src_end, char 
                 }
             } else if ((c & 0xF8) == 0xF0) {
                 if (((const uint8_t*)src_end - src) >= 4) {
-                    if (src[0] > 0xF0 || src[0] == 0xF0 && (src[1] & 0xFF) >= 0x90) {
+                    if (src[0] > 0xF0 || (src[0] == 0xF0 && (src[1] & 0xFF) >= 0x90)) {
                         src_len = 4;
                         code = ((c & 0x07) << 18) | ((src[1] & 0x3F) << 12)  | ((src[2] & 0x3F) << 6) | (src[3] & 0x3F);
                     }
@@ -844,5 +832,13 @@ void FCharset_from_ascii_string(FCharset *cs, char *src, const char *end)
             }
             p++;
         }
+    }
+}
+void FConv_throw_charset_error(FConv *fc)
+{
+    if (fc->to_utf8) {
+        fs->throw_errorf(fs->mod_lang, "CharsetError", "Cannot convert %02X to %S", fc->error_charcode, fc->cs->rc->name);
+    } else {
+        fs->throw_errorf(fs->mod_lang, "CharsetError", "Cannot convert %U to %S", fc->error_charcode, fc->cs->rc->name);
     }
 }

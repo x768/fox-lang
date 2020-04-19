@@ -65,6 +65,7 @@ else()
     rt
     dl
     pcre
+    m
   )
 
   target_link_libraries(foxrt

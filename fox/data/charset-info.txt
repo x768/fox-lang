@@ -1,12 +1,49 @@
-"EUC-JIS-2004": iana = "EUC-JP"
-"ISO-2022-JP-1": iana = "ISO-2022-JP"
-"ISO-2022-JP-2": iana = "ISO-2022-JP"
-"ISO-2022-JP-2004": iana = "ISO-2022-JP"
-"Shift_JISX0213": iana = "Shift_JIS"
-"UTF-16": iconv = "UTF-16BE", ascii_compat = false
-"UTF-16BE": iana = "UTF-16", ascii_compat = false
-"UTF-16LE": iana = "UTF-16", ascii_compat = false
-"UTF-32": iconv = "UTF-32BE", ascii_compat = false
-"UTF-32BE": iana = "UTF-32", ascii_compat = false
-"UTF-32LE": iana = "UTF-32", ascii_compat = false
-"Windows-31J": iana = "Shift_JIS", iconv = "CP932"
+"Big5": type = big5
+"CESU-8": type = cesu8
+"EUC-JIS-2004": iana = "EUC-JP", type = euc, files = ["ASCII", "JIS_X_0213_P1", "JIS_X_0201", "JIS_X_0213_P2"]
+"EUC-JP": type = euc, files = ["ASCII", "JIS_X_0208", "JIS_X_0201", "JIS_X_0212"]
+"EUC-KR": type = euc
+"EUC-TW": type = euc
+"GB2312": type = euc
+"GB18030": type = gb18030
+"ISO-2022-CN": type = iso2022
+"ISO-2022-CN-EXT": type = iso2022
+"ISO-2022-JP": type = iso2022
+"ISO-2022-JP-1": iana = "ISO-2022-JP", type = iso2022
+"ISO-2022-JP-2": iana = "ISO-2022-JP", type = iso2022
+"ISO-2022-JP-2004": iana = "ISO-2022-JP", type = iso2022
+"ISO646-JP":type = singlebyte, files = ["JIS_X_0201"]
+"ISO_8859-1": type = singlebyte, files = ["ASCII", "ISO_8859-1"]
+"ISO_8859-2": type = singlebyte, files = ["ASCII", "ISO_8859-2"]
+"ISO_8859-3": type = singlebyte, files = ["ASCII", "ISO_8859-3"]
+"ISO_8859-4": type = singlebyte, files = ["ASCII", "ISO_8859-4"]
+"ISO-8859-5": type = singlebyte, files = ["ASCII", "ISO_8859-5"]
+"ISO-8859-6": type = singlebyte, files = ["ASCII", "ISO_8859-6"]
+"ISO_8859-7": type = singlebyte, files = ["ASCII", "ISO_8859-7"]
+"ISO_8859-8": type = singlebyte, files = ["ASCII", "ISO_8859-8"]
+"ISO_8859-9": type = singlebyte, files = ["ASCII", "ISO_8859-9"]
+"ISO_8859-10": type = singlebyte, files = ["ASCII", "ISO_8859-10"]
+"ISO_8859-11": type = singlebyte, files = ["ASCII", "ISO_8859-11"]
+"ISO_8859-13": type = singlebyte, files = ["ASCII", "ISO_8859-13"]
+"ISO_8859-14": type = singlebyte, files = ["ASCII", "ISO_8859-14"]
+"ISO_8859-15": type = singlebyte, files = ["ASCII", "ISO_8859-15"]
+"ISO_8859-16": type = singlebyte, files = ["ASCII", "ISO_8859-16"]
+"Shift_JIS": type = shiftjis, files = ["JIS_X_0201", "JIS_X_0201", "JIS_X_0208"]
+"Shift_JISX0213": iana = "Shift_JIS", type = shiftjis, files = ["JIS_X_0201", "JIS_X_0201", "JIS_X_0213_P1", "JIS_X_0213_P2"]
+"UTF-16": type = utf16be
+"UTF-16BE": iana = "UTF-16", type = utf16be
+"UTF-16LE": iana = "UTF-16", type = utf16le
+"UTF-32": type = utf32be
+"UTF-32BE": iana = "UTF-32", type = utf32be
+"UTF-32LE": iana = "UTF-32", type = utf32le
+"Windows-31J": iana = "Shift_JIS", type = shiftjis, files = ["ASCII", "JIS_X_0201", "Windows-31J", "Windows-31Jext"]
+"US-ASCII": type = singlebyte, files = ["ASCII"]
+"Windows-1250": type = singlebyte, files = ["ASCII", "Windows-1250"]
+"Windows-1251": type = singlebyte, files = ["ASCII", "Windows-1251"]
+"Windows-1252": type = singlebyte, files = ["ASCII", "Windows-1252"]
+"Windows-1253": type = singlebyte, files = ["ASCII", "Windows-1253"]
+"Windows-1254": type = singlebyte, files = ["ASCII", "Windows-1254"]
+"Windows-1255": type = singlebyte, files = ["ASCII", "Windows-1255"]
+"Windows-1256": type = singlebyte, files = ["ASCII", "Windows-1256"]
+"Windows-1257": type = singlebyte, files = ["ASCII", "Windows-1257"]
+"Windows-1258": type = singlebyte, files = ["ASCII", "Windows-1258"]

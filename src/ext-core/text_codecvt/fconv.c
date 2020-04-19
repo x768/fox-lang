@@ -1,5 +1,5 @@
 #include "fconv.h"
-#include "util.h"
+#include "m_codecvt.h"
 #include <string.h>
 #include <stdio.h>
 
@@ -84,7 +84,7 @@ static void output_alter_string(char **pdst, const char *fmt, int code, FCharset
     }
     *pdst = dst;
 }
-void FConv_next(FConv *fc)
+int FConv_next(FConv *fc, int throw_error)
 {
     for (;;) {
         const char *src_prev;
@@ -101,7 +101,7 @@ void FConv_next(FConv *fc)
                     fc->dst_tmp -= dst_last;
                 }
                 fc->status = FCONV_OUTPUT_REQUIRED;
-                return;
+                return TRUE;
             } else {
                 memcpy(fc->dst, fc->dst_tmp_buf, tmp_len);
                 fc->dst += tmp_len;
@@ -117,7 +117,7 @@ void FConv_next(FConv *fc)
         } else if (fc->src_terminate) {
             if (fc->src >= fc->src_end) {
                 fc->status = FCONV_OK;
-                return;
+                return TRUE;
             }
         } else {
             // srcが残り少なくなったらsrc_tmpに移す
@@ -129,7 +129,7 @@ void FConv_next(FConv *fc)
                 fc->src_tmp_last = src_last;
                 fc->src += src_last;
                 fc->status = FCONV_INPUT_REQUIRED;
-                return;
+                return TRUE;
             }
         }
         {
@@ -139,7 +139,7 @@ void FConv_next(FConv *fc)
             char *dst_dummy;
 
             if (fc->src_tmp_last > 0) {
-                psrc = &fc->src_tmp;
+                psrc = (const char**)&fc->src_tmp;
                 src_end = fc->src_tmp_end;
             } else {
                 psrc = &fc->src;
@@ -163,7 +163,10 @@ void FConv_next(FConv *fc)
                     } else {
                         fc->status = FCONV_ERROR;
                         fc->error_charcode = **psrc & 0xFF;
-                        return;
+                        if (throw_error) {
+                            FConv_throw_charset_error(fc);
+                        }
+                        return FALSE;
                     }
                 }
             } else {
@@ -176,7 +179,10 @@ void FConv_next(FConv *fc)
                     } else {
                         fc->status = FCONV_ERROR;
                         fc->error_charcode = code;
-                        return;
+                        if (throw_error) {
+                            FConv_throw_charset_error(fc);
+                        }
+                        return FALSE;
                     }
                 }
             }
@@ -188,6 +194,21 @@ void FConv_next(FConv *fc)
                 fc->src += -fc->src_tmp_last;
                 fc->src_tmp_last = 0;
             }
+        }
+    }
+}
+void FConv_conv_strbuf(FConv *fc, StrBuf *sb, const char *src, int src_len, int throw_error)
+{
+    FConv_set_src(fc, src, src_len, TRUE);
+
+    for (;;) {
+        int prev_size = sb->size;
+        fs->StrBuf_alloc(sb, prev_size + FCONV_MAX_CHAR_LENGTH);
+        FConv_set_dst(fc, sb->p + prev_size, FCONV_MAX_CHAR_LENGTH);
+        FConv_next(fc, throw_error);
+        if (fc->status != FCONV_OUTPUT_REQUIRED) {
+            sb->size = fc->dst - sb->p;
+            return;
         }
     }
 }

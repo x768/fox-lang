@@ -18,7 +18,7 @@ typedef struct {
     int pretty;
     int keep_space;
     RefCharset *cs;
-    CodeCVT ic;
+    FConv fc;
 } XMLOutputFormat;
 
 static CodeCVTStatic *codecvt;
@@ -162,7 +162,7 @@ static int stream_write_xmldata(Value dst, StrBuf *buf, XMLOutputFormat *xof)
         StrBuf sb;
         fs->StrBuf_init(&sb, buf->size);
         CodeCVTStatic_init();
-        if (!codecvt->CodeCVT_conv(&xof->ic, &sb, buf->p, buf->size, TRUE, FALSE)) {
+        if (!codecvt->FConv_conv_strbuf(&xof->fc, &sb, buf->p, buf->size, TRUE)) {
             return FALSE;
         }
         if (!fs->stream_write_data(dst, sb.p, sb.size)) {
@@ -358,13 +358,16 @@ FOUND:
 }
 static void convert_encoding_sub(StrBuf *sb, const char *p, int size, RefCharset *cs)
 {
-    CodeCVT ic;
+    FCharset *fc;
 
     CodeCVTStatic_init();
-    codecvt->CodeCVT_open(&ic, cs, fs->cs_utf8, UTF8_ALTER_CHAR);
-    codecvt->CodeCVT_conv(&ic, sb, p, size, FALSE, FALSE);
-    fs->StrBuf_add_c(sb, '\0');
-    codecvt->CodeCVT_close(&ic);
+    fc = codecvt->RefCharset_get_fcharset(cs, FALSE);
+    if (fc != NULL) {
+        FConv cv;
+        codecvt->FConv_init(&cv, fc, TRUE, UTF8_ALTER_CHAR);
+        codecvt->FConv_conv_strbuf(&cv, sb, p, size, FALSE);
+        fs->StrBuf_add_c(sb, '\0');
+    }
 }
 static int parse_xml(Value *vret, Value *v, RefNode *node)
 {
@@ -999,14 +1002,18 @@ static int parse_output_format_charset(XMLOutputFormat *xof, Value *v)
     if (fg->stk_top > v + 3) {
         xof->cs = Value_vp(v[3]);
         if (xof->cs != fs->cs_utf8) {
-            if (!xof->cs->ascii) {
+            FCharset *fc;
+
+            if (xof->cs->type > FCHARSET_ASCII_COMPAT) {
                 fs->throw_errorf(fs->mod_lang, "ValueError", "Encoding %r is not supported", xof->cs->name);
                 return FALSE;
             }
             CodeCVTStatic_init();
-            if (!codecvt->CodeCVT_open(&xof->ic, fs->cs_utf8, xof->cs, "&#d;")) {
+            fc = codecvt->RefCharset_get_fcharset(xof->cs, TRUE);
+            if (fc == NULL) {
                 return FALSE;
             }
+            codecvt->FConv_init(&xof->fc, fc, FALSE, "&#d;");
         }
     } else {
         xof->cs = fs->cs_utf8;
@@ -1058,18 +1065,11 @@ static int xml_node_save(Value *vret, Value *v, RefNode *node)
     }
     StrBuf_close(&buf);
     fs->unref(writer);
-    if (xof.cs != fs->cs_utf8) {
-        CodeCVTStatic_init();
-        codecvt->CodeCVT_close(&xof.ic);
-    }
     return TRUE;
+
 ERROR_END:
     fs->unref(writer);
     StrBuf_close(&buf);
-    if (xof.cs != fs->cs_utf8) {
-        CodeCVTStatic_init();
-        codecvt->CodeCVT_close(&xof.ic);
-    }
     return FALSE;
 }
 
@@ -2071,18 +2071,11 @@ static int xml_document_save(Value *vret, Value *v, RefNode *node)
     }
     StrBuf_close(&buf);
     fs->unref(writer);
-    if (xof.cs != fs->cs_utf8) {
-        CodeCVTStatic_init();
-        codecvt->CodeCVT_close(&xof.ic);
-    }
     return TRUE;
+
 ERROR_END:
     fs->unref(writer);
     StrBuf_close(&buf);
-    if (xof.cs != fs->cs_utf8) {
-        CodeCVTStatic_init();
-        codecvt->CodeCVT_close(&xof.ic);
-    }
     return FALSE;
 }
 
