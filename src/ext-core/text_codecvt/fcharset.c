@@ -95,8 +95,9 @@ static FToU8Table *load_U8Table(const char *fname, Mem *mem)
         }
         {
             int str_size = fread_int32(fh);
-            str = (char*)fs->Mem_get(mem, str_size);
+            str = (char*)fs->Mem_get(mem, str_size + 1);
             read_fox(fh, str, str_size);
+            str[str_size] = '\0';
         }
         for (i = 0; i < size; i++) {
             int32_t ip = table->u[i].ip;

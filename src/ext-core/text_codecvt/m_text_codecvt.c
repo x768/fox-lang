@@ -236,12 +236,6 @@ static Value cstr_Value_conv(const char *p, int size, RefCharset *rc)
 
 static void define_func(RefNode *m)
 {
-    RefNode *n;
-
-    n = fs->define_identifier(m, m, "conv_tobytes", NODE_FUNC_N, 0);
-    fs->define_native_func_a(n, conv_tobytes, 2, 3, NULL, fs->cls_str, fs->cls_charset, fs->cls_bool);
-    n = fs->define_identifier(m, m, "conv_tostr", NODE_FUNC_N, 0);
-    fs->define_native_func_a(n, conv_tostr, 2, 3, NULL, fs->cls_bytes, fs->cls_charset, fs->cls_bool);
 }
 static void define_class(RefNode *m)
 {

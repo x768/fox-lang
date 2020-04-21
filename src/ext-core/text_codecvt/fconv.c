@@ -197,18 +197,23 @@ int FConv_next(FConv *fc, int throw_error)
         }
     }
 }
-void FConv_conv_strbuf(FConv *fc, StrBuf *sb, const char *src, int src_len, int throw_error)
+int FConv_conv_strbuf(FConv *fc, StrBuf *sb, const char *src, int src_len, int throw_error)
 {
     FConv_set_src(fc, src, src_len, TRUE);
 
     for (;;) {
         int prev_size = sb->size;
-        fs->StrBuf_alloc(sb, prev_size + FCONV_MAX_CHAR_LENGTH);
-        FConv_set_dst(fc, sb->p + prev_size, FCONV_MAX_CHAR_LENGTH);
-        FConv_next(fc, throw_error);
+        fs->StrBuf_alloc(sb, prev_size + BUFFER_SIZE);
+        FConv_set_dst(fc, sb->p + prev_size, BUFFER_SIZE);
+        sb->size = fc->dst - sb->p;
+
+        if (!FConv_next(fc, throw_error)) {
+            fc->status = FCONV_ERROR;
+            return FALSE;
+        }
         if (fc->status != FCONV_OUTPUT_REQUIRED) {
             sb->size = fc->dst - sb->p;
-            return;
+            return TRUE;
         }
     }
 }

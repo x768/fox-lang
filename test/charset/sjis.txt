@@ -1,2 +1,2 @@
 プログラミング言語
-abcdefg
+Programming Language

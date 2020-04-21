@@ -45,9 +45,12 @@ static void load_charset_alias_file(const char *filename)
             cs->rh.nref = -1;
             cs->rh.n_memb = 0;
             cs->rh.weak_ref = NULL;
-            cs->type = FCHARSET_NONE;
+
             cs->name = name_r;
             cs->iana = name_r;
+            cs->cs = NULL;
+            cs->type = FCHARSET_NONE;
+            cs->files = NULL;
 
             for (;;) {
                 if (tk.v.type != TL_STR) {

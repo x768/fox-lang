@@ -1,5 +1,5 @@
 for f in glob("*.txt") {
-	let w = FileIO("../../charset/${f.basename}", "w");
+	let w = FileIO("../../fox/charset/${f.basename}", "w");
 
 	puts f.basename, "..."
 
@@ -67,17 +67,13 @@ for f in glob("*.txt") {
 			position[begin] = pos
 			strtable.push b
 			pos += b.size + 1
-			str_total_size += b.size
+			str_total_size += b.size + 1
 		}
 	}
 	w.pack "I", type
 
 	for p in position {
-		if p {
-			w.pack "I", p
-		} else {
-			w.pack "I", -1
-		}
+		w.pack "I", p || -1
 	}
 
 	w.pack "I", str_total_size

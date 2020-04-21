@@ -3,10 +3,12 @@ import text.codecvt
 
 let path = ENV.has_key("TEST_BATCH") ? "charset" : "."
 
-assert_equal readfile("${path}/sjis.txt", Charset("shift_jis")), "プログラミング言語"
+let expected = "プログラミング言語\nProgramming Language\n"
+
+assert_equal readfile("${path}/sjis.txt", Charset("shift_jis")), expected
 assert_equal "プログラミング言語".to_bytes(Charset("ascii"), true), b"?????????"
 assert_error () => "プログラミング言語".to_bytes(Charset("ascii")), CharsetError
 
 let sjis_bytes = readfile("${path}/sjis.txt")
-assert_equal Str(sjis_bytes, Charset("shift_jis")), "プログラミング言語"
+assert_equal Str(sjis_bytes, Charset("shift_jis")), expected
 

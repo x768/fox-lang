@@ -1334,7 +1334,29 @@ static int string_substr(Value *vret, Value *v, RefNode *node)
 static int string_tobytes(Value *vret, Value *v, RefNode *node)
 {
     RefStr *src = Value_vp(*v);
-    *vret = cstr_Value(fs->cls_bytes, src->c, src->size);
+    RefCharset *rc = (fg->stk_top > v + 1) ? Value_vp(v[1]) : fs->cs_utf8;
+
+    if (rc->type == FCHARSET_UTF8 || rc->type == FCHARSET_UTF8_LOOSE) {
+        *vret = cstr_Value(fs->cls_bytes, src->c, src->size);
+    } else {
+        FCharset *fc;
+        FConv cv;
+        StrBuf sb;
+        int alter = (fg->stk_top > v + 2) && bool_Value(v[2]);
+
+        CodeCVTStatic_init();
+        fc = codecvt->RefCharset_get_fcharset(rc, TRUE);
+        if (fc == NULL) {
+            return FALSE;
+        }
+        codecvt->FConv_init(&cv, fc, FALSE, alter ? "?" : NULL);
+        StrBuf_init_refstr(&sb, src->size);
+        if (!codecvt->FConv_conv_strbuf(&cv, &sb, src->c, src->size, TRUE)) {
+            StrBuf_close(&sb);
+            return FALSE;
+        }
+        *vret = StrBuf_str_Value(&sb, fs->cls_bytes);
+    }
     return TRUE;
 }
 
@@ -2180,7 +2202,7 @@ void define_lang_str_class(RefNode *m)
     n = define_identifier(m, cls, "sub", NODE_FUNC_N, 0);
     define_native_func_a(n, string_substr, 1, 2, NULL, fs->cls_int, fs->cls_int);
     n = define_identifier(m, cls, "to_bytes", NODE_FUNC_N, 0);
-    define_native_func_a(n, string_tobytes, 0, 0, NULL);
+    define_native_func_a(n, string_tobytes, 1, 2, NULL, fs->cls_charset, fs->cls_bool);
     extends_method(cls, fs->cls_sequence);
 
     // SequenceIter

@@ -482,7 +482,7 @@ static int zip_randomreader_index(Value *vret, Value *v, RefNode *node)
 
         fs->StrBuf_init(&sb, 0);
         // 文字コードを変換
-        if (cdir->cs != fs->cs_utf8) {
+        if (v_type == fs->cls_str && cdir->cs != fs->cs_utf8) {
             FConv cv;
             FCharset *fc;
             CodeCVTStatic_init();

@@ -1,9 +1,0 @@
-import util.assert
-import text.codecvt
-
-let path = ENV.has_key("TEST_BATCH") ? "charset" : "."
-
-for line in ConvIO(FileIO("${path}/sjis.txt"), Charset("cp932")) {
-    puts line
-}
-
