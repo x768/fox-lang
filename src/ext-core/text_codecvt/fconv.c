@@ -164,7 +164,7 @@ int FConv_next(FConv *fc, int throw_error)
                         fc->status = FCONV_ERROR;
                         fc->error_charcode = **psrc & 0xFF;
                         if (throw_error) {
-                            FConv_throw_charset_error(fc);
+                            FConv_throw_convert_error(fc);
                         }
                         return FALSE;
                     }
@@ -180,7 +180,7 @@ int FConv_next(FConv *fc, int throw_error)
                         fc->status = FCONV_ERROR;
                         fc->error_charcode = code;
                         if (throw_error) {
-                            FConv_throw_charset_error(fc);
+                            FConv_throw_convert_error(fc);
                         }
                         return FALSE;
                     }

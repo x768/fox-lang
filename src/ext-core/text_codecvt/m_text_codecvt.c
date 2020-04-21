@@ -203,12 +203,75 @@ static int convio_translit(Value *vret, Value *v, RefNode *node)
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
-int conv_tobytes(Value *vret, Value *v, RefNode *node)
+static int conv_tobytes(Value *vret, Value *v, RefNode *node)
 {
-    return TRUE;
+    RefStr *rs = Value_vp(v[1]);
+    RefCharset *cs = Value_vp(v[2]);
+    int alter = (fg->stk_top > v + 3) ? Value_bool(v[3]) : FALSE;
+    FCharset *fc = RefCharset_get_fcharset(cs, FALSE);
+
+    if (cs != NULL) {
+        FConv cv;
+        StrBuf buf;
+        fs->StrBuf_init_refstr(&buf, 0);
+        FConv_init(&cv, fc, FALSE, alter ? "?" : NULL);
+        if (!FConv_conv_strbuf(&cv, &buf, rs->c, rs->size, TRUE)) {
+            return FALSE;
+        }
+        *vret = fs->StrBuf_str_Value(&buf, fs->cls_bytes);
+        return TRUE;
+    } else {
+        return FALSE;
+    }
 }
-int conv_tostr(Value *vret, Value *v, RefNode *node)
+static int conv_tostr(Value *vret, Value *v, RefNode *node)
 {
+    RefStr *rs = Value_vp(v[1]);
+    RefCharset *cs = Value_vp(v[2]);
+    int alter = (fg->stk_top > v + 3) ? Value_bool(v[3]) : FALSE;
+    FCharset *fc = RefCharset_get_fcharset(cs, FALSE);
+
+    if (cs != NULL) {
+        FConv cv;
+        StrBuf buf;
+        fs->StrBuf_init_refstr(&buf, 0);
+        FConv_init(&cv, fc, TRUE, alter ? UTF8_ALTER_CHAR : NULL);
+        if (!FConv_conv_strbuf(&cv, &buf, rs->c, rs->size, TRUE)) {
+            return FALSE;
+        }
+        *vret = fs->StrBuf_str_Value(&buf, fs->cls_str);
+        return TRUE;
+    } else {
+        return FALSE;
+    }
+}
+static int is_valid_encoding(Value *vret, Value *v, RefNode *node)
+{
+    RefStr *rs = Value_vp(v[1]);
+    RefCharset *cs = Value_vp(v[2]);
+    FCharset *fc = RefCharset_get_fcharset(cs, FALSE);
+    int to_utf8 = FUNC_INT(node);
+
+    if (cs != NULL) {
+        char buf[BUFFER_SIZE];
+        FConv cv;
+        FConv_init(&cv, fc, to_utf8, NULL);
+        FConv_set_src(&cv, rs->c, rs->size, TRUE);
+        for (;;) {
+            FConv_set_dst(&cv, buf, BUFFER_SIZE);
+            if (!FConv_next(&cv, FALSE)) {
+                *vret = bool_Value(FALSE);
+                return TRUE;
+            }
+            if (cv.status != FCONV_OUTPUT_REQUIRED) {
+                break;
+            }
+        }
+        *vret = bool_Value(TRUE);
+        return TRUE;
+    } else {
+        return FALSE;
+    }
     return TRUE;
 }
 
@@ -236,6 +299,16 @@ static Value cstr_Value_conv(const char *p, int size, RefCharset *rc)
 
 static void define_func(RefNode *m)
 {
+    RefNode *n;
+
+    n = fs->define_identifier(m, m, "conv_tobytes", NODE_FUNC_N, 0);
+    fs->define_native_func_a(n, conv_tobytes, 2, 3, NULL, fs->cls_str, fs->cls_charset, fs->cls_bool);
+    n = fs->define_identifier(m, m, "conv_tostr", NODE_FUNC_N, 0);
+    fs->define_native_func_a(n, conv_tostr, 2, 3, NULL, fs->cls_bytes, fs->cls_charset, fs->cls_bool);
+    n = fs->define_identifier(m, m, "is_representable", NODE_FUNC_N, 0);
+    fs->define_native_func_a(n, is_valid_encoding, 2, 2, (void*)FALSE, fs->cls_str, fs->cls_charset);
+    n = fs->define_identifier(m, m, "is_valid_encoding", NODE_FUNC_N, 0);
+    fs->define_native_func_a(n, is_valid_encoding, 2, 2, (void*)TRUE, fs->cls_bytes, fs->cls_charset);
 }
 static void define_class(RefNode *m)
 {

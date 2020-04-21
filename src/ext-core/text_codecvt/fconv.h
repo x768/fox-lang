@@ -11,7 +11,7 @@ FCharset *FCharset_new(RefCharset *rc);
 int FCharset_from_utf8(FCharset *cs, const char **psrc, char **pdst);
 int FCharset_to_utf8(FCharset *cs, const char **psrc, const char *src_end, char **pdst);
 void FCharset_from_ascii_string(FCharset *cs, char *src, const char *end);
-void FConv_throw_charset_error(FConv *fc);
+void FConv_throw_convert_error(FConv *fc);
 
 void FConv_init(FConv *fc, FCharset *cs, int to_utf8, const char *alter);
 int FConv_conv_strbuf(FConv *fc, StrBuf *sb, const char *src, int src_len, int throw_error);

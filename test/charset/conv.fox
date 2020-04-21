@@ -6,9 +6,9 @@ let path = ENV.has_key("TEST_BATCH") ? "charset" : "."
 let expected = "プログラミング言語\nProgramming Language\n"
 
 assert_equal readfile("${path}/sjis.txt", Charset("shift_jis")), expected
-assert_equal "プログラミング言語".to_bytes(Charset("ascii"), true), b"?????????"
-assert_error () => "プログラミング言語".to_bytes(Charset("ascii")), CharsetError
+assert_equal conv_tobytes("プログラミング言語", Charset("ascii"), true), b"?????????"
+assert_error () => conv_tobytes("プログラミング言語", Charset("ascii")), CharsetError
 
 let sjis_bytes = readfile("${path}/sjis.txt")
-assert_equal Str(sjis_bytes, Charset("shift_jis")), expected
+assert_equal conv_tostr(sjis_bytes, Charset("shift_jis")), expected
 

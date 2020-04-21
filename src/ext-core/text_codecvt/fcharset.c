@@ -835,11 +835,11 @@ void FCharset_from_ascii_string(FCharset *cs, char *src, const char *end)
         }
     }
 }
-void FConv_throw_charset_error(FConv *fc)
+void FConv_throw_convert_error(FConv *fc)
 {
     if (fc->to_utf8) {
-        fs->throw_errorf(fs->mod_lang, "CharsetError", "Cannot convert %02X to %S", fc->error_charcode, fc->cs->rc->name);
+        fs->throw_errorf(fs->mod_lang, "CharsetError", "Cannot convert %02X to %r", fc->error_charcode, fc->cs->rc->name);
     } else {
-        fs->throw_errorf(fs->mod_lang, "CharsetError", "Cannot convert %U to %S", fc->error_charcode, fc->cs->rc->name);
+        fs->throw_errorf(fs->mod_lang, "CharsetError", "Cannot convert %U to %r", fc->error_charcode, fc->cs->rc->name);
     }
 }
