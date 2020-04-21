@@ -1,11 +1,11 @@
-"Big5": type = big5
+"Big5": type = big5, files = ["ASCII", "Big5"]
 "CESU-8": type = cesu8
 "EUC-JIS-2004": iana = "EUC-JP", type = euc, files = ["ASCII", "JIS_X_0213_P1", "JIS_X_0201", "JIS_X_0213_P2"]
 "EUC-JP": type = euc, files = ["ASCII", "JIS_X_0208", "JIS_X_0201", "JIS_X_0212"]
 "EUC-KR": type = euc
 "EUC-TW": type = euc
-"GB2312": type = euc
-"GB18030": type = gb18030
+"GB_2312": type = euc, files = ["ASCII", "GB2312"]
+"GB_18030": type = gb18030
 "ISO-2022-CN": type = iso2022
 "ISO-2022-CN-EXT": type = iso2022
 "ISO-2022-JP": type = iso2022
@@ -28,6 +28,7 @@
 "ISO_8859-14": type = singlebyte, files = ["ASCII", "ISO_8859-14"]
 "ISO_8859-15": type = singlebyte, files = ["ASCII", "ISO_8859-15"]
 "ISO_8859-16": type = singlebyte, files = ["ASCII", "ISO_8859-16"]
+"None": iana = ""
 "Shift_JIS": type = shiftjis, files = ["JIS_X_0201", "JIS_X_0201", "JIS_X_0208"]
 "Shift_JISX0213": iana = "Shift_JIS", type = shiftjis, files = ["JIS_X_0201", "JIS_X_0201", "JIS_X_0213_P1", "JIS_X_0213_P2"]
 "UTF-16": type = utf16be

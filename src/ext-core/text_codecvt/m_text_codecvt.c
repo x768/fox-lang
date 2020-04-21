@@ -373,9 +373,35 @@ void define_module(RefNode *m, const FoxStatic *a_fs, FoxGlobal *a_fg)
 
 const char *module_version(const FoxStatic *a_fs)
 {
+    static char *buf = NULL;
+
     if (a_fs->revision != FOX_INTERFACE_REVISION) {
         return NULL;
     }
-    return "Build at\t" __DATE__ "\n";
+
+    fs = a_fs;
+    if (buf == NULL) {
+        StrBuf sb;
+        int first = TRUE;
+        RefCharset *cs = fs->cs_enumerate;
+
+        fs->StrBuf_init(&sb, 0);
+        fs->StrBuf_add(&sb, "Build at\t" __DATE__ "\nSupported encodings\t", -1);
+
+        for (cs = fs->cs_enumerate; cs != NULL; cs = cs->next) {
+            if (cs->type >= FCHARSET_UTF16LE || cs->files != NULL) {
+                if (first) {
+                    first = FALSE;
+                } else {
+                    fs->StrBuf_add(&sb, ", ", 2);
+                }
+                fs->StrBuf_add_r(&sb, cs->name);
+            }
+        }
+
+        fs->StrBuf_add(&sb, "\n\0", 2);
+        buf = sb.p;
+    }
+    return buf;
 }
 

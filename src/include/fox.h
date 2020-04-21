@@ -267,8 +267,9 @@ typedef struct {
     TimeOffset *off;
 } RefDateTime;
 
-typedef struct {
+typedef struct RefCharset {
     RefHeader rh;
+    struct RefCharset *next;
 
     RefStr *name;    // 文字コード名
     RefStr *iana;    // IANA登録名
@@ -401,6 +402,7 @@ struct FoxStatic
     RefNode *mod_mime;
     RefNode *mod_locale;
     RefCharset *cs_utf8;
+    RefCharset *cs_enumerate;
     RefTimeZone *tz_utc;
 
     RefStr *symbol_stock[T_INDEX_NUM];

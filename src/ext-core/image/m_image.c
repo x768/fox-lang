@@ -2338,7 +2338,7 @@ const char *module_version(const FoxStatic *a_fs)
         fs->Mem_init(&mem, 256);
         hash = load_type_function(&mem);
         fs->StrBuf_init(&sb, 0);
-        fs->StrBuf_add(&sb, "Build at\t" __DATE__ "\nSupported type\t", -1);
+        fs->StrBuf_add(&sb, "Build at\t" __DATE__ "\nSupported types\t", -1);
 
         for (i = 0; i < hash->entry_num; i++) {
             const HashEntry *he = hash->entry[i];

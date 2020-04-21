@@ -21,6 +21,7 @@ static void load_charset_alias_file(const char *filename)
     Tok tk;
     char *path = path_normalize(NULL, fs->fox_home, filename, -1, NULL);
     char *buf = read_from_file(NULL, path, NULL);
+    RefCharset **pp = &fs->cs_enumerate;
 
     if (buf == NULL) {
         fatal_errorf("Cannot load file %q", path);
@@ -46,11 +47,15 @@ static void load_charset_alias_file(const char *filename)
             cs->rh.n_memb = 0;
             cs->rh.weak_ref = NULL;
 
+            cs->next = NULL;
             cs->name = name_r;
             cs->iana = name_r;
             cs->cs = NULL;
             cs->type = FCHARSET_NONE;
             cs->files = NULL;
+
+            *pp = cs;
+            pp = &cs->next;
 
             for (;;) {
                 if (tk.v.type != TL_STR) {

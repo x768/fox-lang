@@ -178,7 +178,7 @@ typedef struct
 /////////////////////////////////////////////////////////////////////////////////////
 
 #define FOX_VERSION_MAJOR    0
-#define FOX_VERSION_MINOR    22
+#define FOX_VERSION_MINOR    23
 #define FOX_VERSION_REVISION 0
 
 #define int32_hash(v) (((v) * 31) & INT32_MAX)
