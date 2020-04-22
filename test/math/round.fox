@@ -1,26 +1,26 @@
 import util.assert
 import math
 
-assert_equal round_down(1.9d), 1d
-assert_equal round_down(-1.9d), -1d
-assert_equal round_up(1.1d), 2d
-assert_equal round_up(-1.1d), -2d
-assert_equal round_floor(1.9d), 1d
-assert_equal round_floor(-1.9d), -2d
-assert_equal round_ceiling(1.1d), 2d
-assert_equal round_ceiling(-1.1d), -1d
+assert_equal (1.9d).round("down"), 1d
+assert_equal (-1.9d).round("down"), -1d
+assert_equal (1.1d).round("up"), 2d
+assert_equal (-1.1d).round("up"), -2d
+assert_equal (1.9d).round("floor"), 1d
+assert_equal (-1.9d).round("floor"), -2d
+assert_equal (1.1d).round("ceiling"), 2d
+assert_equal (-1.1d).round("ceiling"), -1d
 
-assert_equal round_half_down(1.5d), 1d
-assert_equal round_half_down(1.6d), 2d
-assert_equal round_half_down(2.5d), 2d
-assert_equal round_half_down(2.6d), 3d
+assert_equal (1.5d).round("halfdown"), 1d
+assert_equal (1.6d).round("halfdown"), 2d
+assert_equal (2.5d).round("halfdown"), 2d
+assert_equal (2.6d).round("halfdown"), 3d
 
-assert_equal round_half_up(1.4d), 1d
-assert_equal round_half_up(1.5d), 2d
-assert_equal round_half_up(2.4d), 2d
-assert_equal round_half_up(2.5d), 3d
+assert_equal (1.4d).round("halfup"), 1d
+assert_equal (1.5d).round("halfup"), 2d
+assert_equal (2.4d).round("halfup"), 2d
+assert_equal (2.5d).round("halfup"), 3d
 
-assert_equal round_half_even(1.4d), 1d
-assert_equal round_half_even(1.5d), 2d
-assert_equal round_half_even(2.5d), 2d
-assert_equal round_half_even(2.6d), 3d
+assert_equal (1.4d).round("halfeven"), 1d
+assert_equal (1.5d).round("halfeven"), 2d
+assert_equal (2.5d).round("halfeven"), 2d
+assert_equal (2.6d).round("halfeven"), 3d
