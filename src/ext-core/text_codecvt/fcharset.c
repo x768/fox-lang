@@ -509,7 +509,8 @@ int FCharset_to_utf8(FCharset *cs, const char **psrc, const char *src_end, char 
     case FCHARSET_UTF16LE:
     case FCHARSET_UTF16BE:
     case FCHARSET_UTF32LE:
-    case FCHARSET_UTF32BE: {
+    case FCHARSET_UTF32BE:
+    case FCHARSET_CESU8: {
         int code = -1;
         int src_len = 0;
 
