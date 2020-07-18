@@ -293,16 +293,27 @@ int decode_b64_sub(char *dst, const char *p, int size, int strict)
 
 //////////////////////////////////////////////////////////////////////////////////////////////////
 
-void add_backslashes_sub(StrBuf *buf, const char *src_p, int src_size, int mode)
+void add_backslashes_sub(StrBuf *buf, const char *src_p, int src_size, int mode, int quotes)
 {
+    int q1 = 0;
+    int q2 = 0;
+
     if (src_size < 0) {
         src_size = strlen(src_p);
+    }
+    if (quotes == 0) {
+        q1 = '"';
+        q2 = '\'';
+    } else {
+        q1 = quotes;
+        q2 = 0;
     }
 
     if (mode == ADD_BACKSLASH_UCS2 || mode == ADD_BACKSLASH_UCS4) {
         int i;
         for (i = 0; i < src_size; i++) {
-            switch (src_p[i]) {
+            int c = src_p[i] & 0xFF;
+            switch (c) {
             case '\0':
                 if (mode == ADD_BACKSLASH_UCS4) {
                     StrBuf_add(buf, "\\0", 2);
@@ -325,18 +336,14 @@ void add_backslashes_sub(StrBuf *buf, const char *src_p, int src_size, int mode)
             case '\t':
                 StrBuf_add(buf, "\\t", 2);
                 break;
-            case '\'':
-                StrBuf_add(buf, "\\'", 2);
-                break;
-            case '\"':
-                StrBuf_add(buf, "\\\"", 2);
-                break;
             case '\\':
                 StrBuf_add(buf, "\\\\", 2);
                 break;
-            default: {
-                int c = src_p[i] & 0xFF;
-                if (c < ' ') {
+            default:
+                if (c == q1 || c == q2) {
+                    StrBuf_add_c(buf, '\\');
+                    StrBuf_add_c(buf, c);
+                } else if (c < ' ') {
                     char c_buf[8];
                     if (mode == ADD_BACKSLASH_UCS4) {
                         sprintf(c_buf, "\\x%02x", c);
@@ -349,7 +356,6 @@ void add_backslashes_sub(StrBuf *buf, const char *src_p, int src_size, int mode)
                     StrBuf_add_c(buf, c);
                 }
                 break;
-            }
             }
         }
     } else {
@@ -397,12 +403,6 @@ void add_backslashes_sub(StrBuf *buf, const char *src_p, int src_size, int mode)
             case '\t':
                 StrBuf_add(buf, "\\t", 2);
                 break;
-            case '\'':
-                StrBuf_add(buf, "\\'", 2);
-                break;
-            case '\"':
-                StrBuf_add(buf, "\\\"", 2);
-                break;
             case '/':
                 if (mode == ADD_BACKSLASH_U_UCS2) {
                     StrBuf_add(buf, "\\/", 2);
@@ -414,7 +414,10 @@ void add_backslashes_sub(StrBuf *buf, const char *src_p, int src_size, int mode)
                 StrBuf_add(buf, "\\\\", 2);
                 break;
             default:
-                if (code >= ' ' && code < 0x7F) {
+                if (code == q1 || code == q2) {
+                    StrBuf_add_c(buf, '\\');
+                    StrBuf_add_c(buf, code);
+                } else if (code >= ' ' && code < 0x7F) {
                     StrBuf_add_c(buf, c);
                 } else if (code < 0x10000) {  // BMP
                     char c_buf[10];

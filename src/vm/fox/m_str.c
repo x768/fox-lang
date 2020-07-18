@@ -147,7 +147,7 @@ int string_format_sub(Value *v, Str src, const char *fmt_p, int fmt_size, int ut
             } else if (str_eq(fm.p, fm.size, "src", -1)) {
                 if (utf8) {
                     StrBuf_add_c(&buf, '"');
-                    add_backslashes_sub(&buf, src.p, src.size, ADD_BACKSLASH_UCS4);
+                    add_backslashes_sub(&buf, src.p, src.size, ADD_BACKSLASH_UCS4, '"');
                 } else {
                     StrBuf_add(&buf, "b\"", 2);
                     add_backslashes_bin(&buf, src.p, src.size);
@@ -160,7 +160,7 @@ int string_format_sub(Value *v, Str src, const char *fmt_p, int fmt_size, int ut
         case 'j':
             if (str_eq(fm.p, fm.size, "js", -1)) {
                 if (utf8) {
-                    add_backslashes_sub(&buf, src.p, src.size, ADD_BACKSLASH_UCS2);
+                    add_backslashes_sub(&buf, src.p, src.size, ADD_BACKSLASH_UCS2, '"');
                 } else {
                     throw_errorf(fs->mod_lang, "FormatError", "Illigal format 'js' for Bytes");
                     StrBuf_close(&buf);
@@ -174,7 +174,7 @@ int string_format_sub(Value *v, Str src, const char *fmt_p, int fmt_size, int ut
         case 'q':
             if (str_eq(fm.p, fm.size, "quot", -1)) {
                 if (utf8) {
-                    add_backslashes_sub(&buf, src.p, src.size, ADD_BACKSLASH_UCS4);
+                    add_backslashes_sub(&buf, src.p, src.size, ADD_BACKSLASH_UCS4, 0);
                 } else {
                     add_backslashes_bin(&buf, src.p, src.size);
                 }

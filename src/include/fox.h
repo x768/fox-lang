@@ -487,7 +487,7 @@ struct FoxStatic
 
     char *(*str_dup_p)(const char *p, int size, Mem *mem);
     char *(*str_printf)(const char *fmt, ...);
-    void (*add_backslashes_sub)(StrBuf *buf, const char *src_p, int src_size, int mode);
+    void (*add_backslashes_sub)(StrBuf *buf, const char *src_p, int src_size, int mode, int quotes);
     int32_t (*parse_hex)(const char **pp, const char *end, int n);
 
     RefNode *(*Value_type)(Value v);
@@ -644,6 +644,7 @@ extern const char *fox_ctype_flags;
 
 #define isupper_fox(c)    (fox_ctype_flags[(c) & 0xFF] & 0x04)
 #define islower_fox(c)    (fox_ctype_flags[(c) & 0xFF] & 0x08)
+#define isalpha_fox(c)    (fox_ctype_flags[(c) & 0xFF] & 0x0C)
 #define isdigit_fox(c)    (fox_ctype_flags[(c) & 0xFF] & 0x10)
 #define isxdigit_fox(c)   (fox_ctype_flags[(c) & 0xFF] & 0x20)
 

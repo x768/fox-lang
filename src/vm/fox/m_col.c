@@ -162,7 +162,7 @@ static int inspect_sub(StrBuf *buf, Value v, Hash *hash, Mem *mem)
         if (!StrBuf_add_c(buf, '"')) {
             return FALSE;
         }
-        add_backslashes_sub(buf, rs->c, rs->size, ADD_BACKSLASH_UCS4);
+        add_backslashes_sub(buf, rs->c, rs->size, ADD_BACKSLASH_UCS4, '"');
         if (!StrBuf_add_c(buf, '"')) {
             return FALSE;
         }
@@ -2656,6 +2656,43 @@ static int iterator_group_by(Value *vret, Value *v, RefNode *node)
     }
     return TRUE;
 }
+static int iterator_single(Value *vret, Value *v, RefNode *node)
+{
+    Value vval;
+
+    Value_push("v", *v);
+    if (!call_member_func(fs->str_next, 0, TRUE)) {
+        if (Value_type(fg->error) == fs->cls_stopiter) {
+            // throw StopIteration
+            unref(fg->error);
+            fg->error = VALUE_NULL;
+            throw_errorf(fs->mod_lang, "ValueError", "Iterator has no elements");
+            return FALSE;
+        } else {
+            return FALSE;
+        }
+    }
+
+    vval = fg->stk_top[-1];
+    fg->stk_top--;
+
+    if (!call_member_func(fs->str_next, 0, TRUE)) {
+        if (Value_type(fg->error) == fs->cls_stopiter) {
+            // throw StopIteration
+            unref(fg->error);
+            fg->error = VALUE_NULL;
+            *vret = vval;
+            return TRUE;
+        } else {
+            unref(vval);
+            return FALSE;
+        }
+    }
+
+    unref(vval);
+    throw_errorf(fs->mod_lang, "ValueError", "Iterator has 2 or more elements");
+    return FALSE;
+}
 static int itermap_next(Value *vret, Value *v, RefNode *node)
 {
     Ref *r = Value_ref(*v);
@@ -2838,6 +2875,8 @@ void define_lang_col_class(RefNode *m)
     define_native_func_a(n, iterator_sort, 0, 1, intern("reverse_self", -1), fs->cls_fn);
     n = define_identifier(m, cls, "group_by", NODE_FUNC_N, 0);
     define_native_func_a(n, iterator_group_by, 1, 1, NULL, fs->cls_fn);
+    n = define_identifier(m, cls, "single", NODE_FUNC_N, 0);
+    define_native_func_a(n, iterator_single, 0, 0, NULL);
     extends_method(cls, fs->cls_obj);
 
 
@@ -2904,6 +2943,8 @@ void define_lang_col_class(RefNode *m)
     define_native_func_a(n, iterable_invoke, 0, 0, NULL);
     n = define_identifier(m, cls, "group_by", NODE_FUNC_N, 0);
     define_native_func_a(n, iterable_invoke, 1, 1, NULL, fs->cls_fn);
+    n = define_identifier(m, cls, "single", NODE_FUNC_N, 0);
+    define_native_func_a(n, iterable_invoke, 0, 0, NULL);
     n = define_identifier(m, cls, "reduce", NODE_FUNC_N, 0);
     define_native_func_a(n, iterable_invoke, 2, 2, NULL, NULL, fs->cls_fn);
     n = define_identifier(m, cls, "all", NODE_FUNC_N, 0);

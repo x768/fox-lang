@@ -251,7 +251,7 @@ char hex2lchar(int i);
 char hex2uchar(int i);
 int encode_b64_sub(char *dst, const char *p, int size, int url);
 int decode_b64_sub(char *dst, const char *p, int size, int strict);
-void add_backslashes_sub(StrBuf *buf, const char *src_p, int src_size, int mode);
+void add_backslashes_sub(StrBuf *buf, const char *src_p, int src_size, int mode, int quotes);
 void add_backslashes_bin(StrBuf *buf, const char *src_p, int src_size);
 int escape_backslashes_sub(char *dst, const char *src, int size, int bin);
 void urlencode_sub(StrBuf *buf, const char *p, int size, int plus);

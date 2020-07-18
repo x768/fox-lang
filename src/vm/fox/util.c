@@ -460,7 +460,7 @@ int StrBuf_vprintf(StrBuf *s, const char *fmt, va_list va)
                 if (Value_type(v) == fs->cls_str) {
                     RefStr *rs = Value_vp(v);
                     StrBuf_add_c(s, '"');
-                    add_backslashes_sub(s, rs->c, rs->size, ADD_BACKSLASH_UCS4);
+                    add_backslashes_sub(s, rs->c, rs->size, ADD_BACKSLASH_UCS4, '"');
                     StrBuf_add_c(s, '"');
                 } else if (!StrBuf_add_v(s, v)) {
                     return FALSE;

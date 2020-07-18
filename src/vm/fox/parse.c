@@ -1951,7 +1951,7 @@ static int parse_local_var(OpBuf *buf, Block *bk, Tok *tk, int is_var)
     if (tk->v.type == T_NL || tk->v.type == T_SEMICL) {
         Tok_next(tk);
         return TRUE;
-    } else if (tk->v.type == T_EOF) {
+    } else if (tk->v.type == T_EOF || tk->v.type == T_RC) {
         return TRUE;
     }
     unexpected_token_error(tk);
@@ -1971,7 +1971,7 @@ static int parse_return(OpBuf *buf, Block *bk, Tok *tk)
     if (tk->v.type == T_NL || tk->v.type == T_SEMICL) {
         Tok_next(tk);
         return TRUE;
-    } else if (tk->v.type == T_EOF) {
+    } else if (tk->v.type == T_EOF || tk->v.type == T_RC) {
         return TRUE;
     }
     unexpected_token_error(tk);
@@ -1987,7 +1987,7 @@ static int parse_yield(OpBuf *buf, Block *bk, Tok *tk)
     if (tk->v.type == T_NL || tk->v.type == T_SEMICL) {
         Tok_next(tk);
         return TRUE;
-    } else if (tk->v.type == T_EOF) {
+    } else if (tk->v.type == T_EOF || tk->v.type == T_RC) {
         return TRUE;
     }
     unexpected_token_error(tk);
@@ -2003,7 +2003,7 @@ static int parse_throw(OpBuf *buf, Block *bk, Tok *tk)
     if (tk->v.type == T_NL || tk->v.type == T_SEMICL) {
         Tok_next(tk);
         return TRUE;
-    } else if (tk->v.type == T_EOF) {
+    } else if (tk->v.type == T_EOF || tk->v.type == T_RC) {
         return TRUE;
     }
     unexpected_token_error(tk);
@@ -2702,7 +2702,7 @@ static int parse_statements(OpBuf *buf, Block *bk, Tok *tk, RefNode *klass)
                 Tok_next(tk);
                 if (tk->v.type == T_NL || tk->v.type == T_SEMICL) {
                     Tok_next(tk);
-                } else if (tk->v.type != T_EOF) {
+                } else if (tk->v.type != T_EOF && tk->v.type != T_RC) {
                     unexpected_token_error(tk);
                     return FALSE;
                 }

@@ -6,5 +6,5 @@ include(../library.cmake)
 set(DEST_DIR ../../../../fox/import)
 
 add_subdirectory(foxtk)
-add_subdirectory(textedit)
+#add_subdirectory(textedit)
 

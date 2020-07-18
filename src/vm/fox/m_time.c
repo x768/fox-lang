@@ -1252,10 +1252,10 @@ static void build_datetime_string(StrBuf *buf, const char *fmt_p, int fmt_size, 
             }
             break;
         default:
-            if (!isalphau_fox(fmt_p[i])) {
-                StrBuf_add_c(buf, fmt_p[i]);
-            } else {
+            if (isalpha_fox(fmt_p[i])) {
                 StrBuf_add_c(buf, '?');
+            } else {
+                StrBuf_add_c(buf, fmt_p[i]);
             }
             i++;
             break;

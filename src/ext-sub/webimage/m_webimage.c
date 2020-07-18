@@ -330,13 +330,13 @@ static void CMYK_to_RGB(uint8_t *dst, uint8_t *src, int width, int inverted)
         }
     } else {
         for (i = 0; i < width; i++) {
-            int c = src[i * 4 + 0];
-            int m = src[i * 4 + 1];
-            int y = src[i * 4 + 2];
-            int k = src[i * 4 + 3];
-            dst[i * 3 + 0] = (255 - c) * (255 - k) / 255;
-            dst[i * 3 + 1] = (255 - m) * (255 - k) / 255;
-            dst[i * 3 + 2] = (255 - y) * (255 - k) / 255;
+            int c = 255 - src[i * 4 + 0];
+            int m = 255 - src[i * 4 + 1];
+            int y = 255 - src[i * 4 + 2];
+            int k = 255 - src[i * 4 + 3];
+            dst[i * 3 + 0] = c * k / 255;
+            dst[i * 3 + 1] = m * k / 255;
+            dst[i * 3 + 2] = y * k / 255;
         }
     }
 }

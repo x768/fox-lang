@@ -233,11 +233,11 @@ static void JSTok_parse_str(JSTok *tk)
             }
             default:
                 if (isalnumu_fox(ch)) {
-                    fs->throw_errorf(mod_json, "JSONError", "Unknwon backslash sequence");
+                    fs->throw_errorf(mod_json, "JSONError", "Unknown backslash sequence");
                     tk->type = JS_TOK_ERR;
                     return;
                 } else if (*tk->p < ' ') {
-                    fs->throw_errorf(mod_json, "JSONError", "Unknwon character");
+                    fs->throw_errorf(mod_json, "JSONError", "Unknown character");
                     tk->type = JS_TOK_ERR;
                     return;
                 }
@@ -247,7 +247,7 @@ static void JSTok_parse_str(JSTok *tk)
             break;
         default:
             if ((*tk->p & 0xFF) < ' ') {
-                fs->throw_errorf(mod_json, "JSONError", "Unknwon character %c", *tk->p);
+                fs->throw_errorf(mod_json, "JSONError", "Unknown character %c", *tk->p);
                 tk->type = JS_TOK_ERR;
                 return;
             }
@@ -388,7 +388,7 @@ static int json_encode_sub(StrBuf *buf, Value v, Mem *mem, Hash *hash, int mode,
         if (!fs->StrBuf_add_c(buf, '"')) {
             return FALSE;
         }
-        fs->add_backslashes_sub(buf, val->c, val->size, mode);
+        fs->add_backslashes_sub(buf, val->c, val->size, mode, '"');
         if (!fs->StrBuf_add_c(buf, '"')) {
             return FALSE;
         }

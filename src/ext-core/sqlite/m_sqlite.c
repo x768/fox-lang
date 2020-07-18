@@ -311,13 +311,11 @@ static int conn_single(Value *vret, Value *v, RefNode *node)
         int result = sqlite3_step(stmt);
         if (result == SQLITE_ROW) {
             *vret = cursor_get_sub(stmt, 0);
-            sqlite3_finalize(stmt);
         } else if (result == SQLITE_ERROR_USER) {
             fs->throw_errorf(mod_sqlite, "SQLiteError", "%s", sqlite3_errmsg(conn));
             return FALSE;
-        } else {
-            sqlite3_finalize(stmt);
         }
+        sqlite3_finalize(stmt);
     }
 
     return TRUE;

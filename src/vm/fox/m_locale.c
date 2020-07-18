@@ -832,7 +832,7 @@ static void locale_put_array(StrBuf *buf, const char **arr, int size)
             StrBuf_add(buf, sep, SEP_SIZE);
         }
         if (arr[i] != NULL) {
-            add_backslashes_sub(buf, arr[i], -1, ADD_BACKSLASH_U_UCS2);
+            add_backslashes_sub(buf, arr[i], -1, ADD_BACKSLASH_U_UCS2, '"');
         }
     }
 }
@@ -868,9 +868,9 @@ static int locale_data_json(Value *vret, Value *v, RefNode *node)
         locale_put_array(&buf, loc->time, lengthof(loc->time));
 
         StrBuf_add(&buf, "\"],\"am\":\"", -1);
-        add_backslashes_sub(&buf, loc->am_pm[0], -1, ADD_BACKSLASH_U_UCS2);
+        add_backslashes_sub(&buf, loc->am_pm[0], -1, ADD_BACKSLASH_U_UCS2, '"');
         StrBuf_add(&buf, "\",\"pm\":\"", -1);
-        add_backslashes_sub(&buf, loc->am_pm[1], -1, ADD_BACKSLASH_U_UCS2);
+        add_backslashes_sub(&buf, loc->am_pm[1], -1, ADD_BACKSLASH_U_UCS2, '"');
 
         StrBuf_add(&buf, "\",\"bidi\":\"", -1);
         StrBuf_add(&buf, (loc->bidi == 'R' ? "rtl\"}" : "ltr\"}"), 5);
