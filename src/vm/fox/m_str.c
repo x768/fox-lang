@@ -1115,7 +1115,7 @@ static int seqiter_next(Value *vret, Value *v, RefNode *node)
         i = p - s->c;
         *vret = integral_Value(fs->cls_char, ret);
     } else {
-        ret = s->c[i];
+        ret = (uint8_t)s->c[i];
         i++;
         *vret = int32_Value(ret);
     }
