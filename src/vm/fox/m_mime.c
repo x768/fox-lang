@@ -1234,7 +1234,7 @@ static int mimeheader_index_set_sub(StrBuf *sb, Value v)
 {
     RefNode *type = Value_type(v);
 
-    if (type == fs->cls_str || type == fs->cls_bytes || type == fs->cls_uri) {
+    if (type == fs->cls_str || type == fs->cls_bytes || type == fs->cls_uri || type == fs->cls_mimetype) {
         RefStr *rs = Value_vp(v);
         int i;
         for (i = 0; i < rs->size; i++) {

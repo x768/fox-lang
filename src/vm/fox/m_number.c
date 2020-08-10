@@ -32,6 +32,9 @@ static int is_valid_integer(const char *p, int base)
     if (*p == '+' || *p == '-') {
         p++;
     }
+    if (*p == '\0') {
+        return FALSE;
+    }
 
     if (base <= 10) {
         while (*p != '\0') {
@@ -1011,13 +1014,18 @@ static int frac_parse(Value *vret, Value *v, RefNode *node)
     RefStr *rs = Value_vp(v1);
     const char *end;
 
+    if (rs->size == 0 || str_has0(rs->c, rs->size)) {
+        throw_errorf(fs->mod_lang, "ParseError", "Invalid rational string %q", rs->c);
+        return FALSE;
+    }
+
     *vret = vp_Value(md);
 
     BigInt_init(&md->bi[0]);
     BigInt_init(&md->bi[1]);
     if (!cstr_BigRat(md->bi, rs->c, &end) || *end != '\0') {
         // 読み込みエラー時は例外
-        throw_errorf(fs->mod_lang, "ParseError", "Invalid rational string");
+        throw_errorf(fs->mod_lang, "ParseError", "Invalid rational string %q", rs->c);
         return FALSE;
     }
     return TRUE;
@@ -1498,6 +1506,11 @@ static int float_parse(Value *vret, Value *v, RefNode *node)
     RefStr *rs = Value_vp(v[1]);
     char *end = rs->c;
 
+    if (rs->size == 0 || str_has0(rs->c, rs->size)) {
+        throw_errorf(fs->mod_lang, "ParseError", "Invalid float string %q", rs->c);
+        return FALSE;
+    }
+
     *vret = vp_Value(rd);
     errno = 0;
     rd->d = strtod(rs->c, &end);
@@ -1507,7 +1520,7 @@ static int float_parse(Value *vret, Value *v, RefNode *node)
     }
     if (*end != '\0') {
         // 読み込みエラー時は例外
-        throw_errorf(fs->mod_lang, "ParseError", "Invalid float string");
+        throw_errorf(fs->mod_lang, "ParseError", "Invalid float string %q", rs->c);
         return FALSE;
     }
 
