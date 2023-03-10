@@ -51,7 +51,7 @@ for f in glob("*.txt") {
 		if end > 0 {
 			var code = Int.parse(val, 16)
 			for i in begin..end {
-				let b = Str.chr(code).to_bytes(Charset.UTF8)
+				let b = Str.chr(code).to_bytes()
 				if position[i] {
 					throw Error("${i:04X} already defined")
 				}
@@ -63,7 +63,7 @@ for f in glob("*.txt") {
 			}
 		} else {
 			let code = val.split(',').map(s => Int.parse(s, 16))
-			let b = Str.chr(code).to_bytes(Charset.UTF8)
+			let b = Str.chr(code).to_bytes()
 			position[begin] = pos
 			strtable.push b
 			pos += b.size + 1
