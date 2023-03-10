@@ -509,7 +509,7 @@ static int audio_push(Value *vret, Value *v, RefNode *node)
     snd->length++;
     if (snd->alloc_size < snd->length) {
         snd->alloc_size *= 2;
-        snd->u.u8 = realloc(snd->u.u8, snd->alloc_size);
+        snd->u.u8 = realloc(snd->u.u8, snd->alloc_size * snd->width * snd->channels);
     }
 
     if (snd->channels == 2) {
