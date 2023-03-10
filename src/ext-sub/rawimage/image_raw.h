@@ -15,7 +15,7 @@ enum {
     TYPE_PPM_BIN,
 };
 
-#ifndef DEFINE_GLOBALS
+#ifdef DEFINE_GLOBALS
 #define extern
 #endif
 
@@ -24,7 +24,7 @@ extern FoxGlobal *fg;
 extern RefNode *mod_raw;
 extern RefNode *mod_image;
 
-#ifndef DEFINE_GLOBALS
+#ifdef DEFINE_GLOBALS
 #undef extern
 #endif
 

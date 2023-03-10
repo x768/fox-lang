@@ -8,9 +8,9 @@
 #define extern
 #endif
 
-RefNode *cls_genml;
-RefNode *cls_gmlargs;
-RefNode *cls_gmlargsiter;
+extern RefNode *cls_genml;
+extern RefNode *cls_gmlargs;
+extern RefNode *cls_gmlargsiter;
 
 #ifdef DEFINE_GLOBALS
 #undef extern

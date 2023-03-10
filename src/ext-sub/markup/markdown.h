@@ -147,7 +147,7 @@ typedef struct {
 } MDTok;
 
 
-#ifndef DEFINE_GLOBALS
+#ifdef DEFINE_GLOBALS
 #define extern
 #endif
 
@@ -163,7 +163,7 @@ extern RefStr *str_image_callback;
 extern RefStr *str_inline_plugin;
 extern RefStr *str_block_plugin;
 
-#ifndef DEFINE_GLOBALS
+#ifdef DEFINE_GLOBALS
 #undef extern
 #endif
 
