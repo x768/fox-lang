@@ -641,7 +641,7 @@ void fox_error_dump(StrBuf *sb, int log_style)
 
     if (log_style) {
         char cbuf[24];
-        time_t i_tm;
+        time_t i_tm = {0};
         strftime(cbuf, sizeof(cbuf), "%Y-%m-%d %H:%M:%S | ", localtime(&i_tm));
         StrBuf_add(sb, cbuf, -1);
     }
