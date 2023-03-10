@@ -1,3 +1,5 @@
+import time
+
 def _TIFF_HEADER_OFFSET = 12
 
 def _TAGNAME_EXIF_IFD = 34665
@@ -176,6 +178,14 @@ class ExifTag
     def tag_name => _TAG_NAME.get(m_tag) || "$m_tag"
     def value => m_value.size > 1 ? m_value : m_value.size == 1 ? m_value[0] : null
     def values => m_value
+    def to_datetime(tz:TimeZone = null) {
+        let src = this.value.to_str()
+        if let m = src.match(/^(\d\d\d\d):(\d\d):(\d\d) (\d\d):(\d\d):(\d\d)$/) {
+            return DateTime(tz || TimeZone.LOCAL, Int(m[1]), Int(m[2]), Int(m[3]), Int(m[4]), Int(m[5]), Int(m[6]))
+        } else {
+            throw ValueError("Illigal time format: ${src}")
+        }
+    }
 }
 class ExifReader : Iterable
 {
@@ -199,6 +209,11 @@ class ExifReader : Iterable
     this(src) {
         super._new()
 
+        m_tags = []
+        m_tags_map = {}
+        m_int16 = ""
+        m_int32 = ""
+
         let type = typeof(src)
         if type == Str || type == File {
             m_data = FileIO(src)
@@ -210,7 +225,7 @@ class ExifReader : Iterable
 
         // Validate Exif/JPEG format
         if m_data.peek("b2") != b"\xFF\xD8" {
-            throw ExifReaderError("No JPEG file")
+            throw ExifReaderError("Not a JPEG file")
         }
         m_data.peek("x4")
         {
@@ -222,7 +237,7 @@ class ExifReader : Iterable
             if tag == b"Exif" {
                 m_data.peek("x2")
             } else {
-                throw ExifReaderError("No exif data")
+                return this
             }
         }
 
@@ -230,17 +245,15 @@ class ExifReader : Iterable
         if endian == b"MM\0\x2A" {
             m_int16 = "S"  // Big Endian
             m_int32 = "I"
-        } elif endian == b"II\0\x2A" {
+        } elif endian == b"II\x2A\0" {
             m_int16 = "s"  // Little Endian
             m_int32 = "i"
         } else {
-            throw ExifReaderError("Illigal exif data")
+            return this
         }
 
         m_offset_0th_ifd = m_data.peek(m_int32)
 
-        m_tags = []
-        m_tags_map = {}
         m_data.pos = _TIFF_HEADER_OFFSET + m_offset_0th_ifd
         this._parse_exif_tags()
 
@@ -301,12 +314,13 @@ class ExifReader : Iterable
                 m_data.pos = _TIFF_HEADER_OFFSET + tag[3]
                 tag[3] = _read_value(m_data, tag[1], tag[2], m_int16, m_int32)
             }
-            return tag[3]
+            return ExifTag(tag[0], tag[3])
         } else {
             return null
         }
     }
     def _missing(key) => this.op_index(key)
+
     def thumbnail {
         if m_offset_1th_ifd {
             // TODO:broken
