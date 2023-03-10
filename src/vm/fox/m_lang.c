@@ -403,9 +403,16 @@ static int weakref_alive(Value *vret, Value *v, RefNode *node)
 static int weakref_value(Value *vret, Value *v, RefNode *node)
 {
     Ref *r = Value_ref(*v);
+    int alt = FUNC_INT(node);
 
     if (Value_bool(r->v[INDEX_WEAKREF_ALIVE])) {
         *vret = Value_cp(r->v[INDEX_WEAKREF_REF]);
+    } else if (alt) {
+        if (fg->stk_top > v + 1) {
+            *vret = Value_cp(v[1]);
+        } else {
+            *vret = VALUE_NULL;
+        }
     } else {
         throw_errorf(fs->mod_lang, "WeakRefError", "Reference is not alive");
         return FALSE;
@@ -917,7 +924,9 @@ static void define_lang_class(RefNode *m)
     n = define_identifier(m, cls, "alive", NODE_FUNC_N, NODEOPT_PROPERTY);
     define_native_func_a(n, weakref_alive, 0, 0, (void*)FALSE);
     n = define_identifier(m, cls, "value", NODE_FUNC_N, NODEOPT_PROPERTY);
-    define_native_func_a(n, weakref_value, 0, 0, NULL);
+    define_native_func_a(n, weakref_value, 0, 0, (void*)FALSE);
+    n = define_identifier(m, cls, "get", NODE_FUNC_N, 0);
+    define_native_func_a(n, weakref_value, 0, 1, (void*)TRUE, NULL);
     // GC対象外とするため、0を設定
     cls->u.c.n_memb = 0;
     extends_method(cls, fs->cls_obj);
