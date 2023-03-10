@@ -28,7 +28,12 @@ enum {
     INDEX_RANGE_NEXT = INDEX_RANGE_NUM,
     INDEX_RANGEITER_NUM,
 };
-
+enum {
+    INDEX_REPEAT_ELEM,
+    INDEX_REPEAT_COUNT,
+    INDEX_REPEAT_END,
+    INDEX_REPEAT_NUM,
+};
 
 static RefNode *cls_listiter;
 
@@ -1728,6 +1733,25 @@ static int arrayiter_dispose(Value *vret, Value *v, RefNode *node)
     ra->lock_count--;
     return TRUE;
 }
+static int arrayiter_to_list(Value *vret, Value *v, RefNode *node)
+{
+    // 複製を返したうえで、Iteratorを末尾まで進める
+    Ref *r = Value_vp(*v);
+    RefArray *src = Value_vp(r->v[INDEX_LISTITER_VAL]);
+    RefArray *dst = fs->refarray_new(src->size);
+
+    int i = Value_integral(r->v[INDEX_LISTITER_IDX]);
+    if (i < 0) {
+        i = 0;
+    }
+
+    for (; i < src->size; i++) {
+        dst->p[i] = Value_cp(src->p[i]);
+    }
+    *vret = vp_Value(dst);
+    r->v[INDEX_LISTITER_IDX] = int32_Value(i);
+    return TRUE;
+}
 
 ///////////////////////////////////////////////////////////////////////////////////////////
 
@@ -2118,6 +2142,64 @@ STOP_ITER:
     return FALSE;
 }
 
+
+///////////////////////////////////////////////////////////////////////////////////////////
+
+static int repeatiter_new(Value *vret, Value *v, RefNode *node)
+{
+    RefNode *repeatiter = FUNC_VP(node);
+    Ref *r = ref_new(repeatiter);
+    *vret = vp_Value(r);
+
+    if (!Value_isint(v[2]) || Value_integral(v[2]) < 0) {
+        throw_errorf(fs->mod_lang, "ValueError", "Invalid number (argument #2)");
+        return FALSE;
+    }
+
+    r->v[INDEX_REPEAT_ELEM] = Value_cp(v[1]);
+    r->v[INDEX_REPEAT_COUNT] = int32_Value(0);
+    r->v[INDEX_REPEAT_END] = v[2];
+    return TRUE;
+}
+static int repeatiter_next(Value *vret, Value *v, RefNode *node)
+{
+    Ref *r = Value_ref(*v);
+    int32_t count = Value_integral(r->v[INDEX_REPEAT_COUNT]);
+
+    if (count < Value_integral(r->v[INDEX_REPEAT_END])) {
+        r->v[INDEX_REPEAT_COUNT] = int32_Value(count + 1);
+        *vret = Value_cp(r->v[INDEX_REPEAT_ELEM]);
+        return TRUE;
+    } else {
+        throw_stopiter();
+        return FALSE;
+    }
+}
+// 最適化のため
+static int repeatiter_tolist(Value *vret, Value *v, RefNode *node)
+{
+    Ref *r = Value_ref(*v);
+    RefArray *ra;
+    int32_t i;
+    int32_t size = Value_integral(r->v[INDEX_REPEAT_END]) - Value_integral(r->v[INDEX_REPEAT_COUNT]);
+    Value elem = r->v[INDEX_REPEAT_ELEM];
+
+    if (size < 0) {
+        size = 0;
+    }
+    if (size * sizeof(Value) > fs->max_alloc) {
+        throw_error_select(THROW_MAX_ALLOC_OVER__INT, fs->max_alloc);
+        return FALSE;
+    }
+    ra = refarray_new(size);
+    *vret = vp_Value(ra);
+    for (i = 0; i < size; i++) {
+        ra->p[i] = Value_cp(elem);
+    }
+
+    return TRUE;
+}
+
 ///////////////////////////////////////////////////////////////////////////////////////////
 
 static int iterator_new(Value *vret, Value *v, RefNode *node)
@@ -2128,50 +2210,32 @@ static int iterator_new(Value *vret, Value *v, RefNode *node)
 }
 static int iterator_to_list(Value *vret, Value *v, RefNode *node)
 {
-    if (Value_type(*v) == cls_listiter) {
-        // 配列の場合は複製を返したうえで、Iteratorを末尾まで進める
-        Ref *r = Value_vp(*v);
-        RefArray *src = Value_vp(r->v[INDEX_LISTITER_VAL]);
-        RefArray *dst = fs->refarray_new(src->size);
+    int max_size = fs->max_alloc / sizeof(Value);
+    RefArray *ra = refarray_new(0);
+    *vret = vp_Value(ra);
 
-        int i = Value_integral(r->v[INDEX_LISTITER_IDX]);
-        if (i < 0) {
-            i = 0;
+    for (;;) {
+        Value *va;
+
+        if (ra->size >= max_size) {
+            throw_error_select(THROW_MAX_ALLOC_OVER__INT, fs->max_alloc);
+            return FALSE;
         }
 
-        for (; i < src->size; i++) {
-            dst->p[i] = Value_cp(src->p[i]);
-        }
-        *vret = vp_Value(dst);
-        r->v[INDEX_LISTITER_IDX] = int32_Value(i);
-    } else {
-        int max_size = fs->max_alloc / sizeof(Value);
-        RefArray *ra = refarray_new(0);
-        *vret = vp_Value(ra);
-
-        for (;;) {
-            Value *va;
-
-            if (ra->size >= max_size) {
-                throw_error_select(THROW_MAX_ALLOC_OVER__INT, fs->max_alloc);
+        Value_push("v", *v);
+        if (!call_member_func(fs->str_next, 0, TRUE)) {
+            if (Value_type(fg->error) == fs->cls_stopiter) {
+                // throw StopIteration
+                unref(fg->error);
+                fg->error = VALUE_NULL;
+                break;
+            } else {
                 return FALSE;
             }
-
-            Value_push("v", *v);
-            if (!call_member_func(fs->str_next, 0, TRUE)) {
-                if (Value_type(fg->error) == fs->cls_stopiter) {
-                    // throw StopIteration
-                    unref(fg->error);
-                    fg->error = VALUE_NULL;
-                    break;
-                } else {
-                    return FALSE;
-                }
-            }
-            va = refarray_push(ra);
-            fg->stk_top--;
-            *va = *fg->stk_top;
         }
+        va = refarray_push(ra);
+        fg->stk_top--;
+        *va = *fg->stk_top;
     }
     return TRUE;
 }
@@ -3041,8 +3105,11 @@ void define_lang_col_class(RefNode *m)
     cls->u.c.n_memb = INDEX_LISTITER_NUM;
     n = define_identifier_p(m, cls, fs->str_dtor, NODE_FUNC_N, 0);
     define_native_func_a(n, arrayiter_dispose, 0, 0, NULL);
+
     n = define_identifier_p(m, cls, fs->str_next, NODE_FUNC_N, 0);
     define_native_func_a(n, arrayiter_next, 0, 0, NULL);
+    n = define_identifier(m, cls, "to_list", NODE_FUNC_N, 0);
+    define_native_func_a(n, arrayiter_to_list, 0, 0, NULL);
     extends_method(cls, fs->cls_iterator);
 
     // Range
@@ -3087,5 +3154,17 @@ void define_lang_col_class(RefNode *m)
 
     n = define_identifier_p(m, cls, fs->str_next, NODE_FUNC_N, 0);
     define_native_func_a(n, rangeiter_next, 0, 0, NULL);
+    extends_method(cls, fs->cls_iterator);
+
+    // RepeatIter
+    cls = define_identifier(m, m, "RepeatIter", NODE_CLASS, 0);
+    cls->u.c.n_memb = INDEX_REPEAT_NUM;
+    n = define_identifier_p(m, cls, fs->str_new, NODE_NEW_N, 0);
+    define_native_func_a(n, repeatiter_new, 2, 2, cls, NULL, fs->cls_int);
+
+    n = define_identifier_p(m, cls, fs->str_next, NODE_FUNC_N, 0);
+    define_native_func_a(n, repeatiter_next, 0, 0, NULL);
+    n = define_identifier(m, cls, "to_list", NODE_FUNC_N, 0);
+    define_native_func_a(n, repeatiter_tolist, 0, 0, NULL);
     extends_method(cls, fs->cls_iterator);
 }
