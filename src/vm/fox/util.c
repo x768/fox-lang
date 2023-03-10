@@ -449,7 +449,7 @@ int StrBuf_vprintf(StrBuf *s, const char *fmt, va_list va)
             case 'U': {  // %n -> (int)U+?????? (コードポイント16進)
                 char ctmp[16];
                 int c = va_arg(va, int);
-                sprintf(ctmp, "U+%06X", c);
+                sprintf(ctmp, c >= 0x10000 ? "U+%06X" : "U+%04X", c);
                 if (!StrBuf_add(s, ctmp, -1)) {
                     return FALSE;
                 }
