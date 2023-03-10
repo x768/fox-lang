@@ -1,4 +1,4 @@
-project(m_text_charset)
+project(m_text_codecvt)
 
 add_library(m_text_codecvt SHARED
   ${SRC_COMMON}
