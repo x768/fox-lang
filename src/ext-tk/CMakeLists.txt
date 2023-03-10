@@ -1,4 +1,5 @@
 cmake_minimum_required(VERSION 3.0)
+project(ext-tk)
 
 include(../common.cmake)
 include(../library.cmake)
