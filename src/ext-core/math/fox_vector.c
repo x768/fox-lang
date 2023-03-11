@@ -148,6 +148,21 @@ static int vector_norm(Value *vret, Value *v, RefNode *node)
 
     return TRUE;
 }
+static int vector_isinf(Value *vret, Value *v, RefNode *node)
+{
+    int i;
+    const RefVector *vec = Value_vp(*v);
+
+    for (i = 0; i < vec->size; i++) {
+        if (isinf(vec->d[i])) {
+            *vret = VALUE_TRUE;
+            return TRUE;
+        }
+    }
+    *vret = VALUE_FALSE;
+
+    return TRUE;
+}
 static int vector_to_matrix(Value *vret, Value *v, RefNode *node)
 {
     int i;
@@ -561,6 +576,20 @@ static int matrix_size(Value *vret, Value *v, RefNode *node)
     *vret = int32_Value(ret);
     return TRUE;
 }
+static int matrix_isinf(Value *vret, Value *v, RefNode *node)
+{
+    const RefMatrix *mat = Value_vp(*v);
+    int i;
+    int size = mat->rows * mat->cols;
+    for (i = 0; i < size; i++) {
+        if (isinf(mat->d[i])) {
+            *vret = VALUE_TRUE;
+            return TRUE;
+        }
+    }
+    *vret = VALUE_FALSE;
+    return TRUE;
+}
 static int matrix_to_vector(Value *vret, Value *v, RefNode *node)
 {
     const RefMatrix *mat = Value_vp(*v);
@@ -741,7 +770,7 @@ static int matrix_multiple(Value *vret, Value *v, RefNode *node)
         int i, j, k;
 
         if (cols1 != rows2) {
-            fs->throw_errorf(fs->mod_lang, "ValueError", "RefMatrix size mismatch");
+            fs->throw_errorf(fs->mod_lang, "ValueError", "Matrix size mismatch");
             return FALSE;
         }
         mat = fs->buf_new(cls_matrix, sizeof(RefMatrix) + sizeof(double) * rows1 * cols2);
@@ -793,6 +822,45 @@ static int matrix_norm(Value *vret, Value *v, RefNode *node)
 {
     double norm = get_matrix_norm(Value_vp(*v));
     *vret = fs->float_Value(fs->cls_float, norm);
+    return TRUE;
+}
+
+static int matrix_det(Value *vret, Value *v, RefNode *node)
+{
+    const RefMatrix *mat = Value_vp(*v);
+    double ret;
+
+    if (mat->cols != mat->rows) {
+        fs->throw_errorf(fs->mod_lang, "ValueError", "Matrix is not square");
+        return FALSE;
+    }
+    ret = matrix_determinant(mat);
+    if (isnan(ret) || isinf(ret)) {
+        fs->throw_errorf(fs->mod_lang, "ValueError", "Not a regular matrix");
+        return FALSE;
+    }
+    *vret = fs->float_Value(fs->cls_float, ret);
+    return TRUE;
+}
+
+static int matrix_inv(Value *vret, Value *v, RefNode *node)
+{
+    const RefMatrix *mat = Value_vp(*v);
+    RefMatrix *ret;
+
+    if (mat->cols != mat->rows) {
+        fs->throw_errorf(fs->mod_lang, "ValueError", "Matrix is not square");
+        return FALSE;
+    }
+    ret = fs->buf_new(cls_matrix, sizeof(RefMatrix) + sizeof(double) * mat->cols * mat->cols);
+    ret->cols = mat->cols;
+    ret->rows = mat->rows;
+    matrix_inverse(ret, mat);
+    *vret = vp_Value(ret);
+    if (!matrix_is_number(ret)) {
+        fs->throw_errorf(fs->mod_lang, "ValueError", "Not a regular matrix");
+        return FALSE;
+    }
     return TRUE;
 }
 
@@ -1039,6 +1107,8 @@ void define_vector_class(RefNode *m)
     fs->define_native_func_a(n, vector_empty, 0, 0, NULL);
     n = fs->define_identifier(m, cls, "norm", NODE_FUNC_N, NODEOPT_PROPERTY);
     fs->define_native_func_a(n, vector_norm, 0, 0, NULL);
+    n = fs->define_identifier(m, cls, "isinf", NODE_FUNC_N, NODEOPT_PROPERTY);
+    fs->define_native_func_a(n, vector_isinf, 0, 0, NULL);
     n = fs->define_identifier(m, cls, "to_row_matrix", NODE_FUNC_N, 0);
     fs->define_native_func_a(n, vector_to_matrix, 0, 0, (void*)FALSE);
     n = fs->define_identifier(m, cls, "to_col_matrix", NODE_FUNC_N, 0);
@@ -1093,6 +1163,8 @@ void define_vector_class(RefNode *m)
     fs->define_native_func_a(n, matrix_size, 0, 0, (void*)FALSE);
     n = fs->define_identifier(m, cls, "cols", NODE_FUNC_N, NODEOPT_PROPERTY);
     fs->define_native_func_a(n, matrix_size, 0, 0, (void*)TRUE);
+    n = fs->define_identifier(m, cls, "isinf", NODE_FUNC_N, NODEOPT_PROPERTY);
+    fs->define_native_func_a(n, matrix_isinf, 0, 0, NULL);
 
     n = fs->define_identifier(m, cls, "get_row_vector", NODE_FUNC_N, 0);
     fs->define_native_func_a(n, matrix_to_vector, 1, 1, (void*)FALSE, fs->cls_int);
@@ -1121,6 +1193,10 @@ void define_vector_class(RefNode *m)
     fs->define_native_func_a(n, matrix_transpose, 0, 0, NULL);
     n = fs->define_identifier(m, cls, "norm", NODE_FUNC_N, 0);
     fs->define_native_func_a(n, matrix_norm, 0, 0, NULL);
+    n = fs->define_identifier(m, cls, "det", NODE_FUNC_N, 0);
+    fs->define_native_func_a(n, matrix_det, 0, 0, NULL);
+    n = fs->define_identifier(m, cls, "inv", NODE_FUNC_N, 0);
+    fs->define_native_func_a(n, matrix_inv, 0, 0, NULL);
 
     fs->extends_method(cls, fs->cls_obj);
 }

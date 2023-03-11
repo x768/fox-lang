@@ -604,6 +604,12 @@ static int complex_theta(Value *vret, Value *v, RefNode *node)
     *vret = fs->float_Value(fs->cls_float, phi);
     return TRUE;
 }
+static int complex_isinf(Value *vret, Value *v, RefNode *node)
+{
+    const RefComplex *rc = Value_vp(*v);
+    *vret = bool_Value(isinf(rc->re) || isinf(rc->im));
+    return TRUE;
+}
 static int complex_conj(Value *vret, Value *v, RefNode *node)
 {
     const RefComplex *rc = Value_vp(*v);
@@ -738,7 +744,7 @@ static int math_func2(Value *vret, Value *v, RefNode *node)
         fs->throw_errorf(fs->mod_lang, "ValueError", "%s", strerror(errno));
         return FALSE;
     }
-    if (isnan(ret) || isinf(ret)) {
+    if (isnan(ret)) {
         fs->throw_errorf(fs->mod_lang, "ValueError", "Illigal argument value");
         return FALSE;
     }
@@ -1005,6 +1011,8 @@ static void define_class(RefNode *m)
     fs->define_native_func_a(n, complex_rho, 0, 0, NULL);
     n = fs->define_identifier(m, cls, "theta", NODE_FUNC_N, NODEOPT_PROPERTY);
     fs->define_native_func_a(n, complex_theta, 0, 0, NULL);
+    n = fs->define_identifier(m, cls, "isinf", NODE_FUNC_N, NODEOPT_PROPERTY);
+    fs->define_native_func_a(n, complex_isinf, 0, 0, NULL);
     n = fs->define_identifier_p(m, cls, fs->symbol_stock[T_INV], NODE_FUNC_N, 0);
     fs->define_native_func_a(n, complex_conj, 0, 0, NULL);
     n = fs->define_identifier_p(m, cls, fs->symbol_stock[T_PLUS], NODE_FUNC_N, 0);
