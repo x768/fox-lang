@@ -13,6 +13,9 @@ void define_rand_func(RefNode *m);
 void define_vector_func(RefNode *m);
 void define_vector_class(RefNode *m);
 
+double matrix_determinant(const RefMatrix *mat);
+void matrix_inverse(RefMatrix *result, const RefMatrix *mat);
+int matrix_is_number(const RefMatrix *mat);
 
 #ifdef DEFINE_GLOBALS
 #define extern

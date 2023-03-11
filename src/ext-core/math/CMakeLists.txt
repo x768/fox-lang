@@ -5,6 +5,7 @@ add_library(m_math SHARED
   m_math.c
   fox_rand.c
   fox_vector.c
+  matrix.c
 )
 set_target_properties(m_math
   PROPERTIES
