@@ -1393,6 +1393,7 @@ void BigRat_fix(BigInt *rat)
 {
     BigInt gcd;
 
+    int sign = rat[0].sign * rat[1].sign;
     BigInt_init(&gcd);
     BigInt_gcd(&gcd, &rat[0], &rat[1]);
 
@@ -1410,10 +1411,8 @@ void BigRat_fix(BigInt *rat)
     }
 
     // 符号はrat[0]だけに付ける
-    if (rat[1].sign < 0) {
-        rat[1].sign = 1;
-        rat[0].sign *= -1;
-    }
+    rat[0].sign = sign;
+    rat[1].sign = 1;
 }
 int cstr_BigRat(BigInt *rat, const char *src, const char **end)
 {
