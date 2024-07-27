@@ -935,7 +935,24 @@ static int array_sub(Value *vret, Value *v, RefNode *node)
     }
     return TRUE;
 }
+static int array_get(Value *vret, Value *v, RefNode *node)
+{
+    RefArray *ra = Value_vp(*v);
+    int64_t idx = Value_int64(v[1], NULL);
 
+    if (idx < 0) {
+        idx += ra->size;
+    }
+    if (idx >= 0 && idx < ra->size) {
+        *vret = Value_cp(ra->p[idx]);
+    } else {
+        if (v + 2 < fg->stk_top) {
+            *vret = Value_cp(v[2]);
+        }
+    }
+
+    return TRUE;
+}
 static int array_has_key(Value *vret, Value *v, RefNode *node)
 {
     RefArray *ra = Value_vp(*v);
@@ -3052,6 +3069,8 @@ void define_lang_col_class(RefNode *m)
     define_native_func_a(n, array_sub, 1, 2, NULL, fs->cls_int, fs->cls_int);
     n = define_identifier(m, cls, "dup", NODE_FUNC_N, 0);
     define_native_func_a(n, array_sub, 0, 0, NULL);
+    n = define_identifier(m, cls, "get", NODE_FUNC_N, 0);
+    define_native_func_a(n, array_get, 1, 2, NULL, fs->cls_int, NULL);
     n = define_identifier_p(m, cls, empty, NODE_FUNC_N, NODEOPT_PROPERTY);
     define_native_func_a(n, array_empty, 0, 0, NULL);
     n = define_identifier_p(m, cls, size, NODE_FUNC_N, NODEOPT_PROPERTY);
