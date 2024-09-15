@@ -933,8 +933,18 @@ static void define_const(RefNode *m)
     n = fs->define_identifier(m, m, "M_PI", NODE_CONST, 0);
     n->u.k.val = fs->float_Value(fs->cls_float, M_PI);
 
+    n = fs->define_identifier(m, m, "M_TAU", NODE_CONST, 0);
+    n->u.k.val = fs->float_Value(fs->cls_float, M_PI * 2);
+
     n = fs->define_identifier(m, m, "M_E", NODE_CONST, 0);
     n->u.k.val = fs->float_Value(fs->cls_float, M_E);
+
+    n = fs->define_identifier(m, m, "M_I", NODE_CONST, 0);
+    {
+        RefComplex *rc = fs->buf_new(cls_complex, sizeof(RefComplex));
+        rc->im = 1.0;
+        n->u.k.val = vp_Value(rc);
+    }
 }
 static void define_math_cfunc1(RefNode *m)
 {
