@@ -797,7 +797,7 @@ int set_add_value(Value *vret, Value *v, RefNode *node)
             return FALSE;
         }
     }
-    *vret = Value_bool(!exist);
+    *vret = bool_Value(!exist);
     return TRUE;
 }
 int set_and(Value *vret, Value *v, RefNode *node)

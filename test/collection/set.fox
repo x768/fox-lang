@@ -23,10 +23,10 @@ assert_equal Set(1, 2, 3, 4, 5).reduce(1, (a, b) => a * b), 120
 
 let set = Set()
 set.add 1
-set.add 2
+assert_equal set.add(2), true
+assert_equal set.add(2), false
 assert_equal set, Set(1, 2)
 set.delete 2
 assert_equal set, Set(1)
 set.clear()
 assert_equal set, Set()
-
