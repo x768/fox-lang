@@ -1097,7 +1097,7 @@ static int xml_elem_add_attr(Value *v, Str skey, Str sval, int loose)
     }
     {
         Value key = fs->cstr_Value(fs->cls_str, skey.p, skey.size);
-        HashValueEntry *ve = fs->refmap_add(rm, key, loose, TRUE);
+        HashValueEntry *ve = fs->refmap_add(rm, key, loose, NULL);
         if (ve == NULL) {
             fs->unref(key);
             return FALSE;

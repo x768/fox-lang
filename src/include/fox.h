@@ -603,7 +603,7 @@ struct FoxStatic
     int (*refarray_set_size)(RefArray *ra, int size);
 
     RefMap *(*refmap_new)(int size);
-    HashValueEntry *(*refmap_add)(RefMap *rm, Value key, int overwrite, int raise_error);
+    HashValueEntry *(*refmap_add)(RefMap *rm, Value key, int overwrite, int *exist);
     int (*refmap_get)(HashValueEntry **ret, RefMap *rm, Value key);
     HashValueEntry *(*refmap_get_strkey)(RefMap *rm, const char *key_p, int key_size);
     int (*refmap_del)(Value *val, RefMap *rm, Value key);

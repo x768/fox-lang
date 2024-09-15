@@ -100,9 +100,10 @@ static void map_grow_entry(RefMap *map)
  * 同じキーがあれば上書き
  * なければ追加
  * 例外発生時はNULLを返す
+ * exist==NULLのときはすでに存在する場合IndexError
  * keyのカウンタを増やす
  */
-HashValueEntry *refmap_add(RefMap *rm, Value key, int overwrite, int raise_error)
+HashValueEntry *refmap_add(RefMap *rm, Value key, int overwrite, int *exist)
 {
     HashValueEntry *ep, **epp;
     uint32_t hash;
@@ -122,15 +123,13 @@ HashValueEntry *refmap_add(RefMap *rm, Value key, int overwrite, int raise_error
                 }
             }
             ep->val = VALUE_NULL;
-            return ep;
         } else {
-            if (raise_error) {
+            if (exist == NULL) {
                 throw_errorf(fs->mod_lang, "IndexError", "Duplicate key detected");
                 return NULL;
-            } else {
-                return ep;
             }
         }
+        if (exist != NULL) *exist = TRUE;
     } else {
         // 一致しない（追加）
         ep = malloc(sizeof(HashValueEntry));
@@ -144,8 +143,9 @@ HashValueEntry *refmap_add(RefMap *rm, Value key, int overwrite, int raise_error
         if (rm->count > rm->entry_num) {
             map_grow_entry(rm);
         }
-        return ep;
+        if (exist != NULL) *exist = FALSE;
     }
+    return ep;
 }
 int refmap_get(HashValueEntry **ret, RefMap *rm, Value key)
 {
@@ -253,7 +253,7 @@ static int map_new_elems(Value *vret, Value *v, RefNode *node)
     rm = refmap_new(argc / 2);
     *vret = vp_Value(rm);
     for (i = 0; i < argc; i += 2) {
-        HashValueEntry *ve = refmap_add(rm, src[i], FALSE, TRUE);
+        HashValueEntry *ve = refmap_add(rm, src[i], FALSE, NULL);
         if (ve == NULL) {
             return FALSE;
         }
@@ -329,7 +329,7 @@ static int map_marshal_read(Value *vret, Value *v, RefNode *node)
             fg->stk_top--;
             val = *fg->stk_top;
 
-            ve = refmap_add(rm, key, TRUE, FALSE);
+            ve = refmap_add(rm, key, TRUE, NULL);
             if (ve == NULL) {
                 unref(key);
                 unref(val);
@@ -338,7 +338,7 @@ static int map_marshal_read(Value *vret, Value *v, RefNode *node)
             ve->val = val;
         } else {
             // Set
-            if (refmap_add(rm, key, TRUE, FALSE) == NULL) {
+            if (refmap_add(rm, key, TRUE, NULL) == NULL) {
                 unref(key);
                 return FALSE;
             }
@@ -467,12 +467,13 @@ static int map_index_set(Value *vret, Value *v, RefNode *node)
 {
     RefMap *rm = Value_vp(*v);
     HashValueEntry *ve = NULL;
+    int exist;
 
     if (rm->lock_count > 0) {
         throw_error_select(THROW_CANNOT_MODIFY_ON_ITERATION);
         return FALSE;
     }
-    ve = refmap_add(rm, v[1], TRUE, FALSE);
+    ve = refmap_add(rm, v[1], TRUE, &exist);
     if (ve == NULL) {
         return FALSE;
     }
@@ -558,12 +559,13 @@ static int map_add_entry(Value *vret, Value *v, RefNode *node)
     RefMap *rm = Value_vp(*v);
     Ref *r = Value_ref(v[1]);
     HashValueEntry *ve;
+    int exist;
 
     if (rm->lock_count > 0) {
         throw_error_select(THROW_CANNOT_MODIFY_ON_ITERATION);
         return FALSE;
     }
-    ve = refmap_add(rm, r->v[0], TRUE, FALSE);
+    ve = refmap_add(rm, r->v[0], TRUE, &exist);
     if (ve == NULL) {
         return FALSE;
     }
@@ -772,7 +774,7 @@ static int set_new_elems(Value *vret, Value *v, RefNode *node)
 
     for (i = 0; i < argc; i++) {
         // 同じ要素があればエラー
-        if (refmap_add(rm, src[i], FALSE, TRUE) == NULL) {
+        if (refmap_add(rm, src[i], FALSE, NULL) == NULL) {
             return FALSE;
         }
     }
@@ -782,6 +784,7 @@ int set_add_value(Value *vret, Value *v, RefNode *node)
 {
     RefMap *rm = Value_vp(*v);
     Value *v1 = v + 1;
+    int exist;
     int argc = fg->stk_top - fg->stk_base - 1;
     int i;
 
@@ -790,11 +793,11 @@ int set_add_value(Value *vret, Value *v, RefNode *node)
         return FALSE;
     }
     for (i = 0; i < argc; i++) {
-        if (refmap_add(rm, v1[i], TRUE, FALSE) == NULL) {
+        if (refmap_add(rm, v1[i], TRUE, &exist) == NULL) {
             return FALSE;
         }
     }
-
+    *vret = Value_bool(!exist);
     return TRUE;
 }
 int set_and(Value *vret, Value *v, RefNode *node)
@@ -813,13 +816,14 @@ int set_and(Value *vret, Value *v, RefNode *node)
         for (; ep != NULL; ep = ep->next) {
             Value key = ep->key;
             HashValueEntry *ep2 = NULL;
+            int exist;
 
             // v1に同じ値があれば追加
             if (!refmap_get(&ep2, rm1, key)) {
                 goto ERROR_END;
             }
             if (ep2 != NULL) {
-                if (refmap_add(rm2, key, TRUE, FALSE) == NULL) {
+                if (refmap_add(rm2, key, TRUE, &exist) == NULL) {
                     goto ERROR_END;
                 }
             }
@@ -850,7 +854,8 @@ int set_or(Value *vret, Value *v, RefNode *node)
         HashValueEntry *ep = rm->entry[i];
         for (; ep != NULL; ep = ep->next) {
             Value key = ep->key;
-            if (refmap_add(rm2, key, TRUE, FALSE) == NULL) {
+            int exist;
+            if (refmap_add(rm2, key, TRUE, &exist) == NULL) {
                 goto ERROR_END;
             }
         }
@@ -860,7 +865,8 @@ int set_or(Value *vret, Value *v, RefNode *node)
         HashValueEntry *ep = rm1->entry[i];
         for (; ep != NULL; ep = ep->next) {
             Value key = ep->key;
-            if (refmap_add(rm2, key, TRUE, FALSE) == NULL) {
+            int exist;
+            if (refmap_add(rm2, key, TRUE, &exist) == NULL) {
                 goto ERROR_END;
             }
         }
@@ -893,13 +899,14 @@ int set_xor(Value *vret, Value *v, RefNode *node)
         for (; ep != NULL; ep = ep->next) {
             Value key = ep->key;
             HashValueEntry *ep2 = NULL;
+            int exist;
 
             // v1に同じ値がなければ追加
             if (!refmap_get(&ep2, rm1, key)) {
                 goto ERROR_END;
             }
             if (ep2 == NULL) {
-                if (refmap_add(rm2, key, TRUE, FALSE) == NULL) {
+                if (refmap_add(rm2, key, TRUE, &exist) == NULL) {
                     goto ERROR_END;
                 }
             }
@@ -911,13 +918,14 @@ int set_xor(Value *vret, Value *v, RefNode *node)
         for (; ep != NULL; ep = ep->next) {
             Value key = ep->key;
             HashValueEntry *ep2 = NULL;
+            int exist;
 
             // vに同じ値がなければ追加
             if (!refmap_get(&ep2, rm, key)) {
                 goto ERROR_END;
             }
             if (ep2 == NULL) {
-                if (refmap_add(rm2, key, TRUE, FALSE) == NULL) {
+                if (refmap_add(rm2, key, TRUE, &exist) == NULL) {
                     goto ERROR_END;
                 }
             }
@@ -951,13 +959,14 @@ int set_sub(Value *vret, Value *v, RefNode *node)
         for (; ep != NULL; ep = ep->next) {
             Value key = ep->key;
             HashValueEntry *ep2 = NULL;
+            int exist;
 
             // v1に同じ値がなければ追加
             if (!refmap_get(&ep2, rm1, key)) {
                 goto ERROR_END;
             }
             if (ep2 == NULL) {
-                if (refmap_add(rm2, key, TRUE, FALSE) == NULL) {
+                if (refmap_add(rm2, key, TRUE, &exist) == NULL) {
                     goto ERROR_END;
                 }
             }
