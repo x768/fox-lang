@@ -31,5 +31,8 @@ assert_equal map.get('bar', 'none'), 2
 map.clear()
 assert_equal map, {}
 
-assert_error () => map['foo'], IndexError
+assert_equal map.get_or_add('foo', () => 'A'), 'A'
+assert_equal map.get_or_add('foo', () => 'B'), 'A'
+
+assert_error () => map['bar'], IndexError
 

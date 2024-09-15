@@ -481,7 +481,31 @@ static int map_index_set(Value *vret, Value *v, RefNode *node)
 
     return TRUE;
 }
+static int map_get_or_add(Value *vret, Value *v, RefNode *node)
+{
+    RefMap *rm = Value_vp(*v);
+    HashValueEntry *ve = NULL;
+    int exist;
 
+    if (rm->lock_count > 0) {
+        throw_error_select(THROW_CANNOT_MODIFY_ON_ITERATION);
+        return FALSE;
+    }
+    ve = refmap_add(rm, v[1], FALSE, &exist);
+    if (ve == NULL) {
+        return FALSE;
+    }
+    if (!exist) {
+        Value_push("v", v[2]);
+        if (!call_function_obj(0)) {
+            return FALSE;
+        }
+        fg->stk_top--;
+        ve->val = *fg->stk_top;
+    }
+    *vret = Value_cp(ve->val);
+    return TRUE;
+}
 int map_has_key(Value *vret, Value *v, RefNode *node)
 {
     RefMap *rm = Value_vp(*v);
@@ -1026,6 +1050,8 @@ void define_lang_map_class(RefNode *m)
     define_native_func_a(n, map_index_set, 2, 2, NULL, NULL, NULL);
     n = define_identifier(m, cls, "get", NODE_FUNC_N, 0);
     define_native_func_a(n, map_get, 1, 2, NULL, NULL, NULL);
+    n = define_identifier(m, cls, "get_or_add", NODE_FUNC_N, 0);
+    define_native_func_a(n, map_get_or_add, 2, 2, NULL, NULL, fs->cls_fn);
     n = define_identifier_p(m, cls, empty, NODE_FUNC_N, NODEOPT_PROPERTY);
     define_native_func_a(n, map_empty, 0, 0, NULL);
     n = define_identifier_p(m, cls, size, NODE_FUNC_N, NODEOPT_PROPERTY);
