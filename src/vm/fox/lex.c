@@ -1,9 +1,8 @@
 #include "fox_parse.h"
 #include "bigint.h"
+#include "fox_pcre.h"
 #include <string.h>
 #include <errno.h>
-#include <pcre.h>
-
 
 static void Tok_parse_digit(TokValue *v, Tok *tk)
 {
@@ -851,16 +850,16 @@ static void Tok_parse_regex(TokValue *v, Tok *tk, char term)
     for (;;) {
         switch (*tk->p) {
         case 'i':
-            options |= PCRE_CASELESS;
+            options |= PCRE2_CASELESS;
             break;
         case 's':
-            options |= PCRE_DOTALL;
+            options |= PCRE2_DOTALL;
             break;
         case 'm':
-            options |= PCRE_MULTILINE;
+            options |= PCRE2_MULTILINE;
             break;
         case 'u':
-            options |= PCRE_UTF8;
+            options |= PCRE2_UTF;
             break;
         case 'x':
             trim_space = TRUE;

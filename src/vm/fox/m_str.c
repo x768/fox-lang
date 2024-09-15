@@ -1,5 +1,5 @@
 #include "fox_vm.h"
-#include <pcre.h>
+#include "fox_pcre.h"
 
 
 enum {
@@ -8,20 +8,20 @@ enum {
     INDEX_SEQITER_IS_STR,
     INDEX_SEQITER_NUM,
 };
+enum {
+    ERROR_MESSAGE_SIZE = 1024,
+};
 
 typedef struct {
+    size_t begin;
+    size_t end;
+} MatchElem;
+typedef struct {
     RefHeader rh;
-
-    Value source;
-    int is_bytes;
+    Value src;
+    Value re;
     int count;
-
-    int name_count;
-    int name_size;
-    char *name_entry;
-    int *matches;
-
-    char buf[];
+    MatchElem m[];
 } RefMatches;
 
 typedef struct MapReplace {
@@ -29,6 +29,8 @@ typedef struct MapReplace {
     Str key;
     Str val;
 } MapReplace;
+
+static RefNode *cls_matches;
 
 #define Value_pcre_ptr(val) (Value_ptr(Value_ref((val))->v[INDEX_REGEX_PTR]))
 
@@ -225,6 +227,44 @@ int string_format_sub(Value *v, Str src, const char *fmt_p, int fmt_size, int ut
     StrBuf_close(&buf);
 
     return TRUE;
+}
+
+pcre2_code *regex_compile(const char *s, int len, uint32_t options, int *errcode)
+{
+    size_t erroffset = 0;
+    return pcre2_compile((PCRE2_SPTR)s, len, options, errcode, &erroffset, NULL);
+}
+void throw_pcre_error(int errcode)
+{
+    char *message = malloc(ERROR_MESSAGE_SIZE);
+    pcre2_get_error_message(errcode, (PCRE2_UCHAR*)message, ERROR_MESSAGE_SIZE);
+    throw_errorf(fs->mod_lang, "RegexError", "%s", message);
+    free(message);
+}
+static RefMatches *create_regx_matches(pcre2_match_data *matches, int count, Value src, Value to_find)
+{
+    int i;
+    RefMatches *r = buf_new(cls_matches, sizeof(RefMatches) + sizeof(MatchElem) * count);
+    size_t *ovector = pcre2_get_ovector_pointer(matches);
+    r->src = Value_cp(src);
+    r->re = Value_cp(to_find);
+    r->count = count;
+
+    for (i = 0; i < count; i++) {
+        r->m[i].begin = ovector[i * 2];
+        r->m[i].end = ovector[i * 2 + 1];
+    }
+    return r;
+}
+static RefMatches *create_str_matches(int begin, int end, Value v, Value to_find)
+{
+    RefMatches *r = buf_new(cls_matches, sizeof(RefMatches) + sizeof(MatchElem));
+    r->src = Value_cp(v);
+    r->re = Value_cp(to_find);
+    r->count = 1;
+    r->m[0].begin = begin;
+    r->m[0].end = end;
+    return r;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -478,18 +518,13 @@ static int sequence_find(Value *vret, Value *v, RefNode *node)
         RefStr *s2 = Value_vp(v1);
         idx = sequence_find_sub(s1, s2, 0);
     } else if (v1_type == fs->cls_regex) {
-        pcre *re = Value_pcre_ptr(v1);
-        int *matches = NULL;
-        int m_count = 0, m_size = 0;
-
-        pcre_fullinfo(re, NULL, PCRE_INFO_CAPTURECOUNT, &m_count);
-        m_size = (m_count + 1) * 3;
-        matches = malloc(sizeof(int) * m_size);
-
-        if (pcre_exec(re, NULL, s1->c, s1->size, 0, 0, matches, m_size) >= 1) {
-            idx = matches[0];
+        pcre2_code *re = Value_pcre_ptr(v1);
+        pcre2_match_data *matches = pcre2_match_data_create_from_pattern(re, NULL);
+        if (pcre2_match(re, (PCRE2_SPTR)s1->c, s1->size, 0, 0, matches, NULL) > 0) {
+            PCRE2_SIZE *m = pcre2_get_ovector_pointer(matches);
+            idx = m[0];
         }
-        free(matches);
+        pcre2_match_data_free(matches);
     } else {
         throw_error_select(THROW_ARGMENT_TYPE2__NODE_NODE_NODE_INT, v0_type, fs->cls_regex, v1_type, 1);
         return FALSE;
@@ -497,7 +532,6 @@ static int sequence_find(Value *vret, Value *v, RefNode *node)
     if (idx >= 0) {
         *vret = int32_Value(idx);
     }
-
     return TRUE;
 }
 static int sequence_match(Value *vret, Value *v, RefNode *node)
@@ -507,67 +541,25 @@ static int sequence_match(Value *vret, Value *v, RefNode *node)
     RefNode *v0_type = Value_type(v0);
     RefNode *v1_type = Value_type(v1);
     RefStr *src = Value_vp(v0);
-
-    RefNode *cls_matches = FUNC_VP(node);
-    RefMatches *r = NULL;
     int offset = 0;
 
     if (v1_type == v0_type) {
         RefStr *s1 = Value_vp(v1);
         int idx = sequence_find_sub(src, s1, offset);
         if (idx >= 0) {
-            r = buf_new(cls_matches, sizeof(RefMatches) + sizeof(int) * 2);
-            *vret = vp_Value(r);
-
-            r->matches = (int*)r->buf;
-            r->matches[0] = idx;
-            r->matches[1] = idx + s1->size;
-            r->is_bytes = (v0_type == fs->cls_bytes);
-            r->count = 1;
+            *vret = vp_Value(create_str_matches(idx, idx + s1->size, v0, v1));
         }
     } else if (v1_type == fs->cls_regex) {
-        pcre *re = Value_pcre_ptr(v1);
-        int m_count = 0, m_size = 0, n_match;
-        int name_count = 0;
-        int name_size = 0;
-
-        pcre_fullinfo(re, NULL, PCRE_INFO_CAPTURECOUNT, &m_count);
-        pcre_fullinfo(re, NULL, PCRE_INFO_NAMECOUNT, &name_count);
-        if (name_count > 0) {
-            pcre_fullinfo(re, NULL, PCRE_INFO_NAMEENTRYSIZE, &name_size);
+        pcre2_code *re = Value_pcre_ptr(v1);
+        pcre2_match_data *matches = pcre2_match_data_create_from_pattern(re, NULL);
+        int n_match = pcre2_match(re, (PCRE2_SPTR)src->c, src->size, offset, 0, matches, NULL);
+        if (n_match > 0) {
+            *vret = vp_Value(create_regx_matches(matches, n_match, v0, v1));
         }
-
-        m_size = (m_count + 1) * 3;
-        r = buf_new(cls_matches, sizeof(RefMatches) + sizeof(int) * m_size + name_count * name_size);
-        *vret = vp_Value(r);
-        r->matches = (int*)r->buf;
-        r->name_entry = r->buf + sizeof(int) * m_size;
-
-        n_match = pcre_exec(re, NULL, src->c, src->size, offset, 0, r->matches, m_size);
-        if (n_match >= 0) {
-            r->name_count = name_count;
-            pcre_fullinfo(re, NULL, PCRE_INFO_NAMEENTRYSIZE, &r->name_size);
-            if (name_count > 0) {
-                char *entry;
-                pcre_fullinfo(re, NULL, PCRE_INFO_NAMETABLE, &entry);
-                memcpy(r->name_entry, entry, name_count * name_size);
-            }
-
-            r->is_bytes = (v0_type == fs->cls_bytes);
-            r->count = n_match;
-        } else {
-            free(Value_vp(*vret));
-            *vret = VALUE_NULL;
-            r = NULL;
-        }
+        pcre2_match_data_free(matches);
     } else {
         throw_error_select(THROW_ARGMENT_TYPE2__NODE_NODE_NODE_INT, v0_type, fs->cls_regex, v1_type, 1);
         return FALSE;
-    }
-
-    if (r != NULL) {
-        r->source = *v;
-        *v = VALUE_NULL;
     }
     return TRUE;
 }
@@ -603,7 +595,6 @@ static int sequence_replace_sub(StrBuf *buf, RefNode *v_type)
  */
 static int sequence_replace(Value *vret, Value *v, RefNode *node)
 {
-    RefNode *cls_matches = FUNC_VP(node);
     Value v1 = v[1];
     Value v2 = v[2];
     RefNode *v_type = Value_type(*v);
@@ -662,20 +653,9 @@ static int sequence_replace(Value *vret, Value *v, RefNode *node)
             }
 
             if (callback) {
-                RefMatches *r;
-
                 *fg->stk_top++ = v2;
                 addref(v2);
-
-                r = buf_new(cls_matches, sizeof(RefMatches) + sizeof(int) * 2);
-                *fg->stk_top++ = vp_Value(r);
-                r->count = 1;
-                r->matches = (int*)r->buf;
-                r->matches[0] = idx;
-                r->matches[1] = idx + s1->size;
-                r->is_bytes = (v_type == fs->cls_bytes);
-                r->source = Value_cp(*v);
-
+                *fg->stk_top++ = vp_Value(create_str_matches(idx, idx + s1->size, *v, v1));
                 if (!sequence_replace_sub(&buf, v_type)) {
                     return FALSE;
                 }
@@ -686,91 +666,60 @@ static int sequence_replace(Value *vret, Value *v, RefNode *node)
             }
         }
     } else if (v1_type == fs->cls_regex) {
-        pcre *re = Value_pcre_ptr(v1);
-        int prev = 0;
-        int m_count = 0, m_size = 0;
-        int *matches = NULL;
-
-        pcre_fullinfo(re, NULL, PCRE_INFO_CAPTURECOUNT, &m_count);
-        m_size = (m_count + 1) * 3;
-        matches = malloc(sizeof(int) * m_size);
+        pcre2_code *re = Value_pcre_ptr(v1);
+        size_t prev = 0;
+        pcre2_match_data *matches = pcre2_match_data_create_from_pattern(re, NULL);
 
         for (;;) {
+            size_t *ovector;
             Str result;
-            int n_match = pcre_exec(re, NULL, src->c, src->size, offset, 0, matches, m_size);
 
-            if (n_match < 0) {
+            int n_match = pcre2_match(re, (PCRE2_SPTR)src->c, src->size, offset, 0, matches, NULL);
+            if (n_match <= 0) {
                 result = Str_new(src->c + prev, src->size - prev);
                 if (is_str) {
                     result = fix_utf8_part(result);
                 }
                 if (!StrBuf_add(&buf, result.p, result.size)) {
-                    free(matches);
+                    pcre2_match_data_free(matches);
                     return FALSE;
                 }
                 break;
             }
-            result = Str_new(src->c + prev, matches[0] - prev);
+            ovector = pcre2_get_ovector_pointer(matches);
+            result = Str_new(src->c + prev, ovector[0] - prev);
             if (is_str) {
                 result = fix_utf8_part(result);
             }
             if (!StrBuf_add(&buf, result.p, result.size)) {
-                free(matches);
+                pcre2_match_data_free(matches);
                 return FALSE;
             }
 
-            prev = matches[1];
+            prev = ovector[1];
             offset = prev;
-            if (matches[0] == matches[1]) {
+            if (ovector[0] == ovector[1]) {
                 offset++;
             }
 
             if (callback) {
                 // 引数に渡すmatchesオブジェクトを作成
-                RefMatches *r;
-                int name_count = 0;
-                int name_size = 0;
-
                 *fg->stk_top++ = v2;
                 addref(v2);
-
-                pcre_fullinfo(re, NULL, PCRE_INFO_NAMECOUNT, &name_count);
-                if (name_count > 0) {
-                    pcre_fullinfo(re, NULL, PCRE_INFO_NAMEENTRYSIZE, &name_size);
-                }
-
-                r = buf_new(cls_matches, sizeof(RefMatches) + sizeof(int) * n_match * 2 + name_count * name_size);
-                *fg->stk_top++ = vp_Value(r);
-                r->count = n_match;
-                r->matches = (int*)r->buf;
-                r->name_entry = r->buf + sizeof(int) * n_match * 2;
-                r->name_count = name_count;
-                r->name_size = name_size;
-
-                memcpy(r->matches, matches, sizeof(int) * n_match * 2);
-                if (name_count > 0) {
-                    char *entry;
-                    pcre_fullinfo(re, NULL, PCRE_INFO_NAMETABLE, &entry);
-                    memcpy(r->name_entry, entry, name_count * name_size);
-                }
-
-                r->is_bytes = (v_type == fs->cls_bytes);
-                r->source = Value_cp(*v);
+                *fg->stk_top++ = vp_Value(create_regx_matches(matches, n_match, *v, v1));
 
                 if (!sequence_replace_sub(&buf, v_type)) {
-                    free(matches);
+                    pcre2_match_data_free(matches);
                     return FALSE;
                 }
-
-                matches = malloc(sizeof(int) * m_size);
             } else {
                 if (!StrBuf_add(&buf, repl_to->c, repl_to->size)) {
-                    free(matches);
+                    pcre2_match_data_free(matches);
                     return FALSE;
                 }
             }
         }
-        free(matches);
+        pcre2_match_data_free(matches);
     } else {
         throw_error_select(THROW_ARGMENT_TYPE2__NODE_NODE_NODE_INT, v_type, fs->cls_regex, v1_type, 1);
         return FALSE;
@@ -896,18 +845,14 @@ static int sequence_split(Value *vret, Value *v, RefNode *node)
             }
         }
     } else if (v1_type == fs->cls_regex) {
-        pcre *re = Value_pcre_ptr(v1);
-        int prev = 0;
-        int m_count = 0, m_size = 0;
-        int *matches = NULL;
-
-        pcre_fullinfo(re, NULL, PCRE_INFO_CAPTURECOUNT, &m_count);
-        m_size = (m_count + 1) * 3;
-        matches = malloc(sizeof(int) * m_size);
+        pcre2_code *re = Value_pcre_ptr(v1);
+        size_t prev = 0;
+        pcre2_match_data *matches = pcre2_match_data_create_from_pattern(re, NULL);
 
         for (;;) {
             Str result;
-            int n_match = pcre_exec(re, NULL, src->c, src->size, offset, 0, matches, m_size);
+            int n_match = pcre2_match(re, (PCRE2_SPTR)src->c, src->size, offset, 0, matches, NULL);
+            size_t *ovector;
 
             if (n_match < 0) {
                 result = Str_new(src->c + prev, src->size - prev);
@@ -917,15 +862,16 @@ static int sequence_split(Value *vret, Value *v, RefNode *node)
                 refarray_push_str(arr, result.p, result.size, v_type);
                 break;
             }
-            result = Str_new(src->c + prev, matches[0] - prev);
+            ovector = pcre2_get_ovector_pointer(matches);
+            result = Str_new(src->c + prev, ovector[0] - prev);
             if (v_type == fs->cls_str) {
                 result = fix_utf8_part(result);
             }
             refarray_push_str(arr, result.p, result.size, v_type);
 
-            prev = matches[1];
+            prev = ovector[1];
             offset = prev;
-            if (matches[0] == matches[1]) {
+            if (ovector[0] == ovector[1]) {
                 // マッチした幅が0の場合は1進めないと、無限ループになってしまう
                 offset++;
             }
@@ -1072,23 +1018,19 @@ static int sequence_count(Value *vret, Value *v, RefNode *node)
             }
         }
     } else if (v1_type == fs->cls_regex) {
-        pcre *re = Value_pcre_ptr(v1);
-        int *matches = NULL;
-        int m_count = 0, m_size = 0;
-
-        pcre_fullinfo(re, NULL, PCRE_INFO_CAPTURECOUNT, &m_count);
-        m_size = (m_count + 1) * 3;
-        matches = malloc(sizeof(int) * m_size);
+        pcre2_code *re = Value_pcre_ptr(v1);
+        pcre2_match_data *matches = pcre2_match_data_create_from_pattern(re, NULL);
 
         for (;;) {
-            if (pcre_exec(re, NULL, s1->c, s1->size, offset, 0, matches, m_size) >= 1) {
-                offset = matches[1];
+            if (pcre2_match(re, (PCRE2_SPTR)s1->c, s1->size, offset, 0, matches, NULL) > 0) {
+                size_t *ovector = pcre2_get_ovector_pointer(matches);
+                offset = ovector[1];
                 count++;
             } else {
                 break;
             }
         }
-        free(matches);
+        pcre2_match_data_free(matches);
     } else {
         throw_error_select(THROW_ARGMENT_TYPE2__NODE_NODE_NODE_INT, v_type, fs->cls_regex, v1_type, 1);
         return FALSE;
@@ -1553,10 +1495,9 @@ static int regex_new(Value *vret, Value *v, RefNode *node)
 
     RefStr *src = Value_vp(v1);
     RefNode *v1_type = Value_type(v1);
-    pcre *re;
-    const char *errptr = NULL;
+    pcre2_code *re;
+    int errcode = 0;
     int options = 0;
-    int erroffset;
 
     // 第2引数をオプションとして解析
     if (fg->stk_top > v + 2) {
@@ -1566,20 +1507,20 @@ static int regex_new(Value *vret, Value *v, RefNode *node)
         for (i = 0; i < opt->size; i++) {
             switch (opt->c[i]) {
             case 'i':
-                options |= PCRE_CASELESS;
+                options |= PCRE2_CASELESS;
                 break;
             case 's':
-                options |= PCRE_DOTALL;
+                options |= PCRE2_DOTALL;
                 break;
             case 'm':
-                options |= PCRE_MULTILINE;
+                options |= PCRE2_MULTILINE;
                 break;
             case 'u':
                 if (v1_type == fs->cls_bytes) {
                     throw_errorf(fs->mod_lang, "RegexError", "Cannot use 'u' flag when Bytes given");
                     return FALSE;
                 }
-                options |= PCRE_UTF8;
+                options |= PCRE2_UTF;
                 break;
             default:
                 throw_errorf(fs->mod_lang, "RegexError", "Unknown option flag %c", opt->c[i]);
@@ -1587,7 +1528,7 @@ static int regex_new(Value *vret, Value *v, RefNode *node)
             }
         }
     }
-    re = pcre_compile(src->c, options, &errptr, &erroffset, NULL);
+    re = regex_compile(src->c, src->size, options, &errcode);
 
     if (re != NULL) {
         r->v[INDEX_REGEX_PTR] = ptr_Value(re);
@@ -1595,7 +1536,7 @@ static int regex_new(Value *vret, Value *v, RefNode *node)
         v[1] = VALUE_NULL;
         r->v[INDEX_REGEX_FLAGS] = int32_Value(options);
     } else {
-        throw_errorf(fs->mod_lang, "RegexError", "%s", errptr);
+        throw_pcre_error(errcode);
         return FALSE;
     }
 
@@ -1615,12 +1556,11 @@ static int regex_marshal_read(Value *vret, Value *v, RefNode *node)
 {
     char is_str;
     uint32_t size;
-    uint32_t options;
+    int errcode = 0;
+    uint32_t options = 0;
     int rd_size;
     RefStr *rs;
-    pcre *re;
-    const char *errptr = NULL;
-    int erroffset;
+    pcre2_code *re;
 
     Value rd = Value_ref(v[1])->v[INDEX_MARSHALDUMPER_SRC];
     Ref *r = ref_new(fs->cls_regex);
@@ -1651,13 +1591,13 @@ static int regex_marshal_read(Value *vret, Value *v, RefNode *node)
     if (!stream_read_uint32(rd, &options)) {
         return FALSE;
     }
-    re = pcre_compile(rs->c, options, &errptr, &erroffset, NULL);
+    re = regex_compile(rs->c, rs->size, options, &errcode);
 
     if (re != NULL) {
         r->v[INDEX_REGEX_PTR] = ptr_Value(re);
         r->v[INDEX_REGEX_FLAGS] = int32_Value(options);
     } else {
-        throw_errorf(fs->mod_lang, "RegexError", "%s", errptr);
+        throw_pcre_error(errcode);
         return FALSE;
     }
 
@@ -1700,16 +1640,16 @@ static int regex_source(Value *vret, Value *v, RefNode *node)
 }
 static void regex_flags_to_strbuf(StrBuf *sb, int flags)
 {
-    if ((flags & PCRE_CASELESS) != 0) {
+    if ((flags & PCRE2_CASELESS) != 0) {
         StrBuf_add_c(sb, 'i');
     }
-    if ((flags & PCRE_DOTALL) != 0) {
+    if ((flags & PCRE2_DOTALL) != 0) {
         StrBuf_add_c(sb, 's');
     }
-    if ((flags & PCRE_MULTILINE) != 0) {
+    if ((flags & PCRE2_MULTILINE) != 0) {
         StrBuf_add_c(sb, 'm');
     }
-    if ((flags & PCRE_UTF8) != 0) {
+    if ((flags & PCRE2_UTF) != 0) {
         StrBuf_add_c(sb, 'u');
     }
 }
@@ -1773,21 +1713,27 @@ static int regex_eq(Value *vret, Value *v, RefNode *node)
 static int regex_capture_count(Value *vret, Value *v, RefNode *node)
 {
     Ref *r = Value_ref(*v);
-    pcre *re = Value_ptr(r->v[INDEX_REGEX_PTR]);
-    int count = 0;
-
-    pcre_fullinfo(re, NULL, PCRE_INFO_CAPTURECOUNT, &count);
+    pcre2_code *re = Value_ptr(r->v[INDEX_REGEX_PTR]);
+    int count = pcre2_pattern_info(re, PCRE2_INFO_CAPTURECOUNT, NULL);
     *vret = int32_Value(count);
 
     return TRUE;
 }
-static int pcre_capture_index_from_name(int count, int entry_size, const char *entry, const char *name)
+static int capture_index_from_name(pcre2_code *re, const RefStr *name)
 {
+    char *entry;
+    uint32_t count, size;
     int i;
 
+    if (str_has0(name->c, name->size)) return -1;
+    pcre2_pattern_info(re, PCRE2_INFO_NAMECOUNT, &count);
+    if (count < 0) return -1;
+
+    pcre2_pattern_info(re, PCRE2_INFO_NAMETABLE, &entry);
+    pcre2_pattern_info(re, PCRE2_INFO_NAMEENTRYSIZE, &size);
     for (i = 0; i < count; i++) {
-        const char *p = entry + entry_size * i;
-        if (strcmp(name, p + 2) == 0) {
+        const char *p = entry + size * i;
+        if (strcmp(name->c, p + 2) == 0) {
             return ((p[0] & 0xFF) << 8) | (p[1] & 0xFF);
         }
     }
@@ -1796,24 +1742,12 @@ static int pcre_capture_index_from_name(int count, int entry_size, const char *e
 static int regex_capture_index(Value *vret, Value *v, RefNode *node)
 {
     Ref *r = Value_ref(*v);
-    pcre *re = Value_ptr(r->v[INDEX_REGEX_PTR]);
-    int count = 0;
-    int entry_size = 0;
-    int idx = -1;
+    pcre2_code *re = Value_ptr(r->v[INDEX_REGEX_PTR]);
+    int idx = capture_index_from_name(re, Value_vp(v[1]));
 
-    pcre_fullinfo(re, NULL, PCRE_INFO_NAMECOUNT, &count);
-    if (count > 0) {
-        pcre_fullinfo(re, NULL, PCRE_INFO_NAMEENTRYSIZE, &entry_size);
-        if (entry_size > 0) {
-            char *entry;
-            pcre_fullinfo(re, NULL, PCRE_INFO_NAMETABLE, &entry);
-            idx = pcre_capture_index_from_name(count, entry_size, entry, Value_cstr(v[1]));
-        }
-    }
     if (idx >= 0) {
         *vret = int32_Value(idx);
     }
-
     return TRUE;
 }
 
@@ -1822,8 +1756,10 @@ static int regex_capture_index(Value *vret, Value *v, RefNode *node)
 static int matches_dispose(Value *vret, Value *v, RefNode *node)
 {
     RefMatches *r = Value_vp(*v);
-    unref(r->source);
-    r->source = VALUE_NULL;
+    unref(r->src);
+    unref(r->re);
+    r->src = VALUE_NULL;
+    r->re = VALUE_NULL;
     return TRUE;
 }
 static int matches_size(Value *vret, Value *v, RefNode *node)
@@ -1834,8 +1770,8 @@ static int matches_size(Value *vret, Value *v, RefNode *node)
 }
 static int matches_index(Value *vret, Value *v, RefNode *node)
 {
-    RefMatches *r = Value_vp(*v);
     int32_t idx = 0;
+    RefMatches *r = Value_vp(*v);
 
     if (fg->stk_top > v + 1) {
         RefNode *v1_type = Value_type(v[1]);
@@ -1849,8 +1785,11 @@ static int matches_index(Value *vret, Value *v, RefNode *node)
             idx = (int32_t)i64;
         } else if (v1_type == fs->cls_str) {
             RefStr *rs = Value_vp(v[1]);
-            if (!str_has0(rs->c, rs->size)) {
-                idx = pcre_capture_index_from_name(r->name_count, r->name_size, r->name_entry, Value_cstr(v[1]));
+            RefNode *re_type = Value_type(r->re);
+            if (re_type == fs->cls_regex) {
+                idx = capture_index_from_name(Value_pcre_ptr(r->re), rs);
+            } else {
+                idx = -1;
             }
             if (idx < 0) {
                 throw_errorf(fs->mod_lang, "IndexError", "Named capture %v not found", v[1]);
@@ -1863,12 +1802,11 @@ static int matches_index(Value *vret, Value *v, RefNode *node)
     }
 
     {
-        int begin = r->matches[idx * 2 + 0];
-        int end = r->matches[idx * 2 + 1];
-        RefStr *src = Value_vp(r->source);
-        Str s = Str_new(src->c + begin, end - begin);
+        MatchElem m = r->m[idx];
+        RefStr *src = Value_vp(r->src);
+        Str s = Str_new(src->c + m.begin, m.end - m.begin);
 
-        if (r->is_bytes) {
+        if (Value_type(r->src) == fs->cls_bytes) {
             *vret = cstr_Value(fs->cls_bytes, s.p, s.size);
         } else {
             s = fix_utf8_part(s);
@@ -1880,9 +1818,12 @@ static int matches_index(Value *vret, Value *v, RefNode *node)
 }
 static int matches_position(Value *vret, Value *v, RefNode *node)
 {
-    RefMatches *r = Value_vp(*v);
+    Value v0 = *v;
+    RefMatches *r = Value_vp(v0);
     int end = FUNC_INT(node);
     int32_t idx = 0;
+    MatchElem m;
+    int pos;
 
     if (fg->stk_top > v + 1) {
         idx = Value_int64(v[1], NULL);
@@ -1893,21 +1834,25 @@ static int matches_position(Value *vret, Value *v, RefNode *node)
         }
     }
 
-    {
-        int pos = r->matches[idx * 2 + (end ? 1 : 0)];
-        if (!r->is_bytes) {
-            RefStr *src = Value_vp(r->source);
-            pos = strlen_utf8(src->c, pos);
-        }
-        *vret = int32_Value(pos);
+    m = r->m[idx];
+    pos = end ? m.end : m.begin;
+    if (Value_type(v0) == fs->cls_str) {
+        RefStr *src = Value_vp(r->src);
+        pos = strlen_utf8(src->c, pos);
     }
-
+    *vret = int32_Value(pos);
     return TRUE;
 }
 static int matches_source(Value *vret, Value *v, RefNode *node)
 {
     RefMatches *r = Value_vp(*v);
-    *vret = Value_cp(r->source);
+    *vret = Value_cp(r->src);
+    return TRUE;
+}
+static int matches_to_find(Value *vret, Value *v, RefNode *node)
+{
+    RefMatches *r = Value_vp(*v);
+    *vret = Value_cp(r->re);
     return TRUE;
 }
 
@@ -2087,9 +2032,8 @@ void define_lang_str_class(RefNode *m)
 {
     RefNode *cls;
     RefNode *n;
-
-    RefNode *cls_matches = define_identifier(m, m, "Matches", NODE_CLASS, 0);
     RefNode *cls_seqiter = define_identifier(m, m, "SequenceIter", NODE_CLASS, 0);
+    cls_matches = define_identifier(m, m, "Matches", NODE_CLASS, 0);
 
     // Sequence
     cls = fs->cls_sequence;
@@ -2111,9 +2055,9 @@ void define_lang_str_class(RefNode *m)
     n = define_identifier_p(m, cls, fs->symbol_stock[T_IN], NODE_FUNC_N, 0);
     define_native_func_a(n, sequence_find, 1, 1, NULL, NULL);
     n = define_identifier(m, cls, "match", NODE_FUNC_N, 0);
-    define_native_func_a(n, sequence_match, 1, 1, cls_matches, NULL);
+    define_native_func_a(n, sequence_match, 1, 1, NULL, NULL);
     n = define_identifier(m, cls, "replace", NODE_FUNC_N, 0);
-    define_native_func_a(n, sequence_replace, 2, 2, cls_matches, NULL, NULL);
+    define_native_func_a(n, sequence_replace, 2, 2, NULL, NULL, NULL);
     n = define_identifier(m, cls, "split", NODE_FUNC_N, 0);
     define_native_func_a(n, sequence_split, 1, 1, NULL, NULL);
     n = define_identifier(m, cls, "splice", NODE_FUNC_N, 0);
@@ -2228,13 +2172,15 @@ void define_lang_str_class(RefNode *m)
     n = define_identifier_p(m, cls, fs->str_missing, NODE_FUNC_N, 0);
     define_native_func_a(n, matches_index, 1, 1, NULL, NULL);
     n = define_identifier(m, cls, "begin", NODE_FUNC_N, 0);
-    define_native_func_a(n, matches_position, 1, 1, (void*) FALSE, fs->cls_int);
+    define_native_func_a(n, matches_position, 1, 1, (void*)FALSE, fs->cls_int);
     n = define_identifier(m, cls, "end", NODE_FUNC_N, 0);
-    define_native_func_a(n, matches_position, 1, 1, (void*) TRUE, fs->cls_int);
+    define_native_func_a(n, matches_position, 1, 1, (void*)TRUE, fs->cls_int);
     n = define_identifier(m, cls, "size", NODE_FUNC_N, NODEOPT_PROPERTY);
     define_native_func_a(n, matches_size, 0, 0, NULL);
     n = define_identifier(m, cls, "source", NODE_FUNC_N, NODEOPT_PROPERTY);
     define_native_func_a(n, matches_source, 0, 0, NULL);
+    n = define_identifier(m, cls, "to_find", NODE_FUNC_N, NODEOPT_PROPERTY);
+    define_native_func_a(n, matches_to_find, 0, 0, NULL);
     n = define_identifier(m, cls, "all", NODE_FUNC_N, NODEOPT_PROPERTY);
     define_native_func_a(n, matches_index, 0, 0, NULL);
     extends_method(cls, fs->cls_obj);

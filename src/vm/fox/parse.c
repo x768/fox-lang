@@ -1,6 +1,6 @@
 #include "fox_parse.h"
 #include "bigint.h"
-#include <pcre.h>
+#include "fox_pcre.h"
 
 #ifndef WIN32
 #include <dlfcn.h>
@@ -790,9 +790,8 @@ static int parse_elem(OpBuf *buf, Block *bk, Tok *tk)
         break;
     }
     case TL_REGEX: {
-        const char *errptr;
-        int erroffset;
-        pcre *re_val = pcre_compile(tk->str_val.p, tk->int_val, &errptr, &erroffset, NULL);
+        int errcode = 0;
+        pcre2_code *re_val = regex_compile(tk->str_val.p, strlen(tk->str_val.p), tk->int_val, &errcode);
 
         if (re_val != NULL) {
             Ref *r = ref_new(fs->cls_regex);
@@ -803,7 +802,7 @@ static int parse_elem(OpBuf *buf, Block *bk, Tok *tk)
             OpBuf_add_op2(buf, OP_LITERAL, 0, v);
             Tok_next(tk);
         } else {
-            throw_errorf(fs->mod_lang, "RegexError", "%s", errptr);
+            throw_pcre_error(errcode);
             add_stack_trace(tk->module, NULL, tk->v.line);
             return FALSE;
         }

@@ -1,6 +1,3 @@
-project(foxrt)
-project(foxrtd)
-
 include_directories(../compat)
 include_directories(./)
 
@@ -37,7 +34,7 @@ set_target_properties(foxrtd
 
 if("${TARGET_OS}" STREQUAL "win")
   set(LIBS
-    pcre
+    pcre2-8
   )
   target_link_libraries(foxrt
     ${LIBS}
@@ -49,7 +46,7 @@ if("${TARGET_OS}" STREQUAL "win")
 elseif("${TARGET_OS}" STREQUAL "osx")
   set(LIBS
     dl
-    pcre
+    pcre2-8
   )
   find_library(FOUNDATION_LIBRARY Foundation)
   target_link_libraries(foxrt
@@ -64,7 +61,7 @@ else()
   set(LIBS
     rt
     dl
-    pcre
+    pcre2-8
     m
   )
 

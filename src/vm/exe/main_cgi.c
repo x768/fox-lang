@@ -1,7 +1,8 @@
 #define DEFINE_GLOBALS
 #include "fox_vm.h"
 #include "datetime.h"
-#include <pcre.h>
+#define PCRE2_CODE_UNIT_WIDTH 8
+#include <pcre2.h>
 
 #ifndef WIN32
 #include <dlfcn.h>
@@ -61,7 +62,7 @@ static void write_html_encode(const char *p, int size)
 
 static void show_version(void)
 {
-    char cbuf[32];
+    char cbuf[64];
 
     stream_write_data(fg->v_cio, "<h1>Programming language fox</h1>\n", -1);
     stream_write_data(fg->v_cio, tbegin, -1);
@@ -83,12 +84,13 @@ static void show_version(void)
     stream_write_data(fg->v_cio, __DATE__, -1);
 
     stream_write_data(fg->v_cio, tlend, -1);
-    stream_write_data(fg->v_cio, "PCRE</th><td>", -1);
-    stream_write_data(fg->v_cio, pcre_version(), -1);
-
-    stream_write_data(fg->v_cio, tlend, -1);
     stream_write_data(fg->v_cio, "fox home</th><td>", -1);
     write_html_encode(fs->fox_home->c, fs->fox_home->size);
+
+    stream_write_data(fg->v_cio, tlend, -1);
+    stream_write_data(fg->v_cio, "PCRE</th><td>", -1);
+    pcre2_config(PCRE2_CONFIG_VERSION, cbuf);
+    stream_write_data(fg->v_cio, cbuf, -1);
 
     stream_write_data(fg->v_cio, tend, -1);
 }
