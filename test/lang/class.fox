@@ -7,7 +7,7 @@ abstract class Base
 {
     this._new() {
         RESULT.push "Base._new"
-		RESULT.push typeof(this)
+        RESULT.push typeof(this)
     }
     ~this() {
         RESULT.push "~Base"
@@ -19,7 +19,7 @@ class Derived : Base
     this() {
         super._new()
         RESULT.push "Derived.new"
-		RESULT.push typeof(this)
+        RESULT.push typeof(this)
     }
     ~this() {
         RESULT.push "~Derived"
