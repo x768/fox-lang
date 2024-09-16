@@ -938,13 +938,6 @@ static void define_const(RefNode *m)
 
     n = fs->define_identifier(m, m, "M_E", NODE_CONST, 0);
     n->u.k.val = fs->float_Value(fs->cls_float, M_E);
-
-    n = fs->define_identifier(m, m, "M_I", NODE_CONST, 0);
-    {
-        RefComplex *rc = fs->buf_new(cls_complex, sizeof(RefComplex));
-        rc->im = 1.0;
-        n->u.k.val = vp_Value(rc);
-    }
 }
 static void define_math_cfunc1(RefNode *m)
 {
@@ -999,6 +992,12 @@ static void define_class(RefNode *m)
     fs->define_native_func_a(n, complex_new, 0, 2, NULL, NULL, fs->cls_float);
     n = fs->define_identifier(m, cls, "polar", NODE_NEW_N, 0);
     fs->define_native_func_a(n, complex_polar, 0, 2, NULL, NULL, fs->cls_float);
+    n = fs->define_identifier(m, cls, "I", NODE_CONST, 0);
+    {
+        RefComplex *rc = fs->buf_new(cls_complex, sizeof(RefComplex));
+        rc->im = 1.0;
+        n->u.k.val = vp_Value(rc);
+    }
     n = fs->define_identifier_p(m, cls, fs->str_marshal_read, NODE_NEW_N, 0);
     fs->define_native_func_a(n, complex_marshal_read, 1, 1, NULL, fs->cls_marshaldumper);
 

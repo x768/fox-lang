@@ -19,5 +19,6 @@ assert_equal Complex(), Complex(0.0, 0.0)
 assert_equal Complex(2), Complex(2.0, 0.0)
 assert_equal Complex(2.0), Complex(2.0, 0.0)
 assert_equal Complex(2d), Complex(2.0, 0.0)
+assert_equal Complex.I, Complex(0.0, 1.0)
 
 assert_equal Complex.polar(2.0, 0.0), Complex(2.0, 0.0)
