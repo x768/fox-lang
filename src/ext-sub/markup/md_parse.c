@@ -342,6 +342,7 @@ static void MDTok_next(MDTok *tk)
             MDTok_skip_space(tk);
             return;
         case '-':
+        case '=':
             {
                 // 1行全て '='か'-'
                 const char *top = tk->p;

@@ -25,9 +25,7 @@ Please visit [x768's GitHub Page].
 [x768's GitHub Page]: https://github.com/x768
 EOS
 
-let md = Markdown()
-md.compile src
-
+let md = Markdown(src)
 let root = md.make_xml("div")
 let html = XMLDocument(
     DTD_HTML5,
