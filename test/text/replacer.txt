@@ -1,0 +1,8 @@
+import text.util
+import util.assert
+
+
+let hebon = Replacer('text.ja.kana_latn_hebon')
+let dict = Replacer('text.ja.hani_kana')
+assert_equal hebon.replace('プロジェクト'), 'purojekuto'
+assert hebon.replace(dict.replace('大阪市')), 'oosakashi'

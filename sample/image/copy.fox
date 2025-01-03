@@ -1,0 +1,13 @@
+import image
+
+let src = Image.load("dice.png")
+
+let dst1 = Image.new(src.width, src.height, "rgb")
+dst1.blend src, 60, 20
+dst1.blend src, 0, 0
+dst1.save "dice-rgb.png"
+
+let dst2 = Image.new(src.width / 2, src.height / 2, "rgba")
+dst2.copy_resized src
+dst2.save "dice-half.png"
+
