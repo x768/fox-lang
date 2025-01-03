@@ -1890,15 +1890,15 @@ static int image_copy(Value *vret, Value *v, RefNode *node)
         throw_already_closed();
         return FALSE;
     }
-    if (x < -MAX_IMAGE_SIZE) {
-        x = -MAX_IMAGE_SIZE;
-    } else if (x > MAX_IMAGE_SIZE) {
-        x = MAX_IMAGE_SIZE;
+    if (x < -(int64_t)MAX_IMAGE_SIZE) {
+        x = -(int64_t)MAX_IMAGE_SIZE;
+    } else if (x > (int64_t)MAX_IMAGE_SIZE) {
+        x = (int64_t)MAX_IMAGE_SIZE;
     }
-    if (y < -MAX_IMAGE_SIZE) {
-        y = -MAX_IMAGE_SIZE;
-    } else if (y > MAX_IMAGE_SIZE) {
-        y = MAX_IMAGE_SIZE;
+    if (y < -(int64_t)MAX_IMAGE_SIZE) {
+        y = -(int64_t)MAX_IMAGE_SIZE;
+    } else if (y > (int64_t)MAX_IMAGE_SIZE) {
+        y = (int64_t)MAX_IMAGE_SIZE;
     }
     copy_image_sub(dst, src, x, y, src_rect->i, alpha);
 
